@@ -255,6 +255,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
     position:absolute;left:0;top:0;bottom:0;z-index:16;width:320px;max-width:86vw;
     border-right:1px solid var(--bdr);overflow-y:auto;height:100%;
     background:var(--navy2);box-shadow:0 16px 34px rgba(0,0,0,.24);
+    border-radius:18px;
     transform:translateX(0) scale(.985);opacity:0;visibility:hidden;pointer-events:none;
     transition:transform .28s cubic-bezier(.22,.9,.2,1),box-shadow .24s ease,opacity .2s ease,visibility 0s linear .28s
   }
@@ -263,6 +264,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
     position:absolute;left:0;top:0;bottom:0;z-index:16;width:320px;max-width:86vw;
     border-right:1px solid var(--bdr);overflow-y:auto;height:100%;
     background:var(--navy2);box-shadow:0 16px 34px rgba(0,0,0,.24);
+    border-radius:18px;
     transform:translateX(0) scale(.985);opacity:0;visibility:hidden;pointer-events:none;
     transition:transform .28s cubic-bezier(.22,.9,.2,1),box-shadow .24s ease,opacity .2s ease,visibility 0s linear .28s
   }
@@ -286,6 +288,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
   }
   #home-comp-drawer-backdrop.open{opacity:1;pointer-events:auto}
   body.theme-light #home-col-left{background:#fff}
+  body.theme-light #home-todo-panel{background:#fff}
   #home-col-right{display:none!important}
   #home-detail-panel{display:flex!important;flex-direction:column;overflow:visible;position:relative;height:100%;z-index:22}
   #home-detail-comp{position:absolute!important;inset:0!important;height:auto!important;display:flex;flex-direction:column;overflow:hidden}
@@ -417,8 +420,8 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 
   <!-- SIDE RAIL (desktop always visible) -->
   <div id="home-side-rail" style="display:none">
-    <button id="home-open-base-btn" class="rail-btn" onclick="showPage('page-home')">Retour</button>
-    <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Résultats</button>
+    <button id="home-open-base-btn" class="rail-btn" onclick="showDTNPortal()">Gest'DTN</button>
+    <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Divers</button>
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">A faire..</button>
   </div>
 
@@ -504,10 +507,10 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
           </button>
         </div>
 
-        <!-- PANNEAU RÉSULTATS DESKTOP -->
+        <!-- PANNEAU DIVERS DESKTOP -->
         <div id="home-desktop-comps-section" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 4px">
-            <div style="font-size:16px;font-weight:800">Résultats</div>
+            <div style="font-size:16px;font-weight:800">Divers</div>
             <button onclick="toggleHomeCompDrawer(false)" title="Fermer" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:16px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
           </div>
           <div id="home-results-drawer-content" style="padding:0 12px 16px"></div>
@@ -629,6 +632,20 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
           <input id="pilots-search" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" onkeydown="if(event.key==='Enter'){_pilotsSearch=this.value.trim();renderPilots();this.blur()}" oninput="if(!this.value){_pilotsSearch='';renderPilots();document.getElementById('pilots-search-clear').style.display='none';}else{document.getElementById('pilots-search-clear').style.display='flex';}">
           <button id="pilots-search-clear" onclick="document.getElementById('pilots-search').value='';_pilotsSearch='';renderPilots();this.style.display='none'" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--txt3);flex-shrink:0;line-height:1;font-size:16px">✕</button>
         </div>
+        <!-- Bouton Export compétiteurs -->
+        <button onclick="exportPilots()" title="Exporter les compétiteurs (JSON)"
+          style="display:flex;align-items:center;gap:5px;padding:8px 13px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <!-- Bouton Import compétiteurs -->
+        <button onclick="document.getElementById('pilots-import-file').click()" title="Importer des compétiteurs (JSON)"
+          style="display:flex;align-items:center;gap:5px;padding:8px 13px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><polyline points="17 8 12 3 7 8" style="transform:rotate(180deg);transform-origin:12px 9px"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+        </button>
+        <input type="file" id="pilots-import-file" accept=".json" style="display:none" onchange="importPilots(this)">
         <!-- Bouton Collectif France -->
         <button id="btn-collectif-france" onclick="openCollectifFrance()"
           style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;border:1.5px solid #1e6fbe;background:linear-gradient(135deg,#0f4c81,#1565c0);color:#93c5fd;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
@@ -907,7 +924,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
     <button class="nav-btn active" id="nav-base" aria-label="Base" title="Base" onclick="showPage('page-base')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></span><span class="nav-lbl">Base</span>
     </button>
-    <button class="nav-btn" id="nav-home" aria-label="Accueil" title="Accueil" onclick="showPage('page-home')">
+    <button class="nav-btn" id="nav-home" aria-label="Accueil" title="Accueil" onclick="showPage('page-home')" style="display:none">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></span><span id="nav-home-lbl" class="nav-lbl" style="max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Accueil</span>
     </button>
     <button class="nav-btn" id="nav-competitions" aria-label="Compétitions" title="Compétitions" onclick="showPage('page-competitions')">
@@ -1053,6 +1070,31 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 </div>
 
 <!-- ═══════════════ MODAL DÉTAIL BUDGET ═══════════════ -->
+<!-- Modal édition rubrique À faire -->
+<div id="modal-todo-edit" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)" onclick="if(event.target===this)closeHomeTodoEditModal()">
+  <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr)">
+      <span style="font-size:15px;font-weight:800;color:var(--txt)">✏️ Modifier la rubrique</span>
+      <button onclick="closeHomeTodoEditModal()" style="width:28px;height:28px;border:none;border-radius:50%;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:1">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+      <input type="hidden" id="modal-todo-edit-idx" value="">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:5px">Titre</label>
+        <input id="modal-todo-edit-titre" type="text" placeholder="Titre de la rubrique" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:5px">Commentaire</label>
+        <textarea id="modal-todo-edit-commentaire" rows="5" placeholder="Commentaire, notes, détails..." style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box;resize:vertical" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--bdr)">
+      <button onclick="closeHomeTodoEditModal()" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>
+      <button onclick="saveHomeTodoEdit()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div id="budget-detail-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.28);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)">
   <div style="background:#f4f6fa;color:#1a1a2e;border-radius:20px;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.22);display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #dde3ed;flex-shrink:0">
@@ -3357,38 +3399,54 @@ var _homeTodoPanelOpen = false;
 function syncHomeRailVisibility() {
   var rail = document.getElementById('home-side-rail');
   if (!rail) return;
-  var onBase = (_curPage === 'page-base');
-  var onHome = (_curPage === 'page-home');
   var drawerOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
-  // Visible sur Base (toujours) ou sur Accueil (si aucun tiroir ouvert)
-  var show = window.innerWidth >= 768 && (onBase || (onHome && !drawerOpen));
-  rail.style.display = show ? 'flex' : 'none';
-  // Sur la page Base : cacher les boutons Résultats et À faire (non pertinents)
-  var btnRes  = document.getElementById('home-open-comps-btn');
-  var btnTodo = document.getElementById('home-open-todo-btn');
-  if (btnRes)  btnRes.style.display  = onBase ? 'none' : '';
-  if (btnTodo) btnTodo.style.display = onBase ? 'none' : '';
+  var onHome = (_curPage === 'page-home');
+  var desktop = window.innerWidth >= 768;
+  // Rail masqué si volet vertical ouvert ou si pas desktop
+  if (!desktop || drawerOpen) { rail.style.display = 'none'; return; }
+  // Rail toujours visible sinon
+  rail.style.display = 'flex';
+  // Sur page-home : 3 boutons visibles. Sur autres pages : seulement Gest'DTN
+  var btnDivers = document.getElementById('home-open-comps-btn');
+  var btnTodo   = document.getElementById('home-open-todo-btn');
+  if (btnDivers) btnDivers.style.display = onHome ? '' : 'none';
+  if (btnTodo)   btnTodo.style.display   = onHome ? '' : 'none';
+}
+function retourFromBase() {
+  // S'assurer que l'app est visible (pas le portail DTN)
+  var app = document.getElementById('app');
+  if (app) app.style.display = '';
+  var dtn = document.getElementById('page-dtn');
+  if (dtn) dtn.style.display = 'none';
+  showPage('page-home');
 }
 function closeHomeSidePanels() {
   toggleHomeCompDrawer(false);
   toggleHomeTodoPanel(false);
+  _syncPanelOpen();
+}
+
+function _syncPanelOpen() {
+  /* Synchronise le backdrop */
+  var anyOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
+  var backdrop = document.getElementById('home-comp-drawer-backdrop');
+  if (backdrop) backdrop.classList.toggle('open', anyOpen);
 }
 
 function toggleHomeCompDrawer(forceOpen) {
   if (window.innerWidth < 768) return;
   var drawer = document.getElementById('home-col-left');
   var todoPanel = document.getElementById('home-todo-panel');
-  var backdrop = document.getElementById('home-comp-drawer-backdrop');
   var btn = document.getElementById('home-open-comps-btn');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeCompDrawerOpen;
   _homeTodoPanelOpen = false;
   if (todoPanel) todoPanel.classList.remove('open');
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
-  if (backdrop) backdrop.classList.toggle('open', next);
+  _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
-    btn.textContent = 'Résultats';
+    btn.textContent = 'Divers';
     if (next) renderHomeResultsDrawer();
     btn.setAttribute('aria-expanded', next ? 'true' : 'false');
   }
@@ -3398,14 +3456,13 @@ function toggleHomeTodoPanel(forceOpen) {
   if (window.innerWidth < 768) return;
   var todoPanel = document.getElementById('home-todo-panel');
   var drawer = document.getElementById('home-col-left');
-  var backdrop = document.getElementById('home-comp-drawer-backdrop');
   var btn = document.getElementById('home-open-todo-btn');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeTodoPanelOpen;
   _homeCompDrawerOpen = false;
   if (drawer) drawer.classList.remove('open');
-  if (backdrop) backdrop.classList.toggle('open', next);
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
+  _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
   if (next) {
@@ -3417,54 +3474,127 @@ function toggleHomeTodoPanel(forceOpen) {
 function renderHomeResultsDrawer() {
   var cont = document.getElementById('home-results-drawer-content');
   if (!cont) return;
-  if (!_currentCompId) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:18px 4px;text-align:center">Sélectionnez une compétition<br>dans le volet Accueil</div>';
+
+  /* ── Trouver une compétition avec des résultats ── */
+  var compsWithRuns = (S.comps || []).filter(function(c){
+    return c.id && (S.runs[c.id]||[]).length > 0;
+  });
+
+  /* Si la comp courante n'a pas de runs, prendre la meilleure disponible */
+  if (!_currentCompId || !(S.runs[_currentCompId]||[]).length) {
+    var best = _getBestComp();
+    if (best && (S.runs[best.id]||[]).length) {
+      _currentCompId = best.id;
+    } else if (compsWithRuns.length) {
+      _currentCompId = compsWithRuns[0].id;
+    }
+  }
+
+  if (!_currentCompId || !compsWithRuns.length) {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:24px 4px;text-align:center">Aucune compétition avec des résultats</div>';
     return;
   }
+
+  /* ── Sélecteur de compétition (si plusieurs) ── */
+  var selHtml = '';
+  if (compsWithRuns.length > 1) {
+    selHtml = '<select onchange="_currentCompId=this.value;renderHomeResultsDrawer()" '
+      + 'style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 10px;outline:none;margin-bottom:10px;box-sizing:border-box">';
+    compsWithRuns.forEach(function(c){
+      selHtml += '<option value="'+escHtml(c.id)+'"'+(c.id===_currentCompId?' selected':'')+'>'+escHtml(c.name||c.nom||c.id)+'</option>';
+    });
+    selHtml += '</select>';
+  }
+
   var cp = (S.comps || []).find(function(c){ return c.id === _currentCompId; });
-  if (!cp) { cont.innerHTML = ''; return; }
+  if (!cp) { cont.innerHTML = selHtml; return; }
   var runs = S.runs[_currentCompId] || [];
+
   if (!runs.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:18px 4px;text-align:center">Aucun résultat pour cette compétition</div>';
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:24px 4px;text-align:center">Aucun résultat enregistré pour cette compétition</div>';
     return;
   }
-  // Grouper par classe
-  var byClasse = {};
+
+  /* ══ Copie exacte de la section "Résultat · Classement" de renderHDPTabContent ══ */
+  var CLSI = {
+    multiaxes: {label:'Classe 3 · Multiaxes',  color:'#22c55e', order:0},
+    gyro:      {label:'Classe 4 · Autogire',    color:'#f59e0b', order:1},
+    pendulaire:{label:'Classe 2 · Pendulaire',  color:'#3b82f6', order:2}
+  };
+  var medalsI = ['🥇','🥈','🥉'];
+  var COLI = 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
+
+  var byClassPilotI = {};
   runs.forEach(function(r){
-    var cls = r.classe || 'autre';
-    if (!byClasse[cls]) byClasse[cls] = [];
-    byClasse[cls].push(r);
+    var cls = r.classe || 'multiaxes';
+    var ph = (r.phase||'essais').toLowerCase();
+    var bucket = ph.indexOf('qualif')>=0 ? 'qualif' : ph.indexOf('final')>=0 ? 'finale' : 'essais';
+    if (!byClassPilotI[cls]) byClassPilotI[cls] = {};
+    if (!byClassPilotI[cls][r.pilotId]) byClassPilotI[cls][r.pilotId] = {essais:[],qualif:[],finale:[]};
+    byClassPilotI[cls][r.pilotId][bucket].push(r);
   });
-  var classLabels = {paramotor:'Paramoteur',multiaxes:'Multiaxes',pendulaire:'Pendulaire',gyro:'Autogire',microlight:'Microlight'};
-  var html = '<div style="font-size:12px;color:var(--txt3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">' + escHtml(cp.name || '') + '</div>';
-  Object.keys(byClasse).forEach(function(cls){
-    var clsRuns = byClasse[cls];
-    var byPilot = {};
-    clsRuns.forEach(function(r){
-      var key = r.pilotId;
-      if (!byPilot[key]) byPilot[key] = {pilotId:key, essais:null, qualif:null, finale:null, categorie:r.categorie||''};
-      if (r.phase==='essais' && (r.score < (byPilot[key].essais||999))) byPilot[key].essais = r.score;
-      if (r.phase==='qualif' && (r.score < (byPilot[key].qualif||999))) byPilot[key].qualif = r.score;
-      if (r.phase==='finale' && (r.score < (byPilot[key].finale||999))) byPilot[key].finale = r.score;
-    });
-    var pilots = Object.values(byPilot);
-    pilots.sort(function(a,b){ return (a.finale||a.qualif||a.essais||999)-(b.finale||b.qualif||b.essais||999); });
-    html += '<div style="margin-bottom:12px">';
-    html += '<div style="font-size:11px;font-weight:800;color:var(--stol);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;padding:4px 0;border-bottom:1px solid var(--bdr)">'+(classLabels[cls]||cls)+'</div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
-    html += '<thead><tr><th style="color:var(--txt3);font-size:10px;padding:3px 4px;text-align:left">#</th><th style="color:var(--txt3);font-size:10px;padding:3px 4px;text-align:left">Pilote</th><th style="color:var(--txt3);font-size:10px;padding:3px 4px;text-align:right">Score</th></tr></thead><tbody>';
-    pilots.forEach(function(p, i){
-      var pilot = (S.pilots||[]).find(function(pl){ return pl.id===p.pilotId; }) || {prenom:'?',nom:'?'};
-      var score = p.finale !== null ? p.finale : (p.qualif !== null ? p.qualif : (p.essais !== null ? p.essais : null));
-      var rankCls = i===0?'color:var(--gold);font-weight:800':i===1?'color:var(--silver);font-weight:700':i===2?'color:var(--bronze);font-weight:700':'';
-      html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">';
-      html += '<td style="padding:4px 4px;'+rankCls+'">'+(i+1)+'</td>';
-      html += '<td style="padding:4px 4px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</td>';
-      html += '<td style="padding:4px 4px;text-align:right;font-weight:700;color:var(--blue-l)">'+(score!==null?score.toFixed(1):'—')+'</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
+
+  var html = selHtml;
+  html += '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--stol)">'
+    + escHtml(cp.name || cp.nom || '') + '</div>';
+
+  html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
+    + '<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
+    + '</div>';
+
+  var ckeysI = Object.keys(byClassPilotI).sort(function(a,b){
+    return ((CLSI[a]||{order:9}).order) - ((CLSI[b]||{order:9}).order);
   });
+
+  ckeysI.forEach(function(cls){
+    var meta = CLSI[cls] || {label:cls, color:'#64748b'};
+    var pilotMapI = byClassPilotI[cls];
+
+    var getBestI = function(pid){
+      var all = pilotMapI[pid].essais.concat(pilotMapI[pid].qualif).concat(pilotMapI[pid].finale);
+      var scores = all.map(function(r){ return parseFloat(r.score)||0; }).filter(function(v){ return v>0; });
+      return scores.length ? Math.min.apply(null, scores) : 9999;
+    };
+    var pilotIdsI = Object.keys(pilotMapI).sort(function(a,b){ return getBestI(a)-getBestI(b); });
+    var clsIdI = 'rdr-cls-' + cls.replace(/[^a-z0-9]/g,'');
+
+    html += '<div style="margin-bottom:10px">';
+    html += '<button onclick="var d=document.getElementById(\''+clsIdI+'\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.ria\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:1px solid '+meta.color+';padding:6px 0;cursor:pointer;font-family:inherit">';
+    html += '<span style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px">'+meta.label+'</span>';
+    html += '<span class="ria" style="color:var(--txt3);font-size:14px">▶</span>';
+    html += '</button>';
+    html += '<div id="'+clsIdI+'" style="display:none;padding-top:4px">';
+
+    html += '<div style="display:grid;'+COLI+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr)">';
+    html += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
+    html += '</div>';
+
+    pilotIdsI.forEach(function(pid, i){
+      var pilot = (S.pilots||[]).find(function(p){ return p.id===pid; }) || {prenom:'?', nom:'?'};
+      var pr = pilotMapI[pid];
+      var getBestPhaseI = function(arr){
+        var scores = arr.map(function(r){ return parseFloat(r.score)||0; }).filter(function(v){ return v>0; });
+        return scores.length ? Math.min.apply(null, scores) : null;
+      };
+      var essaisB = getBestPhaseI(pr.essais);
+      var qualifB = getBestPhaseI(pr.qualif);
+      var finaleB = getBestPhaseI(pr.finale);
+      var overall = getBestI(pid);
+      var fmt = function(v){ return v!==null ? v.toFixed(2)+'s' : '—'; };
+      var isEven = i%2===1;
+      html += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" style="display:grid;'+COLI+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
+      html += '<div style="font-size:13px;text-align:center">'+(medalsI[i]||((i+1)+'.'))+'</div>';
+      html += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
+      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
+      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
+      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
+      html += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
+      html += '</div>';
+    });
+
+    html += '</div></div>';
+  });
+
   cont.innerHTML = html;
 }
 
@@ -3508,9 +3638,10 @@ function renderHomeTodoPanel() {
     return;
   }
   list.innerHTML = todos.map(function(t, i){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid var(--bdr)">'
-      + '<span style="font-size:13px;color:var(--txt);line-height:1.35">' + escHtml(t.label || '') + '</span>'
-      + '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleHomeTodoDone(' + i + ', this.checked)" style="width:16px;height:16px;cursor:pointer">'
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 4px;border-bottom:1px solid var(--bdr)">'
+      + '<span style="flex:1;font-size:13px;color:var(--txt);line-height:1.35">' + escHtml(t.label || '') + (t.commentaire ? '<br><span style="font-size:11px;color:var(--txt3)">' + escHtml(t.commentaire) + '</span>' : '') + '</span>'
+      + '<button onclick="editHomeTodo(' + i + ')" title="Modifier" style="flex-shrink:0;padding:3px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--navy3);color:var(--txt2);font-size:11px;cursor:pointer;font-family:inherit">✏️</button>'
+      + '<input type="checkbox" ' + (t.done ? 'checked' : '') + ' onchange="toggleHomeTodoDone(' + i + ', this.checked)" style="flex-shrink:0;width:16px;height:16px;cursor:pointer">'
       + '</div>';
   }).join('');
 }
@@ -3524,7 +3655,7 @@ function addHomeTodo() {
   var v = (inp.value || '').trim();
   if (!v) return;
   var todos = getHomeTodosForCurrentComp();
-  todos.unshift({ label: v, done: false });
+  todos.unshift({ label: v, done: false, commentaire: '' });
   inp.value = '';
   saveState();
   renderHomeTodoPanel();
@@ -3536,6 +3667,39 @@ function toggleHomeTodoDone(idx, done) {
   todos[idx].done = !!done;
   saveState();
   renderHomeTodoPanel();
+}
+
+function editHomeTodo(idx) {
+  var todos = getHomeTodosForCurrentComp();
+  var t = todos[idx];
+  if (!t) return;
+  var m = document.getElementById('modal-todo-edit');
+  if (!m) return;
+  document.getElementById('modal-todo-edit-idx').value = idx;
+  document.getElementById('modal-todo-edit-titre').value = t.label || '';
+  document.getElementById('modal-todo-edit-commentaire').value = t.commentaire || '';
+  m.style.display = 'flex';
+}
+
+function saveHomeTodoEdit() {
+  var m = document.getElementById('modal-todo-edit');
+  var idx = parseInt(document.getElementById('modal-todo-edit-idx').value, 10);
+  var titre = (document.getElementById('modal-todo-edit-titre').value || '').trim();
+  var commentaire = (document.getElementById('modal-todo-edit-commentaire').value || '').trim();
+  if (!titre) { toast('Le titre est obligatoire', 'err'); return; }
+  var todos = getHomeTodosForCurrentComp();
+  if (!todos[idx]) return;
+  todos[idx].label = titre;
+  todos[idx].commentaire = commentaire;
+  saveState();
+  renderHomeTodoPanel();
+  if (m) m.style.display = 'none';
+  toast('Rubrique mise à jour', 'ok');
+}
+
+function closeHomeTodoEditModal() {
+  var m = document.getElementById('modal-todo-edit');
+  if (m) m.style.display = 'none';
 }
 
 function updateHomeDashboardStats() {
@@ -3844,7 +4008,7 @@ function renderHomeDetailPanel(cp) {
     // ── Onglets (sans Modifier) ──
     var _today2 = new Date().toISOString().slice(0,10);
     var _isProg = true; // Equipage toujours visible (compétitions passées et à venir)
-    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'},{id:'gestion',lbl:'Equipage'}];
+    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'},{id:'gestion',lbl:'Equipage'},{id:'resultats',lbl:'Résultats'}];
     tabs.push({id:'installation',lbl:'Installation'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'},{id:'messagerie',lbl:'Messagerie'});
     if (_homeDetailTab === 'modifier' || _homeDetailTab === 'carte') _homeDetailTab = 'infos';
     html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 12px;flex-shrink:0">';
@@ -4211,153 +4375,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
     html += '</div>';
     // ── Podiums par classe ULM (run.classe) ──
-    var byPilotInfo = {};
-    runs.forEach(function(r){
-      var sc = parseFloat(r.score);
-      if (!isNaN(sc)) {
-        if (!byPilotInfo[r.pilotId] || sc < byPilotInfo[r.pilotId].score)
-          byPilotInfo[r.pilotId] = {score:sc, classe:r.classe||'multiaxes'};
-      }
-    });
-    if (!Object.keys(byPilotInfo).length) {
-      html += '<div style="text-align:center;color:var(--txt3);font-size:13px;padding:24px 0;background:var(--navy3);border-radius:var(--rs)">Aucun résultat enregistré pour cette compétition</div>';
-      return html;
-    }
-    // ── Section Podium collapsible ──
-    html += '<div style="margin-bottom:16px">';
-    html += '<button onclick="var d=document.getElementById(\'infos-pod-body\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.pa\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid var(--stol);padding:8px 0 10px;cursor:pointer;font-family:inherit">';
-    html += '<span style="font-size:13px;font-weight:800;color:var(--txt)">🏆 Podium</span>';
-    html += '<span class="pa" style="color:var(--txt3);font-size:14px">▶</span>';
-    html += '</button>';
-    html += '<div id="infos-pod-body" style="display:none;padding-top:12px">';
-    var byClass = {};
-    Object.entries(byPilotInfo).forEach(function(entry) {
-      var pid = entry[0]; var info = entry[1];
-      var pilot = (S.pilots||[]).find(function(p){ return p.id===pid; }) || {};
-      if (!byClass[info.classe]) byClass[info.classe] = [];
-      byClass[info.classe].push({pid:pid, score:info.score, pilot:pilot});
-    });
-    Object.keys(byClass).forEach(function(cls){ byClass[cls].sort(function(a,b){return a.score-b.score;}); });
-    var CLS = {
-      multiaxes: {label:'Classe 3 · Multiaxes',  color:'#22c55e', order:0},
-      gyro:      {label:'Classe 4 · Autogire',    color:'#f59e0b', order:1},
-      pendulaire:{label:'Classe 2 · Pendulaire',  color:'#3b82f6', order:2}
-    };
-    var podColors  = ['#f59e0b','#94a3b8','#cd7c2f'];
-    var podHeights = [80, 56, 44];
-    var appLogo    = localStorage.getItem('ffplum_logo') || '';
-    var classKeys  = Object.keys(byClass).sort(function(a,b){
-      return ((CLS[a]||{order:9}).order) - ((CLS[b]||{order:9}).order);
-    });
-    classKeys.forEach(function(cls) {
-      var entries = byClass[cls];
-      var meta    = CLS[cls] || {label:cls, color:'#64748b'};
-      html += '<div style="margin-bottom:28px">';
-      html += '<div style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid '+meta.color+'">'+meta.label+'</div>';
-      var top3 = entries.slice(0,3);
-      var vo   = top3.length >= 3 ? [1,0,2] : (top3.length === 2 ? [1,0] : [0]);
-      html += '<div style="display:flex;align-items:flex-end;justify-content:center;gap:0">';
-      vo.forEach(function(rankIdx) {
-        if (rankIdx >= top3.length) return;
-        var item   = top3[rankIdx];
-        var rank   = rankIdx + 1;
-        var color  = podColors[rankIdx];
-        var blockH = podHeights[rankIdx];
-        var name   = ((item.pilot.prenom||'')+' '+(item.pilot.nom||'')).trim() || '—';
-        html += '<div style="flex:1;max-width:150px;display:flex;flex-direction:column;align-items:center">';
-        // Photo pilote
-        if (item.pilot.photo) {
-          html += '<img src="'+item.pilot.photo+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid '+color+';margin-bottom:5px" onerror="this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px&quot;>👤</div>\'">';
-        } else {
-          html += '<div style="width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px">👤</div>';
-        }
-        // Nom complet (pas de troncature)
-        html += '<div style="font-size:11px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:2px;padding:0 4px;word-break:break-word">'+name+'</div>';
-        html += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">'+item.score.toFixed(2)+'s</div>';
-        // Bloc podium
-        html += '<div style="width:100%;height:'+blockH+'px;background:#fff;border:1.5px solid #3b82f6;border-radius:6px 6px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">';
-        if (rank === 1 && appLogo) {
-          html += '<img src="'+appLogo+'" style="width:22px;height:22px;border-radius:50%;object-fit:contain;background:#fff;margin-bottom:2px" onerror="this.style.display=\'none\'">';
-        }
-        html += '<span style="font-size:20px;font-weight:900;color:'+color+'">'+rank+'</span>';
-        html += '</div></div>';
-      });
-      html += '</div>';
-      html += '</div>';
-    });
-    html += '</div></div>'; // close infos-pod-body + collapsible wrapper
-
-    // ── Section Résultat · Classement collapsible ──
-    html += '<div style="margin-bottom:16px">';
-    html += '<button onclick="var d=document.getElementById(\'infos-res-body\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.rra\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid var(--stol);padding:8px 0 10px;cursor:pointer;font-family:inherit">';
-    html += '<span style="font-size:13px;font-weight:800;color:var(--txt)">📋 Résultat · Classement</span>';
-    html += '<span class="rra" style="color:var(--txt3);font-size:14px">▶</span>';
-    html += '</button>';
-    html += '<div id="infos-res-body" style="display:none;padding-top:10px">';
-    if (!Object.keys(byPilotInfo).length) {
-      html += '<div style="text-align:center;color:var(--txt3);font-size:13px;padding:18px 0">Aucun résultat enregistré</div>';
-    } else {
-      html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
-        +'<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
-        +'</div>';
-      var CLSI = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
-      var byClassPilotI = {};
-      runs.forEach(function(r){
-        var cls = r.classe || 'multiaxes';
-        var ph = (r.phase||'essais').toLowerCase();
-        var bucket = ph.indexOf('qualif')>=0 ? 'qualif' : ph.indexOf('final')>=0 ? 'finale' : 'essais';
-        if (!byClassPilotI[cls]) byClassPilotI[cls] = {};
-        if (!byClassPilotI[cls][r.pilotId]) byClassPilotI[cls][r.pilotId] = {essais:[],qualif:[],finale:[]};
-        byClassPilotI[cls][r.pilotId][bucket].push(r);
-      });
-      var medalsI = ['🥇','🥈','🥉'];
-      var COLI = 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
-      var ckeysI = Object.keys(byClassPilotI).sort(function(a,b){return ((CLSI[a]||{order:9}).order)-((CLSI[b]||{order:9}).order);});
-      ckeysI.forEach(function(cls){
-        var meta = CLSI[cls]||{label:cls,color:'#64748b'};
-        var pilotMapI = byClassPilotI[cls];
-        var getBestI = function(pid){
-          var all = pilotMapI[pid].essais.concat(pilotMapI[pid].qualif).concat(pilotMapI[pid].finale);
-          var scores = all.map(function(r){return parseFloat(r.score)||0;}).filter(function(v){return v>0;});
-          return scores.length ? Math.min.apply(null,scores) : 9999;
-        };
-        var pilotIdsI = Object.keys(pilotMapI).sort(function(a,b){return getBestI(a)-getBestI(b);});
-        var clsIdI = 'infos-rcls-'+cls.replace(/[^a-z0-9]/g,'');
-        html += '<div style="margin-bottom:10px">';
-        html += '<button onclick="var d=document.getElementById(\''+clsIdI+'\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.ria\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:1px solid '+meta.color+';padding:6px 0;cursor:pointer;font-family:inherit">';
-        html += '<span style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px">'+meta.label+'</span>';
-        html += '<span class="ria" style="color:var(--txt3);font-size:14px">▶</span>';
-        html += '</button>';
-        html += '<div id="'+clsIdI+'" style="display:none;padding-top:4px">';
-        html += '<div style="display:grid;'+COLI+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr)">';
-        html += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
-        html += '</div>';
-        pilotIdsI.forEach(function(pid, i){
-          var pilot = (S.pilots||[]).find(function(p){return p.id===pid;})||{prenom:'?',nom:'?'};
-          var pr = pilotMapI[pid];
-          var getBestPhaseI = function(arr){
-            var scores = arr.map(function(r){return parseFloat(r.score)||0;}).filter(function(v){return v>0;});
-            return scores.length ? Math.min.apply(null,scores) : null;
-          };
-          var essaisB = getBestPhaseI(pr.essais);
-          var qualifB = getBestPhaseI(pr.qualif);
-          var finaleB = getBestPhaseI(pr.finale);
-          var overall = getBestI(pid);
-          var fmt = function(v){ return v!==null ? v.toFixed(2)+'s' : '—'; };
-          var isEven = i%2===1;
-          html += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" style="display:grid;'+COLI+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
-          html += '<div style="font-size:13px;text-align:center">'+(medalsI[i]||((i+1)+'.'))+'</div>';
-          html += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
-          html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
-          html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
-          html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
-          html += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
-          html += '</div>';
-        });
-        html += '</div></div>'; // close clsIdI + wrapper
-      });
-    }
-    html += '</div></div>'; // close infos-res-body + collapsible wrapper
     return html;
 
   } else if (tab === 'modifier') {
@@ -4590,6 +4607,78 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
   } else if (tab === 'resultats') {
     if (!runs.length) return '<div style="text-align:center;padding:32px;color:var(--txt3);font-size:13px">Aucun résultat enregistré</div>';
+
+    var htmlR = '';
+
+    // ── Podium ──
+    var byPilotR = {};
+    runs.forEach(function(r){
+      var sc = parseFloat(r.score);
+      if (!isNaN(sc)) {
+        if (!byPilotR[r.pilotId] || sc < byPilotR[r.pilotId].score)
+          byPilotR[r.pilotId] = {score:sc, classe:r.classe||'multiaxes'};
+      }
+    });
+    var CLSPOD = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
+    var podColors = ['#f59e0b','#94a3b8','#cd7c2f'];
+    var podHeights = [80,56,44];
+    var appLogo = localStorage.getItem('ffplum_logo')||'';
+    var byClassR = {};
+    Object.keys(byPilotR).forEach(function(pid){
+      var info = byPilotR[pid];
+      var pilot = (S.pilots||[]).find(function(p){return p.id===pid;})||{};
+      if (!byClassR[info.classe]) byClassR[info.classe]=[];
+      byClassR[info.classe].push({pid:pid,score:info.score,pilot:pilot});
+    });
+    Object.keys(byClassR).forEach(function(cls){byClassR[cls].sort(function(a,b){return a.score-b.score;});});
+    var classKeysR = Object.keys(byClassR).sort(function(a,b){return ((CLSPOD[a]||{order:9}).order)-((CLSPOD[b]||{order:9}).order);});
+
+    htmlR += '<div style="margin-bottom:16px">';
+    htmlR += '<button onclick="var d=document.getElementById(\'res-pod-body\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.rpa\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid var(--stol);padding:8px 0 10px;cursor:pointer;font-family:inherit">';
+    htmlR += '<span style="font-size:13px;font-weight:800;color:var(--txt)">🏆 Podium</span>';
+    htmlR += '<span class="rpa" style="color:var(--txt3);font-size:14px">▼</span>';
+    htmlR += '</button>';
+    htmlR += '<div id="res-pod-body" style="padding-top:12px">';
+    classKeysR.forEach(function(cls){
+      var entries = byClassR[cls];
+      var meta = CLSPOD[cls]||{label:cls,color:'#64748b'};
+      htmlR += '<div style="margin-bottom:28px">';
+      htmlR += '<div style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid '+meta.color+'">'+meta.label+'</div>';
+      var top3 = entries.slice(0,3);
+      var vo = top3.length>=3?[1,0,2]:(top3.length===2?[1,0]:[0]);
+      htmlR += '<div style="display:flex;align-items:flex-end;justify-content:center;gap:0">';
+      vo.forEach(function(rankIdx){
+        if (rankIdx>=top3.length) return;
+        var item=top3[rankIdx], rank=rankIdx+1, color=podColors[rankIdx], blockH=podHeights[rankIdx];
+        var name=((item.pilot.prenom||'')+' '+(item.pilot.nom||'')).trim()||'—';
+        htmlR += '<div style="flex:1;max-width:150px;display:flex;flex-direction:column;align-items:center">';
+        if (item.pilot.photo) {
+          htmlR += '<img src="'+item.pilot.photo+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid '+color+';margin-bottom:5px" onerror="this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px&quot;>👤</div>\'">';
+        } else {
+          htmlR += '<div style="width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px">👤</div>';
+        }
+        htmlR += '<div style="font-size:11px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:2px;padding:0 4px;word-break:break-word">'+name+'</div>';
+        htmlR += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">'+item.score.toFixed(2)+'s</div>';
+        htmlR += '<div style="width:100%;height:'+blockH+'px;background:#fff;border:1.5px solid #3b82f6;border-radius:6px 6px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">';
+        if (rank===1&&appLogo) htmlR += '<img src="'+appLogo+'" style="width:22px;height:22px;border-radius:50%;object-fit:contain;background:#fff;margin-bottom:2px" onerror="this.style.display=\'none\'">';
+        htmlR += '<span style="font-size:20px;font-weight:900;color:'+color+'">'+rank+'</span>';
+        htmlR += '</div></div>';
+      });
+      htmlR += '</div></div>';
+    });
+    htmlR += '</div></div>';
+
+    // ── Résultat · Classement ──
+    htmlR += '<div style="margin-bottom:16px">';
+    htmlR += '<button onclick="var d=document.getElementById(\'res-cls-body\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.rcla\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid var(--stol);padding:8px 0 10px;cursor:pointer;font-family:inherit">';
+    htmlR += '<span style="font-size:13px;font-weight:800;color:var(--txt)">📋 Résultat · Classement</span>';
+    htmlR += '<span class="rcla" style="color:var(--txt3);font-size:14px">▼</span>';
+    htmlR += '</button>';
+    htmlR += '<div id="res-cls-body" style="padding-top:10px">';
+    htmlR += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
+      +'<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
+      +'</div>';
+
     var CLSR = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
     var byClassPilot = {};
     runs.forEach(function(r){
@@ -4602,9 +4691,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     });
     var medals2 = ['🥇','🥈','🥉'];
     var ckeys2 = Object.keys(byClassPilot).sort(function(a,b){return ((CLSR[a]||{order:9}).order)-((CLSR[b]||{order:9}).order);});
-    var html2 = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
-      +'<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
-      +'</div>';
     var COL = 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
     ckeys2.forEach(function(cls){
       var meta = CLSR[cls]||{label:cls,color:'#64748b'};
@@ -4615,18 +4701,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         return scores.length ? Math.min.apply(null,scores) : 9999;
       };
       var pilotIds = Object.keys(pilotMap).sort(function(a,b){ return getBest(a)-getBest(b); });
-      var clsBodyId = 'res-cls-'+cls.replace(/[^a-z0-9]/g,'');
-      html2 += '<div style="margin-bottom:12px">';
-      html2 += '<button onclick="var d=document.getElementById(\''+clsBodyId+'\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.ra\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid '+meta.color+';padding:8px 0 8px;cursor:pointer;font-family:inherit">';
-      html2 += '<span style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px">'+meta.label+'</span>';
-      html2 += '<span class="ra" style="color:var(--txt3);font-size:14px">▼</span>';
-      html2 += '</button>';
-      html2 += '<div id="'+clsBodyId+'" style="padding-top:6px">';
-      // En-tête colonnes
-      html2 += '<div style="display:grid;'+COL+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);margin-bottom:2px">';
-      html2 += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
-      html2 += '</div>';
-      // Lignes pilotes
+      var clsBodyId = 'res-rank-'+cls.replace(/[^a-z0-9]/g,'');
+      htmlR += '<div style="margin-bottom:12px">';
+      htmlR += '<button onclick="var d=document.getElementById(\''+clsBodyId+'\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.ra\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid '+meta.color+';padding:8px 0 8px;cursor:pointer;font-family:inherit">';
+      htmlR += '<span style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px">'+meta.label+'</span>';
+      htmlR += '<span class="ra" style="color:var(--txt3);font-size:14px">▼</span>';
+      htmlR += '</button>';
+      htmlR += '<div id="'+clsBodyId+'" style="padding-top:6px">';
+      htmlR += '<div style="display:grid;'+COL+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);margin-bottom:2px">';
+      htmlR += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
+      htmlR += '</div>';
       pilotIds.forEach(function(pid, i){
         var pilot = (S.pilots||[]).find(function(p){return p.id===pid;})||{prenom:'?',nom:'?'};
         var pr = pilotMap[pid];
@@ -4640,19 +4724,19 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var overall = getBest(pid);
         var fmt = function(v){ return v!==null ? v.toFixed(2)+'s' : '—'; };
         var isEven = i%2===1;
-        html2 += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" title="Voir le profil" style="display:grid;'+COL+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
-        html2 += '<div style="font-size:13px;text-align:center">'+(medals2[i]||((i+1)+'.' ))+'</div>';
-        html2 += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
-        html2 += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
-        html2 += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
-        html2 += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
-        html2 += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
-        html2 += '</div>';
+        htmlR += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" title="Voir le profil" style="display:grid;'+COL+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
+        htmlR += '<div style="font-size:13px;text-align:center">'+(medals2[i]||((i+1)+'.'))+'</div>';
+        htmlR += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
+        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
+        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
+        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
+        htmlR += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
+        htmlR += '</div>';
       });
-      html2 += '</div>'; // close clsBodyId
-      html2 += '</div>'; // close collapsible wrapper
+      htmlR += '</div></div>';
     });
-    return html2;
+    htmlR += '</div></div>'; // close res-cls-body + collapsible wrapper
+    return htmlR;
 
   } else if (tab === 'staff') {
     var escS        = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
@@ -8405,6 +8489,8 @@ function removeCollectifMember(entryId) {
   toast('Membre supprimé', 'ok');
 }
 
+var _cfEditingId = null;
+
 function renderCollectifList() {
   var tbody = document.getElementById('cf-table-body');
   if (!tbody) return;
@@ -8422,32 +8508,209 @@ function renderCollectifList() {
   var discLabel = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', '':'' };
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--txt3);padding:24px;font-size:13px">Aucun membre — utilisez la barre ci-dessus pour en ajouter</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--txt3);padding:24px;font-size:13px">Aucun membre — utilisez la barre ci-dessus pour en ajouter</td></tr>';
     var counter = document.getElementById('cf-counter');
     if (counter) counter.textContent = '0 membre';
     return;
   }
 
+  var inpSt = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:4px 7px;width:100%;box-sizing:border-box;outline:none';
+  var selSt = inpSt + ';cursor:pointer';
+  var yearNow = new Date().getFullYear();
+
   var html = '';
   list.forEach(function(m, i) {
-    html += '<tr style="border-bottom:1px solid var(--bdr)'+(i%2?' background:rgba(255,255,255,.02)':'')+'">'
-      + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.prenom)+' '+esc(m.nom)+'</td>'
-      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2);font-family:monospace">'+esc(m.licence)+'</td>'
-      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.club)+'</td>'
-      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(pratLabel[m.pratique]||m.pratique)+'</td>'
-      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline]||m.discipline)+'</td>'
-      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.saison)+'</td>'
-      + '<td style="padding:9px 10px;text-align:center">'
-        + '<button onclick="cfMessageStarter(\''+esc(m.id)+'\')" title="Message" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:16px;padding:2px 5px" title="Envoyer un message">💬</button>'
-      + '</td>'
-      + '<td style="padding:9px 10px;text-align:center">'
-        + '<button onclick="removeCollectifMember(\''+esc(m.id)+'\')" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:15px;padding:2px 5px">✕</button>'
-      + '</td>'
-      + '</tr>';
+    var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
+    var isEditing = (_cfEditingId === m.id);
+
+    if (isEditing) {
+      // Ligne en mode édition
+      var saisonOpts = '';
+      for (var y = yearNow+1; y >= yearNow-5; y--) {
+        saisonOpts += '<option value="'+y+'"'+(m.saison==y?' selected':'')+'>'+y+'</option>';
+      }
+      html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+';background:rgba(14,165,233,.08)">'
+        + '<td style="padding:6px 8px"><input id="cfe-prenom" value="'+esc(m.prenom)+'" placeholder="Prénom" style="'+inpSt+';margin-bottom:3px"> <input id="cfe-nom" value="'+esc(m.nom)+'" placeholder="Nom" style="'+inpSt+'"></td>'
+        + '<td style="padding:6px 8px"><input id="cfe-licence" value="'+esc(m.licence)+'" placeholder="Licence" style="'+inpSt+'"></td>'
+        + '<td style="padding:6px 8px"><input id="cfe-club" value="'+esc(m.club)+'" placeholder="Club" style="'+inpSt+'"></td>'
+        + '<td style="padding:6px 8px"><select id="cfe-pratique" style="'+selSt+'">'
+            + '<option value="">—</option>'
+            + '<option value="microlight"'+(m.pratique==='microlight'?' selected':'')+'>Microlight</option>'
+            + '<option value="paramotor"'+(m.pratique==='paramotor'||m.pratique==='paramoteur'?' selected':'')+'>Paramoteur</option>'
+          + '</select></td>'
+        + '<td style="padding:6px 8px"><select id="cfe-discipline" style="'+selSt+'">'
+            + '<option value="">—</option>'
+            + '<option value="classic"'+(m.discipline==='classic'||m.discipline==='classique'?' selected':'')+'>Classic</option>'
+            + '<option value="slalom"'+(m.discipline==='slalom'?' selected':'')+'>Slalom</option>'
+            + '<option value="stol"'+(m.discipline==='stol'?' selected':'')+'>STOL</option>'
+          + '</select></td>'
+        + '<td style="padding:6px 8px"><select id="cfe-saison" style="'+selSt+'">'+saisonOpts+'</select></td>'
+        + '<td style="padding:6px 8px;text-align:center">'
+            + '<button onclick="cfSaveMember(\''+esc(m.id)+'\')" title="Enregistrer" style="background:#0ea5e9;border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;font-family:inherit">✓ OK</button>'
+          + '</td>'
+        + '<td style="padding:6px 8px;text-align:center">'
+            + '<button onclick="_cfEditingId=null;renderCollectifList()" title="Annuler" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;font-family:inherit">✕</button>'
+          + '</td>'
+        + '<td></td>'
+        + '</tr>';
+    } else {
+      // Ligne normale
+      html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+'">'
+        + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.prenom)+' '+esc(m.nom)+'</td>'
+        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2);font-family:monospace">'+esc(m.licence)+'</td>'
+        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.club)+'</td>'
+        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(pratLabel[m.pratique]||m.pratique)+'</td>'
+        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline]||m.discipline)+'</td>'
+        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.saison)+'</td>'
+        + '<td style="padding:9px 10px;text-align:center">'
+            + '<button onclick="cfMessageStarter(\''+esc(m.id)+'\')" title="Envoyer un message" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:16px;padding:2px 5px">💬</button>'
+          + '</td>'
+        + '<td style="padding:9px 10px;text-align:center">'
+            + '<button onclick="cfEditMember(\''+esc(m.id)+'\')" title="Modifier" style="background:none;border:none;cursor:pointer;color:#0ea5e9;font-size:15px;padding:2px 5px">✏️</button>'
+          + '</td>'
+        + '<td style="padding:9px 10px;text-align:center">'
+            + '<button onclick="removeCollectifMember(\''+esc(m.id)+'\')" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:15px;padding:2px 5px">✕</button>'
+          + '</td>'
+        + '</tr>';
+    }
   });
   tbody.innerHTML = html;
   var counter = document.getElementById('cf-counter');
   if (counter) counter.textContent = list.length + ' membre' + (list.length>1?'s':'');
+}
+
+function cfEditMember(id) {
+  _cfEditingId = id;
+  renderCollectifList();
+  var row = document.getElementById('cf-row-'+id);
+  if (row) row.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function cfSaveMember(id) {
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) return;
+  var get = function(elId){ var el = document.getElementById(elId); return el ? el.value.trim() : ''; };
+  m.prenom     = get('cfe-prenom');
+  m.nom        = get('cfe-nom');
+  m.licence    = get('cfe-licence');
+  m.club       = get('cfe-club');
+  m.pratique   = get('cfe-pratique');
+  m.discipline = get('cfe-discipline');
+  m.saison     = get('cfe-saison');
+  _cfEditingId = null;
+  saveState();
+  renderCollectifList();
+  toast('Membre mis à jour', 'ok');
+}
+
+/* ══════════ EXPORT / IMPORT COMPÉTITEURS ══════════ */
+function exportPilots() {
+  var data = S.pilots || [];
+  if (!data.length) { toast('Aucun compétiteur à exporter', 'err'); return; }
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var saison = new Date().getFullYear();
+  a.download = 'competiteurs_' + saison + '.json';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  toast('Export téléchargé (' + data.length + ' pilotes)', 'ok');
+}
+
+function importPilots(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) { toast('Format invalide (tableau JSON attendu)', 'err'); return; }
+      var added = 0, updated = 0;
+      imported.forEach(function(p) {
+        if (!p.id) p.id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        var idx = (S.pilots||[]).findIndex(function(x){ return x.id === p.id || (x.licence && x.licence === p.licence); });
+        if (idx >= 0) { S.pilots[idx] = Object.assign(S.pilots[idx], p); updated++; }
+        else { if (!S.pilots) S.pilots = []; S.pilots.push(p); added++; }
+      });
+      saveState();
+      renderPilots();
+      toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
+    } catch(err) { toast('Erreur de lecture du fichier', 'err'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+/* ══════════ EXPORT / IMPORT COLLECTIF FRANCE ══════════ */
+function exportCollectif() {
+  var list = (S.collectif||[]).filter(function(m){
+    if (_cfFilters.saison     && m.saison     !== _cfFilters.saison)     return false;
+    if (_cfFilters.pratique   && m.pratique   !== _cfFilters.pratique)   return false;
+    if (_cfFilters.discipline && m.discipline !== _cfFilters.discipline) return false;
+    return true;
+  });
+  if (!list.length) { toast('Aucun membre à exporter', 'err'); return; }
+  var cols = ['prenom','nom','licence','club','pratique','discipline','saison','email','tel','region'];
+  var csv = cols.join(';') + '\n';
+  list.forEach(function(m) {
+    csv += cols.map(function(c){ return '"'+((m[c]||'').toString().replace(/"/g,'""'))+'"'; }).join(';') + '\n';
+  });
+  var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'collectif_france_' + (_cfFilters.saison || new Date().getFullYear()) + '.csv';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  toast('Export CSV téléchargé (' + list.length + ' membres)', 'ok');
+}
+
+function importCollectif(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result;
+    try {
+      // Tenter JSON d'abord
+      var imported = JSON.parse(text);
+      if (!Array.isArray(imported)) throw new Error('not array');
+      _mergeCollectif(imported);
+    } catch(err) {
+      // CSV
+      var lines = text.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+      if (lines.length < 2) { toast('Fichier vide ou invalide', 'err'); return; }
+      var headers = lines[0].split(';').map(function(h){ return h.replace(/^"|"$/g,'').trim(); });
+      var rows = [];
+      for (var i=1; i<lines.length; i++) {
+        var cells = lines[i].split(';').map(function(c){ return c.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+        var obj = {};
+        headers.forEach(function(h,j){ obj[h] = cells[j]||''; });
+        rows.push(obj);
+      }
+      _mergeCollectif(rows);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  input.value = '';
+}
+
+function _mergeCollectif(rows) {
+  if (!S.collectif) S.collectif = [];
+  var added = 0, updated = 0;
+  rows.forEach(function(r) {
+    if (!r.id) r.id = 'cf_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    var idx = S.collectif.findIndex(function(x){
+      return x.id === r.id || (x.licence && x.licence === r.licence && x.saison === r.saison);
+    });
+    if (idx >= 0) { S.collectif[idx] = Object.assign(S.collectif[idx], r); updated++; }
+    else { S.collectif.push(r); added++; }
+  });
+  saveState();
+  renderCollectifList();
+  toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
 }
 
 function cfMessageStarter(entryId) {
@@ -14494,7 +14757,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 <!-- ══ MODAL COLLECTIF FRANCE ══ -->
 <div id="modal-collectif-france" style="display:none;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.6)">
-  <div style="background:var(--navy2);border-radius:16px;padding:0;width:min(780px,97vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden">
+  <div style="background:var(--navy2);border-radius:16px;padding:0;width:min(1140px,97vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden">
 
     <!-- En-tête -->
     <div style="padding:20px 24px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
@@ -14505,9 +14768,20 @@ document.addEventListener('DOMContentLoaded', async function() {
           <div id="cf-counter" style="font-size:12px;color:var(--txt3);margin-top:1px">0 membre</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button onclick="exportCollectif()" title="Exporter en CSV"
+          style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button onclick="document.getElementById('cf-import-file').click()" title="Importer depuis CSV/JSON"
+          style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import
+        </button>
+        <input type="file" id="cf-import-file" accept=".json,.csv" style="display:none" onchange="importCollectif(this)">
         <button onclick="printCollectifList()" title="Imprimer la liste A4"
-          style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
+          style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
           🖨️ Imprimer
         </button>
         <button onclick="closeCollectifFrance()" style="background:none;border:none;color:var(--txt3);font-size:24px;cursor:pointer;line-height:1;padding:4px 8px">×</button>
@@ -14571,6 +14845,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             <th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Discipline</th>
             <th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Saison</th>
             <th style="padding:9px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;width:40px">Msg</th>
+            <th style="padding:9px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;width:40px">Édit.</th>
             <th style="padding:9px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;width:40px"></th>
           </tr>
         </thead>
