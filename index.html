@@ -601,13 +601,45 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 
     <!-- PAGE COMPÉTITIONS -->
     <div class="page" id="page-competitions">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;flex-wrap:wrap;gap:8px">
         <div style="font-size:18px;font-weight:700">Compétitions</div>
-        <button class="btn btn-sm btn-primary" id="btn-add-comp" style="display:none" onclick="openAddComp()">+ Créer</button>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button onclick="exportComps()" title="Exporter les compétitions (JSON)" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export
+          </button>
+          <button onclick="document.getElementById('comps-import-file').click()" title="Importer des compétitions (JSON)" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import
+          </button>
+          <input type="file" id="comps-import-file" accept=".json" style="display:none" onchange="importComps(this)">
+          <button onclick="printComps()" title="Imprimer la liste" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">
+            🖨️ Imprimer
+          </button>
+          <button class="btn btn-sm btn-primary" id="btn-add-comp" style="display:none" onclick="openAddComp()">+ Créer</button>
+        </div>
       </div>
-      <div style="padding:0 12px 8px">
-        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 12px;width:100%;outline:none" onchange="renderCompetitions()">
+      <!-- Barre de filtres -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px;flex-wrap:wrap">
+        <!-- Recherche -->
+        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;min-width:140px;flex:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" oninput="renderCompetitions()">
+        </div>
+        <!-- Saison -->
+        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
           <option value="all">Toutes saisons</option>
+        </select>
+        <!-- Pratique -->
+        <select id="comp-pratique-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
+          <option value="all">Toutes pratiques</option>
+          <option value="microlight">Microlight</option>
+          <option value="paramoteur">Paramoteur</option>
+        </select>
+        <!-- Discipline -->
+        <select id="comp-discipline-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
+          <option value="all">Toutes disciplines</option>
+          <option value="classic">Classic</option>
+          <option value="slalom">Slalom</option>
+          <option value="stol">STOL</option>
         </select>
       </div>
       <div id="comp-list"></div>
@@ -1070,6 +1102,29 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 </div>
 
 <!-- ═══════════════ MODAL DÉTAIL BUDGET ═══════════════ -->
+<!-- Modal import JSON - gestion doublons -->
+<div id="modal-import-conflicts" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
+  <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:620px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+      <span style="font-size:15px;font-weight:800;color:var(--txt)">⚠️ Doublons détectés</span>
+      <button onclick="document.getElementById('modal-import-conflicts').style.display='none'" style="width:28px;height:28px;border:none;border-radius:50%;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+    </div>
+    <div style="padding:14px 20px;font-size:13px;color:var(--txt2);flex-shrink:0">
+      Des entrées du fichier importé existent déjà dans l'application. Choisissez comment traiter chaque doublon, ou appliquez une règle globale.
+    </div>
+    <div style="display:flex;gap:8px;padding:0 20px 12px;flex-shrink:0;flex-wrap:wrap">
+      <button onclick="_importConflictAll('imported')" style="flex:1;padding:8px 10px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Tout remplacer (importé)</button>
+      <button onclick="_importConflictAll('existing')" style="flex:1;padding:8px 10px;border-radius:10px;border:none;background:var(--navy3);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid var(--bdr);white-space:nowrap">Tout conserver (existant)</button>
+      <button onclick="_importConflictAll('newer')" style="flex:1;padding:8px 10px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Garder le plus récent</button>
+    </div>
+    <div id="modal-import-conflict-list" style="flex:1;overflow-y:auto;padding:0 20px 8px"></div>
+    <div style="display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--bdr);flex-shrink:0">
+      <button onclick="document.getElementById('modal-import-conflicts').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>
+      <button onclick="_importConflictApply()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✓ Appliquer l'import</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal édition rubrique À faire -->
 <div id="modal-todo-edit" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)" onclick="if(event.target===this)closeHomeTodoEditModal()">
   <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:0">
@@ -2041,7 +2096,19 @@ function _renderPageById(id) {
     if (_baseMapC) { try{_baseMapC.remove();}catch(e){} _baseMapC=null; }
     renderHome();
   }
-  else if (id === 'page-competitions') renderCompetitions();
+  else if (id === 'page-competitions') {
+    // Réinitialiser les filtres : saison en cours, toutes pratiques, toutes disciplines
+    var _pfPrat = document.getElementById('comp-pratique-filter');
+    var _pfDisc = document.getElementById('comp-discipline-filter');
+    var _pfSrch = document.getElementById('comp-search-filter');
+    if (_pfPrat) _pfPrat.value = 'all';
+    if (_pfDisc) _pfDisc.value = 'all';
+    if (_pfSrch) _pfSrch.value = '';
+    // La saison sera fixée à l'année en cours par updateSeasonFilter()
+    var _pfSais = document.getElementById('comp-season-filter');
+    if (_pfSais) _pfSais.value = ''; // forcer le recalcul vers l'année en cours
+    renderCompetitions();
+  }
   else if (id === 'page-pilots') {
     _pilotsViewRanking = false; // toujours ouvrir en mode Pilotes
     updatePilotsToggleBtn();
@@ -2246,8 +2313,22 @@ function updateSeasonFilter() {
 function renderCompetitions() {
   var c = document.getElementById('comp-list'); if (!c) return;
   updateSeasonFilter();
-  var saison = document.getElementById('comp-season-filter').value;
-  var list = S.comps.filter(function(cp){ return saison === 'all' || cp.saison === saison; });
+  var saison   = document.getElementById('comp-season-filter').value;
+  var pratique = (document.getElementById('comp-pratique-filter') || {}).value || 'all';
+  var discipl  = (document.getElementById('comp-discipline-filter') || {}).value || 'all';
+  var search   = ((document.getElementById('comp-search-filter') || {}).value || '').trim().toLowerCase();
+  var list = S.comps.filter(function(cp){
+    if (saison   !== 'all' && cp.saison    !== saison)   return false;
+    if (pratique !== 'all' && cp.pratique  !== pratique) return false;
+    if (discipl  !== 'all' && cp.discipline !== discipl) return false;
+    if (search && !(
+      (cp.name   || '').toLowerCase().includes(search) ||
+      (cp.lieu   || '').toLowerCase().includes(search) ||
+      (cp.region || '').toLowerCase().includes(search) ||
+      (cp.oaci   || '').toLowerCase().includes(search)
+    )) return false;
+    return true;
+  });
   list.sort(function(a,b){ return a.dateFrom.localeCompare(b.dateFrom); });
   if (!list.length) { c.innerHTML = '<div style="text-align:center;color:var(--txt3);padding:32px;font-size:14px">Aucune comp&eacute;tition<br><span style="font-size:12px">Utilisez + Cr&eacute;er pour en ajouter</span></div>'; return; }
   c.innerHTML = '';
@@ -2305,6 +2386,103 @@ function renderCompetitions() {
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
+}
+
+function exportComps() {
+  var data = JSON.stringify({ comps: S.comps || [] }, null, 2);
+  var blob = new Blob([data], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'competitions_' + new Date().toISOString().substring(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Compétitions exportées', 'ok');
+}
+
+function importComps(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var parsed = JSON.parse(e.target.result);
+      var imported = parsed.comps || (Array.isArray(parsed) ? parsed : null);
+      if (!imported) { toast('Format invalide', 'err'); return; }
+      var added = 0, updated = 0, skipped = 0;
+      imported.forEach(function(imp) {
+        if (!imp.id && !imp.name) return;
+        // Chercher doublon par id d'abord, puis par nom+date
+        var exIdx = (S.comps || []).findIndex(function(x){ return x.id === imp.id; });
+        if (exIdx < 0 && imp.name && imp.dateFrom) {
+          exIdx = (S.comps || []).findIndex(function(x){
+            return (x.name||'').toLowerCase().trim() === (imp.name||'').toLowerCase().trim()
+                && (x.dateFrom||'') === (imp.dateFrom||'');
+          });
+        }
+        if (exIdx < 0) {
+          // Nouveau : ajouter directement
+          if (!imp.id) imp.id = 'imp-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+          S.comps.push(imp);
+          added++;
+        } else {
+          var ex = S.comps[exIdx];
+          // Comparer lequel est le plus récent
+          var dEx  = ex._updated  || ex.dateTo  || ex.dateFrom  || '';
+          var dImp = imp._updated || imp.dateTo || imp.dateFrom || '';
+          var impIsNewer = dImp > dEx;
+          if (impIsNewer) {
+            // Remplacer les champs de l'existant par ceux de l'importé, mais COMPLÉTER les champs vides
+            var merged = Object.assign({}, imp);
+            Object.keys(ex).forEach(function(k) {
+              // Conserver le champ existant si le champ importé est vide/absent
+              if (merged[k] === undefined || merged[k] === null || merged[k] === '') {
+                merged[k] = ex[k];
+              }
+            });
+            S.comps[exIdx] = merged;
+            updated++;
+          } else {
+            // Existant plus récent : compléter uniquement les champs vides
+            Object.keys(imp).forEach(function(k) {
+              if (ex[k] === undefined || ex[k] === null || ex[k] === '') {
+                ex[k] = imp[k];
+              }
+            });
+            skipped++;
+          }
+        }
+      });
+      saveState(); renderCompetitions();
+      toast(added + ' ajoutée(s), ' + updated + ' mise(s) à jour, ' + skipped + ' conservée(s) existante(s)', 'ok');
+    } catch(ex) { toast('Erreur lecture fichier', 'err'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function printComps() {
+  var saison   = (document.getElementById('comp-season-filter') || {}).value || 'all';
+  var pratique = (document.getElementById('comp-pratique-filter') || {}).value || 'all';
+  var discipl  = (document.getElementById('comp-discipline-filter') || {}).value || 'all';
+  var search   = ((document.getElementById('comp-search-filter') || {}).value || '').trim().toLowerCase();
+  var list = (S.comps || []).filter(function(cp){
+    if (saison   !== 'all' && cp.saison    !== saison)   return false;
+    if (pratique !== 'all' && cp.pratique  !== pratique) return false;
+    if (discipl  !== 'all' && cp.discipline !== discipl) return false;
+    if (search && !((cp.name||'').toLowerCase().includes(search)||(cp.lieu||'').toLowerCase().includes(search))) return false;
+    return true;
+  });
+  list.sort(function(a,b){ return a.dateFrom.localeCompare(b.dateFrom); });
+  var rows = list.map(function(cp){
+    var status = new Date().toISOString().substring(0,10) < cp.dateFrom ? 'Programmée' : new Date().toISOString().substring(0,10) <= (cp.dateTo||cp.dateFrom) ? 'En cours' : 'Terminée';
+    return '<tr><td>'+(cp.name||'')+'</td><td>'+(cp.pratique||'')+'</td><td>'+(cp.discipline||'')+'</td><td>'+cp.dateFrom+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+cp.dateTo:'')+'</td><td>'+(cp.lieu||cp.oaci||'')+'</td><td>'+status+'</td></tr>';
+  }).join('');
+  var win = window.open('','_blank');
+  win.document.write('<html><head><title>Compétitions</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f0f0f0;font-weight:700}h2{margin-bottom:10px}</style></head><body>');
+  win.document.write('<h2>Liste des compétitions</h2><table><thead><tr><th>Nom</th><th>Pratique</th><th>Discipline</th><th>Dates</th><th>Lieu</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
 }
 
 function openCompDetail(compId) {
@@ -10797,19 +10975,157 @@ function importLicenceFfplum(inp) {
   inp.value = '';
 }
 
+/* ── Import JSON global avec gestion des doublons ── */
+var _importPending = null; // { data, conflicts: [{type, id, label, existing, imported, choice}] }
+
 function importData(inp) {
   if (!inp.files || !inp.files[0]) return;
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
       var data = JSON.parse(e.target.result);
-      Object.assign(S, data); saveState();
-      updateNationalRanking(); renderHome(); renderCompetitions(); renderSettings();
-      toast('Import réussi ✓', 'ok');
-    } catch(err) { toast('Fichier invalide', 'err'); }
+      _importPending = { data: data, conflicts: [] };
+      _importDetectConflicts(data);
+      if (_importPending.conflicts.length === 0) {
+        _importApplyDirect(data);
+      } else {
+        _importShowConflictModal();
+      }
+    } catch(err) { toast('Fichier JSON invalide', 'err'); }
   };
   reader.readAsText(inp.files[0]);
   inp.value = '';
+}
+
+function _importDetectConflicts(data) {
+  // Compétitions
+  (data.comps || []).forEach(function(imp) {
+    var ex = (S.comps || []).find(function(x){ return x.id === imp.id; });
+    if (ex) _importPending.conflicts.push({ type:'comp', id:imp.id, label: imp.name || imp.nom || imp.id, existing: ex, imported: imp, choice: 'newer' });
+  });
+  // Pilotes
+  (data.pilots || []).forEach(function(imp) {
+    var ex = (S.pilots || []).find(function(x){ return x.id === imp.id; });
+    if (ex) _importPending.conflicts.push({ type:'pilot', id:imp.id, label: (imp.prenom||'') + ' ' + (imp.nom||''), existing: ex, imported: imp, choice: 'newer' });
+  });
+  // Collectif
+  (data.collectif || []).forEach(function(imp) {
+    var ex = (S.collectif || []).find(function(x){ return x.id === imp.id; });
+    if (ex) _importPending.conflicts.push({ type:'collectif', id:imp.id, label: (imp.prenom||'') + ' ' + (imp.nom||''), existing: ex, imported: imp, choice: 'newer' });
+  });
+}
+
+function _importShowConflictModal() {
+  var list = document.getElementById('modal-import-conflict-list');
+  if (!list) return;
+  var typeLabels = { comp: '🏁 Compétition', pilot: '👤 Compétiteur', collectif: '🇫🇷 Collectif France' };
+  list.innerHTML = _importPending.conflicts.map(function(c, i) {
+    return '<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:var(--navy3)">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      + '<span style="font-size:12px;font-weight:700;color:var(--txt)">' + (typeLabels[c.type]||c.type) + ' · ' + _escHtml(c.label) + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      + '<button id="imp-btn-'+i+'-newer" onclick="_importSetChoice('+i+',\'newer\')" style="padding:5px 10px;border-radius:8px;border:2px solid var(--stol);background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">⏱ Le plus récent</button>'
+      + '<button id="imp-btn-'+i+'-imported" onclick="_importSetChoice('+i+',\'imported\')" style="padding:5px 10px;border-radius:8px;border:2px solid #f59e0b;background:transparent;color:#f59e0b;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📥 Importé</button>'
+      + '<button id="imp-btn-'+i+'-existing" onclick="_importSetChoice('+i+',\'existing\')" style="padding:5px 10px;border-radius:8px;border:2px solid var(--bdr);background:transparent;color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">💾 Existant</button>'
+      + '</div></div>';
+  }).join('');
+  _importRefreshButtons();
+  document.getElementById('modal-import-conflicts').style.display = 'flex';
+}
+
+function _importSetChoice(idx, choice) {
+  if (!_importPending || !_importPending.conflicts[idx]) return;
+  _importPending.conflicts[idx].choice = choice;
+  _importRefreshButtons();
+}
+
+function _importRefreshButtons() {
+  (_importPending.conflicts || []).forEach(function(c, i) {
+    ['newer','imported','existing'].forEach(function(ch) {
+      var btn = document.getElementById('imp-btn-'+i+'-'+ch);
+      if (!btn) return;
+      var active = (c.choice === ch);
+      btn.style.background = active ? (ch==='newer'?'var(--stol)':ch==='imported'?'#f59e0b':'var(--navy3)') : 'transparent';
+      btn.style.color = active ? (ch==='existing'?'var(--txt)':'#fff') : (ch==='newer'?'var(--stol)':ch==='imported'?'#f59e0b':'var(--txt2)');
+    });
+  });
+}
+
+function _importConflictAll(choice) {
+  (_importPending.conflicts || []).forEach(function(c, i) { c.choice = choice; });
+  _importRefreshButtons();
+}
+
+function _importConflictApply() {
+  if (!_importPending) return;
+  // Résoudre les conflits
+  _importPending.conflicts.forEach(function(c) {
+    var winner;
+    if (c.choice === 'imported') {
+      winner = c.imported;
+    } else if (c.choice === 'existing') {
+      winner = null; // on garde l'existant, on ne touche à rien
+    } else {
+      // newer : compare dateFrom ou updatedAt ou id timestamp
+      var dEx  = c.existing._updated  || c.existing.dateFrom  || '';
+      var dImp = c.imported._updated  || c.imported.dateFrom  || '';
+      winner = (dImp >= dEx) ? c.imported : null;
+    }
+    if (!winner) return; // garder existant
+    if (c.type === 'comp') {
+      var idx = (S.comps||[]).findIndex(function(x){ return x.id === c.id; });
+      if (idx >= 0) S.comps[idx] = winner;
+    } else if (c.type === 'pilot') {
+      var idx2 = (S.pilots||[]).findIndex(function(x){ return x.id === c.id; });
+      if (idx2 >= 0) S.pilots[idx2] = winner;
+    } else if (c.type === 'collectif') {
+      var idx3 = (S.collectif||[]).findIndex(function(x){ return x.id === c.id; });
+      if (idx3 >= 0) S.collectif[idx3] = winner;
+    }
+  });
+  // Appliquer le reste (nouveaux éléments sans conflit)
+  _importApplyNew(_importPending.data);
+  document.getElementById('modal-import-conflicts').style.display = 'none';
+  _importPending = null;
+}
+
+function _importApplyNew(data) {
+  // Ajoute uniquement les éléments qui n'existent pas (sans écraser)
+  (data.comps || []).forEach(function(imp) {
+    if (!(S.comps||[]).find(function(x){ return x.id === imp.id; })) { S.comps = S.comps||[]; S.comps.push(imp); }
+  });
+  (data.pilots || []).forEach(function(imp) {
+    if (!(S.pilots||[]).find(function(x){ return x.id === imp.id; })) { S.pilots = S.pilots||[]; S.pilots.push(imp); }
+  });
+  (data.collectif || []).forEach(function(imp) {
+    if (!(S.collectif||[]).find(function(x){ return x.id === imp.id; })) { S.collectif = S.collectif||[]; S.collectif.push(imp); }
+  });
+  // Fusionner les champs scalaires (user, runs, staff, compEnroll, ulms, messages, sitesSportifs, homeTodosByComp)
+  ['user','runs','staff','compEnroll','ulms','messages','sitesSportifs','homeTodosByComp'].forEach(function(k) {
+    if (data[k] !== undefined) {
+      if (k === 'user') {
+        if (!S.user) S.user = data[k];
+      } else if (typeof data[k] === 'object' && !Array.isArray(data[k])) {
+        S[k] = S[k] || {};
+        Object.keys(data[k]).forEach(function(key) {
+          if (S[k][key] === undefined) S[k][key] = data[k][key];
+        });
+      }
+    }
+  });
+  saveState();
+  updateNationalRanking(); renderHome(); renderCompetitions(); renderSettings();
+  var added = (data.comps||[]).length + (data.pilots||[]).length + (data.collectif||[]).length;
+  toast('Import réussi — ' + added + ' entrée(s) traitée(s) ✓', 'ok');
+}
+
+function _importApplyDirect(data) {
+  _importApplyNew(data);
+}
+
+function _escHtml(s) {
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ═══════════════════════════════════
@@ -11842,9 +12158,278 @@ function openDTNModule(module) {
   }
 }
 
+function injectCalendrier2026() {
+  S.comps = S.comps || [];
+  var toAdd = [
+    // ── Régionales / CdF ──
+    { id:'cal26-eyguieres-para-classic', name:'Régionale Paramoteur Classic - Eyguières',
+      dateFrom:'2026-04-03', dateTo:'2026-04-06', oaci:'LFNE', lieu:'Eyguières',
+      region:'Provence Alpes Côte d\'Azur', type:'regional', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Nostradamus · Référent : Jérémy PENONE · DC : Jérémy PENONE' },
+
+    { id:'cal26-eyguieres-micro-classic', name:'Régionale Microlight Classic - Eyguières',
+      dateFrom:'2026-04-03', dateTo:'2026-04-06', oaci:'LFNE', lieu:'Eyguières',
+      region:'Provence Alpes Côte d\'Azur', type:'regional', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Nostradamus · Référent : Yoann Gini' },
+
+    { id:'cal26-pareloup-para-slalom', name:'Entraînement Paramoteur Slalom - Barrage de Pareloup',
+      dateFrom:'2026-04-13', dateTo:'2026-04-18', oaci:'LF1255', lieu:'Barrage de Pareloup',
+      region:'Occitanie', type:'entrainement', pratique:'paramoteur', discipline:'slalom',
+      saison:'2026', desc:'Club : Terrain occasionnel · Référent : Pôle Sport · DC : Jean-Émile Oulha' },
+
+    { id:'cal26-sarreguemines-micro-classic', name:'Régionale Microlight Classic - Sarreguemines',
+      dateFrom:'2026-04-25', dateTo:'2026-04-26', oaci:'LFGU', lieu:'Sarreguemines',
+      region:'Grand Est', type:'regional', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Espoir aéronautique de Sarreguemines · Référent : Manuel BORCHERT' },
+
+    { id:'cal26-levignen-para-classic', name:'Régionale Paramoteur Classic - Crepy en Valois / Lévignen',
+      dateFrom:'2026-05-09', dateTo:'2026-05-10', oaci:'LF6052', lieu:'Crepy en Valois - Lévignen',
+      region:'Hauts-de-France', type:'regional', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Para ton air · Référent : Bruno Fernandez · DC : Jean-Émile Oulha' },
+
+    { id:'cal26-reole-micro-stol', name:'Régionale Microlight STOL - La Réole',
+      dateFrom:'2026-05-09', dateTo:'2026-05-10', oaci:'LFDR', lieu:'La Réole',
+      region:'Nouvelle Aquitaine', type:'regional', pratique:'microlight', discipline:'stol',
+      saison:'2026', desc:'Club : ULM Réolais · Référent : Philippe ARCHAMBAUD · DC : Roland Andral' },
+
+    { id:'cal26-feurs-para-classic', name:'Championnat de France Paramoteur Classic - Feurs',
+      dateFrom:'2026-05-12', dateTo:'2026-05-17', oaci:'LFLZ', lieu:'Feurs',
+      region:'Auvergne Rhône Alpes', type:'cdf', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Aéro-club du Forez · Référent : Michel FAVIER · DC : Jean-Emile OULHA' },
+
+    { id:'cal26-feurs-micro-classic', name:'Championnat de France Microlight Classic - Feurs',
+      dateFrom:'2026-05-12', dateTo:'2026-05-17', oaci:'LFLZ', lieu:'Feurs',
+      region:'Auvergne Rhône Alpes', type:'cdf', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Aéroclub du Forez · Référent : Michel FAVIER' },
+
+    { id:'cal26-ferteGaucher-micro-stol', name:'Régionale Microlight STOL - La Ferté Gaucher',
+      dateFrom:'2026-06-06', dateTo:'2026-06-07', oaci:'LFFG', lieu:'La Ferté Gaucher',
+      region:'Île-de-France', type:'regional', pratique:'microlight', discipline:'stol',
+      saison:'2026', desc:'Club : Les gratte ciel · Référent : François Vandenbussche · DC : Roland Andral' },
+
+    { id:'cal26-stage-thermique-para', name:'Stage Thermique Paramoteur Classic',
+      dateFrom:'2026-06-08', dateTo:'2026-06-12', oaci:'', lieu:'',
+      region:'', type:'entrainement', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Référent : Pôle Sport · DC : Jean-Émile Oulha' },
+
+    { id:'cal26-nogaro-micro-classic', name:'Stage Perfs Microlight Classic - Nogaro',
+      dateFrom:'2026-06-16', dateTo:'2026-06-20', oaci:'LFCN', lieu:'Nogaro',
+      region:'Occitanie', type:'entrainement', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Aéroclub du bas Armagnac · Référent : Pôle Sport' },
+
+    { id:'cal26-belmont-micro-stol', name:'Championnat de France Microlight STOL - Belmont sur Rance',
+      dateFrom:'2026-07-03', dateTo:'2026-07-04', oaci:'LFIF', lieu:'Belmont sur Rance',
+      region:'Occitanie', type:'cdf', pratique:'microlight', discipline:'stol',
+      saison:'2026', desc:'Club : Roland ULM · Référent : Roland Andral · DC : Roland Andral' },
+
+    { id:'cal26-montaigu-micro-classic', name:'Entraînement Microlight Classic - Montaigu St Georges',
+      dateFrom:'2026-07-13', dateTo:'2026-07-18', oaci:'LFFW', lieu:'Montaigu St Georges',
+      region:'Pays de Loire', type:'entrainement', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Aéroclub ULM Montaigu Vendée · Référent : Pôle Sport' },
+
+    { id:'cal26-montaigu-para-classic', name:'Entraînement Paramoteur Classic - Montaigu St Georges',
+      dateFrom:'2026-07-14', dateTo:'2026-07-19', oaci:'LFFW', lieu:'Montaigu St Georges',
+      region:'Pays de Loire', type:'entrainement', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Aéro-club ULM Montaigu Vendée · Référent : Pôle Sport · DC : Jean-Émile Oulha' },
+
+    { id:'cal26-plouharnel-para-stol', name:'Régionale Paramoteur STOL - Plouharnel',
+      dateFrom:'2026-07-25', dateTo:'2026-07-26', oaci:'LF5658', lieu:'Plouharnel',
+      region:'Bretagne', type:'regional', pratique:'paramoteur', discipline:'stol',
+      saison:'2026', desc:'Club : Eagles Paramoteur · Référent : Pôle Sport · DC : Jean-Émile Oulha' },
+
+    { id:'cal26-luquet-para-classic', name:'Régionale Paramoteur Classic - Luquet',
+      dateFrom:'2026-08-29', dateTo:'2026-08-30', oaci:'LF6551', lieu:'Luquet',
+      region:'Nouvelle Aquitaine', type:'regional', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Motor Aile · Référent : Fabrice Larroze · DC : Jean-Emile Oulha' },
+
+    { id:'cal26-stdie-micro-classic', name:'Régionale Microlight Classic - St Diè Remomeix',
+      dateFrom:'2026-08-29', dateTo:'2026-08-30', oaci:'LFGY', lieu:'St Diè Remomeix',
+      region:'Grand Est', type:'regional', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : Aéroclub St Diè Remomeix · Référent : Mathieu CHAMPON' },
+
+    { id:'cal26-annecy-stage-siv', name:'Stage SIV Paramoteur Classic - Annecy',
+      dateFrom:'2026-09-01', dateTo:'2026-09-04', oaci:'', lieu:'Annecy',
+      region:'Auvergne Rhône Alpes', type:'entrainement', pratique:'paramoteur', discipline:'classic',
+      saison:'2026', desc:'Club : Goto Fly · Référent : Alex Ciuhandu' },
+
+    { id:'cal26-argenton-micro-stol', name:'Régionale Microlight STOL - Argenton',
+      dateFrom:'2026-09-12', dateTo:'2026-09-13', oaci:'LFEG', lieu:'Argenton',
+      region:'Nouvelle Aquitaine', type:'regional', pratique:'microlight', discipline:'stol',
+      saison:'2026', desc:'Club : Aéroclub 36 · Référent : José ESTEVES-LOURENCO · DC : Roland Andral' },
+
+    { id:'cal26-mondreville-micro-classic', name:'Régionale Microlight Classic - Mondreville',
+      dateFrom:'2026-09-19', dateTo:'2026-09-20', oaci:'LF7752', lieu:'Mondreville',
+      region:'Île-de-France', type:'regional', pratique:'microlight', discipline:'classic',
+      saison:'2026', desc:'Club : La rose des vents · Référent : Dominique CERVO' },
+
+    { id:'cal26-pareloup-stage-slalom', name:'Stage Paramoteur Slalom - Occitanie',
+      dateFrom:'2026-09-29', dateTo:'2026-10-04', oaci:'LF1255', lieu:'Occitanie',
+      region:'Occitanie', type:'entrainement', pratique:'paramoteur', discipline:'slalom',
+      saison:'2026', desc:'Club : Terrain occasionnel · Référent : Pôle Sport · DC : Jean-Émile Oulha' }
+  ];
+  var added = 0;
+  toAdd.forEach(function(cp) {
+    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
+      S.comps.push(cp);
+      S.compEnroll = S.compEnroll || {};
+      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+      added++;
+    }
+  });
+  if (added > 0) saveState();
+}
+
+function injectCalendrierFull() {
+  S.comps = S.comps || []; S.compEnroll = S.compEnroll || {};
+  function _add(cp) {
+    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
+      S.comps.push(cp);
+      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+    }
+  }
+  // ── 2027 ──
+  _add({id:'calf-2027-roanne-para-classic',name:'Régionale Paramoteur Classic - Roanne (suspendue)',dateFrom:'2027-04-11',dateTo:'2027-04-12',oaci:'LFLO',lieu:'Roanne',region:'Auvergne Rhône Alpes',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2027',desc:'Club : Paramoteur Roanne · Référent : Serge DAVID · Compétition suspendue'});
+  // ── 2026 compléments ──
+  _add({id:'calf-2026-lf4724-micro-stol-pres',name:'Présentation Microlight STOL - LF4724',dateFrom:'2026-07-04',dateTo:'2026-07-05',oaci:'LF4724',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'stol',saison:'2026',desc:'Référent : Roland ANDRAL · Présentation'});
+  // ── 2025 ──
+  _add({id:'calf-2025-chambley-odf-para-classic',name:'Open de France Paramoteur Classic - Chambley',dateFrom:'2025-05-27',dateTo:'2025-06-01',oaci:'LFJY',lieu:'Chambley',region:'Grand Est',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2025',desc:'Référent : La DTN'});
+  _add({id:'calf-2025-chambley-odf-micro-classic',name:'Open de France Microlight Classic - Chambley',dateFrom:'2025-05-07',dateTo:'2025-05-11',oaci:'LFJY',lieu:'Chambley',region:'Grand Est',type:'regional',pratique:'microlight',discipline:'classic',saison:'2025',desc:'Club : Club ULM Loisirs · Référent : Georges Humeau · DC : Laurent Rapiteau'});
+  _add({id:'calf-2025-lfhw-micro-classic-entr',name:'Entraînement Microlight Classic - LFHW',dateFrom:'2025-06-07',dateTo:'2025-06-09',oaci:'LFHW',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'classic',saison:'2025',desc:''});
+  _add({id:'calf-2025-montpezat-cf-para-classic',name:'Entraînement Collectif France Paramoteur Classic - Montpezat d\'Agenais',dateFrom:'2025-04-30',dateTo:'2025-05-04',oaci:'LF4724',lieu:'Montpezat d\'Agenais',region:'Nouvelle Aquitaine',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2025',desc:'Club : Delta Aquitaine · Référent : La DTN · DC : Jean-Emile OULHA · Sélection EdF'});
+  _add({id:'calf-2025-chambley-cdm-para-classic',name:'Championnat du Monde Paramoteur Classic - Chambley',dateFrom:'2025-08-21',dateTo:'2025-08-31',oaci:'LFJY',lieu:'Chambley',region:'Grand Est',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2025',desc:'Club : Club ULM Loisirs · Référent : Georges Humeau'});
+  _add({id:'calf-2025-chambley-cdm-micro-classic',name:'Championnat du Monde Microlight Classic - Chambley',dateFrom:'2025-08-04',dateTo:'2025-08-16',oaci:'LFJY',lieu:'Chambley',region:'Grand Est',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2025',desc:'Club : Club ULM Loisirs · Référent : Georges Humeau · DC : Laurent RAPITEAU'});
+  _add({id:'calf-2025-bornos-sel-para-slalom',name:'Entraînement Sélection EdF Paramoteur Slalom - Bornos',dateFrom:'2025-07-27',dateTo:'2025-07-31',oaci:'',lieu:'Bornos (ESP)',region:'',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2025',desc:'Référent : Paco'});
+  _add({id:'calf-2025-bornos-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom - Bornos',dateFrom:'2025-10-19',dateTo:'2025-10-25',oaci:'',lieu:'Bornos',region:'Cadiz - ESP',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2025',desc:'Club : Club parapente y paramotor Lijar Sur · Référent : Francisco Sanchez Reina'});
+  _add({id:'calf-2025-stthorette-micro-classic',name:'Régionale Microlight Classic - Saint Thorette',dateFrom:'2025-04-26',dateTo:'2025-04-27',oaci:'LF1853',lieu:'Saint Thorette',region:'Centre Val de Loire',type:'regional',pratique:'microlight',discipline:'classic',saison:'2025',desc:''});
+  _add({id:'calf-2025-luquet-para-classic',name:'Régionale Paramoteur Classic - Luquet',dateFrom:'2025-04-26',dateTo:'2025-04-27',oaci:'LF6551',lieu:'Luquet',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2025',desc:'Référent : Fabrice Larroze'});
+  _add({id:'calf-2025-lfdr-micro-stol',name:'Régionale Microlight STOL - LFDR',dateFrom:'2025-05-03',dateTo:'2025-05-04',oaci:'LFDR',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2025',desc:'Club : ULM Réolais'});
+  _add({id:'calf-2025-micro-classic-mai',name:'Régionale Microlight Classic',dateFrom:'2025-05-24',dateTo:'2025-05-25',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2025',desc:'Référent : Jack Gaudin'});
+  _add({id:'calf-2025-ferteGaucher-micro-stol',name:'Régionale Microlight STOL - La Ferté Gaucher',dateFrom:'2025-09-13',dateTo:'2025-09-14',oaci:'LFFG',lieu:'La Ferté Gaucher',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2025',desc:'Club : Club ULM les Gratte Ciel'});
+  _add({id:'calf-2025-micro-classic-oct',name:'Régionale Microlight Classic',dateFrom:'2025-10-04',dateTo:'2025-10-05',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2025',desc:''});
+  _add({id:'calf-2025-para-stol-sept',name:'Régionale Paramoteur STOL',dateFrom:'2025-09-13',dateTo:'2025-09-13',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'stol',saison:'2025',desc:'Référent : Jean-Emile Oulha'});
+  // ── 2024 ──
+  _add({id:'calf-2024-doha-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom - Doha',dateFrom:'2024-02-01',dateTo:'2024-02-14',oaci:'',lieu:'Doha (Qatar)',region:'Lusail',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2024',desc:''});
+  _add({id:'calf-2024-demo-para-classic',name:'Démonstration Paramoteur Classic',dateFrom:'2024-05-17',dateTo:'2024-05-19',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2024',desc:''});
+  _add({id:'calf-2024-levroux-cdf-para-classic',name:'Championnat de France Paramoteur Classic - Levroux',dateFrom:'2024-05-07',dateTo:'2024-05-12',oaci:'LF3624',lieu:'Levroux',region:'Centre Val de Loire',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2024',desc:'Référent : Denise Lacote'});
+  _add({id:'calf-2024-levroux-cdf-micro-classic',name:'Championnat de France Microlight Classic - Levroux',dateFrom:'2024-05-07',dateTo:'2024-05-12',oaci:'LF3624',lieu:'Levroux',region:'Centre Val de Loire',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2024',desc:'Référent : Denise Lacote'});
+  _add({id:'calf-2024-deenethorpe-cdm-micro-classic',name:'Championnat du Monde Microlight Classic - Deenethorpe',dateFrom:'2024-07-27',dateTo:'2024-08-03',oaci:'',lieu:'Deenethorpe (UK)',region:'UK',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2024',desc:''});
+  _add({id:'calf-2024-annecy-siv-para',name:'Stage SIV Paramoteur Classic - Annecy',dateFrom:'2024-04-23',dateTo:'2024-04-25',oaci:'',lieu:'Annecy',region:'Auvergne Rhône Alpes',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2024',desc:'Club : Gotofly · Référent : Alexandre'});
+  _add({id:'calf-2024-manston-open-para-classic',name:'Open Paramoteur Classic - Manston (UK)',dateFrom:'2024-07-29',dateTo:'2024-08-10',oaci:'',lieu:'Kent CT12 5DF',region:'UK',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2024',desc:''});
+  _add({id:'calf-2024-manston-cdm-endurance-para',name:'Championnat du Monde Endurance Paramoteur Classic - Manston',dateFrom:'2024-08-03',dateTo:'2024-08-10',oaci:'',lieu:'Manston',region:'UK',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2024',desc:'Référent : La DTN'});
+  _add({id:'calf-2024-ghisonaccia-micro-stol',name:'Régionale Microlight STOL - Ghisonaccia',dateFrom:'2024-06-08',dateTo:'2024-06-09',oaci:'',lieu:'Ghisonaccia',region:'Corse',type:'regional',pratique:'microlight',discipline:'stol',saison:'2024',desc:''});
+  _add({id:'calf-2024-lfhw-micro-classic',name:'Entraînement Microlight Classic - LFHW',dateFrom:'2024-01-01',dateTo:'2024-01-01',oaci:'LFHW',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'classic',saison:'2024',desc:''});
+  // ── 2023 ──
+  _add({id:'calf-2023-bornos-sel-para-slalom',name:'Entraînement Sélections Paramoteur Slalom - Bornos',dateFrom:'2023-04-23',dateTo:'2023-04-28',oaci:'',lieu:'Bornos',region:'ESP',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2023',desc:''});
+  _add({id:'calf-2023-0318-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-03-18',dateTo:'2023-03-19',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0318-micro-classic-stage',name:'Stage Microlight Classic',dateFrom:'2023-03-18',dateTo:'2023-03-19',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0401-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-04-01',dateTo:'2023-04-02',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0408-micro-classic-stage',name:'Stage Microlight Classic',dateFrom:'2023-04-08',dateTo:'2023-04-10',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0409-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-04-09',dateTo:'2023-04-10',oaci:'LF3461',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0415-micro-classic',name:'Régionale Microlight Classic',dateFrom:'2023-04-15',dateTo:'2023-04-16',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0415-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-04-15',dateTo:'2023-04-16',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0422-micro-stol',name:'Régionale Microlight STOL',dateFrom:'2023-04-22',dateTo:'2023-04-23',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2023',desc:''});
+  _add({id:'calf-2023-0429-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-04-29',dateTo:'2023-04-30',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0506-micro-classic-a',name:'Régionale Microlight Classic',dateFrom:'2023-05-06',dateTo:'2023-05-08',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0506-micro-classic-b',name:'Régionale Microlight Classic',dateFrom:'2023-05-06',dateTo:'2023-05-07',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0513-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-05-13',dateTo:'2023-05-14',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0513-micro-classic',name:'Régionale Microlight Classic',dateFrom:'2023-05-13',dateTo:'2023-05-14',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-cdf-para-classic',name:'Championnat de France Paramoteur Classic',dateFrom:'2023-05-18',dateTo:'2023-05-21',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:'Référent : Georges HUMEAU'});
+  _add({id:'calf-2023-cdf-micro-classic',name:'Championnat de France Microlight Classic',dateFrom:'2023-05-18',dateTo:'2023-05-21',oaci:'',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2023',desc:'Référent : Georges HUMEAU'});
+  _add({id:'calf-2023-0527-micro-classic',name:'Régionale Microlight Classic',dateFrom:'2023-05-27',dateTo:'2023-05-28',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0601-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom',dateFrom:'2023-06-01',dateTo:'2023-06-10',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2023',desc:''});
+  _add({id:'calf-2023-0610-micro-stol',name:'Régionale Microlight STOL',dateFrom:'2023-06-10',dateTo:'2023-06-11',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2023',desc:''});
+  _add({id:'calf-2023-0626-para-classic-entr',name:'Entraînement Paramoteur Classic',dateFrom:'2023-06-26',dateTo:'2023-06-29',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-cdf-micro-stol',name:'Championnat de France Microlight STOL',dateFrom:'2023-06-30',dateTo:'2023-07-02',oaci:'',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'stol',saison:'2023',desc:'Référent : Roland ANDRAL'});
+  _add({id:'calf-2023-0720-micro-classic-open',name:'Open Microlight Classic',dateFrom:'2023-07-20',dateTo:'2023-07-23',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-0812-micro-classic-entr',name:'Entraînement Microlight Classic',dateFrom:'2023-08-12',dateTo:'2023-08-14',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-1014-micro-classic',name:'Régionale Microlight Classic - PACA',dateFrom:'2023-10-14',dateTo:'2023-10-15',oaci:'',lieu:'',region:'Provence Alpes Côte d\'Azur',type:'regional',pratique:'microlight',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-1014-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2023-10-14',dateTo:'2023-10-15',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2023',desc:''});
+  _add({id:'calf-2023-1105-para-slalom-entr',name:'Entraînement Paramoteur Slalom',dateFrom:'2023-11-05',dateTo:'2023-11-10',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2023',desc:''});
+  // ── 2022 ──
+  _add({id:'calf-2022-auch-cdf-micro-classic',name:'Championnat de France Microlight Classic - Auch',dateFrom:'2022-07-09',dateTo:'2022-07-16',oaci:'LFDH',lieu:'Auch',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-saquarema-para-classic',name:'Compétition Paramoteur Classic - Saquarema (Brésil)',dateFrom:'2022-04-20',dateTo:'2022-04-30',oaci:'',lieu:'Saquarema',region:'State of Rio de Janeiro',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-anere-stage-para',name:'Stage Paramoteur Classic - Anère',dateFrom:'2022-02-12',dateTo:'2022-02-13',oaci:'LF6538',lieu:'Anère',region:'Occitanie',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-odf-para-slalom',name:'Open de France Paramoteur Slalom',dateFrom:'2022-06-21',dateTo:'2022-06-25',oaci:'LF0551',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'slalom',saison:'2022',desc:''});
+  _add({id:'calf-2022-cdf-micro-stol',name:'Championnat de France Microlight STOL',dateFrom:'2022-07-01',dateTo:'2022-07-03',oaci:'',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'stol',saison:'2022',desc:''});
+  _add({id:'calf-2022-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom - Strachotín',dateFrom:'2022-09-06',dateTo:'2022-09-18',oaci:'',lieu:'Strachotín',region:'République Tchèque',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2022',desc:''});
+  _add({id:'calf-2022-chenay-para-classic',name:'Régionale Paramoteur Classic - Chenay',dateFrom:'2022-03-19',dateTo:'2022-03-20',oaci:'LF7922',lieu:'Chenay',region:'Nouvelle-Aquitaine',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0507-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2022-05-07',dateTo:'2022-05-08',oaci:'LFDH',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0514-para-classic',name:'Régionale Paramoteur Classic - LFFW',dateFrom:'2022-05-14',dateTo:'2022-05-15',oaci:'LFFW',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0521-para-classic-plouharnel',name:'Régionale Paramoteur Classic - Plouharnel',dateFrom:'2022-05-21',dateTo:'2022-05-22',oaci:'LF5658',lieu:'Plouharnel',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0527-micro-stol',name:'Régionale Microlight STOL - LFCS',dateFrom:'2022-05-27',dateTo:'2022-05-28',oaci:'LFCS',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2022',desc:''});
+  _add({id:'calf-2022-0604-para-classic',name:'Régionale Paramoteur Classic - LF8421',dateFrom:'2022-06-04',dateTo:'2022-06-05',oaci:'LF8421',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0611-micro-stol',name:'Régionale Microlight STOL - LFEQ',dateFrom:'2022-06-11',dateTo:'2022-06-12',oaci:'LFEQ',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2022',desc:''});
+  _add({id:'calf-2022-0702-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2022-07-02',dateTo:'2022-07-03',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0808-para-classic-entr',name:'Entraînement Paramoteur Classic',dateFrom:'2022-08-08',dateTo:'2022-08-12',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:'DC : Pascal Vallée'});
+  _add({id:'calf-2022-0813-para-classic',name:'Régionale Paramoteur Classic',dateFrom:'2022-08-13',dateTo:'2022-08-14',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-0822-para-slalom-entr',name:'Entraînement Paramoteur Slalom',dateFrom:'2022-08-22',dateTo:'2022-08-26',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2022',desc:''});
+  _add({id:'calf-2022-0924-micro-classic',name:'Régionale Microlight Classic - LF1853',dateFrom:'2022-09-24',dateTo:'2022-09-25',oaci:'LF1853',lieu:'',region:'Centre',type:'regional',pratique:'microlight',discipline:'classic',saison:'2022',desc:'DC : Laurent Rapiteau'});
+  _add({id:'calf-2022-1015-micro-classic',name:'Régionale Microlight Classic - LF8421',dateFrom:'2022-10-15',dateTo:'2022-10-16',oaci:'LF8421',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-1022-para-classic',name:'Régionale Paramoteur Classic - LFPA',dateFrom:'2022-10-22',dateTo:'2022-10-23',oaci:'LFPA',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  _add({id:'calf-2022-1026-stage-para-classic',name:'Stage Paramoteur Classic - LF3461',dateFrom:'2022-10-26',dateTo:'2022-10-27',oaci:'LF3461',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2022',desc:''});
+  // ── 2021 ──
+  _add({id:'calf-2021-savines-stage-para-slalom',name:'Stage Open Paramoteur Slalom - Savines-le-Lac',dateFrom:'2021-06-14',dateTo:'2021-06-18',oaci:'',lieu:'Savines-le-Lac',region:'Provence Alpes Côte d\'Azur',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2021',desc:'Club : Base ULM · Référent : FFPLUM · DC : Pascal Vallée'});
+  _add({id:'calf-2021-mondreville-cdf-para-classic',name:'Championnat de France Paramoteur Classic - Mondreville',dateFrom:'2021-07-10',dateTo:'2021-07-17',oaci:'LF7752',lieu:'Mondreville',region:'Île-de-France',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:'Référent : FFPLUM · DC : Pascal Vallée'});
+  _add({id:'calf-2021-mondreville-cdf-micro-classic',name:'Championnat de France Microlight Classic - Mondreville',dateFrom:'2021-07-10',dateTo:'2021-07-17',oaci:'LF7752',lieu:'Mondreville',region:'Île-de-France',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2021',desc:'DC : Pascal Vallée'});
+  _add({id:'calf-2021-levroux-stage-para',name:'Stage Paramoteur Classic - Levroux',dateFrom:'2021-08-02',dateTo:'2021-08-06',oaci:'LF3624',lieu:'Levroux',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:'Club : Les Ailes Motorisées · Référent : FFPLUM'});
+  _add({id:'calf-2021-hageville-stage-para',name:'Stage Paramoteur Classic - Hagéville',dateFrom:'2021-08-23',dateTo:'2021-08-27',oaci:'LFJY',lieu:'Hagéville',region:'',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:'Club : Association ULM Sports & Loisirs · Référent : CTN'});
+  _add({id:'calf-2021-0604-para-classic',name:'Compétition Paramoteur Classic - LFVZ',dateFrom:'2021-06-04',dateTo:'2021-06-05',oaci:'LFVZ',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0605-para-classic',name:'Compétition Paramoteur Classic - Saint Martin de Castillon',dateFrom:'2021-06-05',dateTo:'2021-06-06',oaci:'',lieu:'Saint Martin de Castillon',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0612-micro-classic',name:'Compétition Microlight Classic - Normandie',dateFrom:'2021-06-12',dateTo:'2021-06-13',oaci:'LFFD',lieu:'',region:'Normandie',type:'regional',pratique:'microlight',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0626-micro-classic',name:'Compétition Microlight Classic',dateFrom:'2021-06-26',dateTo:'2021-06-27',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0703-micro-stol',name:'Compétition Microlight STOL',dateFrom:'2021-07-03',dateTo:'2021-07-04',oaci:'',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'stol',saison:'2021',desc:''});
+  _add({id:'calf-2021-0703-para-slalom',name:'Compétition Paramoteur Slalom',dateFrom:'2021-07-03',dateTo:'2021-07-04',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'slalom',saison:'2021',desc:''});
+  _add({id:'calf-2021-0731-para-classic',name:'Compétition Paramoteur Classic',dateFrom:'2021-07-31',dateTo:'2021-08-01',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0807-para-classic',name:'Compétition Paramoteur Classic - Vitry-en-Artois',dateFrom:'2021-08-07',dateTo:'2021-08-08',oaci:'LFQS',lieu:'Vitry-en-Artois',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0828-para-classic',name:'Compétition Paramoteur Classic',dateFrom:'2021-08-28',dateTo:'2021-08-28',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0925-para-classic-a',name:'Compétition Paramoteur Classic',dateFrom:'2021-09-25',dateTo:'2021-09-26',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-0925-para-classic-b',name:'Régionale Paramoteur Classic - LF3624',dateFrom:'2021-09-25',dateTo:'2021-09-26',oaci:'LF3624',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:'Club : Les Ailes Motorisées'});
+  _add({id:'calf-2021-1016-para-classic-a',name:'Régionale Paramoteur Classic - Mondreville',dateFrom:'2021-10-16',dateTo:'2021-10-16',oaci:'LF7752',lieu:'Mondreville',region:'Île-de-France',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:'Club : Comité régional Ile de France'});
+  _add({id:'calf-2021-1016-micro-classic',name:'Compétition Microlight Classic - LF8421',dateFrom:'2021-10-16',dateTo:'2021-10-17',oaci:'LF8421',lieu:'',region:'',type:'regional',pratique:'microlight',discipline:'classic',saison:'2021',desc:''});
+  _add({id:'calf-2021-1030-para-classic',name:'Compétition Paramoteur Classic - LF5658',dateFrom:'2021-10-30',dateTo:'2021-10-31',oaci:'LF5658',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2021',desc:''});
+  // ── 2020 ──
+  _add({id:'calf-2020-lfoq-cdf-para-classic',name:'Championnat de France Paramoteur Classic - LFOQ',dateFrom:'2020-10-03',dateTo:'2020-10-10',oaci:'LFOQ',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2020',desc:''});
+  // ── 2019 ──
+  _add({id:'calf-2019-para-classic-entr-mondreville',name:'Entraînement Paramoteur Classic - Mondreville',dateFrom:'2019-05-25',dateTo:'2019-05-30',oaci:'',lieu:'Mondreville',region:'Île-de-France',type:'entrainement',pratique:'paramoteur',discipline:'classic',saison:'2019',desc:'Référent : FFPLUM · DC : Pascal Vallée'});
+  _add({id:'calf-2019-para-slalom',name:'Compétition Paramoteur Slalom',dateFrom:'2019-05-18',dateTo:'2019-05-22',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'slalom',saison:'2019',desc:'DC : Pascal Vallée'});
+  _add({id:'calf-2019-para-classic',name:'Compétition Paramoteur Classic',dateFrom:'2019-06-29',dateTo:'2019-07-06',oaci:'',lieu:'',region:'',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2019',desc:'Référent : FFPLUM · DC : Pascal Vallée'});
+  // ── 2018 ──
+  _add({id:'calf-2018-lfoq-cdf-para-classic',name:'Championnat de France Paramoteur Classic - LFOQ',dateFrom:'2018-06-30',dateTo:'2018-07-07',oaci:'LFOQ',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2018',desc:''});
+  _add({id:'calf-2018-lfoq-cdf-micro-classic',name:'Championnat de France Microlight Classic - LFOQ',dateFrom:'2018-07-04',dateTo:'2018-07-07',oaci:'LFOQ',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2018',desc:''});
+  _add({id:'calf-2018-thaïlande-para-classic',name:'Compétition Paramoteur Classic - Thaïlande',dateFrom:'2018-04-27',dateTo:'2018-05-06',oaci:'',lieu:'Pasak Jolasid Dam',region:'Thaïlande',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2018',desc:'Référent : La DTN'});
+  _add({id:'calf-2018-egypte-para-slalom',name:'Compétition Paramoteur Slalom - Égypte',dateFrom:'2018-10-25',dateTo:'2018-11-05',oaci:'',lieu:'Égypte',region:'',type:'regional',pratique:'paramoteur',discipline:'slalom',saison:'2018',desc:''});
+  _add({id:'calf-2018-stage-para-slalom',name:'Stage Paramoteur Slalom',dateFrom:'2018-08-20',dateTo:'2018-08-24',oaci:'',lieu:'',region:'',type:'entrainement',pratique:'paramoteur',discipline:'slalom',saison:'2018',desc:'DC : Pascal Vallée'});
+  // ── 2017 ──
+  _add({id:'calf-2017-blois-cdf-para-classic',name:'Championnat de France Paramoteur Classic - Blois',dateFrom:'2017-07-02',dateTo:'2017-07-08',oaci:'LFOQ',lieu:'Blois',region:'Centre',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2017',desc:'Référent : Pascal Vallée · DC : Pascal Vallée'});
+  _add({id:'calf-2017-lfoq-cdf-micro-classic',name:'Championnat de France Microlight Classic - LFOQ',dateFrom:'2017-07-02',dateTo:'2017-07-08',oaci:'LFOQ',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2017',desc:'Référent : Jean-Michel SERRE'});
+  _add({id:'calf-2017-wroclaw-para-classic',name:'Compétition Paramoteur Classic - Wroclaw',dateFrom:'2017-07-20',dateTo:'2017-07-25',oaci:'',lieu:'Wroclaw',region:'Pologne',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2017',desc:'Référent : Pascal Vallée'});
+  _add({id:'calf-2017-breclav-para-classic',name:'Compétition Paramoteur Classic - Břeclav',dateFrom:'2017-08-16',dateTo:'2017-08-26',oaci:'',lieu:'Břeclav',region:'République Tchèque',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2017',desc:'Référent : Pascal Vallée'});
+  _add({id:'calf-2017-nagykanizsa-micro-classic',name:'Compétition Microlight Classic - Nagykanizsa (Hongrie)',dateFrom:'2017-08-09',dateTo:'2017-08-19',oaci:'',lieu:'Nagykanizsa',region:'Hongrie',type:'regional',pratique:'microlight',discipline:'classic',saison:'2017',desc:'Référent : Mohamed AZZOUNI'});
+  _add({id:'calf-2017-bornos-para-slalom',name:'Compétition Paramoteur Slalom - Bornos',dateFrom:'2017-10-03',dateTo:'2017-11-07',oaci:'',lieu:'Bornos',region:'ESP',type:'regional',pratique:'paramoteur',discipline:'slalom',saison:'2017',desc:'Référent : Pascal Vallée'});
+  // ── 2016 ──
+  _add({id:'calf-2016-cde-para-slalom',name:'Championnat d\'Europe Paramoteur Slalom',dateFrom:'2016-06-09',dateTo:'2016-06-18',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2016',desc:''});
+  _add({id:'calf-2016-popham-cdm-micro-classic',name:'Championnat du Monde Microlight Classic - Popham',dateFrom:'2016-08-20',dateTo:'2016-08-27',oaci:'',lieu:'Popham',region:'UK',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2016',desc:''});
+  _add({id:'calf-2016-popham-cdm-para-classic',name:'Championnat du Monde Paramoteur Classic - Popham',dateFrom:'2016-08-20',dateTo:'2016-08-27',oaci:'',lieu:'Popham',region:'UK',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2016',desc:''});
+  // ── 2015 ──
+  _add({id:'calf-2015-legnica-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom - Legnica',dateFrom:'2015-06-27',dateTo:'2015-07-05',oaci:'',lieu:'Legnica',region:'Pologne',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2015',desc:''});
+  _add({id:'calf-2015-cdf-micro-classic',name:'Championnat de France Microlight Classic',dateFrom:'2015-09-24',dateTo:'2015-10-04',oaci:'',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2015',desc:''});
+  // ── 2014 ──
+  _add({id:'calf-2014-cdm-para-slalom-hongrie',name:'Championnat du Monde Paramoteur Slalom - Hongrie',dateFrom:'2014-01-01',dateTo:'2014-01-01',oaci:'',lieu:'Hongrie',region:'',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2014',desc:''});
+  _add({id:'calf-2014-lf3624-cdf-micro-classic',name:'Championnat de France Microlight Classic - LF3624',dateFrom:'2014-01-01',dateTo:'2014-01-01',oaci:'LF3624',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2014',desc:''});
+  // ── 2013 ──
+  _add({id:'calf-2013-cde-micro-classic',name:'Championnat d\'Europe Microlight Classic',dateFrom:'2013-05-23',dateTo:'2013-06-02',oaci:'',lieu:'',region:'',type:'cdf',pratique:'microlight',discipline:'classic',saison:'2013',desc:''});
+  _add({id:'calf-2013-cde-para-classic',name:'Championnat d\'Europe Paramoteur Classic',dateFrom:'2013-08-10',dateTo:'2013-08-18',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2013',desc:''});
+  _add({id:'calf-2013-cdm-para-slalom',name:'Championnat du Monde Paramoteur Slalom',dateFrom:'2013-09-09',dateTo:'2013-09-12',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'slalom',saison:'2013',desc:''});
+  // ── 2012 ──
+  _add({id:'calf-2012-cdm-para-classic',name:'Championnat du Monde Paramoteur Classic',dateFrom:'2012-09-01',dateTo:'2012-09-01',oaci:'',lieu:'',region:'',type:'cdf',pratique:'paramoteur',discipline:'classic',saison:'2012',desc:''});
+  saveState();
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
-  await loadState(); // attendre la restauration complète (affiches incluses) avant tout saveState()
+  await loadState();
   injectMaisoncelles2026();
+  injectCalendrier2026();
+  injectCalendrierFull();
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
