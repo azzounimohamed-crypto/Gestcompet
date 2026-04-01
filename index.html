@@ -109,6 +109,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
 .sheet-title{font-size:16px;font-weight:700}
 .sheet-close{background:var(--navy3);border:none;color:var(--txt2);border-radius:50%;width:30px;height:30px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
+@keyframes spin{to{transform:rotate(360deg)}}
 .sheet-body{padding:0 16px 20px}
 /* Toast */
 #toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);background:var(--navy3);color:var(--txt);border:1px solid var(--bdr);border-radius:20px;padding:10px 20px;font-size:13px;font-weight:600;z-index:500;opacity:0;transition:opacity .25s;white-space:nowrap;pointer-events:none}
@@ -1306,63 +1307,244 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 
 <!-- AJOUT / EDIT COMPÉTITION -->
 <div class="overlay" id="sheet-comp" onclick="closeOnBg(event,'sheet-comp')">
-<div class="sheet">
-  <div class="sheet-bar"></div>
-  <div class="sheet-head">
-    <div class="sheet-title" id="comp-sheet-title">Nouvelle compétition</div>
-    <button class="sheet-close" onclick="closeSheet('sheet-comp')">×</button>
+<div class="sheet" style="max-height:93vh;display:flex;flex-direction:column">
+  <div class="sheet-bar" style="flex-shrink:0"></div>
+
+  <!-- ── Barre d'actions (sticky) ── -->
+  <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:10px 16px 12px;border-bottom:1px solid var(--bdr)">
+    <button id="comp-delete-btn" onclick="deleteComp()"
+      style="display:none;align-items:center;gap:5px;padding:7px 11px;border-radius:8px;border:1.5px solid var(--red);background:rgba(239,68,68,.08);color:var(--red);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
+      🗑 Supprimer
+    </button>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:15px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="comp-sheet-title">Nouvelle compétition</div>
+      <div style="font-size:10px;color:var(--txt3);margin-top:1px">* Champs obligatoires</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <button style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer" onclick="closeSheet('sheet-comp')">Annuler</button>
+      <button onclick="saveComp()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Enregistrer
+      </button>
+      <button class="sheet-close" onclick="closeSheet('sheet-comp')">×</button>
+    </div>
   </div>
-  <div class="sheet-body">
+
+  <!-- ── Corps scrollable ── -->
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px">
     <input type="hidden" id="comp-edit-id">
-    <div class="grid2">
-      <div class="field"><label>Date début</label><input type="date" id="comp-date-from"></div>
-      <div class="field"><label>Date fin</label><input type="date" id="comp-date-to"></div>
-    </div>
-    <div class="field"><label>Nom / Lieu</label><input type="text" id="comp-name" placeholder="Championnat de France STOL…"></div>
-    <div class="grid2">
-      <div class="field"><label>Code OACI</label><input type="text" id="comp-oaci" placeholder="LFSE" style="text-transform:uppercase"></div>
-      <div class="field"><label>Lieu</label><input type="text" id="comp-lieu" placeholder="Ville ou aérodrome"></div>
-    </div>
-    <div class="field"><label>Région</label><input type="text" id="comp-region" placeholder="Occitanie"></div>
-    <div class="field"><label>Type</label>
-      <select id="comp-type">
-        <option value="cdf">Championnat de France</option>
-        <option value="regional">Manche régionale</option>
-        <option value="comp-regionale">Compétition Régionale</option>
-        <option value="stage">Stage</option>
-        <option value="entrainement">Entraînement / Qualif</option>
-      </select>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Pratique</label>
-        <select id="comp-pratique">
-          <option value="microlight">Microlight</option>
-          <option value="paramoteur">Paramoteur</option>
-        </select>
+
+    <!-- ═══ § 1 · IDENTITÉ ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:12px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(0,87,255,.15);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">📋</span>
+        Identité
       </div>
-      <div class="field"><label>Discipline</label>
-        <select id="comp-discipline">
-          <option value="classic">Classic</option>
-          <option value="slalom">Slalom</option>
-          <option value="stol">STOL</option>
-        </select>
+      <!-- Nom -->
+      <div style="margin-bottom:10px">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Nom de la compétition <span style="color:var(--red)">*</span></label>
+        <input type="text" id="comp-name" placeholder="ex : Championnat de France STOL 2026"
+          style="width:100%;box-sizing:border-box;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;font-weight:600;padding:10px 12px;outline:none">
+      </div>
+      <!-- Type · Pratique · Discipline -->
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Type</label>
+          <select id="comp-type" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:9px 8px;outline:none;cursor:pointer">
+            <option value="comp-internationale">Compétition internationale</option>
+            <option value="cdf">Compétition nationale</option>
+            <option value="comp-regionale">Compétition régionale</option>
+            <option value="entrainement-national">Entraînement national</option>
+            <option value="stage">Stage</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Pratique</label>
+          <select id="comp-pratique" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:9px 8px;outline:none;cursor:pointer">
+            <option value="microlight">Microlight</option>
+            <option value="paramoteur">Paramoteur</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Discipline</label>
+          <select id="comp-discipline" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:9px 8px;outline:none;cursor:pointer">
+            <option value="classic">Classic</option>
+            <option value="slalom">Slalom</option>
+            <option value="stol">STOL</option>
+          </select>
+        </div>
       </div>
     </div>
-    <div class="field"><label>Affiche</label>
-      <div id="comp-affiche-preview" onclick="document.getElementById('comp-affiche-inp').click()"
-        style="width:100%;height:160px;background:var(--navy3);border:2px dashed var(--bdr);border-radius:var(--rs);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;margin-bottom:8px">
-        <span id="comp-affiche-icon" style="font-size:32px;color:var(--txt3)">🖼 Appuyer pour ajouter une affiche</span>
-        <img id="comp-affiche-img" style="display:none;width:100%;height:100%;object-fit:cover">
+
+    <!-- ═══ § 2 · PLANIFICATION ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:12px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(245,158,11,.15);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">📅</span>
+        Planification
       </div>
-      <input type="file" id="comp-affiche-inp" accept="image/*" style="display:none" onchange="handleAfficheUpload(this)">
-      <input type="text" id="comp-affiche-url" placeholder="ou coller une URL https://…" style="font-size:12px" oninput="previewAfficheUrl(this.value)">
+      <!-- Dates principales -->
+      <div style="font-size:11px;font-weight:600;color:var(--txt2);margin-bottom:7px">Dates de la compétition</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:5px">Début <span style="color:var(--red)">*</span></label>
+          <input type="date" id="comp-date-from" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:5px">Fin</label>
+          <input type="date" id="comp-date-to" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;outline:none">
+        </div>
+      </div>
+      <!-- Séparateur report -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="flex:1;height:1px;background:var(--bdr)"></div>
+        <span style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;padding:0 4px">Report éventuel</span>
+        <div style="flex:1;height:1px;background:var(--bdr)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:5px;opacity:.7">Reportée du</label>
+          <input type="date" id="comp-date-report-from" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;outline:none;opacity:.75">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:5px;opacity:.7">Au</label>
+          <input type="date" id="comp-date-report-to" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;outline:none;opacity:.75">
+        </div>
+      </div>
     </div>
-    <div class="field"><label>Description</label><textarea id="comp-desc" placeholder="Informations complémentaires…"></textarea></div>
-    <div class="row">
-      <button class="btn btn-secondary" style="flex:1" onclick="closeSheet('sheet-comp')">Annuler</button>
-      <button class="btn btn-primary" style="flex:1" onclick="saveComp()">💾 Enregistrer</button>
+
+    <!-- ═══ § 3 · LOCALISATION ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:12px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(34,197,94,.15);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">📍</span>
+        Localisation
+      </div>
+      <div style="display:grid;grid-template-columns:96px 1fr 1fr;gap:8px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Code OACI</label>
+          <input type="text" id="comp-oaci" placeholder="LFSE" maxlength="8"
+            oninput="autoFillCompOACI(this.value)"
+            style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--stol);font-family:'Inter',monospace;font-size:15px;font-weight:800;letter-spacing:2px;padding:9px 6px;outline:none;text-transform:uppercase;text-align:center">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Lieu / Aérodrome</label>
+          <input type="text" id="comp-lieu" placeholder="Commune, terrain…"
+            style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Région / Pays</label>
+          <input type="text" id="comp-region" placeholder="Région ou pays" list="comp-regions-list"
+            style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none">
+          <datalist id="comp-regions-list">
+            <option value="Auvergne-Rhône-Alpes"><option value="Bourgogne-Franche-Comté">
+            <option value="Bretagne"><option value="Centre-Val de Loire"><option value="Corse">
+            <option value="Grand Est"><option value="Hauts-de-France"><option value="Île-de-France">
+            <option value="Normandie"><option value="Nouvelle-Aquitaine"><option value="Occitanie">
+            <option value="Pays de la Loire"><option value="Provence-Alpes-Côte d'Azur">
+            <option value="Guadeloupe"><option value="Martinique"><option value="Guyane">
+            <option value="La Réunion"><option value="Mayotte">
+            <option value="Allemagne"><option value="Belgique"><option value="Espagne">
+            <option value="Italie"><option value="Luxembourg"><option value="Maroc">
+            <option value="Pays-Bas"><option value="Portugal"><option value="Royaume-Uni">
+            <option value="Suisse"><option value="Tunisie">
+          </datalist>
+        </div>
+      </div>
     </div>
-  </div>
+
+    <!-- ═══ § 4 · CANDIDATURE ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:12px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(168,85,247,.15);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">📄</span>
+        Candidature
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <!-- Zone portrait PDF -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center;flex-shrink:0">
+          <div id="comp-cand-preview"
+            onclick="document.getElementById('comp-cand-inp').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--stol)'"
+            ondragleave="this.style.borderColor='var(--bdr)'"
+            ondrop="handleCandidatureDrop(event)"
+            style="width:86px;height:122px;background:var(--navy2);border:2px dashed var(--bdr);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s;position:relative">
+            <span id="comp-cand-icon" style="font-size:10px;color:var(--txt3);text-align:center;padding:7px;line-height:1.8">📄<br>Courrier<br>candidature<br><br>Déposer<br>ou cliquer</span>
+            <div id="comp-cand-done" style="display:none;flex-direction:column;align-items:center;gap:5px;padding:7px;text-align:center">
+              <div style="font-size:26px">📋</div>
+              <div id="comp-cand-name" style="font-size:9px;color:var(--stol);word-break:break-all;line-height:1.4;font-weight:600"></div>
+            </div>
+            <div id="comp-cand-spinner" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;flex-direction:column;gap:6px;border-radius:10px">
+              <div style="width:20px;height:20px;border:2.5px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></div>
+              <div style="font-size:9px;color:#fff;text-align:center;font-weight:600">Lecture…</div>
+            </div>
+          </div>
+          <input type="file" id="comp-cand-inp" accept=".pdf,.doc,.docx,.odt,image/*" style="display:none" onchange="handleCandidatureUpload(this)">
+          <button id="comp-cand-view-btn" type="button" onclick="viewCandidatureDoc()"
+            style="display:none;width:86px;padding:5px 0;border-radius:20px;border:1.5px solid var(--stol);background:rgba(0,87,255,.1);color:var(--stol);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center">
+            👁 Voir
+          </button>
+        </div>
+        <!-- Champs droite -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:9px;min-width:0">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Date de candidature</label>
+              <input type="date" id="comp-cand-date" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:8px 8px;outline:none">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Date de validation</label>
+              <input type="date" id="comp-cand-validation" style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:8px 8px;outline:none">
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">Demandeur</label>
+            <input type="text" id="comp-cand-demandeur" placeholder="Club, association, ligue…"
+              style="width:100%;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none">
+          </div>
+          <div id="comp-cand-ai-info" style="display:none;font-size:11px;color:var(--stol);background:rgba(0,87,255,.07);border:1px solid rgba(0,87,255,.18);border-radius:8px;padding:7px 10px;line-height:1.5"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ § 5 · AFFICHE ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:12px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(239,68,68,.12);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">🖼</span>
+        Affiche
+      </div>
+      <input type="file" id="comp-affiche-inp" accept="image/*,.pdf" style="display:none" onchange="handleAfficheUpload(this)">
+      <input type="hidden" id="comp-affiche-url">
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+          <div id="comp-affiche-preview"
+            onclick="document.getElementById('comp-affiche-inp').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--stol)'"
+            ondragleave="this.style.borderColor='var(--bdr)'"
+            ondrop="handleAfficheDrop(event)"
+            style="width:88px;height:124px;background:var(--navy2);border:2px dashed var(--bdr);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s">
+            <span id="comp-affiche-icon" style="font-size:11px;color:var(--txt3);text-align:center;padding:8px;line-height:1.8">🖼<br>Cliquer ou<br>déposer</span>
+            <img id="comp-affiche-img" style="display:none;width:100%;height:100%;object-fit:contain">
+          </div>
+          <button id="comp-affiche-view-btn" type="button" onclick="viewAfficheDoc()"
+            style="display:none;width:88px;padding:5px 0;border-radius:20px;border:1.5px solid var(--stol);background:rgba(0,87,255,.1);color:var(--stol);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;text-align:center">
+            👁 Voir
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--txt3);line-height:2;padding-bottom:6px">
+          Format portrait (3:4)<br>Image ou PDF<br>Cliquer ou glisser-déposer
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ § 6 · NOTES ═══ -->
+    <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:10px;display:flex;align-items:center;gap:7px">
+        <span style="width:20px;height:20px;background:rgba(148,163,184,.12);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">📝</span>
+        Notes
+      </div>
+      <textarea id="comp-desc" placeholder="Programme, informations complémentaires, consignes…"
+        style="width:100%;box-sizing:border-box;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;line-height:1.6;padding:10px 12px;outline:none;resize:vertical;min-height:80px"></textarea>
+    </div>
+
+  </div><!-- /corps scrollable -->
 </div>
 </div>
 
@@ -2210,6 +2392,12 @@ function openAddComp() {
   document.getElementById('comp-sheet-title').textContent = 'Nouvelle compétition';
   document.getElementById('comp-date-from').value = '';
   document.getElementById('comp-date-to').value = '';
+  document.getElementById('comp-date-report-from').value = '';
+  document.getElementById('comp-date-report-to').value = '';
+  document.getElementById('comp-cand-date').value = '';
+  document.getElementById('comp-cand-demandeur').value = '';
+  document.getElementById('comp-cand-validation').value = '';
+  resetCandidatureForm();
   document.getElementById('comp-name').value = '';
   document.getElementById('comp-oaci').value = '';
   var _aeroSearch = document.getElementById('comp-aero-search'); if (_aeroSearch) _aeroSearch.value = '';
@@ -2219,7 +2407,244 @@ function openAddComp() {
   document.getElementById('comp-desc').value = '';
   document.getElementById('comp-affiche-url').value = '';
   resetAfficheForm();
+  var delBtn = document.getElementById('comp-delete-btn');
+  if (delBtn) delBtn.style.display = 'none';
   openSheet('sheet-comp');
+}
+
+// Auto-complétion OACI → Lieu + Région dans sheet-comp
+var _OACI_REGION_MAP = {
+  'A':'Occitanie','B':'Nouvelle-Aquitaine','C':'Occitanie','D':'Nouvelle-Aquitaine',
+  'E':'Bretagne','F':'Centre-Val de Loire','G':'Grand Est','H':'Auvergne-Rhône-Alpes',
+  'J':'Normandie','K':'Corse','L':'Auvergne-Rhône-Alpes',
+  'M':'Provence-Alpes-Côte d\'Azur','N':'Occitanie','O':'Normandie',
+  'P':'Île-de-France','Q':'Hauts-de-France','R':'Bretagne',
+  'S':'Hauts-de-France','T':'Pays de la Loire','X':'Grand Est','Y':'Grand Est'
+};
+function autoFillCompOACI(val) {
+  var oaci = (val || '').trim().toUpperCase();
+  var lieuEl   = document.getElementById('comp-lieu');
+  var regionEl = document.getElementById('comp-region');
+  if (!oaci || oaci.length < 4) return;
+  var aMatch = (AERODROMES_FR || []).find(function(a) { return a[0] === oaci; });
+  if (aMatch) {
+    // Toujours remplir Lieu quand un code OACI reconnu est saisi
+    if (lieuEl) lieuEl.value = aMatch[1];
+    if (regionEl) {
+      var prefix3 = oaci.length >= 3 ? oaci[2].toUpperCase() : '';
+      var region  = _OACI_REGION_MAP[prefix3] || '';
+      if (region) regionEl.value = region;
+    }
+    toast('OACI ' + oaci + ' → ' + aMatch[1], 'ok');
+  }
+}
+
+// ── Suppression compétition ──────────────────────────────────────────────────
+function deleteComp() {
+  var id = document.getElementById('comp-edit-id').value;
+  if (!id) return;
+  var cp = S.comps.find(function(c){ return c.id === id; });
+  if (!cp) return;
+  if (!confirm('Supprimer « ' + (cp.name || 'cette compétition') + ' » ?\n\nCette action est irréversible.')) return;
+  S.comps = S.comps.filter(function(c){ return c.id !== id; });
+  saveState();
+  closeSheet('sheet-comp');
+  renderCompetitions();
+  if (typeof renderHomeDesktopComps === 'function') renderHomeDesktopComps();
+  toast('Compétition supprimée', 'ok');
+}
+
+// ── Candidature : reset ───────────────────────────────────────────────────────
+function resetCandidatureForm() {
+  var inp  = document.getElementById('comp-cand-inp');
+  var done = document.getElementById('comp-cand-done');
+  var icon = document.getElementById('comp-cand-icon');
+  var name = document.getElementById('comp-cand-name');
+  var spin = document.getElementById('comp-cand-spinner');
+  var info = document.getElementById('comp-cand-ai-info');
+  var vBtn = document.getElementById('comp-cand-view-btn');
+  if (inp)  { inp._data = null; inp._name = ''; inp.value = ''; }
+  if (done) done.style.display = 'none';
+  if (icon) icon.style.display = '';
+  if (name) name.textContent = '';
+  if (spin) spin.style.display = 'none';
+  if (info) { info.style.display = 'none'; info.innerHTML = ''; }
+  if (vBtn) vBtn.style.display = 'none';
+}
+
+// ── Candidature : extraction de texte lisible depuis binaire ─────────────────
+function _extractReadableText(buffer) {
+  var bytes = new Uint8Array(buffer);
+  var result = '';
+  var run = '';
+  for (var i = 0; i < bytes.length; i++) {
+    var b = bytes[i];
+    if (b === 10 || b === 13) {
+      if (run.trim().length >= 3) result += run.trim() + '\n';
+      run = '';
+    } else if (b >= 32 && b < 127) {
+      run += String.fromCharCode(b);
+    } else {
+      if (run.trim().length >= 3) result += run.trim() + ' ';
+      run = '';
+    }
+  }
+  if (run.trim().length >= 3) result += run.trim();
+  return result;
+}
+
+// ── Candidature : analyse du texte extrait ────────────────────────────────────
+function _parseCandidatureText(text, filename) {
+  var foundDate = '';
+  // Format JJ/MM/AAAA ou JJ-MM-AAAA
+  var re1 = /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](20\d{2})\b/g;
+  var m;
+  while ((m = re1.exec(text)) !== null) {
+    var d = parseInt(m[1]), mo = parseInt(m[2]);
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) {
+      foundDate = m[3] + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      break;
+    }
+  }
+  // Format AAAA-MM-JJ
+  if (!foundDate) {
+    var re2 = /\b(20\d{2})-(\d{2})-(\d{2})\b/.exec(text);
+    if (re2) foundDate = re2[1] + '-' + re2[2] + '-' + re2[3];
+  }
+  // Format textuel français : "12 avril 2025"
+  if (!foundDate) {
+    var months = {janvier:'01',f:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',ao:'08',septembre:'09',octobre:'10',novembre:'11',d:'12'};
+    var re3 = /\b(\d{1,2})\s+(janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+(20\d{2})\b/gi;
+    var fm;
+    var _mmap = {janvier:'01',février:'02',fevrier:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',août:'08',aout:'08',septembre:'09',octobre:'10',novembre:'11',décembre:'12',decembre:'12'};
+    while ((fm = re3.exec(text)) !== null) {
+      var mon = _mmap[(fm[2]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')];
+      if (!mon) mon = _mmap[(fm[2]||'').toLowerCase()];
+      if (mon) { foundDate = fm[3] + '-' + mon + '-' + String(parseInt(fm[1])).padStart(2,'0'); break; }
+    }
+  }
+  // Expéditeur / Demandeur
+  var demandeur = '';
+  var lines = text.split(/\n+/);
+  var deRe = /^(?:de\s*:\s*|from\s*:\s*|exp[ée]diteur\s*:\s*|signataire\s*:\s*|contact\s*:\s*)(.{3,80})/i;
+  var orgRe = /\b(club|aéro|aero|association|soci[ée]t[ée]|ligue|comit[ée]|f[ée]d[ée]r|ligue|groupement)\b/i;
+  for (var i = 0; i < Math.min(lines.length, 100); i++) {
+    var l = lines[i].trim();
+    if (!l || l.length < 4 || l.length > 100) continue;
+    var dm = deRe.exec(l);
+    if (dm) { demandeur = dm[1].trim().substring(0, 80); break; }
+    if (orgRe.test(l) && l.length >= 5) { demandeur = l.substring(0, 80); break; }
+  }
+  // Fallback : nom de fichier nettoyé
+  if (!demandeur && filename) {
+    demandeur = filename.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim().substring(0, 80);
+  }
+  return { date: foundDate, demandeur: demandeur };
+}
+
+function _applyCandidatureAutoFill(result, filename) {
+  var spin = document.getElementById('comp-cand-spinner');
+  if (spin) spin.style.display = 'none';
+  var dateEl = document.getElementById('comp-cand-date');
+  var demEl  = document.getElementById('comp-cand-demandeur');
+  var info   = document.getElementById('comp-cand-ai-info');
+  var viewBtn= document.getElementById('comp-cand-view-btn');
+  if (viewBtn) viewBtn.style.display = '';
+  var filled = [];
+  if (result.date)      { if (dateEl) { dateEl.value = result.date; }      filled.push('date'); }
+  if (result.demandeur) { if (demEl)  { demEl.value  = result.demandeur; } filled.push('demandeur'); }
+  if (info) {
+    info.style.display = '';
+    info.innerHTML = filled.length
+      ? '✨ Rempli automatiquement : ' + filled.join(' · ')
+      : 'ℹ️ Aucune donnée reconnue — remplissez manuellement';
+  }
+}
+
+function handleCandidatureUpload(inp) {
+  if (!inp.files || !inp.files[0]) return;
+  var file = inp.files[0];
+  var done = document.getElementById('comp-cand-done');
+  var icon = document.getElementById('comp-cand-icon');
+  var nameEl = document.getElementById('comp-cand-name');
+  var spin = document.getElementById('comp-cand-spinner');
+  if (spin) spin.style.display = 'flex';
+  if (nameEl) nameEl.textContent = file.name;
+  // 1. Stocker en DataURL
+  var r1 = new FileReader();
+  r1.onload = function(e) { inp._data = e.target.result; inp._name = file.name; };
+  r1.readAsDataURL(file);
+  // 2. Lire en ArrayBuffer → extraction texte robuste (fonctionne sur PDF + Word + texte)
+  var r2 = new FileReader();
+  r2.onload = function(e) {
+    var txt = _extractReadableText(e.target.result);
+    if (done) done.style.display = 'flex';
+    if (icon) icon.style.display = 'none';
+    var result = _parseCandidatureText(txt, file.name);
+    setTimeout(function() { _applyCandidatureAutoFill(result, file.name); }, 400);
+  };
+  r2.onerror = function() {
+    if (spin) spin.style.display = 'none';
+    if (done) done.style.display = 'flex';
+    if (icon) icon.style.display = 'none';
+    _applyCandidatureAutoFill({ date: '', demandeur: '' }, file.name);
+  };
+  r2.readAsArrayBuffer(file);
+}
+
+// ── Visualiser le document candidature ────────────────────────────────────────
+function viewCandidatureDoc() {
+  var inp = document.getElementById('comp-cand-inp');
+  if (!inp || !inp._data) { toast('Aucun document chargé', 'err'); return; }
+  var data = inp._data;
+  var win = window.open('', '_blank');
+  if (!win) { toast('Popup bloquée par le navigateur', 'err'); return; }
+  if (data.startsWith('data:application/pdf') || (inp._name||'').toLowerCase().endsWith('.pdf')) {
+    win.document.write('<html><body style="margin:0"><embed src="' + data + '" type="application/pdf" width="100%" height="100%" style="height:100vh"></body></html>');
+  } else if (data.startsWith('data:image/')) {
+    win.document.write('<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + data + '" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>');
+  } else {
+    var a = win.document.createElement('a');
+    a.href = data; a.download = inp._name || 'document'; a.click();
+    win.close();
+  }
+}
+
+// ── Candidature : drag & drop ─────────────────────────────────────────────────
+function handleCandidatureDrop(e) {
+  e.preventDefault();
+  var prev = document.getElementById('comp-cand-preview');
+  if (prev) prev.style.borderColor = 'var(--bdr)';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file) return;
+  var fakeInp = document.getElementById('comp-cand-inp');
+  if (!fakeInp) return;
+  // Simuler l'upload via le même gestionnaire
+  var dt = new DataTransfer();
+  dt.items.add(file);
+  try { fakeInp.files = dt.files; } catch(ex) {}
+  handleCandidatureUpload(fakeInp);
+}
+
+// Drag & drop affiche dans sheet-comp
+function handleAfficheDrop(e) {
+  e.preventDefault();
+  var prev = document.getElementById('comp-affiche-preview');
+  if (prev) prev.style.borderColor = 'var(--bdr)';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var inp  = document.getElementById('comp-affiche-inp');
+    var img  = document.getElementById('comp-affiche-img');
+    var icon = document.getElementById('comp-affiche-icon');
+    var url  = document.getElementById('comp-affiche-url');
+    if (img)  { img.src = ev.target.result; img.style.display = ''; }
+    if (icon) icon.style.display = 'none';
+    if (inp)  inp._data = ev.target.result;
+    if (url)  url.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 function searchAerodrome(q) {
@@ -2263,6 +2688,13 @@ function saveComp() {
     name: document.getElementById('comp-name').value.trim(),
     dateFrom: document.getElementById('comp-date-from').value,
     dateTo: document.getElementById('comp-date-to').value,
+    dateReportFrom: document.getElementById('comp-date-report-from').value,
+    dateReportTo: document.getElementById('comp-date-report-to').value,
+    candidatureDoc: (function(){ var i=document.getElementById('comp-cand-inp'); return (i&&i._data)||''; })(),
+    candidatureDocName: (function(){ var i=document.getElementById('comp-cand-inp'); return (i&&i._name)||''; })(),
+    candidatureDate: document.getElementById('comp-cand-date').value,
+    candidatureDemandeur: document.getElementById('comp-cand-demandeur').value.trim(),
+    dateValidation: document.getElementById('comp-cand-validation').value,
     oaci: document.getElementById('comp-oaci').value.toUpperCase().trim(),
     lieu: document.getElementById('comp-lieu').value.trim(),
     region: document.getElementById('comp-region').value.trim(),
@@ -2336,7 +2768,7 @@ function renderCompetitions() {
     var today = new Date().toISOString().substring(0,10);
     var status = today < cp.dateFrom ? 'badge-prog' : today <= (cp.dateTo||cp.dateFrom) ? 'badge-enc' : 'badge-term';
     var statusLabel = status === 'badge-prog' ? 'Programmée' : status === 'badge-enc' ? 'En cours' : 'Terminée';
-    var typeLabel = {cdf:'🏆 CdF',regional:'🔵 Régionale',entrainement:'🟡 Entraînement'}[cp.type] || cp.type;
+    var typeLabel = {'comp-internationale':'🌍 Internationale','cdf':'🏆 Nationale','regional':'🔵 Régionale','comp-regionale':'🔵 Régionale','entrainement-national':'🟡 Entraînement national','entrainement':'🟡 Entraînement','stage':'📚 Stage'}[cp.type] || (cp.type||'');
     var runCount = S.runs[cp.id] ? S.runs[cp.id].length : 0;
     var card = document.createElement('div');
     card.className = 'comp-card';
@@ -2380,6 +2812,16 @@ function renderCompetitions() {
     runs.textContent = runCount + ' résultat(s)';
     info.appendChild(runs);
     card.appendChild(info);
+    // Bouton Modifier (à droite)
+    var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
+    if (canEdit) {
+      var editBtn = document.createElement('button');
+      editBtn.title = 'Modifier la compétition';
+      editBtn.style.cssText = 'align-self:center;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap';
+      editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Modifier';
+      editBtn.onclick = (function(id){ return function(e){ e.stopPropagation(); editComp(id); }; })(cp.id);
+      card.appendChild(editBtn);
+    }
     c.appendChild(card);
   });
   // Bouton ajouter
@@ -2709,13 +3151,32 @@ function editComp(id) {
   document.getElementById('comp-sheet-title').textContent = 'Modifier compétition';
   document.getElementById('comp-date-from').value = cp.dateFrom || '';
   document.getElementById('comp-date-to').value = cp.dateTo || '';
+  document.getElementById('comp-date-report-from').value = cp.dateReportFrom || '';
+  document.getElementById('comp-date-report-to').value = cp.dateReportTo || '';
+  document.getElementById('comp-cand-date').value = cp.candidatureDate || '';
+  document.getElementById('comp-cand-demandeur').value = cp.candidatureDemandeur || '';
+  document.getElementById('comp-cand-validation').value = cp.dateValidation || '';
+  resetCandidatureForm();
+  if (cp.candidatureDoc) {
+    var _ci = document.getElementById('comp-cand-inp');
+    var _cd = document.getElementById('comp-cand-done');
+    var _cicon = document.getElementById('comp-cand-icon');
+    var _cname = document.getElementById('comp-cand-name');
+    var _cvBtn = document.getElementById('comp-cand-view-btn');
+    if (_ci) { _ci._data = cp.candidatureDoc; _ci._name = cp.candidatureDocName || 'document'; }
+    if (_cd) _cd.style.display = 'flex';
+    if (_cicon) _cicon.style.display = 'none';
+    if (_cname) _cname.textContent = cp.candidatureDocName || 'document';
+    if (_cvBtn) _cvBtn.style.display = '';
+  }
   document.getElementById('comp-name').value = cp.name || '';
   document.getElementById('comp-oaci').value = cp.oaci || '';
-  var _aSrch = document.getElementById('comp-aero-search'); if (_aSrch) { var _aMatch = AERODROMES_FR.find(function(a){return a[0]===(cp.oaci||'');}); _aSrch.value = _aMatch ? _aMatch[1]+' ('+_aMatch[0]+')' : (cp.oaci||''); }
   var _aDd2 = document.getElementById('oaci-dropdown'); if (_aDd2) _aDd2.style.display='none';
   document.getElementById('comp-lieu').value = cp.lieu || '';
   document.getElementById('comp-region').value = cp.region || '';
-  document.getElementById('comp-type').value = cp.type || 'cdf';
+  // Rétrocompatibilité : mapper les anciens types vers les nouveaux
+  var _typeMap = {regional:'comp-regionale', entrainement:'entrainement-national'};
+  document.getElementById('comp-type').value = _typeMap[cp.type] || cp.type || 'cdf';
   document.getElementById('comp-pratique').value = cp.pratique || 'microlight';
   document.getElementById('comp-discipline').value = cp.discipline || 'stol';
   document.getElementById('comp-desc').value = cp.desc || '';
@@ -2724,13 +3185,17 @@ function editComp(id) {
   var urlField = document.getElementById('comp-affiche-url');
   if (urlField) urlField.value = afficheVal.startsWith('http') ? afficheVal : '';
   if (afficheVal) {
-    var img  = document.getElementById('comp-affiche-img');
-    var icon = document.getElementById('comp-affiche-icon');
-    var inp  = document.getElementById('comp-affiche-inp');
+    var img     = document.getElementById('comp-affiche-img');
+    var icon    = document.getElementById('comp-affiche-icon');
+    var inp     = document.getElementById('comp-affiche-inp');
+    var viewBtn = document.getElementById('comp-affiche-view-btn');
     if (img)  { img.src = afficheVal; img.style.display = ''; }
     if (icon) icon.style.display = 'none';
-    if (inp && !afficheVal.startsWith('http')) inp._data = afficheVal;
+    if (inp && !afficheVal.startsWith('http')) { inp._data = afficheVal; }
+    if (viewBtn) viewBtn.style.display = '';
   }
+  var delBtn = document.getElementById('comp-delete-btn');
+  if (delBtn) { delBtn.style.display = 'flex'; }
   closeSheet('sheet-comp-detail');
   openSheet('sheet-comp');
 }
@@ -3203,7 +3668,7 @@ function renderBase() {
   });
 
   var discLabels = {classic:'Classic',classique:'Classic',slalom:'Slalom',stol:'STOL',autre:'Autre'};
-  var typeLabels = {cdf:'Championnat de France',regional:'Manche Régionale','comp-regionale':'Comp. Régionale',stage:'Stage',entrainement:'Entraînement',autre:'Autre'};
+  var typeLabels = {'comp-internationale':'Compétition internationale','cdf':'Compétition nationale','regional':'Compétition régionale','comp-regionale':'Compétition régionale','entrainement-national':'Entraînement national','entrainement':'Entraînement','stage':'Stage',autre:'Autre'};
   var pratColors = {paramotor:'#f59e0b',microlight:'#0057FF',paramoteur:'#f59e0b',all:'#6366f1',autre:'#6b7280'};
   var discColors = {classic:'#0057FF',classique:'#0057FF',slalom:'#10b981',stol:'#f59e0b',autre:'#6b7280'};
   var typeColors = {cdf:'#ef4444','comp-regionale':'#0057FF',regional:'#10b981',stage:'#f59e0b',entrainement:'#8b5cf6',autre:'#6b7280'};
@@ -3537,7 +4002,7 @@ function renderHomeDesktopComps() {
     var status = today < cp.dateFrom ? 'badge-prog' : today <= (cp.dateTo||cp.dateFrom) ? 'badge-enc' : 'badge-term';
     // Pastille colorée : rouge=à venir, vert=en cours, bleu=terminée
     var dotColor = status === 'badge-prog' ? '#ef4444' : status === 'badge-enc' ? '#22c55e' : '#3b82f6';
-    var typeLabel = {cdf:'CdF', regional:'', entrainement:'Entraînement'}[cp.type] || (cp.type||'');
+    var typeLabel = {'comp-internationale':'Internationale','cdf':'Nationale','regional':'Régionale','comp-regionale':'Régionale','entrainement-national':'Entraîn. national','entrainement':'Entraînement','stage':'Stage'}[cp.type] || (cp.type||'');
     var card = document.createElement('div');
     card.className = 'comp-card';
     card.style.cssText = 'padding:0;overflow:hidden;display:flex;align-items:stretch';
@@ -4136,7 +4601,7 @@ function renderHomeDetailPanel(cp) {
   if (!cp) return;
   var detail = document.getElementById('home-detail-comp');
   if (!detail) return;
-  var typeLabel = {cdf:'Championnat de France',regional:'Manche Régionale','comp-regionale':'Compétition Régionale',stage:'Stage',entrainement:'Entraînement'}[cp.type] || (cp.type||'');
+  var typeLabel = {'comp-internationale':'Compétition internationale','cdf':'Compétition nationale','regional':'Compétition régionale','comp-regionale':'Compétition régionale','entrainement-national':'Entraînement national','entrainement':'Entraînement','stage':'Stage'}[cp.type] || (cp.type||'');
   var runs = (S.runs || {})[cp.id] || [];
   var enrolled = (S.compEnroll || {})[cp.id] || [];
   var staffList = [];
@@ -4148,47 +4613,36 @@ function renderHomeDetailPanel(cp) {
     });
   }
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
-  var isEditMode = (_homeDetailTab === 'modifier');
   var html = '';
 
-  // ── En-tête : affiche + infos + boutons (Modifier + Corbeille) ──
+  // ── En-tête : affiche + infos + bouton Modifier ──
   html += '<div style="padding:14px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;gap:12px;flex-shrink:0">';
-  if (cp.affiche && !isEditMode) {
+  if (cp.affiche) {
     html += '<div style="width:80px;min-width:80px;height:96px;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center">';
     html += '<img src="'+cp.affiche+'" style="width:80px;height:96px;object-fit:contain;display:block" onerror="this.parentElement.style.display=\'none\'">';
     html += '</div>';
   }
   html += '<div style="flex:1;min-width:0">';
-  if (isEditMode) {
-    html += '<div style="font-size:15px;font-weight:800;margin-bottom:2px">✏️ Modifier la compétition</div>';
-    html += '<div style="font-size:12px;color:var(--txt3)">'+cp.name+'</div>';
-  } else {
-    html += '<div style="font-size:11px;color:var(--stol);font-weight:700;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">'+typeLabel+'</div>';
-    html += '<div style="font-size:16px;font-weight:800;line-height:1.25;margin-bottom:5px">'+cp.name+'</div>';
-    html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:2px">'+formatDate(cp.dateFrom)+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' — '+formatDate(cp.dateTo):'')+'</div>';
-    if (cp.oaci) html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:2px">'+cp.oaci+(cp.region?' · '+cp.region:'')+'</div>';
-    html += '<div style="font-size:11px;color:var(--txt3)">'+runs.length+' résultat(s) · '+enrolled.length+' inscrit(s)</div>';
-  }
+  html += '<div style="font-size:11px;color:var(--stol);font-weight:700;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">'+typeLabel+'</div>';
+  html += '<div style="font-size:16px;font-weight:800;line-height:1.25;margin-bottom:5px">'+cp.name+'</div>';
+  html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:2px">'+formatDate(cp.dateFrom)+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' — '+formatDate(cp.dateTo):'')+'</div>';
+  if (cp.oaci) html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:2px">'+cp.oaci+(cp.region?' · '+cp.region:'')+'</div>';
+  html += '<div style="font-size:11px;color:var(--txt3)">'+runs.length+' résultat(s) · '+enrolled.length+' inscrit(s)</div>';
   html += '</div>';
-  if (!isEditMode) {
+  if (canEdit) {
     html += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center">';
-    html += '<button onclick="switchHomeDetailTab(\'modifier\')" style="background:#2563eb;border:none;border-radius:8px;cursor:pointer;padding:0 14px;height:36px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;font-family:inherit">Modifier</button>';
+    html += '<button onclick="editComp(\''+cp.id+'\')" style="background:#2563eb;border:none;border-radius:8px;cursor:pointer;padding:0 14px;height:36px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;font-family:inherit">Modifier</button>';
     html += '</div>';
   }
   html += '</div>';
 
-  if (isEditMode) {
-    // ── Mode édition : formulaire pleine hauteur, sans onglets ──
-    html += '<div style="flex:1;overflow-y:auto;padding:16px" id="hdp-tab-content">';
-    html += renderHDPTabContent(cp, 'modifier', runs, enrolled, staffList);
-    html += '</div>';
-  } else {
-    // ── Onglets (sans Modifier) ──
+  {
+    // ── Onglets ──
     var _today2 = new Date().toISOString().slice(0,10);
     var _isProg = true; // Equipage toujours visible (compétitions passées et à venir)
     var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'},{id:'gestion',lbl:'Equipage'},{id:'resultats',lbl:'Résultats'}];
     tabs.push({id:'installation',lbl:'Installation'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'},{id:'messagerie',lbl:'Messagerie'});
-    if (_homeDetailTab === 'modifier' || _homeDetailTab === 'carte') _homeDetailTab = 'infos';
+    if (_homeDetailTab === 'modifier' || _homeDetailTab === 'carte' || !tabs.some(function(t){return t.id===_homeDetailTab;})) _homeDetailTab = 'infos';
     html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 12px;flex-shrink:0">';
     html += '<div style="display:flex;flex:1;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;overflow-x:auto;scrollbar-width:none">';
     tabs.forEach(function(t){
@@ -4702,7 +5156,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       instH += '<div style="border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:12px">';
       instH += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
       instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px">Identité du site</div>';
-      instH += '<button onclick="switchHomeDetailTab(\'modifier\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);cursor:pointer;font-family:inherit">Modifier la compétition</button>';
+      instH += '<button onclick="editComp(\''+sid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);cursor:pointer;font-family:inherit">Modifier la compétition</button>';
       instH += '</div>';
       // OACI + Lieu + Région sur une ligne
       instH += '<div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px">';
@@ -5403,7 +5857,7 @@ function printCompResults(compId) {
   var runs      = (S.runs||{})[compId] || [];
   var staffList = (S.staff||{})[compId] || [];
   var logo      = localStorage.getItem('ffplum_logo') || '';
-  var typeLabel = {cdf:'Championnat de France',regional:'Manche régionale','comp-regionale':'Compétition Régionale',stage:'Stage',entrainement:'Entraînement / Qualif'}[cp.type] || (cp.type||'');
+  var typeLabel = {'comp-internationale':'Compétition internationale','cdf':'Compétition nationale','regional':'Compétition régionale','comp-regionale':'Compétition régionale','entrainement-national':'Entraînement national','entrainement':'Entraînement / Qualif','stage':'Stage'}[cp.type] || (cp.type||'');
   var today     = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
 
   // Construire classements par classe
@@ -7767,13 +8221,15 @@ function handleAfficheUpload(inp) {
   var reader = new FileReader();
   reader.onload = function(e) {
     inp._data = e.target.result;
-    var prev = document.getElementById('comp-affiche-preview');
-    var img  = document.getElementById('comp-affiche-img');
-    var icon = document.getElementById('comp-affiche-icon');
+    inp._name = inp.files[0].name;
+    var prev    = document.getElementById('comp-affiche-preview');
+    var img     = document.getElementById('comp-affiche-img');
+    var icon    = document.getElementById('comp-affiche-icon');
+    var viewBtn = document.getElementById('comp-affiche-view-btn');
     if (img)  { img.src = e.target.result; img.style.display = ''; }
     if (icon) icon.style.display = 'none';
     if (prev) prev.style.borderStyle = 'solid';
-    // Vider l'URL si on a uploadé un fichier
+    if (viewBtn) viewBtn.style.display = '';
     var urlField = document.getElementById('comp-affiche-url');
     if (urlField) urlField.value = '';
   };
@@ -7782,23 +8238,43 @@ function handleAfficheUpload(inp) {
 
 function previewAfficheUrl(url) {
   if (!url) return;
-  var img  = document.getElementById('comp-affiche-img');
-  var icon = document.getElementById('comp-affiche-icon');
-  var inp  = document.getElementById('comp-affiche-inp');
+  var img     = document.getElementById('comp-affiche-img');
+  var icon    = document.getElementById('comp-affiche-icon');
+  var inp     = document.getElementById('comp-affiche-inp');
+  var viewBtn = document.getElementById('comp-affiche-view-btn');
   if (img)  { img.src = url; img.style.display = ''; img.onerror = function(){ img.style.display='none'; if(icon) icon.style.display=''; }; }
   if (icon) icon.style.display = 'none';
-  if (inp)  inp._data = null; // annuler le fichier uploadé
+  if (inp)  { inp._data = null; inp._name = ''; }
+  if (viewBtn) viewBtn.style.display = '';
 }
 
 function resetAfficheForm() {
-  var img  = document.getElementById('comp-affiche-img');
-  var icon = document.getElementById('comp-affiche-icon');
-  var inp  = document.getElementById('comp-affiche-inp');
-  var url  = document.getElementById('comp-affiche-url');
+  var img     = document.getElementById('comp-affiche-img');
+  var icon    = document.getElementById('comp-affiche-icon');
+  var inp     = document.getElementById('comp-affiche-inp');
+  var url     = document.getElementById('comp-affiche-url');
+  var viewBtn = document.getElementById('comp-affiche-view-btn');
   if (img)  { img.src = ''; img.style.display = 'none'; }
   if (icon) icon.style.display = '';
-  if (inp)  { inp._data = null; inp.value = ''; }
+  if (inp)  { inp._data = null; inp._name = ''; inp.value = ''; }
   if (url)  url.value = '';
+  if (viewBtn) viewBtn.style.display = 'none';
+}
+
+function viewAfficheDoc() {
+  var inp = document.getElementById('comp-affiche-inp');
+  var img = document.getElementById('comp-affiche-img');
+  // Priorité : data uploadée, sinon src de l'image (URL externe)
+  var src = (inp && inp._data) ? inp._data : (img && img.src && !img.src.startsWith('data:,') ? img.src : '');
+  if (!src) { toast('Aucune affiche chargée', 'err'); return; }
+  var win = window.open('', '_blank');
+  if (!win) { toast('Autorisez les popups pour visualiser', 'err'); return; }
+  if (src.startsWith('data:application/pdf') || ((inp && inp._name)||'').toLowerCase().endsWith('.pdf')) {
+    win.document.write('<html><body style="margin:0"><embed src="' + src + '" type="application/pdf" width="100%" height="100%" style="height:100vh"></body></html>');
+  } else {
+    win.document.write('<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + src + '" style="max-width:100%;max-height:100vh;object-fit:contain"></body></html>');
+  }
+  win.document.close();
 }
 
 // ═══════════════════════════════════
