@@ -102,7 +102,7 @@ body.theme-light .fc-slot{background:#f0f4f8;border-color:#cbd5e1}
 .field input:focus,.field select:focus{border-color:var(--blue)}
 .field textarea{resize:vertical;min-height:70px}
 /* Overlays & Sheets */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:flex-end}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:flex-end}
 .overlay.open{display:flex}
 .sheet{background:var(--navy2);border-radius:0;width:100%;height:100vh;height:100dvh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom)}
 .sheet-bar{width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 0}
@@ -144,6 +144,41 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
 /* Splash */
 #splash{position:fixed;inset:0;z-index:1000;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+/* Masquer le bouton FS en mode PWA standalone (déjà sans chrome navigateur) */
+@media (display-mode: standalone),(display-mode: fullscreen){#fullscreen-btn{display:none!important}}
+/* Masquer le bouton FS quand une overlay/sheet est ouverte */
+.overlay.open ~ #fullscreen-btn,
+body:has(.overlay.open) #fullscreen-btn{display:none!important}
+/* ── Agenda ── */
+.ag-wdh{padding:7px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.35);text-align:center;border-right:1px solid rgba(255,255,255,.06);background:var(--navy2)}
+.ag-wend{color:rgba(255,255,255,.2)}
+.ag-cell{min-height:88px;border-right:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);padding:5px 4px 4px;cursor:pointer;transition:background .12s;position:relative;display:flex;flex-direction:column;gap:2px;background:var(--navy)}
+.ag-cell:hover{background:var(--navy3)!important}
+.ag-cell.ag-wend-cell{background:var(--navy2)}
+.ag-cell.ag-selected{background:rgba(0,87,255,.14)!important;box-shadow:inset 0 0 0 1.5px rgba(0,87,255,.55)}
+.ag-cell.ag-other-month{background:var(--navy2)!important;opacity:.5}
+.ag-cell.ag-other-month .ag-cell-num{color:var(--txt3)}
+.ag-cell-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--txt);line-height:1;flex-shrink:0;margin-bottom:1px}
+.ag-cell.ag-today .ag-cell-num{background:var(--stol);color:#fff}
+.ag-event{display:flex;align-items:center;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:filter .12s;min-height:18px;line-height:1.3}
+.ag-event:hover{filter:brightness(1.18)}
+.ag-event.ag-ev-start{border-radius:4px 0 0 4px;padding-right:2px}
+.ag-event.ag-ev-mid{border-radius:0;padding:2px 2px}
+.ag-event.ag-ev-end{border-radius:0 4px 4px 0;padding-left:2px}
+.ag-more{font-size:9px;font-weight:700;color:var(--txt3);padding:0 4px;cursor:pointer}
+.ag-more:hover{color:var(--stol)}
+/* Panneau latéral */
+#agenda-side{background:var(--navy2)}
+#agenda-side-content,#agenda-side-empty{background:var(--navy2)}
+/* Sheet pilot manual au-dessus des modaux collectif (z-index:3000) */
+#sheet-pilot-manual.open{z-index:3500!important}
+/* Thème clair */
+body.theme-light .ag-wdh{color:rgba(0,0,0,.45);background:var(--navy3);border-color:rgba(0,0,0,.08)}
+body.theme-light .ag-wend{color:rgba(0,0,0,.3)}
+body.theme-light .ag-cell{background:#fff;border-color:rgba(0,0,0,.08)}
+body.theme-light .ag-cell.ag-wend-cell{background:#f8fafc}
+body.theme-light .ag-cell.ag-other-month{background:#f1f5f9!important}
+body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-light #agenda-side-empty{background:var(--navy3)}
 @keyframes barFill{from{width:0}to{width:100%}}
 /* Photo splash */
 #photo-splash{position:fixed;inset:0;z-index:1100;background:#0a0d18;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;overflow:hidden;transition:opacity .5s ease}
@@ -404,8 +439,83 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
   <div style="font-size:11px;color:var(--txt3);margin-top:40px">v1.0.8 · 2026</div>
 </div>
 
+<!-- ═══════════════ MODALE AGENDA SAISONNIER ═══════════════ -->
+<div id="agenda-overlay" onclick="if(event.target===this)closeAgenda()" style="display:none;position:fixed;inset:0;z-index:800;background:var(--navy)">
+  <div id="agenda-modal" style="width:100%;height:100%;display:flex;flex-direction:column;background:var(--navy);overflow:hidden">
+
+    <!-- ═══ HEADER ═══ -->
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--navy2);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">
+      <!-- Nav -->
+      <button onclick="_agendaGoToday()" style="padding:5px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='transparent'">Aujourd'hui</button>
+      <div style="display:flex;align-items:center;gap:2px">
+        <button onclick="agendaNav(-1)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--txt2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='transparent'">‹</button>
+        <button onclick="agendaNav(+1)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--txt2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='transparent'">›</button>
+      </div>
+      <div id="agenda-month-label" style="font-size:17px;font-weight:800;color:var(--txt);letter-spacing:-.3px;min-width:170px"></div>
+      <!-- Légende -->
+      <div style="flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-left:8px">
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#0057FF;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Nationale</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#7c3aed;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Internationale</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#3b82f6;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Régionale</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#f59e0b;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Entraînement</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#10b981;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Stage</span></div>
+      </div>
+      <!-- Saison + fermer -->
+      <div id="agenda-subtitle" style="font-size:11px;font-weight:700;color:var(--txt3);white-space:nowrap"></div>
+      <button onclick="closeAgenda()" style="width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='transparent'">×</button>
+    </div>
+
+    <!-- ═══ CORPS : calendrier + panneau détail ═══ -->
+    <div style="flex:1;display:flex;overflow:hidden">
+
+      <!-- ── Calendrier (gauche) ── -->
+      <div style="flex:1;overflow:hidden;min-width:0">
+
+        <!-- Conteneur scrollable unique : en-tête sticky + grille -->
+        <div style="height:100%;overflow-y:scroll;scrollbar-gutter:stable;display:flex;flex-direction:column">
+
+          <!-- En-tête jours sticky -->
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid rgba(255,255,255,.06);position:sticky;top:0;z-index:2;flex-shrink:0;background:var(--navy2)">
+            <div class="ag-wdh">Lun</div>
+            <div class="ag-wdh">Mar</div>
+            <div class="ag-wdh">Mer</div>
+            <div class="ag-wdh">Jeu</div>
+            <div class="ag-wdh">Ven</div>
+            <div class="ag-wdh ag-wend">Sam</div>
+            <div class="ag-wdh ag-wend">Dim</div>
+          </div>
+
+          <!-- Grille jours -->
+          <div id="agenda-grid" style="display:grid;grid-template-columns:repeat(7,1fr);align-content:start"></div>
+
+        </div>
+      </div>
+
+      <!-- ── Panneau détail (droite) ── -->
+      <div id="agenda-side" style="width:0;flex-shrink:0;border-left:1px solid rgba(255,255,255,.07);overflow:hidden;display:flex;flex-direction:column;transition:width .28s cubic-bezier(.22,.9,.2,1)">
+        <!-- Rempli par JS -->
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;color:var(--txt3)" id="agenda-side-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="opacity:.3"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div style="font-size:12px;text-align:center;line-height:1.6">Cliquez sur un jour<br>pour voir les compétitions</div>
+        </div>
+        <div id="agenda-side-content" style="display:none;flex-direction:column;height:100%;background:var(--navy2)"></div>
+      </div>
+
+    </div><!-- /corps -->
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast"></div>
+
+<!-- BOUTON PLEIN ÉCRAN FLOTTANT -->
+<button id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein écran"
+  style="position:fixed;bottom:90px;right:14px;z-index:490;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(20,24,40,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:rgba(255,255,255,.65);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.3);transition:opacity .2s,background .2s;padding:0"
+  onmouseover="this.style.background='rgba(0,87,255,.7)';this.style.color='#fff'"
+  onmouseout="this.style.background='rgba(20,24,40,.82)';this.style.color='rgba(255,255,255,.65)'">
+  <svg id="fs-icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+  <svg id="fs-icon-reduce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+</button>
 
 <!-- APP -->
 <div id="app" style="display:none">
@@ -450,7 +560,7 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
   <!-- SIDE RAIL (desktop always visible) -->
   <div id="home-side-rail" style="display:none">
     <button id="home-open-base-btn" class="rail-btn" onclick="showDTNPortal()">Gest'DTN</button>
-    <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Divers</button>
+    <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Documents</button>
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">A faire..</button>
   </div>
 
@@ -470,6 +580,11 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
           <select id="base-saison-sel" onchange="renderBase()"
             style="background:var(--navy3);border:1.5px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:14px;font-weight:700;padding:8px 14px;outline:none;cursor:pointer;min-width:110px">
           </select>
+          <button onclick="openAgenda()" title="Agenda saisonnier"
+            style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1.5px solid var(--stol);background:rgba(0,87,255,.1);color:var(--stol);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Agenda
+          </button>
           <button onclick="printBaseA4()" title="Imprimer le tableau de bord A4"
             style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
             🖨️ Imprimer A4
@@ -539,7 +654,7 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
         <!-- PANNEAU DIVERS DESKTOP -->
         <div id="home-desktop-comps-section" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px 4px">
-            <div style="font-size:16px;font-weight:800">Divers</div>
+            <div style="font-size:16px;font-weight:800">Documents</div>
             <button onclick="toggleHomeCompDrawer(false)" title="Fermer" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:16px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
           </div>
           <div id="home-results-drawer-content" style="padding:0 12px 16px"></div>
@@ -796,6 +911,20 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
 
       <!-- TAB RÉGLAGES -->
       <div id="stab-reglages-panel" style="display:none;overflow-y:auto">
+        <div class="section-title">Affichage</div>
+        <div class="card" style="margin-bottom:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--txt)">Plein écran</div>
+              <div style="font-size:11px;color:var(--txt3);margin-top:2px">Masquer les menus et volets du navigateur</div>
+            </div>
+            <button id="regl-fullscreen-btn" onclick="toggleFullscreen()" class="btn btn-sm"
+              style="flex-shrink:0;display:flex;align-items:center;gap:6px;font-size:12px;min-width:110px;justify-content:center">
+              <svg id="regl-fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              <span id="regl-fs-label">Activer</span>
+            </button>
+          </div>
+        </div>
         <div class="section-title">Apparence</div>
         <div class="card">
           <div style="display:flex;gap:8px">
@@ -866,11 +995,84 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
         </div>
         <div class="section-title">Données locales</div>
         <div class="card">
-          <div class="row">
-            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="exportData()">⬇ Export JSON</button>
-            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="document.getElementById('import-inp').click()">⬆ Import JSON</button>
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
+            La sauvegarde inclut <strong>toutes les données</strong> : compétitions, pilotes, collectif, budget, documents, images (en-tête, pied de page, photos).
           </div>
-          <input type="file" id="import-inp" accept=".json" style="display:none" onchange="importData(this)">
+
+          <!-- Export -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Sauvegarde</div>
+            <button class="btn btn-secondary btn-sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px" onclick="exportData()">
+              <span>⬇</span><span>Télécharger la sauvegarde complète</span><span id="export-size-badge" style="font-size:10px;opacity:.7"></span>
+            </button>
+          </div>
+
+          <!-- Import fusion (avec gestion doublons) -->
+          <div style="margin-bottom:6px">
+            <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Restauration</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="document.getElementById('import-inp').click()">
+                🔀 Fusionner
+              </button>
+              <button class="btn btn-sm" style="flex:1;font-size:11px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444" onclick="document.getElementById('import-full-inp').click()">
+                🔄 Remplacer tout
+              </button>
+            </div>
+            <input type="file" id="import-inp"      accept=".json" style="display:none" onchange="importData(this)">
+            <input type="file" id="import-full-inp" accept=".json" style="display:none" onchange="importDataFull(this)">
+            <div style="font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.4">
+              <strong>Fusionner</strong> : gère les doublons · <strong style="color:#ef4444">Remplacer tout</strong> : écrase toutes les données locales
+            </div>
+          </div>
+
+          <!-- Indicateur taille localStorage -->
+          <div id="localstorage-info" style="margin-top:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;font-size:10px;color:var(--txt3)"></div>
+        </div>
+
+        <!-- Guide mise à jour -->
+        <div class="section-title">Mise à jour de l'application</div>
+        <div class="card" style="margin-bottom:4px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
+            Les données sont stockées <strong>localement dans le navigateur</strong>. Elles ne sont pas perdues lors d'une mise à jour du code, mais elles sont <strong>propres à chaque appareil et chaque navigateur</strong>.
+          </div>
+
+          <!-- Explication des 2 versions -->
+          <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.6">
+            <div style="font-weight:700;color:#3b82f6;margin-bottom:6px">📱 Version publiée</div>
+            <div style="color:var(--txt2);margin-bottom:4px">
+              <a href="https://azzounimohamed-crypto.github.io/Gestcompet/" target="_blank" style="color:#3b82f6;font-size:10px;word-break:break-all">https://azzounimohamed-crypto.github.io/Gestcompet/</a>
+            </div>
+            <div style="color:var(--txt3);font-size:10px">Données stockées dans <strong>ce navigateur</strong> sur ce domaine uniquement.</div>
+          </div>
+
+          <!-- Protocole de mise à jour -->
+          <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Protocole de mise à jour sans perte de données</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+              <span style="font-size:14px;flex-shrink:0">1️⃣</span>
+              <div><span style="color:var(--txt)">Sur la <strong>version publiée</strong></span> → <strong>Télécharger la sauvegarde complète</strong> (bouton ci-dessus)</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+              <span style="font-size:14px;flex-shrink:0">2️⃣</span>
+              <div>Développer et tester les évolutions sur la <strong>version locale</strong></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+              <span style="font-size:14px;flex-shrink:0">3️⃣</span>
+              <div>Publier le nouveau <code style="background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">index.html</code> sur GitHub Pages</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+              <span style="font-size:14px;flex-shrink:0">4️⃣</span>
+              <div>Sur la <strong>version publiée mise à jour</strong> → <strong>Remplacer tout</strong> avec le fichier de l'étape 1</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:7px;font-size:11px">
+              <span style="font-size:14px;flex-shrink:0">✅</span>
+              <div>Toutes les données (pilotes, compétitions, images, documents) sont restaurées automatiquement.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:7px;font-size:10px;color:var(--txt3);line-height:1.5">
+            💡 <strong>Astuce :</strong> Les données ne sont PAS effacées par une mise à jour du code. Elles le sont uniquement si tu vides le cache du navigateur ou reinstalles. La sauvegarde JSON est donc une assurance, pas une obligation à chaque mise à jour.
+          </div>
         </div>
         <div class="section-title">Synchronisation Base44</div>
         <div class="card">
@@ -880,6 +1082,126 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
             Synchroniser depuis Base44
           </button>
         </div>
+        <div class="section-title">Documents officiels</div>
+        <div class="card" style="margin-bottom:4px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">
+            Configurez l'en‑tête et le bas de page intégrés dans tous les documents imprimés.
+          </div>
+
+          <!-- LAYOUT : Aperçu gauche | Réglages droite -->
+          <div style="display:flex;gap:14px;align-items:flex-start">
+
+            <!-- COLONNE GAUCHE : Mini A4 + bouton -->
+            <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px">
+              <!-- Mini A4 -->
+              <div id="regl-doc-preview" style="background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.18);box-shadow:0 3px 16px rgba(0,0,0,.3);width:150px;aspect-ratio:210/297;position:relative;overflow:hidden">
+                <!-- Lignes de contenu simulées — padding mis à jour par JS -->
+                <div id="regl-preview-content" style="position:absolute;inset:0;overflow:hidden">
+                  <div style="display:flex;flex-direction:column;gap:3px;padding:inherit;box-sizing:border-box;height:100%">
+                    <div style="height:5px;background:#e5e7eb;border-radius:2px;width:55%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:85%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:70%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:90%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:62%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:78%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:50%;flex-shrink:0"></div>
+                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:88%;flex-shrink:0"></div>
+                  </div>
+                </div>
+                <!-- Repère zone texte (pointillés bleus) -->
+                <div id="regl-preview-zone" style="position:absolute;top:14px;bottom:11px;left:11px;right:11px;border:1px dashed rgba(99,140,217,.45);pointer-events:none"></div>
+                <!-- En-tête -->
+                <div id="regl-preview-header" style="position:absolute;top:0;left:0;right:0;height:14px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:1px 4px;overflow:hidden">
+                  <span style="font-size:6px;color:#9ca3af;font-style:italic">En‑tête</span>
+                </div>
+                <!-- Bas de page -->
+                <div id="regl-preview-footer" style="position:absolute;bottom:0;left:0;right:0;height:11px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                  <span style="font-size:6px;color:#9ca3af;font-style:italic">Bas de page</span>
+                </div>
+              </div>
+              <!-- Bouton Visualiser sous l'aperçu -->
+              <button onclick="officialDocPreview()" style="width:150px;font-size:11px;padding:7px 0;border-radius:7px;border:1px solid var(--stol);background:rgba(var(--stol-rgb),.12);color:var(--stol);cursor:pointer;font-family:inherit;font-weight:700">🔍 Visualiser</button>
+              <div style="font-size:9px;color:var(--txt3);text-align:center;line-height:1.4">Pointillés bleus<br>= zone de texte</div>
+            </div>
+
+            <!-- COLONNE DROITE : tous les réglages -->
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+
+              <!-- EN-TÊTE -->
+              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">En‑tête</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                  <div id="regl-header-preview" onclick="document.getElementById('regl-header-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    <input type="file" id="regl-header-inp" accept="image/*" style="display:none" onchange="officialDocUpload('header',this)">
+                    <button onclick="document.getElementById('regl-header-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
+                    <button onclick="officialDocRemove('header')" id="regl-header-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
+                    <input type="number" id="od-header-h" min="5" max="80" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('headerHeight',this.value)">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Position</div>
+                    <select id="od-header-pos" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 6px;outline:none;width:100%;box-sizing:border-box" onchange="officialDocSetConfig('headerPos',this.value)">
+                      <option value="left">← Gauche</option>
+                      <option value="center">⊙ Centre</option>
+                      <option value="right">→ Droite</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BAS DE PAGE -->
+              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Bas de page</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                  <div id="regl-footer-preview" onclick="document.getElementById('regl-footer-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    <input type="file" id="regl-footer-inp" accept="image/*" style="display:none" onchange="officialDocUpload('footer',this)">
+                    <button onclick="document.getElementById('regl-footer-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
+                    <button onclick="officialDocRemove('footer')" id="regl-footer-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
+                  <input type="number" id="od-footer-h" min="5" max="60" value="15" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('footerHeight',this.value)">
+                </div>
+              </div>
+
+              <!-- MARGES -->
+              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Marges (mm)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Haut</div>
+                    <input type="number" id="od-mt" min="5" max="60" value="25" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginTop',this.value)">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Bas</div>
+                    <input type="number" id="od-mb" min="5" max="60" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginBottom',this.value)">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Gauche</div>
+                    <input type="number" id="od-ml" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginLeft',this.value)">
+                  </div>
+                  <div>
+                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Droite</div>
+                    <input type="number" id="od-mr" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginRight',this.value)">
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- fin colonne droite -->
+          </div><!-- fin flex layout -->
+        </div>
+
         <div class="section-title">Import licences FFPLUM</div>
         <div class="card">
           <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Sélectionnez le fichier <strong>Licence 2015 2025.xlsx</strong> pour mettre à jour automatiquement les compétiteurs et le staff avec les données manquantes (genre, DDN, téléphone, email, adresse, licence, club, région).</div>
@@ -1011,72 +1333,118 @@ body.theme-light .cf-divider span{color:rgba(0,0,0,.3)}
 <!-- ═══════════════ PORTAIL GEST'DTN ═══════════════ -->
 
 <!-- Page portail principale (desktop/tablette) -->
-<div id="page-dtn" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column">
-  <!-- DTN Header -->
-  <div style="display:flex;align-items:center;padding:14px 28px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:16px">
-    <!-- Gauche : logo FFPLUM + La DTN -->
-    <div style="display:flex;align-items:center;gap:12px;min-width:180px">
-      <div style="width:48px;height:48px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.15)">
-        <img id="dtn-logo-img" src="" style="width:42px;height:42px;object-fit:contain;display:none" onerror="this.style.display='none';document.getElementById('dtn-logo-fb').style.display='flex'">
+<div id="page-dtn" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column;overflow:hidden">
+
+  <!-- ── DTN Header ── -->
+  <div style="display:flex;align-items:center;padding:10px 20px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:12px">
+    <!-- Gauche : logo -->
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+      <div style="width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.15)">
+        <img id="dtn-logo-img" src="" style="width:36px;height:36px;object-fit:contain;display:none" onerror="this.style.display='none';document.getElementById('dtn-logo-fb').style.display='flex'">
         <div id="dtn-logo-fb" style="display:flex;align-items:center;justify-content:center">
-          <img src="https://ffplum.fr/templates/ffplum/images/logo.png" style="width:38px;height:38px;object-fit:contain" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:9px;font-weight:800;color:#003399;text-align:center;line-height:1.1\'>FF<br>PLUM</span>'">
+          <img src="https://ffplum.fr/templates/ffplum/images/logo.png" style="width:32px;height:32px;object-fit:contain" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:8px;font-weight:800;color:#003399;text-align:center;line-height:1.1\'>FF<br>PLUM</span>'">
         </div>
       </div>
       <div>
-        <div style="font-size:10px;font-weight:600;color:var(--txt3);letter-spacing:.4px;text-transform:uppercase">Fédération Française d'ULM</div>
-        <div style="font-size:16px;font-weight:900;color:var(--txt)">La DTN</div>
+        <div style="font-size:9px;font-weight:600;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">FFPLUM · Fédération Française d'ULM</div>
+        <div style="font-size:15px;font-weight:900;color:var(--txt);line-height:1.1">Gest'<span style="color:var(--stol)">DTN</span></div>
       </div>
     </div>
-    <!-- Centre : titre Gest'DTN -->
-    <div style="flex:1;text-align:center;font-size:28px;font-weight:900;color:var(--txt)">Gest'<span style="color:var(--stol)">DTN</span></div>
-    <!-- Droite : avatar -->
-    <div style="min-width:180px;display:flex;justify-content:flex-end">
-      <div onclick="openUserAccountPopup()" style="display:flex;align-items:center;gap:8px;cursor:pointer;border-radius:24px;padding:4px 10px 4px 4px;transition:background .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background=''">
-        <div class="avatar" id="dtn-avatar" style="width:38px;height:38px;font-size:13px;font-weight:900;overflow:hidden;border:2px solid var(--stol);background:var(--navy3);color:var(--stol);flex-shrink:0">?</div>
-        <span id="dtn-user-name" style="font-size:12px;font-weight:700;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)"></span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="color:var(--txt3)"><polyline points="6 9 12 15 18 9"/></svg>
+    <!-- Droite : Plein écran + avatar -->
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <!-- Bouton Plein écran / Réduire -->
+      <button id="dtn-fs-btn" onclick="toggleFullscreen()" title="Plein écran"
+        style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.05);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.25)';this.style.background='rgba(255,255,255,.09)'"
+        onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.background='rgba(255,255,255,.05)'">
+        <svg id="dtn-fs-icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        <svg id="dtn-fs-icon-reduce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        <span id="dtn-fs-label">Plein écran</span>
+      </button>
+      <!-- Avatar -->
+      <div onclick="openUserAccountPopup()" style="display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:24px;padding:3px 9px 3px 3px;transition:background .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background=''">
+        <div class="avatar" id="dtn-avatar" style="width:34px;height:34px;font-size:12px;font-weight:900;overflow:hidden;border:2px solid var(--stol);background:var(--navy3);color:var(--stol);flex-shrink:0">?</div>
+        <span id="dtn-user-name" style="font-size:12px;font-weight:700;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="color:var(--txt3)"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
     </div>
   </div>
-  <!-- Modules -->
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding:40px 24px;overflow-y:auto">
-    <div style="font-size:14px;font-weight:600;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">Choisissez un module</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;width:100%;max-width:960px">
-      <!-- Compétitions -->
-      <button onclick="openDTNModule('competitions')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 16px;border:2px solid var(--bdr);border-radius:20px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s" onmouseover="this.style.borderColor='var(--stol)';this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,87,255,.2)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-        <div style="width:64px;height:64px;border-radius:16px;background:rgba(0,87,255,.12);display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--stol)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="12" cy="8" r="2" fill="var(--stol)" stroke="none"/><path d="M6 17l2 2 4-4"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:var(--txt);text-align:center">Compétitions</div>
-        <div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.5">Gestion des compétitions<br>et classements</div>
-      </button>
-      <!-- Sécurité des pratiques -->
-      <button onclick="openDTNModule('securite')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 16px;border:2px solid var(--bdr);border-radius:20px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s" onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(16,185,129,.2)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-        <div style="width:64px;height:64px;border-radius:16px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:var(--txt);text-align:center">Sécurité<br>des pratiques</div>
-        <div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.5">Prévention et gestion<br>de la sécurité</div>
-      </button>
-      <!-- Accès aux pratiques -->
-      <button onclick="openDTNModule('acces')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 16px;border:2px solid var(--bdr);border-radius:20px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(245,158,11,.2)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-        <div style="width:64px;height:64px;border-radius:16px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:var(--txt);text-align:center">Accès<br>aux pratiques</div>
-        <div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.5">Infrastructures et<br>terrains de pratique</div>
-      </button>
-      <!-- Territoires -->
-      <button onclick="openDTNModule('territoires')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px 16px;border:2px solid var(--bdr);border-radius:20px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-hadow .2s" onmouseover="this.style.borderColor='#8b5cf6';this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(139,92,246,.2)'" onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-        <div style="width:64px;height:64px;border-radius:16px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="34" height="34"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:var(--txt);text-align:center">Territoires</div>
-        <div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.5">Cartographie et<br>données territoriales</div>
-      </button>
-    </div>
-    <div style="font-size:11px;color:var(--txt3);opacity:.6">Gest'DTN · FFPLUM · 2026</div>
-  </div>
+
+  <!-- ── Corps : bloc centré ── -->
+  <div style="flex:1;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:32px 20px 40px">
+    <div style="width:100%;max-width:860px;display:flex;flex-direction:column;gap:28px">
+
+      <!-- Titre de section -->
+      <div style="text-align:center">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3)">Direction Technique Nationale</div>
+        <div style="font-size:22px;font-weight:900;color:var(--txt);margin-top:4px">Choisissez un module</div>
+      </div>
+
+      <!-- Grille modules -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
+
+        <!-- Compétitions -->
+        <button onclick="openDTNModule('competitions')"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
+          onmouseover="this.style.borderColor='var(--stol)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(0,87,255,.18)'"
+          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
+          <div style="width:56px;height:56px;border-radius:14px;background:rgba(0,87,255,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--stol)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="12" cy="8" r="2" fill="var(--stol)" stroke="none"/><path d="M6 17l2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--txt)">Compétitions</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Gestion des compétitions<br>et classements</div>
+          </div>
+        </button>
+
+        <!-- Sécurité des pratiques -->
+        <button onclick="openDTNModule('securite')"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
+          onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(16,185,129,.16)'"
+          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
+          <div style="width:56px;height:56px;border-radius:14px;background:rgba(16,185,129,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--txt)">Sécurité<br>des pratiques</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Prévention et gestion<br>de la sécurité</div>
+          </div>
+        </button>
+
+        <!-- Accès aux pratiques -->
+        <button onclick="openDTNModule('acces')"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
+          onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(245,158,11,.16)'"
+          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
+          <div style="width:56px;height:56px;border-radius:14px;background:rgba(245,158,11,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--txt)">Accès<br>aux pratiques</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Infrastructures et<br>terrains de pratique</div>
+          </div>
+        </button>
+
+        <!-- Territoires -->
+        <button onclick="openDTNModule('territoires')"
+          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
+          onmouseover="this.style.borderColor='#8b5cf6';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(139,92,246,.16)'"
+          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
+          <div style="width:56px;height:56px;border-radius:14px;background:rgba(139,92,246,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--txt)">Territoires</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Cartographie et<br>données territoriales</div>
+          </div>
+        </button>
+
+      </div><!-- /grille -->
+
+      <div style="text-align:center;font-size:11px;color:var(--txt3);opacity:.5">Gest'DTN · FFPLUM · 2026</div>
+    </div><!-- /max-width -->
+  </div><!-- /corps -->
+
 </div>
 
 <!-- Module Sécurité des pratiques -->
@@ -2006,7 +2374,9 @@ var S = {
   compEnroll: {},
   nationalRanking: {},
   messages: [],
-  collectif: []
+  collectif: [],
+  documents: [],
+  officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 }
 };
 
 var BASE44_APP_ID  = '699889ffedef688bae3506c8'; // Production app ID
@@ -2243,23 +2613,31 @@ function toast(msg, type) {
 // ═══════════════════════════════════
 // SHEETS & NAVIGATION
 // ═══════════════════════════════════
+function _syncFsBtn() {
+  var btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  var anyOpen = document.querySelector('.overlay.open');
+  btn.style.display = anyOpen ? 'none' : '';
+}
 function openSheet(id) {
   var el = document.getElementById(id);
   if (!el) return;
-  if (id === 'sheet-profile') { el.style.display = 'flex'; return; }
+  if (id === 'sheet-profile') { el.style.display = 'flex'; _syncFsBtn(); return; }
   el.classList.add('open');
   // Remettre le scroll en haut à chaque ouverture
   var sh = el.querySelector('.sheet');
   if (sh) sh.scrollTop = 0;
+  _syncFsBtn();
 }
 function closeSheet(id) {
   var el = document.getElementById(id);
   if (!el) return;
-  if (id === 'sheet-profile') { el.style.display = 'none'; return; }
+  if (id === 'sheet-profile') { el.style.display = 'none'; _syncFsBtn(); return; }
   if (id === 'sheet-comp-detail' && _cdMap) {
     try { _cdMap.off(); _cdMap.remove(); } catch(e){} _cdMap = null;
   }
   el.classList.remove('open');
+  _syncFsBtn();
 }
 function closeOnBg(e, id) { if (e.target === document.getElementById(id)) closeSheet(id); }
 
@@ -3708,6 +4086,299 @@ function _baseCard(title, content, extra) {
 }
 // ────────────────────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AGENDA SAISONNIER — style Outlook
+// ═══════════════════════════════════════════════════════════════════════════
+var _agendaYear    = null;
+var _agendaMonth   = 0;
+var _agendaSelDate = null;
+var _agendaCompsByDate = {};
+
+var _agendaTypeColor = {
+  'cdf':'#0057FF','comp-internationale':'#7c3aed',
+  'regional':'#3b82f6','comp-regionale':'#3b82f6',
+  'entrainement':'#d97706','entrainement-national':'#d97706',
+  'stage':'#059669'
+};
+function _agendaColor(comp){ return _agendaTypeColor[(comp||{}).type] || '#6b7280'; }
+
+var _agendaTypeLabel = {
+  'cdf':'Nationale','comp-internationale':'Internationale',
+  'regional':'Régionale','comp-regionale':'Régionale',
+  'entrainement':'Entraînement','entrainement-national':'Entr. national',
+  'stage':'Stage'
+};
+
+function openAgenda() {
+  var sel = document.getElementById('base-saison-sel');
+  _agendaYear = sel ? parseInt(sel.value,10) : new Date().getFullYear();
+  var now = new Date();
+  if (now.getFullYear() === _agendaYear) {
+    _agendaMonth = now.getMonth();
+  } else {
+    var comps = _agendaGetComps();
+    _agendaMonth = 0;
+    if (comps.length) {
+      var ms = comps.map(function(c){ return parseInt((c.dateFrom||'').substring(5,7),10)-1; }).filter(function(m){ return !isNaN(m); });
+      ms.sort(function(a,b){return a-b;});
+      if (ms.length) _agendaMonth = ms[0];
+    }
+  }
+  _agendaSelDate = null;
+  var ov = document.getElementById('agenda-overlay');
+  if (ov) ov.style.display = 'flex';
+  _agendaRender();
+  _agendaSideEmpty();
+}
+
+function closeAgenda() {
+  var ov = document.getElementById('agenda-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function _agendaGetComps() {
+  var yr = String(_agendaYear);
+  return (S.comps || []).filter(function(c){
+    return (c.saison===yr) || ((c.dateFrom||'').startsWith(yr));
+  });
+}
+
+function agendaNav(dir) {
+  _agendaMonth += dir;
+  if (_agendaMonth < 0)  { _agendaMonth = 11; _agendaYear--; }
+  if (_agendaMonth > 11) { _agendaMonth = 0;  _agendaYear++; }
+  _agendaRender();
+  if (_agendaSelDate) {
+    var sel = document.querySelectorAll('.ag-cell[data-date="'+_agendaSelDate+'"]');
+    if (!sel.length) { _agendaSelDate = null; _agendaSideEmpty(); }
+  }
+}
+
+function _agendaGoToday() {
+  var now = new Date();
+  _agendaYear  = now.getFullYear();
+  _agendaMonth = now.getMonth();
+  _agendaSelDate = null;
+  _agendaRender();
+  _agendaSideEmpty();
+}
+
+function _agendaRender() {
+  var MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var sub  = document.getElementById('agenda-subtitle');
+  var lbl  = document.getElementById('agenda-month-label');
+  var sel  = document.getElementById('base-saison-sel');
+  if (sub) sub.textContent = 'Saison ' + (sel ? sel.value : _agendaYear);
+  if (lbl) lbl.textContent = MOIS[_agendaMonth] + ' ' + _agendaYear;
+
+  // Indexer compétitions par date (couvre toute la durée)
+  _agendaCompsByDate = {};
+  _agendaGetComps().forEach(function(c) {
+    var from = c.dateFrom || '';
+    var to   = c.dateTo   || from;
+    if (!from) return;
+    var d = new Date(from+'T00:00:00'), dEnd = new Date((to||from)+'T00:00:00');
+    while (d <= dEnd) {
+      var key = d.toISOString().substring(0,10);
+      if (!_agendaCompsByDate[key]) _agendaCompsByDate[key] = [];
+      if (!_agendaCompsByDate[key].find(function(x){return x.id===c.id;}))
+        _agendaCompsByDate[key].push(c);
+      d.setDate(d.getDate()+1);
+    }
+  });
+
+  var grid = document.getElementById('agenda-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  var today    = new Date().toISOString().substring(0,10);
+  var firstDay = new Date(_agendaYear, _agendaMonth, 1);
+  var lastDay  = new Date(_agendaYear, _agendaMonth+1, 0);
+  var prevLast = new Date(_agendaYear, _agendaMonth, 0);
+  var startWd  = (firstDay.getDay()+6)%7; // lundi=0
+  var totalEnd = (6 - (lastDay.getDay()+6)%7) % 7;
+  var totalCells = startWd + lastDay.getDate() + totalEnd;
+  if (totalCells < 35) totalCells = 35;
+  if (totalCells > 35 && totalCells < 42) totalCells = 42;
+
+  for (var i = 0; i < totalCells; i++) {
+    var isOther = (i < startWd || i >= startWd + lastDay.getDate());
+    var day, dateStr;
+    if (i < startWd) {
+      day = prevLast.getDate() - startWd + i + 1;
+      dateStr = new Date(_agendaYear, _agendaMonth-1, day).toISOString().substring(0,10);
+    } else if (i < startWd + lastDay.getDate()) {
+      day = i - startWd + 1;
+      dateStr = _agendaYear + '-' + String(_agendaMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    } else {
+      day = i - startWd - lastDay.getDate() + 1;
+      dateStr = new Date(_agendaYear, _agendaMonth+1, day).toISOString().substring(0,10);
+    }
+
+    var wd = (i % 7); // 0=lun ... 6=dim
+    var isWend = (wd === 5 || wd === 6);
+    var dayComps = _agendaCompsByDate[dateStr] || [];
+
+    var cell = document.createElement('div');
+    cell.className = 'ag-cell' + (isOther?' ag-other-month':'') + (isWend?' ag-wend-cell':'') + (dateStr===_agendaSelDate?' ag-selected':'');
+    cell.setAttribute('data-date', dateStr);
+
+    // Numéro du jour
+    var numEl = document.createElement('div');
+    numEl.className = 'ag-cell-num' + (dateStr===today?' ag-today':'');
+    numEl.textContent = day;
+    cell.appendChild(numEl);
+
+    // Barres d'événements (max 3 visibles)
+    var maxShow = 3;
+    var shown = Math.min(dayComps.length, maxShow);
+    for (var k = 0; k < shown; k++) {
+      var c2 = dayComps[k];
+      var col = _agendaColor(c2);
+      var isStart = (c2.dateFrom === dateStr);
+      var isEnd   = ((c2.dateTo||c2.dateFrom) === dateStr);
+      var evEl = document.createElement('div');
+      evEl.className = 'ag-event' + (isStart&&!isEnd?' ag-ev-start':(!isStart&&!isEnd?' ag-ev-mid':(!isStart&&isEnd?' ag-ev-end':'')));
+      evEl.style.cssText = 'background:'+col+';color:#fff;';
+      evEl.title = c2.name || '';
+      // Texte visible seulement au départ ou sur jour unique
+      var label = '';
+      if (isStart || c2.dateFrom === c2.dateTo || !c2.dateTo) {
+        label = (c2.name||'').substring(0,22);
+      }
+      evEl.textContent = label;
+      (function(id){ evEl.onclick = function(e){ e.stopPropagation(); _agendaSelectDate(dateStr); _agendaHighlightComp(id); }; })(c2.id);
+      cell.appendChild(evEl);
+    }
+    if (dayComps.length > maxShow) {
+      var more = document.createElement('div');
+      more.className = 'ag-more';
+      more.textContent = '+ ' + (dayComps.length - maxShow) + ' autre' + (dayComps.length-maxShow>1?'s':'');
+      (function(ds){ more.onclick = function(e){ e.stopPropagation(); _agendaSelectDate(ds); }; })(dateStr);
+      cell.appendChild(more);
+    }
+
+    (function(ds){ cell.onclick = function(){ _agendaSelectDate(ds); }; })(dateStr);
+    grid.appendChild(cell);
+  }
+}
+
+function _agendaSelectDate(dateStr) {
+  _agendaSelDate = dateStr;
+  document.querySelectorAll('.ag-cell').forEach(function(c){ c.classList.remove('ag-selected'); });
+  var target = document.querySelector('.ag-cell[data-date="'+dateStr+'"]');
+  if (target) target.classList.add('ag-selected');
+  _agendaShowSide(dateStr, _agendaCompsByDate[dateStr] || []);
+}
+
+function _agendaHighlightComp(compId) {
+  // Surligner la carte dans le panneau après rendu
+  setTimeout(function(){
+    var el = document.getElementById('ag-card-'+compId);
+    if (el) { el.style.boxShadow='0 0 0 2px var(--stol)'; setTimeout(function(){el.style.boxShadow='';},1200); }
+  }, 60);
+}
+
+function _agendaSideEmpty() {
+  var emp = document.getElementById('agenda-side-empty');
+  var cnt = document.getElementById('agenda-side-content');
+  var side = document.getElementById('agenda-side');
+  if (emp) emp.style.display = '';
+  if (cnt) { cnt.style.display = 'none'; cnt.innerHTML = ''; }
+  if (side) side.style.width = '0';
+}
+
+function _agendaShowSide(dateStr, dayComps) {
+  var emp = document.getElementById('agenda-side-empty');
+  var cnt = document.getElementById('agenda-side-content');
+  var side = document.getElementById('agenda-side');
+  if (!cnt) return;
+  if (emp) emp.style.display = 'none';
+  cnt.style.display = 'flex';
+  if (side) side.style.width = '300px';
+
+  var JOURS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  var MOIS2 = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  var d  = new Date(dateStr+'T00:00:00');
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+
+  // En-tête du panneau
+  var hdr = '<div style="padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);margin-bottom:2px">'+JOURS[d.getDay()]+'</div>'
+    + '<div style="font-size:22px;font-weight:900;color:var(--txt);line-height:1">'+d.getDate()
+    + ' <span style="font-size:15px;font-weight:600;color:var(--txt2)">'+MOIS2[d.getMonth()]+' '+d.getFullYear()+'</span></div>'
+    + (dayComps.length ? '<div style="font-size:11px;color:var(--txt3);margin-top:4px">'+dayComps.length+' compétition'+(dayComps.length>1?'s':'')+' ce jour</div>' : '')
+    + '</div>';
+
+  if (!dayComps.length) {
+    cnt.innerHTML = hdr
+      + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="32" height="32" style="color:var(--txt3);opacity:.3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+      + '<div style="font-size:12px;color:var(--txt3);text-align:center">Aucune compétition</div>'
+      + '<button onclick="_agendaAddComp(\''+dateStr+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:1.5px dashed rgba(0,87,255,.45);background:rgba(0,87,255,.07);color:var(--stol);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Ajouter</button>'
+      + '</div>';
+    return;
+  }
+
+  var cards = dayComps.map(function(c) {
+    var color = _agendaColor(c);
+    var typ   = _agendaTypeLabel[c.type] || (c.type||'');
+    var disc  = (c.discipline||'').charAt(0).toUpperCase()+(c.discipline||'').slice(1);
+    var prat  = (c.pratique||'').charAt(0).toUpperCase()+(c.pratique||'').slice(1);
+    var lieu  = [c.lieu, c.region].filter(Boolean).join(' · ');
+    var dFrom = c.dateFrom||'', dTo = c.dateTo||dFrom;
+    var durée = '';
+    if (dFrom && dTo && dFrom!==dTo) {
+      var ms1=new Date(dFrom+'T00:00:00'), ms2=new Date(dTo+'T00:00:00');
+      durée = Math.round((ms2-ms1)/86400000)+1+' jours';
+    }
+
+    return '<div id="ag-card-'+c.id+'" style="margin:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);overflow:hidden;transition:box-shadow .2s">'
+      // Bande couleur
+      + '<div style="height:3px;background:'+color+'"></div>'
+      + '<div style="padding:10px 12px">'
+      // Nom
+      + '<div style="font-size:13px;font-weight:800;color:var(--txt);line-height:1.3;margin-bottom:6px">'+esc(c.name||'—')+'</div>'
+      // Badges
+      + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px">'
+      + (typ  ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+color+'22;color:'+color+'">'+esc(typ)+'</span>' : '')
+      + (disc ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--txt2)">'+esc(disc)+'</span>' : '')
+      + (prat ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--txt2)">'+esc(prat)+'</span>' : '')
+      + '</div>'
+      // Infos
+      + (lieu  ? '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt3);margin-bottom:3px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>'+esc(lieu)+'</div>' : '')
+      + (dFrom ? '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt3);margin-bottom:'+(durée?'2px':'7px')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'+esc(dFrom===dTo?dFrom:dFrom+' → '+dTo)+'</div>' : '')
+      + (durée ? '<div style="font-size:10px;color:var(--txt3);margin-bottom:7px;padding-left:16px">'+esc(durée)+'</div>' : '')
+      // Boutons
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+      + '<button onclick="closeAgenda();editComp(\''+c.id+'\')" style="padding:6px 0;border-radius:7px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✏️ Modifier</button>'
+      + '<button onclick="closeAgenda();openCompDetail(\''+c.id+'\')" style="padding:6px 0;border-radius:7px;border:1px solid var(--bdr);background:rgba(255,255,255,.04);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">👁 Ouvrir</button>'
+      + '</div>'
+      + '</div></div>';
+  }).join('');
+
+  cnt.innerHTML = hdr
+    + '<div style="flex:1;overflow-y:auto;padding-bottom:12px">'+cards
+    + '<div style="margin:4px 10px 0">'
+    + '<button onclick="_agendaAddComp(\''+dateStr+'\')" style="width:100%;padding:8px 0;border-radius:9px;border:1.5px dashed rgba(0,87,255,.35);background:transparent;color:var(--stol);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Ajouter une compétition</button>'
+    + '</div></div>';
+}
+
+function _agendaAddComp(dateStr) {
+  closeAgenda();
+  openAddComp();
+  setTimeout(function() {
+    var fromEl = document.getElementById('comp-date-from');
+    var toEl   = document.getElementById('comp-date-to');
+    if (fromEl) fromEl.value = dateStr;
+    if (toEl)   toEl.value   = dateStr;
+    var saisonEl = document.getElementById('comp-saison');
+    if (saisonEl) saisonEl.value = dateStr.substring(0,4);
+  }, 200);
+}
+
 function renderBase() {
   var curYear = new Date().getFullYear().toString();
 
@@ -4154,9 +4825,9 @@ function syncHomeRailVisibility() {
   // Rail toujours visible sinon
   rail.style.display = 'flex';
   // Sur page-home : 3 boutons visibles. Sur autres pages : seulement Gest'DTN
-  var btnDivers = document.getElementById('home-open-comps-btn');
+  var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo   = document.getElementById('home-open-todo-btn');
-  if (btnDivers) btnDivers.style.display = onHome ? '' : 'none';
+  if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
   if (btnTodo)   btnTodo.style.display   = onHome ? '' : 'none';
 }
 function retourFromBase() {
@@ -4193,7 +4864,7 @@ function toggleHomeCompDrawer(forceOpen) {
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
-    btn.textContent = 'Divers';
+    btn.textContent = 'Documents';
     if (next) renderHomeResultsDrawer();
     btn.setAttribute('aria-expanded', next ? 'true' : 'false');
   }
@@ -4221,128 +4892,182 @@ function toggleHomeTodoPanel(forceOpen) {
 function renderHomeResultsDrawer() {
   var cont = document.getElementById('home-results-drawer-content');
   if (!cont) return;
+  if (!S.documents) S.documents = [];
 
-  /* ── Trouver une compétition avec des résultats ── */
-  var compsWithRuns = (S.comps || []).filter(function(c){
-    return c.id && (S.runs[c.id]||[]).length > 0;
-  });
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); };
 
-  /* Si la comp courante n'a pas de runs, prendre la meilleure disponible */
-  if (!_currentCompId || !(S.runs[_currentCompId]||[]).length) {
-    var best = _getBestComp();
-    if (best && (S.runs[best.id]||[]).length) {
-      _currentCompId = best.id;
-    } else if (compsWithRuns.length) {
-      _currentCompId = compsWithRuns[0].id;
-    }
-  }
+  var html = '';
 
-  if (!_currentCompId || !compsWithRuns.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:24px 4px;text-align:center">Aucune compétition avec des résultats</div>';
-    return;
-  }
+  // Zone de dépôt / ajout
+  html += '<div id="doc-drop-zone" ondragover="event.preventDefault();this.style.background=\'rgba(0,87,255,.08)\';this.style.borderColor=\'var(--stol)\'" ondragleave="this.style.background=\'\';this.style.borderColor=\'rgba(255,255,255,.12)\'" ondrop="docDropZone(event)" onclick="document.getElementById(\'doc-add-inp\').click()" style="border:1.5px dashed rgba(255,255,255,.18);border-radius:10px;padding:14px 10px;text-align:center;margin-bottom:12px;cursor:pointer;transition:border-color .2s,background .2s">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" style="color:var(--txt3);margin-bottom:5px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+  html += '<div style="font-size:11px;font-weight:700;color:var(--txt3)">Déposer ou cliquer pour ajouter un document</div>';
+  html += '</div>';
+  html += '<input type="file" id="doc-add-inp" multiple style="display:none" onchange="docAddFiles(this.files)">';
 
-  /* ── Sélecteur de compétition (si plusieurs) ── */
-  var selHtml = '';
-  if (compsWithRuns.length > 1) {
-    selHtml = '<select onchange="_currentCompId=this.value;renderHomeResultsDrawer()" '
-      + 'style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 10px;outline:none;margin-bottom:10px;box-sizing:border-box">';
-    compsWithRuns.forEach(function(c){
-      selHtml += '<option value="'+escHtml(c.id)+'"'+(c.id===_currentCompId?' selected':'')+'>'+escHtml(c.name||c.nom||c.id)+'</option>';
-    });
-    selHtml += '</select>';
-  }
-
-  var cp = (S.comps || []).find(function(c){ return c.id === _currentCompId; });
-  if (!cp) { cont.innerHTML = selHtml; return; }
-  var runs = S.runs[_currentCompId] || [];
-
-  if (!runs.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:24px 4px;text-align:center">Aucun résultat enregistré pour cette compétition</div>';
-    return;
-  }
-
-  /* ══ Copie exacte de la section "Résultat · Classement" de renderHDPTabContent ══ */
-  var CLSI = {
-    multiaxes: {label:'Classe 3 · Multiaxes',  color:'#22c55e', order:0},
-    gyro:      {label:'Classe 4 · Autogire',    color:'#f59e0b', order:1},
-    pendulaire:{label:'Classe 2 · Pendulaire',  color:'#3b82f6', order:2}
-  };
-  var medalsI = ['🥇','🥈','🥉'];
-  var COLI = 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
-
-  var byClassPilotI = {};
-  runs.forEach(function(r){
-    var cls = r.classe || 'multiaxes';
-    var ph = (r.phase||'essais').toLowerCase();
-    var bucket = ph.indexOf('qualif')>=0 ? 'qualif' : ph.indexOf('final')>=0 ? 'finale' : 'essais';
-    if (!byClassPilotI[cls]) byClassPilotI[cls] = {};
-    if (!byClassPilotI[cls][r.pilotId]) byClassPilotI[cls][r.pilotId] = {essais:[],qualif:[],finale:[]};
-    byClassPilotI[cls][r.pilotId][bucket].push(r);
-  });
-
-  var html = selHtml;
-  html += '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--stol)">'
-    + escHtml(cp.name || cp.nom || '') + '</div>';
-
-  html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
-    + '<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
-    + '</div>';
-
-  var ckeysI = Object.keys(byClassPilotI).sort(function(a,b){
-    return ((CLSI[a]||{order:9}).order) - ((CLSI[b]||{order:9}).order);
-  });
-
-  ckeysI.forEach(function(cls){
-    var meta = CLSI[cls] || {label:cls, color:'#64748b'};
-    var pilotMapI = byClassPilotI[cls];
-
-    var getBestI = function(pid){
-      var all = pilotMapI[pid].essais.concat(pilotMapI[pid].qualif).concat(pilotMapI[pid].finale);
-      var scores = all.map(function(r){ return parseFloat(r.score)||0; }).filter(function(v){ return v>0; });
-      return scores.length ? Math.min.apply(null, scores) : 9999;
-    };
-    var pilotIdsI = Object.keys(pilotMapI).sort(function(a,b){ return getBestI(a)-getBestI(b); });
-    var clsIdI = 'rdr-cls-' + cls.replace(/[^a-z0-9]/g,'');
-
-    html += '<div style="margin-bottom:10px">';
-    html += '<button onclick="var d=document.getElementById(\''+clsIdI+'\');var op=d.style.display!==\'none\';d.style.display=op?\'none\':\'block\';this.querySelector(\'span.ria\').textContent=op?\'▶\':\'▼\'" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:1px solid '+meta.color+';padding:6px 0;cursor:pointer;font-family:inherit">';
-    html += '<span style="font-size:11px;font-weight:800;color:'+meta.color+';text-transform:uppercase;letter-spacing:.8px">'+meta.label+'</span>';
-    html += '<span class="ria" style="color:var(--txt3);font-size:14px">▶</span>';
-    html += '</button>';
-    html += '<div id="'+clsIdI+'" style="display:none;padding-top:4px">';
-
-    html += '<div style="display:grid;'+COLI+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr)">';
-    html += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
-    html += '</div>';
-
-    pilotIdsI.forEach(function(pid, i){
-      var pilot = (S.pilots||[]).find(function(p){ return p.id===pid; }) || {prenom:'?', nom:'?'};
-      var pr = pilotMapI[pid];
-      var getBestPhaseI = function(arr){
-        var scores = arr.map(function(r){ return parseFloat(r.score)||0; }).filter(function(v){ return v>0; });
-        return scores.length ? Math.min.apply(null, scores) : null;
-      };
-      var essaisB = getBestPhaseI(pr.essais);
-      var qualifB = getBestPhaseI(pr.qualif);
-      var finaleB = getBestPhaseI(pr.finale);
-      var overall = getBestI(pid);
-      var fmt = function(v){ return v!==null ? v.toFixed(2)+'s' : '—'; };
-      var isEven = i%2===1;
-      html += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" style="display:grid;'+COLI+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
-      html += '<div style="font-size:13px;text-align:center">'+(medalsI[i]||((i+1)+'.'))+'</div>';
-      html += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
-      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
-      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
-      html += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
-      html += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
+  // Liste
+  if (!S.documents.length) {
+    html += '<div style="text-align:center;color:var(--txt3);font-size:12px;padding:20px 0">Aucun document — déposez un fichier ci-dessus</div>';
+  } else {
+    S.documents.forEach(function(doc) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);margin-bottom:7px;cursor:pointer;transition:border-color .15s" onclick="docPreview(\''+esc(doc.id)+'\')" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'">';
+      html += '<div style="font-size:20px;flex-shrink:0;line-height:1">'+docTypeIcon(doc.type)+'</div>';
+      html += '<input value="'+esc(doc.name)+'" title="Cliquer pour renommer" style="flex:1;background:transparent;border:none;color:var(--txt);font-size:12px;font-weight:600;outline:none;cursor:text;padding:0;min-width:0" onclick="event.stopPropagation()" onblur="docRename(\''+esc(doc.id)+'\',this.value)" onkeydown="if(event.key===\'Enter\')this.blur()">';
+      html += '<div style="font-size:10px;color:var(--txt3);white-space:nowrap;flex-shrink:0">'+docSizeStr(doc.size)+'</div>';
+      html += '<button id="docdel-'+esc(doc.id)+'" onclick="event.stopPropagation();docDelete(\''+esc(doc.id)+'\')" style="flex-shrink:0;min-width:28px;height:24px;border-radius:6px;border:none;background:rgba(239,68,68,.1);color:#ef4444;font-size:11px;font-weight:700;cursor:pointer;padding:0 6px;transition:background .15s;white-space:nowrap" onmouseover="this.style.background=\'rgba(239,68,68,.28)\'" onmouseout="this.style.background=\'rgba(239,68,68,.1)\'">✕</button>';
       html += '</div>';
     });
-
-    html += '</div></div>';
-  });
+  }
 
   cont.innerHTML = html;
+}
+
+/* ══════════════════════════════════
+   DOCUMENTS — helpers & actions
+══════════════════════════════════ */
+function docTypeIcon(type) {
+  if (!type) return '📄';
+  var t = type.toLowerCase();
+  if (t.includes('pdf'))  return '📕';
+  if (t.includes('word') || t.includes('docx') || t.includes('doc')) return '📘';
+  if (t.includes('excel') || t.includes('sheet') || t.includes('xlsx') || t.includes('xls') || t.includes('csv')) return '📗';
+  if (t.includes('image') || t.includes('png') || t.includes('jpg') || t.includes('jpeg') || t.includes('gif') || t.includes('webp')) return '🖼️';
+  if (t.includes('video') || t.includes('mp4') || t.includes('mov')) return '🎬';
+  if (t.includes('audio') || t.includes('mp3') || t.includes('wav')) return '🎵';
+  if (t.includes('zip') || t.includes('rar') || t.includes('7z')) return '🗜️';
+  if (t.includes('text') || t.includes('txt')) return '📄';
+  return '📄';
+}
+
+function docSizeStr(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' o';
+  if (bytes < 1024*1024) return Math.round(bytes/1024) + ' Ko';
+  return (bytes/(1024*1024)).toFixed(1) + ' Mo';
+}
+
+function docDropZone(event) {
+  event.preventDefault();
+  var zone = document.getElementById('doc-drop-zone');
+  if (zone) { zone.style.background = ''; zone.style.borderColor = 'rgba(255,255,255,.18)'; }
+  docAddFiles(event.dataTransfer.files);
+}
+
+function docAddFiles(files) {
+  if (!files || !files.length) return;
+  if (!S.documents) S.documents = [];
+  var pending = files.length;
+  Array.from(files).forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var data = e.target.result;
+      // Extraire le titre : tenter PDF, sinon nom du fichier sans extension
+      var name = _docExtractTitle(file.name, file.type, data);
+      var doc = {
+        id:   'doc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        name: name,
+        type: file.type || file.name.split('.').pop(),
+        size: file.size,
+        data: data
+      };
+      S.documents.push(doc);
+      pending--;
+      if (pending === 0) { saveState(); renderHomeResultsDrawer(); toast('Document ajouté ✓', 'ok'); }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function _docExtractTitle(filename, type, dataUrl) {
+  // Pour PDF : chercher /Title dans le flux (heuristique simple)
+  if (type === 'application/pdf' && dataUrl) {
+    try {
+      var raw = atob(dataUrl.split(',')[1]);
+      var m = raw.match(/\/Title\s*\(([^)]{1,120})\)/);
+      if (m && m[1].trim()) return m[1].trim();
+    } catch(e) {}
+  }
+  // Fallback : nom du fichier sans extension
+  return filename.replace(/\.[^.]+$/, '');
+}
+
+function docRename(id, newName) {
+  var doc = (S.documents||[]).find(function(d){ return d.id === id; });
+  if (doc && newName.trim() && newName.trim() !== doc.name) {
+    doc.name = newName.trim();
+    saveState();
+  }
+}
+
+var _docDelPending = {};
+function docDelete(id) {
+  var btn = document.getElementById('docdel-' + id);
+  if (!btn) return;
+  if (_docDelPending[id]) {
+    clearTimeout(_docDelPending[id]);
+    delete _docDelPending[id];
+    S.documents = (S.documents||[]).filter(function(d){ return d.id !== id; });
+    saveState();
+    renderHomeResultsDrawer();
+    toast('Document supprimé', 'ok');
+  } else {
+    btn.textContent = '⚠️ ?';
+    btn.style.background = 'rgba(239,68,68,.35)';
+    _docDelPending[id] = setTimeout(function() {
+      delete _docDelPending[id];
+      if (btn && btn.isConnected) { btn.textContent = '✕'; btn.style.background = 'rgba(239,68,68,.1)'; }
+    }, 3000);
+  }
+}
+
+function docPreview(id) {
+  var doc = (S.documents||[]).find(function(d){ return d.id === id; });
+  if (!doc) return;
+  var modal = document.getElementById('modal-doc-preview');
+  var title = document.getElementById('modal-doc-title');
+  var body  = document.getElementById('modal-doc-body');
+  if (!modal || !body) return;
+  if (title) title.textContent = doc.name;
+
+  var t = (doc.type||'').toLowerCase();
+  var isImg   = t.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(t);
+  var isPdf   = t === 'application/pdf' || t.endsWith('pdf');
+  var isVideo = t.startsWith('video/');
+  var isText  = t.startsWith('text/') || /\.(txt|csv|md|json|xml|html)$/i.test(t);
+
+  if (isImg) {
+    body.innerHTML = '<img src="'+doc.data+'" style="max-width:100%;max-height:74vh;object-fit:contain;border-radius:8px;display:block;margin:0 auto">';
+  } else if (isPdf) {
+    body.innerHTML = '<iframe src="'+doc.data+'" style="width:100%;height:76vh;border:none;border-radius:8px"></iframe>';
+  } else if (isVideo) {
+    body.innerHTML = '<video src="'+doc.data+'" controls style="width:100%;max-height:74vh;border-radius:8px"></video>';
+  } else if (isText) {
+    try {
+      var raw = atob(doc.data.split(',')[1]);
+      body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:74vh;overflow-y:auto;padding:8px">'+raw.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>';
+    } catch(e) { body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; }
+  } else {
+    body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--txt3)">'
+      + '<div style="font-size:48px;margin-bottom:12px">'+docTypeIcon(doc.type)+'</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:8px">'+doc.name+'</div>'
+      + '<div style="font-size:12px;margin-bottom:20px">'+docSizeStr(doc.size)+'</div>'
+      + '<a href="'+doc.data+'" download="'+doc.name+'" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:9px;background:var(--stol);color:#fff;text-decoration:none;font-size:13px;font-weight:700">⬇️ Télécharger</a>'
+      + '</div>';
+  }
+
+  // Bouton télécharger dans le header
+  var dlBtn = document.getElementById('modal-doc-dl');
+  if (dlBtn) { dlBtn.href = doc.data; dlBtn.download = doc.name; }
+
+  modal.style.display = 'flex';
+  requestAnimationFrame(function(){ modal.style.opacity = '1'; });
+}
+
+function closeDocPreview() {
+  var modal = document.getElementById('modal-doc-preview');
+  if (!modal) return;
+  modal.style.opacity = '0';
+  setTimeout(function(){ modal.style.display = 'none'; document.getElementById('modal-doc-body').innerHTML = ''; }, 200);
 }
 
 function openResultsRail() {
@@ -5668,19 +6393,24 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var computeCout = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var calcTotal = function(lines){ return lines.reduce(function(s,l){ return s+computeCout(l); }, 0); };
     var BGRID = 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
+    var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
-    // Sous-onglets
-    htmlB += '<div style="display:flex;background:var(--navy3);border-radius:10px;padding:3px;gap:2px;margin:10px 12px 0;flex-shrink:0">';
-    htmlB += bTabBtn('engagement','Engagement');
-    htmlB += bTabBtn('ressources','Ressources');
-    htmlB += bTabBtn('synthese','Budget E/R');
+    // Sous-onglets + boutons actions dans la même barre
+    htmlB += '<div style="display:flex;align-items:center;gap:2px;margin:10px 12px 0;flex-shrink:0;background:var(--navy3);border-radius:10px;padding:3px">';
+    htmlB += bTabBtn('engagement','Dépenses');
+    htmlB += bTabBtn('ressources','Recettes');
+    htmlB += bTabBtn('synthese','Solde');
+    htmlB += '<div style="width:1px;height:18px;background:rgba(255,255,255,.12);flex-shrink:0;margin:0 3px"></div>';
+    htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" title="Imprimer A4" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">🖨️ Impr.</button>';
+    htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" title="Export Excel" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">📊 Export</button>';
+    htmlB += '<label title="Charger Excel" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--stol);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📂 Import<input type="file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importBudgetExcel(event,\''+cpIdS2+'\')"></label>';
     htmlB += '</div>';
     htmlB += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 12px 20px">';
 
     if (bSub === 'engagement' || bSub === 'ressources') {
       var section  = bSub;
       var lines    = bdata[section];
-      var secColor = section === 'engagement' ? '#ef4444' : '#10b981';
+      var secColor = section === 'engagement' ? '#ef4444' : '#3b82f6';
       var hStyle   = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap';
       var addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
       var nInp     = 'type="number" min="0" step="0.01"';
@@ -5764,7 +6494,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var soldeColor = solde >= 0 ? '#10b981' : '#ef4444';
 
       // ── Helper graphique à barres horizontales par domaine ──
-      var buildChart = function(lines, color, title) {
+      var buildChart = function(lines, color, title, hideTotal) {
         if (!lines.length) return '<div style="text-align:center;color:var(--txt3);font-size:12px;padding:16px 0">Aucune donnée</div>';
         // Grouper par domaine
         var doms = {}, domOrd = [];
@@ -5788,38 +6518,42 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           h += '</div>';
           h += '</div>';
         });
-        h += '<div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:6px;border-top:1px solid var(--bdr)">';
-        h += '<span style="font-size:11px;color:var(--txt3)">TOTAL </span><span style="font-size:13px;font-weight:900;color:'+color+';margin-left:6px">'+calcTotal(lines).toFixed(2)+' €</span>';
-        h += '</div>';
+        if (!hideTotal) {
+          h += '<div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:6px;border-top:1px solid var(--bdr)">';
+          h += '<span style="font-size:11px;color:var(--txt3)">TOTAL </span><span style="font-size:13px;font-weight:900;color:'+color+';margin-left:6px">'+calcTotal(lines).toFixed(2)+' €</span>';
+          h += '</div>';
+        }
         return h;
       };
 
-      // ── Barre d'actions ──
-      var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      htmlB += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:4px 0">';
-      htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimer A4</button>';
-      htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📊 Export Excel</button>';
-      htmlB += '<label style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1px solid var(--stol);background:rgba(255,255,255,0.04);color:var(--stol);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📂 Charger Excel<input type="file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importBudgetExcel(event,\''+cpIdS2+'\')"></label>';
-      htmlB += '</div>';
-
       htmlB += '<div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">';
 
-      // ── Solde en haut ──
+      // ── 3 cartes résumé ──
       htmlB += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
       htmlB += '<div style="background:var(--navy3);border-radius:10px;padding:10px 12px;border-top:3px solid #ef4444;text-align:center"><div style="font-size:9px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Dépenses</div><div style="font-size:18px;font-weight:900;color:#ef4444">'+totEng.toFixed(0)+' €</div></div>';
-      htmlB += '<div style="background:var(--navy3);border-radius:10px;padding:10px 12px;border-top:3px solid #10b981;text-align:center"><div style="font-size:9px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ressources</div><div style="font-size:18px;font-weight:900;color:#10b981">'+totRes.toFixed(0)+' €</div></div>';
+      htmlB += '<div style="background:var(--navy3);border-radius:10px;padding:10px 12px;border-top:3px solid #3b82f6;text-align:center"><div style="font-size:9px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Recettes</div><div style="font-size:18px;font-weight:900;color:#3b82f6">'+totRes.toFixed(0)+' €</div></div>';
       htmlB += '<div style="background:var(--navy3);border-radius:10px;padding:10px 12px;border-top:3px solid '+soldeColor+';text-align:center"><div style="font-size:9px;font-weight:700;color:'+soldeColor+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Solde</div><div style="font-size:18px;font-weight:900;color:'+soldeColor+'">'+(solde>=0?'+':'')+solde.toFixed(0)+' €</div></div>';
       htmlB += '</div>';
 
-      // ── Deux graphiques côte à côte (empilés sur mobile) ──
+      // ── Deux graphiques côte à côte ──
       htmlB += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-      // Graphique Dépenses
       htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;border-left:3px solid #ef4444">';
-      htmlB += buildChart(bdata.engagement, '#ef4444', '📉 Dépenses par domaine');
+      htmlB += buildChart(bdata.engagement, '#ef4444', '📉 Dépenses par domaine', true);
       htmlB += '</div>';
-      // Graphique Ressources
-      htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;border-left:3px solid #10b981">';
-      htmlB += buildChart(bdata.ressources, '#10b981', '📈 Ressources par domaine');
+      htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;border-left:3px solid #3b82f6">';
+      htmlB += buildChart(bdata.ressources, '#3b82f6', '📈 Recettes par domaine', true);
+      htmlB += '</div>';
+      htmlB += '</div>';
+
+      // ── Totaux alignés en bas ──
+      htmlB += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      htmlB += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:8px 14px;border-radius:8px;background:var(--navy3);border-top:2px solid #ef4444">';
+      htmlB += '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Total Dépenses</span>';
+      htmlB += '<span style="font-size:16px;font-weight:900;color:#ef4444">'+totEng.toFixed(2)+' €</span>';
+      htmlB += '</div>';
+      htmlB += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:8px 14px;border-radius:8px;background:var(--navy3);border-top:2px solid #3b82f6">';
+      htmlB += '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Total Recettes</span>';
+      htmlB += '<span style="font-size:16px;font-weight:900;color:#3b82f6">'+totRes.toFixed(2)+' €</span>';
       htmlB += '</div>';
       htmlB += '</div>';
 
@@ -6004,30 +6738,29 @@ function printCompResults(compId) {
   var win = window.open('','_blank','width=900,height=700');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Résultats — '+cp.name+'</title>'
     +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:24mm 18mm}'
-    +'@media print{body{padding:16mm 12mm}}</style></head><body>'
-    // ── En-tête ──
-    +'<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #1e40af">'
-    +(logo?'<img src="'+logo+'" style="width:64px;height:64px;object-fit:contain;border-radius:50%;border:2px solid #e5e7eb;flex-shrink:0">':'<div style="width:64px;height:64px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:28px">✈️</div>')
-    +'<div style="flex:1">'
-    +'<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">FFPLUM SPORT</div>'
-    +'<div style="font-size:20px;font-weight:900;color:#1e40af;margin-bottom:4px">'+cp.name+'</div>'
-    +'<div style="font-size:12px;color:#374151;line-height:1.6">'
-    +typeLabel
-    +(cp.dateFrom?'  ·  📅 '+cp.dateFrom+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+cp.dateTo:''):'')
-    +(cp.oaci?'  ·  ✈️ '+cp.oaci:'')
-    +(cp.region?'  ·  📍 '+cp.region:'')
-    +'</div>'
-    +'</div>'
-    +'</div>'
-    // ── Résultats ──
-    +(clsHtml || '<p style="color:#6b7280;font-style:italic">Aucun résultat enregistré</p>')
-    // ── Staff ──
-    +'<div style="margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb">'
-    +'<span style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px">Encadrement / Staff : </span>'
-    +'<span style="font-size:10px;color:#374151">'+staffHtml+'</span>'
-    +'</div>'
-    // ── Pied de page ──
-    +'<div style="margin-top:12px;text-align:right;font-size:10px;color:#9ca3af">Document généré le '+today+'</div>'
+    +'@media print{body{padding:16mm 12mm}}'+_officialDocPrintCSS()+'</style></head><body>'
+    +_officialDocWrap(
+      // ── En-tête ──
+      '<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #1e40af">'
+      +(logo?'<img src="'+logo+'" style="width:64px;height:64px;object-fit:contain;border-radius:50%;border:2px solid #e5e7eb;flex-shrink:0">':'<div style="width:64px;height:64px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:28px">✈️</div>')
+      +'<div style="flex:1">'
+      +'<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">FFPLUM SPORT</div>'
+      +'<div style="font-size:20px;font-weight:900;color:#1e40af;margin-bottom:4px">'+cp.name+'</div>'
+      +'<div style="font-size:12px;color:#374151;line-height:1.6">'
+      +typeLabel
+      +(cp.dateFrom?'  ·  📅 '+cp.dateFrom+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+cp.dateTo:''):'')
+      +(cp.oaci?'  ·  ✈️ '+cp.oaci:'')
+      +(cp.region?'  ·  📍 '+cp.region:'')
+      +'</div></div></div>'
+      // ── Résultats ──
+      +(clsHtml || '<p style="color:#6b7280;font-style:italic">Aucun résultat enregistré</p>')
+      // ── Staff ──
+      +'<div style="margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb">'
+      +'<span style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px">Encadrement / Staff : </span>'
+      +'<span style="font-size:10px;color:#374151">'+staffHtml+'</span>'
+      +'</div>'
+      +'<div style="margin-top:12px;text-align:right;font-size:10px;color:#9ca3af">Document généré le '+today+'</div>'
+    )
     +'</body></html>');
   win.document.close();
   win.focus();
@@ -7248,12 +7981,360 @@ function renderSettings() {
   var canStaff = isLogged && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
   var staffBtn = document.getElementById('btn-add-staff');
   if (staffBtn) staffBtn.style.display = canStaff ? '' : 'none';
-  // Onglet Utilisateurs visible uniquement pour le gestionnaire
   var utilTab = document.getElementById('stab-utilisateurs');
   if (utilTab) utilTab.style.display = isGest ? '' : 'none';
   applyTheme(localStorage.getItem('geststol_theme') || 'auto');
-  // Ouvrir sur l'onglet Réglages par défaut
   switchSettingsTab('apropos', document.getElementById('stab-apropos'));
+  // Restaurer l'aperçu Documents officiels
+  _officialDocRefreshPreview();
+  // Afficher l'indicateur localStorage
+  setTimeout(_refreshLocalStorageInfo, 50);
+}
+
+/* ══════════════════════════════════
+   DOCUMENTS OFFICIELS — Réglages
+══════════════════════════════════ */
+function officialDocUpload(zone, input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    if (!S.officialDocs) S.officialDocs = {};
+    S.officialDocs[zone] = e.target.result;
+    saveState();
+    _officialDocRefreshPreview();
+    toast(zone === 'header' ? 'En‑tête enregistré ✓' : 'Bas de page enregistré ✓', 'ok');
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function officialDocRemove(zone) {
+  if (!S.officialDocs) S.officialDocs = {};
+  S.officialDocs[zone] = null;
+  saveState();
+  _officialDocRefreshPreview();
+  toast('Image supprimée', 'ok');
+}
+
+function officialDocSetConfig(field, value) {
+  if (!S.officialDocs) S.officialDocs = {};
+  var numFields = ['headerHeight','footerHeight','marginTop','marginBottom','marginLeft','marginRight'];
+  S.officialDocs[field] = numFields.indexOf(field) >= 0 ? (parseFloat(value) || 0) : value;
+  saveState();
+  _officialDocRefreshPreview();
+}
+
+function _officialDocRefreshPreview() {
+  var od = S.officialDocs || {};
+  var imgStyle = 'width:100%;height:100%;object-fit:contain;display:block';
+  var svgPlaceholder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+
+  // Miniatures en-tête / bas de page
+  var hPrev = document.getElementById('regl-header-preview');
+  var hDel  = document.getElementById('regl-header-del');
+  if (hPrev) hPrev.innerHTML = od.header ? '<img src="'+od.header+'" style="'+imgStyle+'">' : svgPlaceholder;
+  if (hDel)  hDel.style.display = od.header ? '' : 'none';
+
+  var fPrev = document.getElementById('regl-footer-preview');
+  var fDel  = document.getElementById('regl-footer-del');
+  if (fPrev) fPrev.innerHTML = od.footer ? '<img src="'+od.footer+'" style="'+imgStyle+'">' : svgPlaceholder;
+  if (fDel)  fDel.style.display = od.footer ? '' : 'none';
+
+  // Repopuler les champs depuis S.officialDocs
+  var fieldMap = { 'od-header-h':'headerHeight', 'od-footer-h':'footerHeight', 'od-mt':'marginTop', 'od-mb':'marginBottom', 'od-ml':'marginLeft', 'od-mr':'marginRight' };
+  Object.keys(fieldMap).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && od[fieldMap[id]] !== undefined) el.value = od[fieldMap[id]];
+  });
+  var posEl = document.getElementById('od-header-pos');
+  if (posEl && od.headerPos) posEl.value = od.headerPos;
+
+  // Échelle mini A4 : 150px largeur = 210mm → 1mm ≈ 0.714px
+  var sc   = 150 / 210;
+  var hh   = od.headerHeight !== undefined ? od.headerHeight : 20;
+  var fh   = od.footerHeight !== undefined ? od.footerHeight : 15;
+  var mt   = od.marginTop    !== undefined ? od.marginTop    : 22;
+  var mb   = od.marginBottom !== undefined ? od.marginBottom : 20;
+  var ml   = od.marginLeft   !== undefined ? od.marginLeft   : 14;
+  var mr   = od.marginRight  !== undefined ? od.marginRight  : 14;
+
+  var hPx  = Math.round(hh * sc);
+  var fPx  = Math.round(fh * sc);
+  var mtPx = Math.round(mt * sc);   // marge = espace entre bord page et bord image
+  var mbPx = Math.round(mb * sc);
+  var mlPx = Math.round(ml * sc);
+  var mrPx = Math.round(mr * sc);
+  // Le contenu commence SOUS le header (marge + hauteur logo)
+  var contentTopPx = mtPx + hPx;
+  var contentBotPx = mbPx + fPx;
+
+  var posMap = { left:'flex-start', center:'center', right:'flex-end' };
+  var justH  = posMap[od.headerPos || 'left'] || 'flex-start';
+
+  // En-tête : top = marge haut, left/right = marges G/D
+  var pHdr = document.getElementById('regl-preview-header');
+  if (pHdr) {
+    pHdr.style.top            = mtPx + 'px';
+    pHdr.style.height         = hPx + 'px';
+    pHdr.style.left           = mlPx + 'px';
+    pHdr.style.right          = mrPx + 'px';
+    pHdr.style.bottom         = '';
+    pHdr.style.justifyContent = justH;
+    pHdr.innerHTML = od.header
+      ? '<img src="'+od.header+'" style="max-width:100%;max-height:'+(hPx-1)+'px;width:auto;height:auto;display:block">'
+      : '<span style="font-size:6px;color:#9ca3af;font-style:italic">En‑tête</span>';
+  }
+
+  // Bas de page : bottom = marge bas, left/right = marges G/D
+  var pFtr = document.getElementById('regl-preview-footer');
+  if (pFtr) {
+    pFtr.style.bottom         = mbPx + 'px';
+    pFtr.style.height         = fPx + 'px';
+    pFtr.style.left           = mlPx + 'px';
+    pFtr.style.right          = mrPx + 'px';
+    pFtr.style.top            = '';
+    pFtr.style.justifyContent = 'center';
+    pFtr.innerHTML = od.footer
+      ? '<img src="'+od.footer+'" style="max-width:100%;max-height:'+(fPx-1)+'px;width:auto;height:auto;display:block;margin:0 auto">'
+      : '<span style="font-size:6px;color:#9ca3af;font-style:italic">Bas de page</span>';
+  }
+
+  // Repère zone texte : commence sous le logo, finit au-dessus du footer
+  var pZone = document.getElementById('regl-preview-zone');
+  if (pZone) {
+    pZone.style.top    = contentTopPx + 'px';
+    pZone.style.bottom = contentBotPx + 'px';
+    pZone.style.left   = mlPx + 'px';
+    pZone.style.right  = mrPx + 'px';
+  }
+
+  // Contenu simulé : padding = marge + hauteur image → les lignes bougent avec les marges
+  var pContent = document.getElementById('regl-preview-content');
+  if (pContent) {
+    pContent.style.paddingTop    = contentTopPx + 'px';
+    pContent.style.paddingBottom = contentBotPx + 'px';
+    pContent.style.paddingLeft   = mlPx + 'px';
+    pContent.style.paddingRight  = mrPx + 'px';
+  }
+}
+
+/* ── Helper : CSS @page + reset body (injecté dans le <style> de toutes les popups print) ── */
+function _officialDocPrintCSS() {
+  var od = S.officialDocs || {};
+  var mt = od.marginTop    !== undefined ? od.marginTop    : 22;
+  var mb = od.marginBottom !== undefined ? od.marginBottom : 20;
+  var ml = od.marginLeft   !== undefined ? od.marginLeft   : 14;
+  var mr = od.marginRight  !== undefined ? od.marginRight  : 14;
+  var hdrH = od.header ? (od.headerHeight || 20) : 0;
+  var ftrH = od.footer ? (od.footerHeight || 15) : 0;
+  // @page margin = marge externe + hauteur image (le texte commence après le logo)
+  var pageTop = mt + hdrH;
+  var pageBot = mb + ftrH;
+  return 'body{margin:0!important}@page{margin:'+pageTop+'mm '+mr+'mm '+pageBot+'mm '+ml+'mm}';
+}
+
+/* ── Helper : enveloppe le contenu avec en-tête/bas de page fixes et applique les marges ── */
+/* ══════════════════════════════════════════════════════
+   RENDERER A4 MAÎTRE — utilisé par tous les documents
+   Reçoit du HTML pur (sans padding/box-shadow propres)
+   et produit une page A4 propre avec header/footer officiels
+══════════════════════════════════════════════════════ */
+function _openA4Doc(contentHtml, title) {
+  var od  = S.officialDocs || {};
+  var mt  = od.marginTop    !== undefined ? od.marginTop    : 20;
+  var mb  = od.marginBottom !== undefined ? od.marginBottom : 20;
+  var ml  = od.marginLeft   !== undefined ? od.marginLeft   : 20;
+  var mr  = od.marginRight  !== undefined ? od.marginRight  : 20;
+  var hh  = od.header ? (od.headerHeight || 20) : 0;
+  var fh  = od.footer ? (od.footerHeight || 15) : 0;
+  // Espace contenu = marge + hauteur image + 4mm d'air
+  var ctTop = mt + hh + (hh > 0 ? 4 : 0);
+  var ctBot = mb + fh + (fh > 0 ? 4 : 0);
+  var posMap   = { left:'left', center:'center', right:'right' };
+  var hdrAlign = posMap[od.headerPos || 'left'] || 'left';
+  var win = window.open('', '_blank', 'width=860,height=1080');
+  var hdrImg = od.header
+    ? '<div style="position:absolute;top:'+mt+'mm;left:'+ml+'mm;right:'+mr+'mm;text-align:'+hdrAlign+'">'
+      + '<img src="'+od.header+'" style="max-height:'+hh+'mm;max-width:100%;width:auto;height:auto"></div>'
+    : '';
+  var ftrImg = od.footer
+    ? '<div style="position:absolute;bottom:'+mb+'mm;left:'+ml+'mm;right:'+mr+'mm;text-align:center">'
+      + '<img src="'+od.footer+'" style="max-height:'+fh+'mm;max-width:100%;width:auto;height:auto"></div>'
+    : '';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+(title||'Document')+'</title><style>');
+  win.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+  win.document.write('body{background:#707070;display:flex;justify-content:center;padding:24px;font-family:\'Times New Roman\',Times,serif;color:#111}');
+  win.document.write('.a4{background:#fff;width:210mm;min-height:297mm;position:relative;box-shadow:0 4px 32px rgba(0,0,0,.45)}');
+  win.document.write('.a4-content{position:absolute;top:'+ctTop+'mm;bottom:'+ctBot+'mm;left:'+ml+'mm;right:'+mr+'mm;overflow:hidden}');
+  win.document.write('@media print{');
+  win.document.write('body{background:#fff;padding:0;display:block}');
+  win.document.write('.a4{box-shadow:none;width:auto;min-height:0;position:static}');
+  win.document.write('.a4-content{position:static;overflow:visible}');
+  win.document.write('@page{margin:'+ctTop+'mm '+mr+'mm '+ctBot+'mm '+ml+'mm}');
+  win.document.write('}');
+  win.document.write('</style></head><body>');
+  win.document.write('<div class="a4">');
+  win.document.write(hdrImg);
+  win.document.write(ftrImg);
+  win.document.write('<div class="a4-content">'+contentHtml+'</div>');
+  win.document.write('</div></body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(function(){ win.print(); }, 500);
+}
+
+/* ══════════════════════════════════════════════════════
+   TEMPLATES DE DOCUMENTS
+   Chaque fonction retourne du HTML pur (pas de padding/box-shadow)
+   à passer à _openA4Doc()
+══════════════════════════════════════════════════════ */
+var _docTemplates = {
+
+  /* ── Attestation Collectif France ── */
+  attestation_collectif: function(data) {
+    var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+    var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    var today  = new Date();
+    var dateEd = today.getDate()+' '+moisFr[today.getMonth()]+' '+today.getFullYear();
+    var pratLabel = {microlight:'Microlight (ULM)',paramoteur:'Paramoteur',paramotor:'Paramoteur'};
+    var discLabel = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
+    var pratFmt = pratLabel[data.pratique] || data.pratique || '___________';
+    var discFmt = discLabel[data.discipline] || data.discipline || '___________';
+    var ddnFmt  = data.ddnFmt || '___________';
+    var nomComplet = esc((data.prenom+' '+data.nom).trim() || '___________');
+    var nomUpper   = esc(((data.prenom||'')+' '+(data.nom||'').toUpperCase()).trim() || '___________');
+    var genre      = data.genre ? esc(data.genre)+' ' : '';
+    var saison     = esc(String(data.saison || new Date().getFullYear()));
+    var s = '';
+    s += '<div style="font-size:13px;line-height:1.75">';
+    // Bloc destinataire (droite)
+    s += '<div style="text-align:right;margin-bottom:28px">';
+    s += '<div style="color:#555;margin-bottom:10px">Maisons-Alfort, le '+esc(dateEd)+'</div>';
+    s += '<div style="font-weight:700;font-size:14px">'+nomComplet+'</div>';
+    s += data.adresse
+      ? '<div style="margin-top:4px;font-size:12px;color:#333">'+esc(data.adresse)+'</div>'
+      : '<div style="margin-top:4px;font-size:11px;color:#aaa;font-style:italic">Adresse non renseignée</div>';
+    s += '</div>';
+    // Titre
+    s += '<div style="text-align:center;margin-bottom:28px">';
+    s += '<div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#444;margin-bottom:8px">LA DIRECTION TECHNIQUE NATIONALE</div>';
+    s += '<div style="font-size:18px;font-weight:700;letter-spacing:3px;text-decoration:underline;text-transform:uppercase">ATTESTATION</div>';
+    s += '</div>';
+    // Corps
+    s += '<div style="text-align:justify;margin-bottom:32px">';
+    s += '<p style="margin-bottom:14px">Je soussigné, <strong>Mohamed AZZOUNI</strong>, Directeur Technique National de la Fédération Française ULM, atteste que&nbsp;:</p>';
+    s += '<p style="margin:20px 0;text-align:center;font-size:15px;line-height:2"><strong>'+genre+nomUpper+'</strong><br>';
+    s += 'né(e) le <strong>'+ddnFmt+'</strong></p>';
+    s += '<p>Est membre du <strong>Collectif France</strong> et sélectionnable en <strong>Équipe de France</strong> pour la saison <strong>'+saison+'</strong> en <strong>'+esc(pratFmt)+'</strong>, discipline <strong>'+esc(discFmt)+'</strong>.</p>';
+    s += '<p style="margin-top:16px">Cette attestation est délivrée pour servir et valoir ce que de droit.</p>';
+    s += '</div>';
+    // Signature
+    s += '<div style="text-align:right;margin-top:40px">';
+    s += '<div style="font-style:italic;color:#666;margin-bottom:40px">Fait à Maisons-Alfort, le '+esc(dateEd)+'</div>';
+    s += '<div style="margin-bottom:6px;font-style:italic;color:#888;font-size:12px">Signature du DTN</div>';
+    s += '<div style="border-top:1px solid #ccc;width:160px;margin-left:auto;padding-top:8px">';
+    s += '<div style="font-weight:700">Mohamed AZZOUNI</div>';
+    s += '<div style="font-size:11px;color:#555">Directeur Technique National<br>Fédération Française ULM</div>';
+    s += '</div></div>';
+    s += '</div>';
+    return s;
+  }
+
+}; /* fin _docTemplates */
+
+function _officialDocWrap(innerHtml) {
+  var od = S.officialDocs || {};
+  var mt = od.marginTop    !== undefined ? od.marginTop    : 22;
+  var mb = od.marginBottom !== undefined ? od.marginBottom : 20;
+  var ml = od.marginLeft   !== undefined ? od.marginLeft   : 14;
+  var mr = od.marginRight  !== undefined ? od.marginRight  : 14;
+  var px = function(v) { return Math.round(v * 3.7795); }; // mm → px à 96dpi
+  var hdrH = od.header ? (od.headerHeight || 20) : 0;
+  var ftrH = od.footer ? (od.footerHeight || 15) : 0;
+  var leftPx  = px(ml);
+  var rightPx = px(mr);
+  // Marge haut = espace entre bord page et bord haut du logo
+  // Le contenu commence sous le logo : marge + hauteur logo
+  var topPx = px(mt) + px(hdrH);
+  var botPx = px(mb) + px(ftrH);
+  var posMap = { left:'left', center:'center', right:'right' };
+  var hdrAlign = posMap[od.headerPos || 'left'] || 'left';
+  // Header positionné à top = marge haut (pas top:0)
+  var hdr = od.header
+    ? '<div style="position:fixed;top:'+px(mt)+'px;left:'+leftPx+'px;right:'+rightPx+'px;z-index:100;text-align:'+hdrAlign+'">'
+      + '<img src="'+od.header+'" style="max-width:100%;max-height:'+px(hdrH)+'px;width:auto;height:auto;display:block;'+(hdrAlign==='center'?'margin:0 auto':hdrAlign==='right'?'margin-left:auto':'')+'"></div>'
+    : '';
+  // Footer positionné à bottom = marge bas (pas bottom:0)
+  var ftr = od.footer
+    ? '<div style="position:fixed;bottom:'+px(mb)+'px;left:'+leftPx+'px;right:'+rightPx+'px;z-index:100;text-align:center">'
+      + '<img src="'+od.footer+'" style="max-width:100%;max-height:'+px(ftrH)+'px;width:auto;height:auto;display:block;margin:0 auto"></div>'
+    : '';
+  return hdr + ftr + '<div style="padding:'+topPx+'px '+rightPx+'px '+botPx+'px '+leftPx+'px">'+innerHtml+'</div>';
+}
+
+/* ── Visualiser : ouvre une fenêtre A4 réelle avec en-tête, bas de page, marges et repères ── */
+function officialDocPreview() {
+  var od = S.officialDocs || {};
+  var mt = od.marginTop    !== undefined ? od.marginTop    : 22;
+  var mb = od.marginBottom !== undefined ? od.marginBottom : 20;
+  var ml = od.marginLeft   !== undefined ? od.marginLeft   : 14;
+  var mr = od.marginRight  !== undefined ? od.marginRight  : 14;
+  var hh = od.header ? (od.headerHeight || 20) : 0;
+  var fh = od.footer ? (od.footerHeight || 15) : 0;
+  // Marge = espace entre bord page et bord de l'image
+  // Le contenu commence SOUS le logo : mt + hh
+  var contentTop = mt + hh;
+  var contentBot = mb + fh;
+  var posMap  = { left:'left', center:'center', right:'right' };
+  var hdrAlign = posMap[od.headerPos || 'left'] || 'left';
+  var hdrFlex  = hdrAlign==='center' ? 'justify-content:center' : hdrAlign==='right' ? 'justify-content:flex-end' : 'justify-content:flex-start';
+  var w = window.open('', '_blank', 'width=900,height=1080');
+  var lines = [55,85,72,90,60,78,65,88,50,80,70,93,45,75,62];
+  var lineHtml = lines.map(function(p) {
+    return '<div style="height:4mm;background:#f0f0f0;border-radius:1mm;margin-bottom:2mm;width:'+p+'%"></div>';
+  }).join('');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Aperçu document officiel</title><style>');
+  w.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+  w.document.write('body{background:#6b7280;display:flex;justify-content:center;padding:30px;min-height:100vh;font-family:Arial,sans-serif}');
+  w.document.write('.page{background:#fff;width:210mm;min-height:297mm;position:relative;box-shadow:0 6px 40px rgba(0,0,0,.5)}');
+  // En-tête : top = marge haut, inséré par marges G/D
+  w.document.write('.hdr{position:absolute;top:'+mt+'mm;left:'+ml+'mm;right:'+mr+'mm;display:flex;align-items:flex-start;'+hdrFlex+'}');
+  // Bas de page : bottom = marge bas, inséré par marges G/D
+  w.document.write('.ftr{position:absolute;bottom:'+mb+'mm;left:'+ml+'mm;right:'+mr+'mm;display:flex;align-items:flex-end;justify-content:center}');
+  // Zone de contenu : commence sous le logo
+  w.document.write('.content{position:absolute;top:'+contentTop+'mm;bottom:'+contentBot+'mm;left:'+ml+'mm;right:'+mr+'mm;overflow:hidden}');
+  // Repères de marges
+  w.document.write('.guide-h{position:absolute;left:0;right:0;border-top:1px dashed rgba(59,130,246,.4)}');
+  w.document.write('.guide-v{position:absolute;top:0;bottom:0;border-left:1px dashed rgba(59,130,246,.4)}');
+  w.document.write('.lbl{position:absolute;font-size:6pt;color:rgba(59,130,246,.7);white-space:nowrap;background:rgba(255,255,255,.8);padding:0 1mm}');
+  w.document.write('@media print{body{background:#fff;padding:0}.page{box-shadow:none;width:100%;min-height:0}.guide-h,.guide-v,.lbl{display:none}@page{margin:'+contentTop+'mm '+mr+'mm '+contentBot+'mm '+ml+'mm}}');
+  w.document.write('</style></head><body><div class="page">');
+  // Header
+  if (od.header) {
+    w.document.write('<div class="hdr"><img src="'+od.header+'" style="max-width:100%;max-height:'+hh+'mm;width:auto;height:auto"></div>');
+  } else {
+    w.document.write('<div class="hdr" style="height:'+Math.max(hh,8)+'mm;border-bottom:1px dashed #d1d5db;align-items:center"><span style="font-size:8pt;color:#9ca3af;font-style:italic">En-tête non configuré</span></div>');
+  }
+  // Footer
+  if (od.footer) {
+    w.document.write('<div class="ftr"><img src="'+od.footer+'" style="max-width:100%;max-height:'+fh+'mm;width:auto;height:auto"></div>');
+  } else {
+    w.document.write('<div class="ftr" style="height:'+Math.max(fh,8)+'mm;border-top:1px dashed #d1d5db;align-items:center;justify-content:center"><span style="font-size:8pt;color:#9ca3af;font-style:italic">Bas de page non configuré</span></div>');
+  }
+  // Repères : marge haut (bord logo), marge bas (bord footer), G/D
+  w.document.write('<div class="guide-h" style="top:'+mt+'mm"><span class="lbl" style="top:-8pt;left:0">↑ logo : '+mt+'mm</span></div>');
+  w.document.write('<div class="guide-h" style="top:'+contentTop+'mm"><span class="lbl" style="top:2pt;left:0">↓ texte : '+contentTop+'mm</span></div>');
+  w.document.write('<div class="guide-h" style="bottom:'+mb+'mm"><span class="lbl" style="top:2pt;left:0">↑ footer : '+mb+'mm</span></div>');
+  w.document.write('<div class="guide-v" style="left:'+ml+'mm"><span class="lbl" style="top:'+Math.round(contentTop+2)+'mm;left:1pt;writing-mode:vertical-lr;transform:rotate(180deg)">← '+ml+'mm</span></div>');
+  w.document.write('<div class="guide-v" style="right:'+mr+'mm"><span class="lbl" style="top:'+Math.round(contentTop+2)+'mm;right:1pt;writing-mode:vertical-lr">→ '+mr+'mm</span></div>');
+  // Contenu simulé
+  w.document.write('<div class="content">');
+  w.document.write('<p style="font-size:12pt;font-weight:700;margin-bottom:6mm;color:#111">Document de référence</p>');
+  w.document.write('<p style="font-size:9pt;color:#555;margin-bottom:6mm">Aperçu — Réglages → Documents officiels</p>');
+  w.document.write(lineHtml);
+  w.document.write('</div></div></body></html>');
+  w.document.close();
 }
 
 function renderStatusBadge(containerId, statut) {
@@ -9013,6 +10094,23 @@ function savePilotManual() {
   closeSheet('sheet-pilot-manual');
   renderPilots();
   toast(editId ? 'Compétiteur mis à jour ✓' : 'Compétiteur ajouté ✓', 'ok');
+  // Si ouvert depuis Collectif France : mettre à jour l'entrée et rafraîchir la liste
+  if (_cfEditingFromId) {
+    var cfEntry = (S.collectif||[]).find(function(x){ return x.id === _cfEditingFromId; });
+    if (cfEntry) {
+      cfEntry.pilotId    = pilotId;
+      cfEntry.prenom     = prenom;
+      cfEntry.nom        = nom;
+      cfEntry.licence    = document.getElementById('pm-licence').value.trim();
+      cfEntry.club       = document.getElementById('pm-club').value.trim();
+      cfEntry.region     = document.getElementById('pm-region').value;
+      cfEntry.email      = document.getElementById('pm-email').value.trim();
+      cfEntry.genre      = document.getElementById('pm-genre').value;
+      saveState();
+      renderCollectifList();
+    }
+    _cfEditingFromId = null;
+  }
   silentPush();
 }
 
@@ -9247,7 +10345,32 @@ function removeCollectifMember(entryId) {
   toast('Membre supprimé', 'ok');
 }
 
-var _cfEditingId = null;
+var _cfDelPending = {};
+function cfDeleteMember(id) {
+  var btn = document.getElementById('cf-del-' + id);
+  if (!btn) return;
+  if (_cfDelPending[id]) {
+    // 2e clic : suppression confirmée
+    clearTimeout(_cfDelPending[id]);
+    delete _cfDelPending[id];
+    removeCollectifMember(id);
+  } else {
+    // 1er clic : passer en mode confirmation
+    btn.innerHTML = '⚠️ Confirmer ?';
+    btn.style.background = 'rgba(239,68,68,.22)';
+    btn.style.borderColor = '#ef4444';
+    btn.style.color = '#fff';
+    _cfDelPending[id] = setTimeout(function() {
+      delete _cfDelPending[id];
+      if (btn && btn.isConnected) {
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>Supprimer';
+        btn.style.background = 'rgba(239,68,68,.08)';
+        btn.style.borderColor = 'rgba(239,68,68,.35)';
+        btn.style.color = '#ef4444';
+      }
+    }, 3000);
+  }
+}
 
 function renderCollectifList() {
   var tbody = document.getElementById('cf-table-body');
@@ -9263,7 +10386,7 @@ function renderCollectifList() {
 
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); };
   var pratLabel = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur', '':'' };
-  var discLabel = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', '':'' };
+  var discLabel = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision', '':'' };
 
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--txt3);padding:24px;font-size:13px">Aucun membre — utilisez la barre ci-dessus pour en ajouter</td></tr>';
@@ -9272,93 +10395,100 @@ function renderCollectifList() {
     return;
   }
 
-  var inpSt = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:4px 7px;width:100%;box-sizing:border-box;outline:none';
-  var selSt = inpSt + ';cursor:pointer';
-  var yearNow = new Date().getFullYear();
-
   var html = '';
   list.forEach(function(m, i) {
     var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
-    var isEditing = (_cfEditingId === m.id);
-
-    if (isEditing) {
-      // Ligne en mode édition
-      var saisonOpts = '';
-      for (var y = yearNow+1; y >= yearNow-5; y--) {
-        saisonOpts += '<option value="'+y+'"'+(m.saison==y?' selected':'')+'>'+y+'</option>';
-      }
-      html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+';background:rgba(14,165,233,.08)">'
-        + '<td style="padding:6px 8px"><input id="cfe-prenom" value="'+esc(m.prenom)+'" placeholder="Prénom" style="'+inpSt+';margin-bottom:3px"> <input id="cfe-nom" value="'+esc(m.nom)+'" placeholder="Nom" style="'+inpSt+'"></td>'
-        + '<td style="padding:6px 8px"><input id="cfe-licence" value="'+esc(m.licence)+'" placeholder="Licence" style="'+inpSt+'"></td>'
-        + '<td style="padding:6px 8px"><input id="cfe-club" value="'+esc(m.club)+'" placeholder="Club" style="'+inpSt+'"></td>'
-        + '<td style="padding:6px 8px"><select id="cfe-pratique" style="'+selSt+'">'
-            + '<option value="">—</option>'
-            + '<option value="microlight"'+(m.pratique==='microlight'?' selected':'')+'>Microlight</option>'
-            + '<option value="paramotor"'+(m.pratique==='paramotor'||m.pratique==='paramoteur'?' selected':'')+'>Paramoteur</option>'
-          + '</select></td>'
-        + '<td style="padding:6px 8px"><select id="cfe-discipline" style="'+selSt+'">'
-            + '<option value="">—</option>'
-            + '<option value="classic"'+(m.discipline==='classic'||m.discipline==='classique'?' selected':'')+'>Classic</option>'
-            + '<option value="slalom"'+(m.discipline==='slalom'?' selected':'')+'>Slalom</option>'
-            + '<option value="stol"'+(m.discipline==='stol'?' selected':'')+'>STOL</option>'
-          + '</select></td>'
-        + '<td style="padding:6px 8px"><select id="cfe-saison" style="'+selSt+'">'+saisonOpts+'</select></td>'
-        + '<td style="padding:6px 8px;text-align:center">'
-            + '<button onclick="cfSaveMember(\''+esc(m.id)+'\')" title="Enregistrer" style="background:#0ea5e9;border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;font-family:inherit">✓ OK</button>'
-          + '</td>'
-        + '<td style="padding:6px 8px;text-align:center">'
-            + '<button onclick="_cfEditingId=null;renderCollectifList()" title="Annuler" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;font-family:inherit">✕</button>'
-          + '</td>'
-        + '<td></td>'
-        + '</tr>';
-    } else {
-      // Ligne normale
-      html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+'">'
-        + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.prenom)+' '+esc(m.nom)+'</td>'
-        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2);font-family:monospace">'+esc(m.licence)+'</td>'
-        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.club)+'</td>'
-        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(pratLabel[m.pratique]||m.pratique)+'</td>'
-        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline]||m.discipline)+'</td>'
-        + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.saison)+'</td>'
-        + '<td style="padding:9px 10px;text-align:center">'
-            + '<button onclick="cfMessageStarter(\''+esc(m.id)+'\')" title="Envoyer un message" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:16px;padding:2px 5px">💬</button>'
-          + '</td>'
-        + '<td style="padding:9px 10px;text-align:center">'
-            + '<button onclick="cfEditMember(\''+esc(m.id)+'\')" title="Modifier" style="background:none;border:none;cursor:pointer;color:#0ea5e9;font-size:15px;padding:2px 5px">✏️</button>'
-          + '</td>'
-        + '<td style="padding:9px 10px;text-align:center">'
-            + '<button onclick="removeCollectifMember(\''+esc(m.id)+'\')" title="Supprimer" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:15px;padding:2px 5px">✕</button>'
-          + '</td>'
-        + '</tr>';
-    }
+    html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+'">'
+      + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.prenom)+' '+esc(m.nom)+'</td>'
+      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2);font-family:monospace">'+esc(m.licence)+'</td>'
+      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.club)+'</td>'
+      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(pratLabel[m.pratique]||m.pratique)+'</td>'
+      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline]||m.discipline)+'</td>'
+      + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.saison)+'</td>'
+      + '<td style="padding:9px 10px;text-align:center">'
+          + '<button onclick="cfMessageStarter(\''+esc(m.id)+'\')" title="Générer l\'attestation" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'
+          + 'Attestation</button>'
+        + '</td>'
+      + '<td style="padding:9px 10px;text-align:center">'
+          + '<button onclick="cfEditMember(\''+esc(m.id)+'\')" title="Modifier" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;border:1px solid rgba(14,165,233,.35);background:rgba(14,165,233,.08);color:#0ea5e9;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>'
+          + 'Modifier</button>'
+        + '</td>'
+      + '<td style="padding:9px 10px;text-align:center">'
+          + '<button id="cf-del-'+esc(m.id)+'" onclick="cfDeleteMember(\''+esc(m.id)+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);color:#ef4444;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .2s">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>'
+          + 'Supprimer</button>'
+        + '</td>'
+      + '</tr>';
   });
   tbody.innerHTML = html;
   var counter = document.getElementById('cf-counter');
   if (counter) counter.textContent = list.length + ' membre' + (list.length>1?'s':'');
 }
 
+var _cfEditingFromId = null; // collectif entry id en cours d'édition
+
 function cfEditMember(id) {
-  _cfEditingId = id;
-  renderCollectifList();
-  var row = document.getElementById('cf-row-'+id);
-  if (row) row.scrollIntoView({block:'nearest',behavior:'smooth'});
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) return;
+
+  // Chercher le pilote : d'abord par pilotId, puis par numéro de licence
+  var pilot = null;
+  if (m.pilotId) pilot = (S.pilots||[]).find(function(p){ return p.id === m.pilotId; });
+  if (!pilot && m.licence) pilot = (S.pilots||[]).find(function(p){ return p.licence && String(p.licence) === String(m.licence); });
+
+  // Si aucun pilote trouvé : créer une fiche minimale dans S.pilots
+  if (!pilot) {
+    if (!S.pilots) S.pilots = [];
+    pilot = {
+      id:      'cf_pilot_' + Date.now(),
+      prenom:  m.prenom  || '',
+      nom:     m.nom     || '',
+      licence: m.licence || '',
+      club:    m.club    || '',
+      region:  m.region  || '',
+      email:   m.email   || '',
+      genre:   m.genre   || '',
+      ddn:     m.dateNaissance || ''
+    };
+    S.pilots.push(pilot);
+    saveState();
+  }
+
+  // Lier le pilotId dans l'entrée collectif
+  if (!m.pilotId) { m.pilotId = pilot.id; saveState(); }
+
+  _cfEditingFromId = id;
+  showPilotDetailModal(pilot.id, null, true);
 }
 
-function cfSaveMember(id) {
+function closeCfEditModal() {
+  var modal = document.getElementById('modal-cf-edit');
+  if (!modal) return;
+  modal.style.opacity = '0';
+  setTimeout(function(){ modal.style.display = 'none'; }, 200);
+}
+
+function cfSaveMemberModal() {
+  var id = document.getElementById('cfe-id').value;
   var m = (S.collectif||[]).find(function(x){ return x.id === id; });
   if (!m) return;
   var get = function(elId){ var el = document.getElementById(elId); return el ? el.value.trim() : ''; };
-  m.prenom     = get('cfe-prenom');
-  m.nom        = get('cfe-nom');
-  m.licence    = get('cfe-licence');
-  m.club       = get('cfe-club');
-  m.pratique   = get('cfe-pratique');
-  m.discipline = get('cfe-discipline');
-  m.saison     = get('cfe-saison');
-  _cfEditingId = null;
+  m.prenom     = get('cfe2-prenom');
+  m.nom        = get('cfe2-nom');
+  m.licence    = get('cfe2-licence');
+  m.club       = get('cfe2-club');
+  m.region     = get('cfe2-region');
+  m.email      = get('cfe2-email');
+  m.pratique   = get('cfe2-pratique');
+  m.discipline = get('cfe2-discipline');
+  m.saison     = get('cfe2-saison');
+  m.genre      = get('cfe2-genre');
   saveState();
   renderCollectifList();
-  toast('Membre mis à jour', 'ok');
+  closeCfEditModal();
+  toast('Membre mis à jour ✓', 'ok');
 }
 
 /* ══════════ EXPORT / IMPORT COMPÉTITEURS ══════════ */
@@ -9425,33 +10555,146 @@ function exportCollectif() {
   toast('Export CSV téléchargé (' + list.length + ' membres)', 'ok');
 }
 
+/* Normalise les colonnes d'un fichier externe vers le format interne */
+function _normalizeCollectifRows(rows) {
+  // table de correspondance : clé normalisée → champ interne
+  var colMap = {
+    'n° licence':'licence','no licence':'licence','licence':'licence',
+    'numero licence':'licence','numéro licence':'licence','num licence':'licence',
+    'nom':'_nomComplet','name':'_nomComplet',
+    'prénom':'prenom','prenom':'prenom','firstname':'prenom','first name':'prenom',
+    'nom famille':'nom','last name':'nom','lastname':'nom',
+    'date de naissance':'dateNaissance','naissance':'dateNaissance','dob':'dateNaissance',
+    'région':'region','region':'region','ligue':'region',
+    'genre':'genre','sexe':'genre','sex':'genre','gender':'genre','civilité':'genre','civilite':'genre',
+    'email':'email','mail':'email','courriel':'email',
+    'pratique':'pratique','activité':'pratique','activite':'pratique',
+    'discipline':'discipline','disc':'discipline',
+    'discipline2':'discipline2','discipline 2':'discipline2',
+    'club':'club','aéroclub':'club','aeroclub':'club',
+    'saison':'saison','year':'saison','année':'saison','annee':'saison',
+    'région sportive':'regionSportive','region sportive':'regionSportive',
+    'statut':'statut','status':'statut',
+    'niveau':'niveau','level':'niveau',
+    'téléphone':'tel','telephone':'tel','tel':'tel','phone':'tel'
+  };
+
+  var normKey = function(k) {
+    return (k||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  };
+  var normVal = function(v) {
+    return (v === null || v === undefined) ? '' : String(v).trim();
+  };
+  var normPratique = function(v) {
+    var lv = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if (lv.indexOf('microlight') >= 0 || lv.indexOf('ulm') >= 0) return 'microlight';
+    if (lv.indexOf('param') >= 0) return 'paramoteur';
+    return v.toLowerCase();
+  };
+  var normDiscipline = function(v) {
+    var lv = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if (lv.indexOf('classic') >= 0) return 'classic';
+    if (lv.indexOf('slalom') >= 0) return 'slalom';
+    if (lv.indexOf('stol') >= 0) return 'stol';
+    if (lv.indexOf('cross') >= 0) return 'cross';
+    if (lv.indexOf('precision') >= 0 || lv.indexOf('précision') >= 0) return 'precision';
+    return v.toLowerCase();
+  };
+
+  var defaultSaison = (_cfFilters.saison || new Date().getFullYear().toString());
+
+  return rows.map(function(r) {
+    var out = {};
+    // Mapper chaque colonne source
+    Object.keys(r).forEach(function(rawKey) {
+      var mapped = colMap[normKey(rawKey)];
+      if (mapped) out[mapped] = normVal(r[rawKey]);
+    });
+
+    // Si _nomComplet présent et pas de prenom séparé : splitter
+    if (out._nomComplet) {
+      var parts = out._nomComplet.trim().split(/\s+/);
+      if (!out.prenom) out.prenom = parts[0] || '';
+      if (!out.nom)    out.nom    = parts.slice(1).join(' ') || '';
+      delete out._nomComplet;
+    }
+
+    // Normaliser pratique / discipline
+    if (out.pratique)   out.pratique   = normPratique(out.pratique);
+    if (out.discipline) out.discipline = normDiscipline(out.discipline);
+
+    // Assigner saison par défaut si manquante
+    if (!out.saison) out.saison = defaultSaison;
+
+    // Générer un id stable basé sur licence+saison si absent
+    if (!out.id) {
+      if (out.licence) out.id = 'cf_' + out.licence + '_' + out.saison;
+      else out.id = 'cf_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    }
+
+    return out;
+  }).filter(function(r) {
+    // Ignorer les lignes sans licence ET sans nom
+    return r.licence || r.nom || r.prenom;
+  });
+}
+
 function importCollectif(input) {
   var file = input.files[0];
   if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
+  var ext = file.name.split('.').pop().toLowerCase();
+
+  // ── Excel / ODS ──────────────────────────────────────────
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée', 'err'); return; }
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (!rows.length) { toast('Feuille vide', 'err'); return; }
+        _mergeCollectif(_normalizeCollectifRows(rows));
+      } catch(err) {
+        toast('Erreur lecture Excel : ' + err.message, 'err');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    input.value = '';
+    return;
+  }
+
+  // ── JSON / CSV / TSV ─────────────────────────────────────
+  var reader2 = new FileReader();
+  reader2.onload = function(e) {
     var text = e.target.result;
     try {
-      // Tenter JSON d'abord
       var imported = JSON.parse(text);
       if (!Array.isArray(imported)) throw new Error('not array');
-      _mergeCollectif(imported);
+      // JSON interne : pas de normalisation si les champs existent déjà
+      var firstKey = imported[0] ? Object.keys(imported[0])[0] : '';
+      var needsNorm = firstKey && !['id','nom','prenom','licence','saison'].includes(firstKey);
+      _mergeCollectif(needsNorm ? _normalizeCollectifRows(imported) : imported);
     } catch(err) {
-      // CSV
+      var sep = ext === 'tsv' ? '\t' : ';';
+      if (ext === 'csv') {
+        var firstLine = text.split('\n')[0] || '';
+        if ((firstLine.match(/,/g)||[]).length > (firstLine.match(/;/g)||[]).length) sep = ',';
+      }
       var lines = text.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
       if (lines.length < 2) { toast('Fichier vide ou invalide', 'err'); return; }
-      var headers = lines[0].split(';').map(function(h){ return h.replace(/^"|"$/g,'').trim(); });
+      var headers = lines[0].split(sep).map(function(h){ return h.replace(/^"|"$/g,'').trim(); });
       var rows = [];
       for (var i=1; i<lines.length; i++) {
-        var cells = lines[i].split(';').map(function(c){ return c.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+        var cells = lines[i].split(sep).map(function(c){ return c.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
         var obj = {};
         headers.forEach(function(h,j){ obj[h] = cells[j]||''; });
         rows.push(obj);
       }
-      _mergeCollectif(rows);
+      _mergeCollectif(_normalizeCollectifRows(rows));
     }
   };
-  reader.readAsText(file, 'UTF-8');
+  reader2.readAsText(file, 'UTF-8');
   input.value = '';
 }
 
@@ -9474,9 +10717,114 @@ function _mergeCollectif(rows) {
 function cfMessageStarter(entryId) {
   var m = (S.collectif||[]).find(function(x){ return x.id === entryId; });
   if (!m) return;
-  // Pré-remplir la messagerie avec le pilote concerné
-  var dest = (m.prenom + ' ' + m.nom).trim();
-  toast('Message à '+dest+' — fonctionnalité à venir', 'info');
+
+  // Récupérer données pilote si lié
+  var pilot = null;
+  if (m.pilotId) pilot = (S.pilots||[]).find(function(p){ return p.id === m.pilotId; });
+  if (!pilot && m.licence) pilot = (S.pilots||[]).find(function(p){ return String(p.licence) === String(m.licence); });
+
+  var genre      = m.genre      || (pilot && pilot.genre)   || '';
+  var prenom     = m.prenom     || (pilot && pilot.prenom)  || '';
+  var nom        = m.nom        || (pilot && pilot.nom)     || '';
+  var ddn        = m.dateNaissance || (pilot && pilot.ddn)  || '';
+  var adresse    = (pilot && pilot.adresse) || '';
+  var saison     = m.saison     || new Date().getFullYear();
+  var pratique   = m.pratique   || (pilot && pilot.pratique)   || '';
+  var discipline = m.discipline || (pilot && pilot.discipline)  || '';
+
+  var pratLabel = { microlight:'Microlight (ULM)', paramoteur:'Paramoteur', paramotor:'Paramoteur' };
+  var discLabel = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+  var pratFmt = pratLabel[pratique] || pratique || '___________';
+  var discFmt = discLabel[discipline] || discipline || '___________';
+
+  var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var today = new Date();
+  var dateEdition = today.getDate() + ' ' + moisFr[today.getMonth()] + ' ' + today.getFullYear();
+
+  var ddnFmt = '';
+  if (ddn) {
+    var d = new Date((ddn.indexOf('T') < 0 ? ddn + 'T00:00:00' : ddn));
+    if (!isNaN(d)) ddnFmt = d.getDate() + ' ' + moisFr[d.getMonth()] + ' ' + d.getFullYear();
+    else ddnFmt = ddn;
+  }
+  ddnFmt = ddnFmt || '___________';
+
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var nomComplet = (prenom + ' ' + nom).trim() || '___________';
+  var nomUpper   = ((prenom || '') + ' ' + (nom || '').toUpperCase()).trim() || '___________';
+
+  // Construire l'objet data pour le template
+  var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var ddnFmtStr = '';
+  if (ddn) {
+    var d = new Date((ddn.indexOf('T') < 0 ? ddn + 'T00:00:00' : ddn));
+    if (!isNaN(d)) ddnFmtStr = d.getDate() + ' ' + moisFr[d.getMonth()] + ' ' + d.getFullYear();
+    else ddnFmtStr = ddn;
+  }
+
+  var data = {
+    prenom: prenom, nom: nom, genre: genre,
+    adresse: adresse, saison: saison,
+    pratique: pratique, discipline: discipline,
+    ddnFmt: ddnFmtStr || '___________'
+  };
+
+  // Aperçu dans la modal (version compacte avec fond blanc)
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var moisFrLocal = moisFr;
+  var today2 = new Date();
+  var dateEd2 = today2.getDate()+' '+moisFrLocal[today2.getMonth()]+' '+today2.getFullYear();
+  var nomComplet = (prenom+' '+nom).trim() || '___________';
+  var pratLabel2 = {microlight:'Microlight (ULM)',paramoteur:'Paramoteur',paramotor:'Paramoteur'};
+  var discLabel2 = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
+
+  var el = document.getElementById('cf-attestation-body');
+  if (!el) return;
+  // Stocker data pour printCfAttestation
+  el.dataset.attestationData = JSON.stringify(data);
+  // Aperçu modal : version simplifiée
+  el.innerHTML =
+    '<div style="font-family:\'Times New Roman\',Times,serif;font-size:13px;color:#111;line-height:1.65;padding:20px;background:#fff;border-radius:4px">'
+    + '<div style="text-align:right;margin-bottom:20px;font-size:12px">'
+    + '<div style="color:#666">Maisons-Alfort, le '+esc(dateEd2)+'</div>'
+    + '<div style="font-weight:700;margin-top:8px">'+esc(nomComplet)+'</div>'
+    + (adresse ? '<div style="font-size:11px;color:#444">'+esc(adresse)+'</div>' : '<div style="font-size:11px;color:#bbb;font-style:italic">Adresse non renseignée</div>')
+    + '</div>'
+    + '<div style="text-align:center;margin-bottom:18px">'
+    + '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#444;margin-bottom:6px">LA DIRECTION TECHNIQUE NATIONALE</div>'
+    + '<div style="font-size:15px;font-weight:700;letter-spacing:2px;text-decoration:underline;text-transform:uppercase">ATTESTATION</div>'
+    + '</div>'
+    + '<div style="text-align:justify;font-size:12px">'
+    + '<p style="margin-bottom:12px">Je soussigné, <strong>Mohamed AZZOUNI</strong>, DTN de la Fédération Française ULM, atteste que&nbsp;:</p>'
+    + '<p style="margin:16px 0;text-align:center;font-size:13px"><strong>'+(genre?esc(genre)+' ':'')+esc((prenom+' '+(nom||'').toUpperCase()).trim())+'</strong><br>né(e) le <strong>'+esc(data.ddnFmt)+'</strong></p>'
+    + '<p>Est membre du <strong>Collectif France</strong> et sélectionnable en <strong>Équipe de France</strong> pour la saison <strong>'+esc(String(saison))+'</strong> en <strong>'+esc(pratLabel2[pratique]||pratique||'___')+'</strong>, discipline <strong>'+esc(discLabel2[discipline]||discipline||'___')+'</strong>.</p>'
+    + '<p style="margin-top:12px">Cette attestation est délivrée pour servir et valoir ce que de droit.</p>'
+    + '</div>'
+    + '<div style="text-align:right;margin-top:28px;font-size:12px">'
+    + '<div style="font-style:italic;color:#888;margin-bottom:28px">Signature du DTN</div>'
+    + '<div style="font-weight:700">Mohamed AZZOUNI</div>'
+    + '<div style="font-size:11px;color:#666">Directeur Technique National — FFPLUM</div>'
+    + '</div></div>';
+
+  var modal = document.getElementById('modal-cf-attestation');
+  modal.style.display = 'flex';
+  requestAnimationFrame(function(){ modal.style.opacity = '1'; });
+}
+
+function closeCfAttestation() {
+  var modal = document.getElementById('modal-cf-attestation');
+  modal.style.opacity = '0';
+  setTimeout(function(){ modal.style.display = 'none'; }, 200);
+}
+
+function printCfAttestation() {
+  var body = document.getElementById('cf-attestation-body');
+  if (!body) return;
+  var raw = body.dataset.attestationData;
+  if (!raw) { toast('Données manquantes — rouvrir l\'attestation', 'err'); return; }
+  var data = JSON.parse(raw);
+  var html = _docTemplates.attestation_collectif(data);
+  _openA4Doc(html, 'Attestation Collectif France');
 }
 
 function printCollectifList() {
@@ -9509,11 +10857,11 @@ function printCollectifList() {
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Collectif France</title>'
     + '<style>body{font-family:Arial,sans-serif;padding:20px;color:#111}h1{font-size:20px;margin:0 0 4px}p{font-size:12px;color:#555;margin:0 0 16px}table{border-collapse:collapse;width:100%}th{background:#0f4c81;color:#fff;padding:8px 10px;text-align:left;border:1px solid #ccc;font-size:12px}td{font-size:12px}@media print{@page{size:A4;margin:15mm}}</style>'
     + '</head><body>'
-    + '<h1>🇫🇷 Collectif France — Membres</h1>'
+    + _officialDocWrap('<h1>🇫🇷 Collectif France — Membres</h1>'
     + '<p>' + (filtLabel.length ? filtLabel.join(' | ') : 'Tous filtres') + ' &nbsp;·&nbsp; ' + list.length + ' membre(s)</p>'
     + '<table><thead><tr><th>#</th><th>Prénom Nom</th><th>N° Licence</th><th>Club</th><th>Pratique</th><th>Discipline</th><th>Saison</th></tr></thead>'
     + '<tbody>'+rows+'</tbody></table>'
-    + '<p style="margin-top:16px;font-size:10px;color:#999">Imprimé le '+new Date().toLocaleDateString('fr-FR')+' — Gest\'Appli FFPLUM</p>'
+    + '<p style="margin-top:16px;font-size:10px;color:#999">Imprimé le '+new Date().toLocaleDateString('fr-FR')+' — Gest\'Appli FFPLUM</p>')
     + '<script>window.onload=function(){window.print();}<\/script></body></html>');
   w.document.close();
 }
@@ -9741,6 +11089,63 @@ function silentPush() {
 // ═══════════════════════════════════
 // ÉCRAN BIENVENUE (non connecté)
 // ═══════════════════════════════════
+// ── Quitter l'application (retour écran bienvenue) ───────────────────────────
+function quitterApp() {
+  // Cacher toutes les pages
+  var dtn = document.getElementById('page-dtn');
+  if (dtn) dtn.style.display = 'none';
+  var app = document.getElementById('app');
+  if (app) app.style.display = 'none';
+  ['page-securite','page-acces','page-territoires'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  // Sortir du plein écran si actif
+  if (document.fullscreenElement) document.exitFullscreen();
+  // Effacer la session utilisateur
+  S.user = null;
+  saveState();
+  showWelcomeScreen();
+}
+
+// ── Plein écran (masquer menus navigateur) ────────────────────────────────────
+function _updateFullscreenUI(isFs) {
+  // Bouton flottant
+  var expandIco  = document.getElementById('fs-icon-expand');
+  var reduceIco  = document.getElementById('fs-icon-reduce');
+  if (expandIco) expandIco.style.display = isFs ? 'none' : '';
+  if (reduceIco) reduceIco.style.display = isFs ? '' : 'none';
+  // Bouton réglages
+  var reglLabel  = document.getElementById('regl-fs-label');
+  var reglIcon   = document.getElementById('regl-fs-icon');
+  var reglBtn    = document.getElementById('regl-fullscreen-btn');
+  if (reglLabel) reglLabel.textContent = isFs ? 'Désactiver' : 'Activer';
+  if (reglBtn)   reglBtn.className = isFs ? 'btn btn-sm btn-primary' : 'btn btn-sm';
+  if (reglIcon)  reglIcon.innerHTML = isFs
+    ? '<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>'
+    : '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+  // Bouton DTN header
+  var dtnExpand = document.getElementById('dtn-fs-icon-expand');
+  var dtnReduce = document.getElementById('dtn-fs-icon-reduce');
+  var dtnLabel  = document.getElementById('dtn-fs-label');
+  if (dtnExpand) dtnExpand.style.display = isFs ? 'none' : '';
+  if (dtnReduce) dtnReduce.style.display = isFs ? '' : 'none';
+  if (dtnLabel)  dtnLabel.textContent    = isFs ? 'Réduire' : 'Plein écran';
+}
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (req) { req.call(el).catch(function(){}); }
+    else { toast('Plein écran non supporté', ''); }
+  } else {
+    var ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+    if (ex) ex.call(document);
+  }
+}
+// Sync UI quand l'état plein écran change (ex: touche Échap)
+document.addEventListener('fullscreenchange', function(){ _updateFullscreenUI(!!document.fullscreenElement); });
+document.addEventListener('webkitfullscreenchange', function(){ _updateFullscreenUI(!!document.fullscreenElement); });
+
 function showWelcomeScreen() {
   var ws = document.getElementById('welcome-screen');
   if (ws) { ws.style.display = 'flex'; }
@@ -10267,6 +11672,20 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     frRegions.forEach(function(r){ html += '<option value="'+r+'"'+(pilot.region===r?' selected':'')+'>'+r+'</option>'; });
     html += '</select></div>';
     html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html += '<div><div style="'+lSt+'">Pratique</div><select id="pd-pratique" style="'+iSt+'">';
+    html += '<option value="">— Non précisé —</option>';
+    [{v:'microlight',l:'Microlight'},{v:'paramoteur',l:'Paramoteur'}].forEach(function(o){
+      html += '<option value="'+o.v+'"'+((pilot.pratique===o.v)?' selected':'')+'>'+o.l+'</option>';
+    });
+    html += '</select></div>';
+    html += '<div><div style="'+lSt+'">Discipline</div><select id="pd-discipline" style="'+iSt+'">';
+    html += '<option value="">— Non précisé —</option>';
+    [{v:'classic',l:'Classic'},{v:'slalom',l:'Slalom'},{v:'stol',l:'STOL'},{v:'cross',l:'Cross'},{v:'precision',l:'Précision'}].forEach(function(o){
+      html += '<option value="'+o.v+'"'+((pilot.discipline===o.v)?' selected':'')+'>'+o.l+'</option>';
+    });
+    html += '</select></div>';
+    html += '</div>';
     html += '</div></div>';
 
     // ── Section ULM / Machine ──
@@ -10418,9 +11837,11 @@ function savePilotDetail(pilotId, compId) {
   pilot.tel     = g('pd-tel');
   pilot.email   = g('pd-email');
   // Licences & Club
-  pilot.licence = g('pd-licence');
-  pilot.club    = g('pd-club');
-  pilot.region  = g('pd-region');
+  pilot.licence    = g('pd-licence');
+  pilot.club       = g('pd-club');
+  pilot.region     = g('pd-region');
+  pilot.pratique   = g('pd-pratique');
+  pilot.discipline = g('pd-discipline');
   // Inscription
   pilot._pdCopilote  = g('pd-copilote');
   pilot._pdNotes     = g('pd-notes');
@@ -10445,6 +11866,23 @@ function savePilotDetail(pilotId, compId) {
   if (typeof silentPush === 'function') silentPush();
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
   toast('Mis à jour ✓', '');
+  // Sync collectif si ouvert depuis Collectif France
+  if (_cfEditingFromId) {
+    var cfEntry = (S.collectif||[]).find(function(x){ return x.id === _cfEditingFromId; });
+    if (cfEntry) {
+      cfEntry.pilotId  = pilotId;
+      cfEntry.prenom   = pilot.prenom  || cfEntry.prenom;
+      cfEntry.nom      = pilot.nom     || cfEntry.nom;
+      cfEntry.licence  = pilot.licence || cfEntry.licence;
+      cfEntry.club     = pilot.club    || cfEntry.club;
+      cfEntry.region   = pilot.region  || cfEntry.region;
+      cfEntry.email    = pilot.email   || cfEntry.email;
+      cfEntry.genre    = pilot.genre   || cfEntry.genre;
+      saveState();
+      renderCollectifList();
+    }
+    _cfEditingFromId = null;
+  }
   closeAllModals();
 }
 
@@ -11391,12 +12829,102 @@ function unenrollPilot(pid) {
 // ═══════════════════════════════════
 // EXPORT / IMPORT
 // ═══════════════════════════════════
-function exportData() {
-  var blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'geststol_backup_' + new Date().toISOString().substring(0,10) + '.json';
-  a.click(); toast('Export téléchargé ✓', 'ok');
+/* Export complet : lit depuis IndexedDB (source de vérité avec photos/affiches)
+   puis complète avec les champs de S non présents dans IDB (officialDocs, documents, etc.) */
+async function exportData() {
+  toast('⏳ Préparation de la sauvegarde…', 'ok');
+  try {
+    // 1. Lire l'état complet depuis IndexedDB
+    var idbData = await loadFromIDB();
+    // 2. Fusionner avec S en cours (IDB fait autorité, S complète ce qui manque)
+    var full = Object.assign({}, S, idbData || {});
+    // 3. S'assurer que les champs de S qui ne sont pas dans IDB sont inclus
+    //    (officialDocs, documents, collectif, budgets, sitesSportifs…)
+    var keysToForceFromS = ['officialDocs','documents','collectif','budgets','sitesSportifs','messages'];
+    keysToForceFromS.forEach(function(k) { if (S[k] !== undefined) full[k] = S[k]; });
+    // 4. Ajouter métadonnées de migration
+    full._exportMeta = {
+      date: new Date().toISOString(),
+      appVersion: (S._appVersion || '1.0'),
+      origin: window.location.origin
+    };
+    var json = JSON.stringify(full);
+    var blob = new Blob([json], {type:'application/json'});
+    var sizeMb = (blob.size / 1048576).toFixed(2);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'GestAppli_backup_' + new Date().toISOString().substring(0,10) + '.json';
+    a.click();
+    toast('Sauvegarde complète téléchargée (' + sizeMb + ' Mo) ✓', 'ok');
+    _refreshLocalStorageInfo();
+  } catch(e) {
+    // Fallback si IDB indisponible
+    var json = JSON.stringify(S);
+    var blob = new Blob([json], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'GestAppli_backup_' + new Date().toISOString().substring(0,10) + '.json';
+    a.click();
+    toast('Sauvegarde téléchargée (sans IDB) ✓', 'ok');
+  }
+}
+
+/* Affiche la taille utilisée dans localStorage + badge sur le bouton export */
+function _refreshLocalStorageInfo() {
+  try {
+    var raw = localStorage.getItem('gestStolState') || '';
+    var used = (raw.length * 2) / 1048576; // UTF-16 ≈ 2 octets/char
+    var pct  = Math.min(100, Math.round(used / 5 * 100));
+    var color = pct > 80 ? '#ef4444' : pct > 55 ? '#f59e0b' : '#10b981';
+    var info = document.getElementById('localstorage-info');
+    if (info) {
+      info.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'
+        + '<span>💾 Stockage local utilisé</span>'
+        + '<span style="font-weight:700;color:'+color+'">'+used.toFixed(2)+' Mo / 5 Mo ('+pct+'%)</span>'
+        + '</div>'
+        + '<div style="height:5px;background:var(--navy2);border-radius:3px;overflow:hidden">'
+        + '<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:3px;transition:width .3s"></div>'
+        + '</div>'
+        + (pct > 80 ? '<div style="margin-top:5px;color:#ef4444;font-size:10px">⚠️ Stockage presque plein — pensez à supprimer des documents ou images inutilisés.</div>' : '');
+    }
+    // Badge taille export
+    var badge = document.getElementById('export-size-badge');
+    if (badge) badge.textContent = '· ' + used.toFixed(2) + ' Mo';
+  } catch(e) {}
+}
+
+/* Restauration complète — remplace localStorage + IndexedDB puis recharge */
+function importDataFull(inp) {
+  if (!inp.files || !inp.files[0]) return;
+  var fileName = inp.files[0].name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (typeof data !== 'object' || Array.isArray(data)) { toast('Format invalide', 'err'); return; }
+      var meta = data._exportMeta || {};
+      var info = meta.date ? '\nDate sauvegarde : ' + new Date(meta.date).toLocaleString('fr-FR') : '';
+      var origin = meta.origin ? '\nOrigine : ' + meta.origin : '';
+      var ok = confirm(
+        '⚠️ RESTAURATION COMPLÈTE\n\n' +
+        'Fichier : "' + fileName + '"' + info + origin + '\n\n' +
+        'TOUTES les données locales actuelles seront remplacées.\n' +
+        'Cette action est irréversible.\n\nContinuer ?'
+      );
+      if (!ok) { inp.value = ''; return; }
+      // Nettoyer les métadonnées d'export avant de sauvegarder
+      delete data._exportMeta;
+      // Écraser S
+      Object.keys(data).forEach(function(k) { S[k] = data[k]; });
+      // Sauvegarder dans localStorage ET IndexedDB
+      saveState();
+      toast('Restauration en cours… rechargement dans 2s', 'ok');
+      setTimeout(function(){ location.reload(); }, 2000);
+    } catch(err) { toast('Fichier JSON invalide', 'err'); }
+  };
+  reader.readAsText(inp.files[0]);
+  inp.value = '';
 }
 
 // ══════════════════════════════════════════════════════
@@ -11903,18 +13431,20 @@ function printBudgetA4(compId) {
   var solde = totRes - totEng;
   var w = window.open('','_blank');
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Budget – '+esc(cp.name)+'</title>');
-  w.document.write('<style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#555;font-weight:400;margin-bottom:16px}.summary{display:flex;gap:16px;margin-bottom:16px}.card{flex:1;padding:10px 14px;border-radius:8px;text-align:center}.card .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}.card .val{font-size:20px;font-weight:900}@media print{body{margin:10mm}}</style>');
+  w.document.write('<style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;color:#555;font-weight:400;margin-bottom:16px}.summary{display:flex;gap:16px;margin-bottom:16px}.card{flex:1;padding:10px 14px;border-radius:8px;text-align:center}.card .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}.card .val{font-size:20px;font-weight:900}'+_officialDocPrintCSS()+'</style>');
   w.document.write('</head><body>');
-  w.document.write('<h1>Budget – '+esc(cp.name)+'</h1>');
-  w.document.write('<h2>'+esc(cp.lieu||'')+(cp.dateFrom?' · '+cp.dateFrom:'')+'</h2>');
-  w.document.write('<div class="summary">');
-  w.document.write('<div class="card" style="border:2px solid #ef4444"><div class="lbl" style="color:#ef4444">Dépenses</div><div class="val" style="color:#ef4444">'+totEng.toFixed(2)+' €</div></div>');
-  w.document.write('<div class="card" style="border:2px solid #10b981"><div class="lbl" style="color:#10b981">Ressources</div><div class="val" style="color:#10b981">'+totRes.toFixed(2)+' €</div></div>');
-  w.document.write('<div class="card" style="border:2px solid '+(solde>=0?'#10b981':'#ef4444')+'"><div class="lbl" style="color:'+(solde>=0?'#10b981':'#ef4444')+'">Solde</div><div class="val" style="color:'+(solde>=0?'#10b981':'#ef4444')+'">'+(solde>=0?'+':'')+solde.toFixed(2)+' €</div></div>');
-  w.document.write('</div>');
-  w.document.write(buildTable(bdata.engagement, 'Engagements / Dépenses', '#ef4444'));
-  w.document.write(buildTable(bdata.ressources, 'Ressources / Recettes', '#10b981'));
-  w.document.write('<p style="font-size:10px;color:#999;margin-top:20px">Imprimé le '+new Date().toLocaleDateString('fr-FR')+' — Gest\'Appli FFPLUM</p>');
+  var _budgetBody = '';
+  _budgetBody += '<h1>Budget – '+esc(cp.name)+'</h1>';
+  _budgetBody += '<h2>'+esc(cp.lieu||'')+(cp.dateFrom?' · '+cp.dateFrom:'')+'</h2>';
+  _budgetBody += '<div class="summary">';
+  _budgetBody += '<div class="card" style="border:2px solid #ef4444"><div class="lbl" style="color:#ef4444">Dépenses</div><div class="val" style="color:#ef4444">'+totEng.toFixed(2)+' €</div></div>';
+  _budgetBody += '<div class="card" style="border:2px solid #10b981"><div class="lbl" style="color:#10b981">Ressources</div><div class="val" style="color:#10b981">'+totRes.toFixed(2)+' €</div></div>';
+  _budgetBody += '<div class="card" style="border:2px solid '+(solde>=0?'#10b981':'#ef4444')+'"><div class="lbl" style="color:'+(solde>=0?'#10b981':'#ef4444')+'">Solde</div><div class="val" style="color:'+(solde>=0?'#10b981':'#ef4444')+'">'+(solde>=0?'+':'')+solde.toFixed(2)+' €</div></div>';
+  _budgetBody += '</div>';
+  _budgetBody += buildTable(bdata.engagement, 'Engagements / Dépenses', '#ef4444');
+  _budgetBody += buildTable(bdata.ressources, 'Ressources / Recettes', '#10b981');
+  _budgetBody += '<p style="font-size:10px;color:#999;margin-top:20px">Imprimé le '+new Date().toLocaleDateString('fr-FR')+' — Gest\'Appli FFPLUM</p>';
+  w.document.write(_officialDocWrap(_budgetBody));
   w.document.write('</body></html>');
   w.document.close();
   w.focus();
@@ -12717,15 +14247,33 @@ function openDTNModule(module) {
   if (dtn) dtn.style.display = 'none';
 
   if (module === 'competitions') {
-    // Ouvrir le module Compétitions (app existante)
+    // Ouvrir le module Compétitions — atterrissage sur page-base (tableau de bord)
     document.getElementById('app').style.display = '';
     var baseBtn = document.getElementById('dtn-base-btn');
     if (baseBtn) baseBtn.style.display = 'flex';
-    renderHome(); renderCompetitions();
-    if (window.innerWidth >= 768 && S.comps.length > 0) {
-      _homeDetailTab = 'infos';
-      setTimeout(function(){ var _best=_getBestComp(); if(_best) showHomeCompDetail(_best.id); }, 150);
+
+    // Forcer la saison courante dans le sélecteur avant de rendre
+    var curYear = new Date().getFullYear().toString();
+    var saisonSel = document.getElementById('base-saison-sel');
+    if (saisonSel) {
+      // Reconstruire les options si nécessaire
+      var seasons = [];
+      (S.comps || []).forEach(function(c) {
+        var y = c.saison || (c.dateFrom||'').substring(0,4);
+        if (y && !seasons.includes(y)) seasons.push(y);
+      });
+      if (!seasons.includes(curYear)) seasons.push(curYear);
+      seasons.sort(function(a,b){ return b.localeCompare(a); });
+      saisonSel.innerHTML = seasons.map(function(y){
+        return '<option value="'+y+'"'+(y===curYear?' selected':'')+'>Saison '+y+'</option>';
+      }).join('');
+      saisonSel.value = curYear;
     }
+
+    // Afficher page-base avec statistiques
+    showPage('page-base');
+    renderBase();
+    renderCompetitions();
     updateHeader();
   } else {
     // Ouvrir une page module vierge
@@ -15944,7 +17492,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Import
         </button>
-        <input type="file" id="cf-import-file" accept=".json,.csv" style="display:none" onchange="importCollectif(this)">
+        <input type="file" id="cf-import-file" accept=".json,.csv,.xlsx,.xls,.ods,.tsv" style="display:none" onchange="importCollectif(this)">
         <button onclick="printCollectifList()" title="Imprimer la liste A4"
           style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
           🖨️ Imprimer
@@ -16018,6 +17566,109 @@ document.addEventListener('DOMContentLoaded', async function() {
       </table>
     </div>
 
+  </div>
+</div>
+
+<!-- ══ MODAL PRÉVISUALISATION DOCUMENT ══ -->
+<div id="modal-doc-preview" onclick="if(event.target===this)closeDocPreview()" style="display:none;opacity:0;transition:opacity .18s;position:fixed;inset:0;z-index:4200;align-items:center;justify-content:center;background:rgba(0,0,0,.72);padding:16px">
+  <div style="background:var(--navy2);border-radius:14px;width:min(860px,98vw);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;gap:10px">
+      <div id="modal-doc-title" style="font-size:14px;font-weight:800;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <a id="modal-doc-dl" href="#" download style="display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;text-decoration:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Télécharger
+        </a>
+        <button onclick="closeDocPreview()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+      </div>
+    </div>
+    <div id="modal-doc-body" style="flex:1;overflow:auto;padding:16px;background:var(--navy)"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL ATTESTATION COLLECTIF FRANCE ══ -->
+<div id="modal-cf-attestation" onclick="if(event.target===this)closeCfAttestation()" style="display:none;opacity:0;transition:opacity .18s;position:fixed;inset:0;z-index:4100;align-items:center;justify-content:center;background:rgba(0,0,0,.65);padding:16px">
+  <div style="background:#1c2333;border-radius:14px;width:min(760px,98vw);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+    <!-- Barre actions -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">📄</span>
+        <div style="font-size:14px;font-weight:800;color:#f1f5f9">Attestation Collectif France</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="printCfAttestation()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimer / PDF
+        </button>
+        <button onclick="closeCfAttestation()" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+      </div>
+    </div>
+    <!-- Aperçu lettre -->
+    <div style="flex:1;overflow-y:auto;padding:20px;background:#e8e8e8">
+      <div id="cf-attestation-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ÉDITION MEMBRE COLLECTIF ══ -->
+<div id="modal-cf-edit" onclick="if(event.target===this)closeCfEditModal()" style="display:none;opacity:0;transition:opacity .18s;position:fixed;inset:0;z-index:4000;align-items:center;justify-content:center;background:rgba(0,0,0,.6)">
+  <div style="background:var(--navy2);border-radius:14px;padding:22px 24px 24px;width:min(480px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.55)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:15px;font-weight:800;color:var(--txt)">Modifier le membre du collectif</div>
+      <button onclick="closeCfEditModal()" style="background:none;border:none;color:var(--txt3);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+    </div>
+    <input type="hidden" id="cfe-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">Prénom</label><input class="cf-input" id="cfe2-prenom" placeholder="Prénom"></div>
+      <div class="cf-row"><label class="cf-label">Nom</label><input class="cf-input" id="cfe2-nom" placeholder="NOM"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">N° Licence</label><input class="cf-input" id="cfe2-licence" placeholder="N° licence"></div>
+      <div class="cf-row"><label class="cf-label">Saison</label>
+        <select class="cf-select" id="cfe2-saison"></select>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">Club / Aéroclub</label><input class="cf-input" id="cfe2-club" placeholder="Club"></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">Région</label><input class="cf-input" id="cfe2-region" placeholder="Région"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">Pratique</label>
+        <select class="cf-select" id="cfe2-pratique">
+          <option value="">— Non précisé —</option>
+          <option value="microlight">Microlight</option>
+          <option value="paramoteur">Paramoteur</option>
+        </select>
+      </div>
+      <div class="cf-row"><label class="cf-label">Discipline</label>
+        <select class="cf-select" id="cfe2-discipline">
+          <option value="">— Non précisé —</option>
+          <option value="classic">Classic</option>
+          <option value="slalom">Slalom</option>
+          <option value="stol">STOL</option>
+          <option value="cross">Cross</option>
+          <option value="precision">Précision</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="cf-row"><label class="cf-label">Genre</label>
+        <select class="cf-select" id="cfe2-genre">
+          <option value="">—</option>
+          <option value="M.">M.</option>
+          <option value="Mme">Mme</option>
+          <option value="F">F</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+      <div class="cf-row"><label class="cf-label">Email</label><input class="cf-input" type="email" id="cfe2-email" placeholder="email@…"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button onclick="closeCfEditModal()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
+      <button onclick="cfSaveMemberModal()" style="flex:2;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">💾 Enregistrer</button>
+    </div>
   </div>
 </div>
 
