@@ -10607,7 +10607,19 @@ async function _pushMedias(sb) {
   } catch(e){ console.warn('_pushMedias', e.message||e); }
 }
 
-// ── PULL : lire le cloud → REMPLACER local ────────────
+// ── FUSION par id : les deux sources sont conservées, jamais de perte ──
+function _mergeById(local, remote) {
+  var map = {};
+  (local  || []).forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  (remote || []).forEach(function(x){ if (x && x.id) map[x.id] = x; }); // cloud complète/écrase par id
+  return Object.values(map);
+}
+// ── FUSION objet : les clés des deux sources sont gardées ──
+function _mergeObj(local, remote) {
+  return Object.assign({}, local || {}, remote || {}); // cloud complète le local
+}
+
+// ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
 async function pullFromCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
   var { data, error } = await sb.from('stol_shared')
@@ -10628,24 +10640,24 @@ async function pullFromCloud() {
   S.comps.forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
   S.pilots.forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo; });
 
-  // ── REMPLACEMENT TOTAL par le cloud ──
-  // Chaque champ du cloud écrase le local (sauf si le cloud est vide/null)
-  if (r.comps         && r.comps.length)                           S.comps         = r.comps;
-  if (r.runs          && Object.keys(r.runs).length)               S.runs          = r.runs;
-  if (r.pilots        && r.pilots.length)                          S.pilots        = r.pilots;
-  if (r.ulms          && Object.keys(r.ulms).length)               S.ulms          = r.ulms;
-  if (r.staff         && r.staff.length)                           S.staff         = r.staff;
-  if (r.compEnroll    && Object.keys(r.compEnroll).length)         S.compEnroll    = r.compEnroll;
-  if (r.materiel      && Object.keys(r.materiel).length)           S.materiel      = r.materiel;
-  if (r.evenements    && Object.keys(r.evenements).length)         S.evenements    = r.evenements;
-  if (r.budgets       && Object.keys(r.budgets).length)            S.budgets       = r.budgets;
-  if (r.partenaires   && Object.keys(r.partenaires).length)        S.partenaires   = r.partenaires;
-  if (r.messages      && r.messages.length)                        S.messages      = r.messages;
-  if (r.sitesSportifs && r.sitesSportifs.length)                   S.sitesSportifs = r.sitesSportifs;
-  if (r.collectif     && r.collectif.length)                       S.collectif     = r.collectif;
-  if (r.documents     && r.documents.length)                       S.documents     = r.documents;
-  if (r.officialDocs  && Object.keys(r.officialDocs||{}).length)   S.officialDocs  = r.officialDocs;
-  if (r.docSettings   && Object.keys(r.docSettings||{}).length)    S.docSettings   = r.docSettings;
+  // ── FUSION : on garde TOUT — local + cloud, jamais de remplacement total ──
+  S.comps         = _mergeById(S.comps,         r.comps);
+  S.pilots        = _mergeById(S.pilots,        r.pilots);
+  S.staff         = _mergeById(S.staff,         r.staff);
+  S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
+  S.collectif     = _mergeById(S.collectif,     r.collectif);
+  S.documents     = _mergeById(S.documents,     r.documents);
+  S.messages      = _mergeById(S.messages,      r.messages);
+  S.runs          = _mergeObj(S.runs,       r.runs);
+  S.ulms          = _mergeObj(S.ulms,       r.ulms);
+  S.compEnroll    = _mergeObj(S.compEnroll, r.compEnroll);
+  S.materiel      = _mergeObj(S.materiel,   r.materiel);
+  S.evenements    = _mergeObj(S.evenements, r.evenements);
+  S.budgets       = _mergeObj(S.budgets,    r.budgets);
+  S.partenaires   = _mergeObj(S.partenaires,r.partenaires);
+  S.officialDocs  = _mergeObj(S.officialDocs, r.officialDocs);
+  S.docSettings   = _mergeObj(S.docSettings,  r.docSettings);
+
   S._lastPushAt = r._pushAt || 0;
 
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
@@ -10660,7 +10672,7 @@ async function pullFromCloud() {
 
   updateNationalRanking();
   saveState();
-  console.log('[GestSTOL] pullFromCloud OK — comps:', S.comps.length, '| pilots:', S.pilots.length, '| materiel:', Object.keys(S.materiel||{}).length, '| budgets:', Object.keys(S.budgets||{}).length);
+  console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
 }
 
 async function _pullMedias(sb) {
