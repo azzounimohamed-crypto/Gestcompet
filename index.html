@@ -10498,13 +10498,24 @@ async function pushToCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
 
   var shared = {
-    comps:      S.comps,
-    runs:       S.runs,
-    pilots:     S.pilots.map(function(p){ var pp=Object.assign({},p); if(pp.photo&&pp.photo.startsWith('data:')) pp.photo=''; return pp; }),
-    ulms:       S.ulms,
-    staff:      S.staff,
-    compEnroll: S.compEnroll || {},
-    _pushAt:    Date.now()
+    comps:        S.comps,
+    runs:         S.runs,
+    pilots:       S.pilots.map(function(p){ var pp=Object.assign({},p); if(pp.photo&&pp.photo.startsWith('data:')) pp.photo=''; return pp; }),
+    ulms:         S.ulms,
+    staff:        S.staff,
+    compEnroll:   S.compEnroll   || {},
+    // ── Données étendues (sync complet multi-appareils) ──
+    materiel:     S.materiel     || {},
+    evenements:   S.evenements   || {},
+    budgets:      S.budgets      || {},
+    partenaires:  S.partenaires  || {},
+    messages:     S.messages     || [],
+    sitesSportifs:S.sitesSportifs|| [],
+    collectif:    S.collectif    || [],
+    documents:    S.documents    || [],
+    officialDocs: S.officialDocs || {},
+    docSettings:  S.docSettings  || {},
+    _pushAt:      Date.now()
   };
 
   var { error } = await sb.from('stol_shared').upsert(
@@ -10683,6 +10694,82 @@ function mergeRemote(remote) {
       });
     });
   }
+  // MATÉRIEL (par compId, fusion par item.id)
+  if (remote.materiel) {
+    if (!S.materiel) S.materiel = {};
+    Object.keys(remote.materiel).forEach(function(cid) {
+      if (!S.materiel[cid]) { S.materiel[cid] = remote.materiel[cid]; return; }
+      remote.materiel[cid].forEach(function(rm) {
+        if (!S.materiel[cid].find(function(lm){ return lm.id === rm.id; }))
+          S.materiel[cid].push(rm);
+      });
+    });
+  }
+  // ÉVÉNEMENTS (par compId, fusion par item.id)
+  if (remote.evenements) {
+    if (!S.evenements) S.evenements = {};
+    Object.keys(remote.evenements).forEach(function(cid) {
+      if (!S.evenements[cid]) { S.evenements[cid] = remote.evenements[cid]; return; }
+      remote.evenements[cid].forEach(function(re) {
+        if (!S.evenements[cid].find(function(le){ return le.id === re.id; }))
+          S.evenements[cid].push(re);
+      });
+    });
+  }
+  // BUDGETS (par compId, remplacement si absent localement)
+  if (remote.budgets) {
+    if (!S.budgets) S.budgets = {};
+    Object.keys(remote.budgets).forEach(function(cid) {
+      if (!S.budgets[cid]) S.budgets[cid] = remote.budgets[cid];
+    });
+  }
+  // PARTENAIRES (par compId, fusion par item.id)
+  if (remote.partenaires) {
+    if (!S.partenaires) S.partenaires = {};
+    Object.keys(remote.partenaires).forEach(function(cid) {
+      if (!S.partenaires[cid]) { S.partenaires[cid] = remote.partenaires[cid]; return; }
+      remote.partenaires[cid].forEach(function(rp) {
+        if (!S.partenaires[cid].find(function(lp){ return lp.id === rp.id; }))
+          S.partenaires[cid].push(rp);
+      });
+    });
+  }
+  // MESSAGES (fusion par message.id)
+  if (remote.messages && Array.isArray(remote.messages)) {
+    if (!S.messages) S.messages = [];
+    remote.messages.forEach(function(rm) {
+      if (!S.messages.find(function(lm){ return lm.id === rm.id; }))
+        S.messages.push(rm);
+    });
+  }
+  // SITES SPORTIFS (fusion par site.id)
+  if (remote.sitesSportifs && Array.isArray(remote.sitesSportifs)) {
+    if (!S.sitesSportifs) S.sitesSportifs = [];
+    remote.sitesSportifs.forEach(function(rs) {
+      if (!S.sitesSportifs.find(function(ls){ return ls.id === rs.id; }))
+        S.sitesSportifs.push(rs);
+    });
+  }
+  // COLLECTIF (fusion par membre.id)
+  if (remote.collectif && Array.isArray(remote.collectif)) {
+    if (!S.collectif) S.collectif = [];
+    remote.collectif.forEach(function(rc) {
+      if (!S.collectif.find(function(lc){ return lc.id === rc.id; }))
+        S.collectif.push(rc);
+    });
+  }
+  // DOCUMENTS (fusion par doc.id)
+  if (remote.documents && Array.isArray(remote.documents)) {
+    if (!S.documents) S.documents = [];
+    remote.documents.forEach(function(rd) {
+      if (!S.documents.find(function(ld){ return ld.id === rd.id; }))
+        S.documents.push(rd);
+    });
+  }
+  // DOCUMENTS OFFICIELS & RÉGLAGES (remplacement si absent localement)
+  if (remote.officialDocs && !S.officialDocs) S.officialDocs = remote.officialDocs;
+  if (remote.docSettings  && !S.docSettings)  S.docSettings  = remote.docSettings;
+
   updateNationalRanking();
 }
 
@@ -12475,8 +12562,9 @@ async function syncBase44All(compId) {
 }
 
 // Push silencieux sans feedback visuel
+// Note : ne nécessite PAS d'être connecté (anon key suffisant)
 function silentPush() {
-  if (!getSB() || !S.user || !navigator.onLine) return;
+  if (!getSB() || !navigator.onLine) return;
   pushToCloud().catch(function(){});
 }
 
