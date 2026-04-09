@@ -2615,7 +2615,7 @@ function saveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
@@ -3353,7 +3353,9 @@ function exportComps() {
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'competitions_' + new Date().toISOString().substring(0,10) + '.json';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
   toast('Compétitions exportées', 'ok');
 }
@@ -10716,11 +10718,16 @@ function mergeRemote(remote) {
       });
     });
   }
-  // BUDGETS (par compId, remplacement si absent localement)
+  // BUDGETS (par compId, toujours prendre le remote s'il a plus de données)
   if (remote.budgets) {
     if (!S.budgets) S.budgets = {};
     Object.keys(remote.budgets).forEach(function(cid) {
-      if (!S.budgets[cid]) S.budgets[cid] = remote.budgets[cid];
+      var remB = remote.budgets[cid];
+      var locB = S.budgets[cid];
+      if (!locB) { S.budgets[cid] = remB; return; }
+      var remTotal = ((remB.engagement||[]).length + (remB.ressources||[]).length);
+      var locTotal = ((locB.engagement||[]).length + (locB.ressources||[]).length);
+      if (remTotal > locTotal) S.budgets[cid] = remB;
     });
   }
   // PARTENAIRES (par compId, fusion par item.id)
@@ -14545,7 +14552,9 @@ async function exportData() {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'GestAppli_backup_' + new Date().toISOString().substring(0,10) + '.json';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     toast('Sauvegarde complète téléchargée (' + sizeMb + ' Mo) ✓', 'ok');
     _refreshLocalStorageInfo();
   } catch(e) {
@@ -14555,7 +14564,9 @@ async function exportData() {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'GestAppli_backup_' + new Date().toISOString().substring(0,10) + '.json';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     toast('Sauvegarde téléchargée (sans IDB) ✓', 'ok');
   }
 }
