@@ -1741,6 +1741,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             </div>
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
+          <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
           <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 60 secondes</div>
         </div>
 
@@ -10697,6 +10698,20 @@ async function _pullMedias(sb) {
 }
 
 // ── SYNC SILENCIEUSE auto toutes les 60s ──────────────
+// ── Force push : envoie le local vers le cloud SANS pull préalable ──
+async function forcePushCloud() {
+  var nb = S.comps ? S.comps.length : 0;
+  var ok = confirm('⬆️ FORCER L\'ENVOI VERS LE CLOUD\n\nVos données locales (' + nb + ' compétition(s)) vont écraser le cloud.\n\nContinuer ?');
+  if (!ok) return;
+  try {
+    toast('Envoi en cours…', '');
+    await pushToCloud();
+    toast('Cloud mis à jour ✓ — ' + nb + ' compétition(s) envoyée(s)', 'ok');
+  } catch(e) {
+    toast('Erreur : ' + (e.message || 'réseau indisponible'), 'err');
+  }
+}
+
 // ── Drawer compétition mobile (MCD) ──────────────────
 function openMCDDrawer() {
   var d = document.getElementById('mcd-drawer');
@@ -14674,8 +14689,21 @@ function importDataFull(inp) {
       Object.keys(data).forEach(function(k) { S[k] = data[k]; });
       // Sauvegarder dans localStorage ET IndexedDB
       saveState();
-      toast('Restauration en cours… rechargement dans 2s', 'ok');
-      setTimeout(function(){ location.reload(); }, 2000);
+      toast('Restauration : envoi vers le cloud…', 'ok');
+      // ── CRITIQUE : pousser immédiatement vers le cloud avant le rechargement ──
+      // Cela évite que la sync automatique au démarrage n'écrase le backup restauré
+      var doReload = function() {
+        toast('Restauration complète ✓ — rechargement…', 'ok');
+        setTimeout(function(){ location.reload(); }, 1500);
+      };
+      var sb = getSB();
+      if (sb && navigator.onLine) {
+        pushToCloud()
+          .then(function(){ doReload(); })
+          .catch(function(){ doReload(); }); // en cas d'erreur réseau, on recharge quand même
+      } else {
+        doReload();
+      }
     } catch(err) { toast('Fichier JSON invalide', 'err'); }
   };
   reader.readAsText(inp.files[0]);
