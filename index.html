@@ -10614,13 +10614,17 @@ async function _pushMedias(sb) {
 // ── FUSION par id : les deux sources sont conservées, jamais de perte ──
 function _mergeById(local, remote) {
   var map = {};
-  (local  || []).forEach(function(x){ if (x && x.id) map[x.id] = x; });
-  (remote || []).forEach(function(x){ if (x && x.id) map[x.id] = x; }); // cloud complète/écrase par id
-  return Object.values(map);
+  var la = Array.isArray(local)  ? local  : [];
+  var ra = Array.isArray(remote) ? remote : [];
+  la.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  return Object.keys(map).map(function(k){ return map[k]; });
 }
 // ── FUSION objet : les clés des deux sources sont gardées ──
 function _mergeObj(local, remote) {
-  return Object.assign({}, local || {}, remote || {}); // cloud complète le local
+  var lo = (local  && typeof local  === 'object' && !Array.isArray(local))  ? local  : {};
+  var ro = (remote && typeof remote === 'object' && !Array.isArray(remote)) ? remote : {};
+  return Object.assign({}, lo, ro);
 }
 
 // ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
