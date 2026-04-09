@@ -10560,8 +10560,11 @@ async function sbSync() {
     if (syncBtn) syncBtn.textContent = '☁️';
   } catch(e) {
     console.error('[GestSTOL] sbSync échouée:', e);
-    toast('Sync échouée : ' + (e.message||'erreur réseau'), 'err');
+    var errMsg = e.message || 'erreur réseau';
+    toast('Sync échouée : ' + errMsg, 'err');
     if (syncBtn) syncBtn.textContent = '✗';
+    // Afficher dans une bannière lisible qui reste visible
+    showSyncError(errMsg);
   } finally {
     _syncInProgress = false;
   }
@@ -10698,6 +10701,18 @@ async function _pullMedias(sb) {
 }
 
 // ── SYNC SILENCIEUSE auto toutes les 60s ──────────────
+// ── Affichage erreur sync lisible ────────────────────
+function showSyncError(msg) {
+  var existing = document.getElementById('sync-error-banner');
+  if (existing) existing.remove();
+  var banner = document.createElement('div');
+  banner.id = 'sync-error-banner';
+  banner.style.cssText = 'position:fixed;top:66px;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:flex-start;gap:10px;max-width:480px;margin:0 auto;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  banner.innerHTML = '<div style="flex:1"><div style="font-weight:800;margin-bottom:3px">⚠️ Erreur de synchronisation</div><div style="font-weight:400;word-break:break-all;font-size:12px">' + msg + '</div></div><button onclick="document.getElementById(\'sync-error-banner\').remove()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;padding:4px 8px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>';
+  var app = document.getElementById('app') || document.body;
+  app.appendChild(banner);
+}
+
 // ── Force push : envoie le local vers le cloud SANS pull préalable ──
 async function forcePushCloud() {
   var nb = S.comps ? S.comps.length : 0;
@@ -10845,29 +10860,47 @@ function startAutoSync() {
 // ── DIAGNOSTIC cloud ──────────────────────────────────
 async function diagCloud() {
   var sb = getSB();
-  if (!sb) { alert('⚠️ Supabase non disponible.\nVérifiez votre connexion internet.'); return; }
+  if (!sb) { alert('⚠️ Supabase non chargé.\n\nCauses possibles :\n• Pas de connexion internet\n• CDN jsdelivr bloqué\n\nEssayez de recharger la page.'); return; }
+  var msg = '';
   try {
+    // ── Test connexion principale ──
     var { data, error } = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
-    if (error) { alert('❌ Erreur Supabase : ' + error.message + '\nCode : ' + (error.code||'?')); return; }
+    if (error) {
+      msg = '❌ ERREUR TABLE stol_shared\n\nCode : ' + (error.code||'?') + '\nMessage : ' + error.message;
+      msg += '\n\nSolutions :\n• Si code PGRST301 : vous n\'êtes pas connecté au compte\n• Si code 42P01 : la table n\'existe pas\n• Si code PGRST116 : le cloud est vide (OK, il sera initialisé)';
+      alert(msg); return;
+    }
     if (!data || !data.data) {
-      alert('☁️ LE CLOUD EST VIDE\n\nAucune donnée dans Supabase.\n\nAction : sur l\'ordinateur qui a les données, cliquez "☁️ Sync maintenant" pour les envoyer dans le cloud.');
+      alert('☁️ LE CLOUD EST VIDE\n\nAucune donnée dans Supabase.\nAction : cliquez "⬆️ Forcer l\'envoi" depuis l\'appareil qui a les données.');
       return;
     }
     var d = data.data;
-    var ts = d._pushAt ? new Date(d._pushAt).toLocaleString('fr-FR') : '?';
-    var msg = '✅ CLOUD OK — ' + ts + '\n\n';
-    msg += '🏆 Compétitions (' + (d.comps||[]).length + ') :\n';
+    var ts = d._pushAt ? new Date(d._pushAt).toLocaleString('fr-FR') : 'inconnu';
+    msg = '✅ CLOUD stol_shared — ' + ts + '\n';
+    msg += '━━━━━━━━━━━━━━━━━━━━\n';
+    msg += '🏆 Compétitions dans le cloud : ' + (d.comps||[]).length + '\n';
     (d.comps||[]).forEach(function(c){ msg += '   • ' + (c.name||c.id||'?') + '\n'; });
-    msg += '\n👥 Pilotes : ' + (d.pilots||[]).length;
-    msg += '\n🔧 Matériel : ' + Object.keys(d.materiel||{}).length + ' compét.';
-    msg += '\n💰 Budgets : '  + Object.keys(d.budgets||{}).length  + ' compét.';
-    msg += '\n\n📱 CET APPAREIL :\n';
-    msg += '🏆 Compétitions : ' + S.comps.length + '\n';
+    msg += '👥 Pilotes : ' + (d.pilots||[]).length + '\n';
+    msg += '🔧 Matériel : ' + Object.keys(d.materiel||{}).length + ' compét.\n';
+    msg += '━━━━━━━━━━━━━━━━━━━━\n';
+    msg += '📱 CET APPAREIL :\n';
+    msg += '🏆 Compétitions locales : ' + S.comps.length + '\n';
     msg += '👥 Pilotes : ' + S.pilots.length + '\n';
-    msg += '🔧 Matériel : ' + Object.keys(S.materiel||{}).length + ' compét.\n';
+    // ── Test table médias ──
+    try {
+      var { data: mdata, error: merr } = await sb.from('stol_medias').select('id').limit(1);
+      if (merr) {
+        msg += '━━━━━━━━━━━━━━━━━━━━\n';
+        msg += '⚠️ TABLE stol_medias INTROUVABLE\n';
+        msg += 'Les affiches ne peuvent pas être synchronisées.\n';
+        msg += 'Créez la table dans Supabase (voir instructions).';
+      } else {
+        msg += '🖼️ Table stol_medias : OK (' + (mdata||[]).length + ' médias)';
+      }
+    } catch(me) { msg += '⚠️ stol_medias : ' + (me.message||'erreur inconnue'); }
     alert(msg);
   } catch(e) {
-    alert('❌ Impossible de contacter Supabase :\n' + (e.message||e));
+    alert('❌ Impossible de contacter Supabase :\n' + (e.message||String(e)) + '\n\nVérifiez votre connexion internet.');
   }
 }
 
