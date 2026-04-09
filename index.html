@@ -8298,6 +8298,9 @@ function renderSettingsCompte() {
   html += '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--txt3)">';
   html += '<span id="sync-status">○</span><span>Données partagées · Dernière : </span><span id="sync-time">jamais</span>';
   html += '</div>';
+  html += '<div style="margin-top:6px">';
+  html += '<button onclick="diagCloud()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);cursor:pointer">🔍 Voir données dans le cloud</button>';
+  html += '</div>';
   html += '</div>';
 
   if (_scEditMode) {
@@ -10477,17 +10480,25 @@ async function sbSync() {
   if (syncBtn) syncBtn.textContent = '⏳';
   toast('Synchronisation…', '');
   try {
+    var compsBefore = S.comps.length;
     await pullFromCloud();
     await pushToCloud();
     _lastSyncAt = Date.now();
-    _lastSyncAt = Date.now();
-    toast('Synchronisé ✓', 'ok');
+    var compsAfter = S.comps.length;
+    var msg = 'Synchronisé ✓ — ' + compsAfter + ' compétition' + (compsAfter > 1 ? 's' : '');
+    if (compsAfter > compsBefore) msg += ' (+' + (compsAfter - compsBefore) + ' récupérée' + (compsAfter - compsBefore > 1 ? 's' : '') + ')';
+    console.log('[GestSTOL] Sync OK — comps:', compsAfter, '| pilots:', S.pilots.length, '| materiel keys:', Object.keys(S.materiel||{}).length, '| budgets keys:', Object.keys(S.budgets||{}).length);
+    toast(msg, 'ok');
     if (syncBtn) syncBtn.textContent = '☁️';
+    // Réinitialiser le filtre saison pour afficher toutes les compétitions synchronisées
+    var sf = document.getElementById('comp-season-filter');
+    if (sf) sf.value = 'all';
     renderHome(); renderCompetitions(); renderPilots(); updateHeader();
     renderProfileCompte();
     renderSettingsCompte();
     renderUtilisateursTab();
   } catch(e) {
+    console.error('[GestSTOL] Sync échouée:', e);
     toast('Sync échouée : ' + (e.message||'erreur réseau'), 'err');
     if (syncBtn) syncBtn.textContent = '✗';
   } finally {
@@ -10639,109 +10650,138 @@ async function pullMedias(sb) {
 }
 
 function mergeRemote(remote) {
-  // COMPÉTITIONS : fusionner par id, TOUJOURS préserver l'affiche locale
-  if (remote.comps) {
+  console.log('[GestSTOL] mergeRemote — cloud comps:', (remote.comps||[]).length, '| local comps:', S.comps.length);
+
+  // COMPÉTITIONS : le cloud est source de vérité, TOUJOURS prendre le remote
+  if (remote.comps && remote.comps.length > 0) {
     remote.comps.forEach(function(rc) {
-      var local = S.comps.find(function(c){ return c.id === rc.id; });
-      if (!local) {
+      var idx = S.comps.findIndex(function(c){ return c.id === rc.id; });
+      if (idx < 0) {
+        // Nouvelle compétition depuis le cloud → ajouter
         S.comps.push(rc);
+        console.log('[GestSTOL] +comp depuis cloud:', rc.name || rc.id);
       } else {
-        var savedAffiche = local.affiche || rc.affiche || '';
-        Object.assign(local, rc);
-        // Restaurer l'affiche locale si le cloud l'a perdue
-        if (!local.affiche && savedAffiche) local.affiche = savedAffiche;
+        // Compétition existante → prendre le remote SAUF l'affiche locale
+        var savedAffiche = S.comps[idx].affiche || rc.affiche || '';
+        S.comps[idx] = Object.assign({}, S.comps[idx], rc);
+        if (!S.comps[idx].affiche && savedAffiche) S.comps[idx].affiche = savedAffiche;
       }
     });
   }
-  // RÉSULTATS : fusionner par compId
+
+  // RÉSULTATS : prendre le remote s'il a plus de données
   if (remote.runs) {
     Object.keys(remote.runs).forEach(function(compId) {
-      if (!S.runs[compId] || S.runs[compId].length === 0) {
-        S.runs[compId] = remote.runs[compId];
-      } else if (remote.runs[compId].length > S.runs[compId].length) {
-        S.runs[compId] = remote.runs[compId];
-      }
+      var loc = S.runs[compId] || [];
+      var rem = remote.runs[compId] || [];
+      if (rem.length >= loc.length) S.runs[compId] = rem;
     });
   }
+
   // PILOTES : fusionner par id, préserver photos locales
   if (remote.pilots) {
     remote.pilots.forEach(function(rp) {
-      var local = S.pilots.find(function(p){ return p.id === rp.id; });
-      if (!local) {
+      var idx = S.pilots.findIndex(function(p){ return p.id === rp.id; });
+      if (idx < 0) {
         S.pilots.push(rp);
       } else {
-        var localPhoto = local.photo;
-        Object.assign(local, rp);
-        if (!local.photo && localPhoto) local.photo = localPhoto;
+        var localPhoto = S.pilots[idx].photo;
+        S.pilots[idx] = Object.assign({}, S.pilots[idx], rp);
+        if (!S.pilots[idx].photo && localPhoto) S.pilots[idx].photo = localPhoto;
       }
     });
   }
-  // ULMs
+
+  // ULMs : toujours prendre le remote si absent ou plus récent localement
   if (remote.ulms) {
     Object.keys(remote.ulms).forEach(function(uid) {
-      if (!S.ulms[uid]) S.ulms[uid] = remote.ulms[uid];
+      if (!S.ulms[uid] || (remote.ulms[uid] && remote.ulms[uid].length >= (S.ulms[uid]||[]).length)) {
+        S.ulms[uid] = remote.ulms[uid];
+      }
     });
   }
-  // STAFF
+
+  // STAFF : toujours prendre le plus grand ensemble
   if (remote.staff && remote.staff.length > (S.staff || []).length) {
     S.staff = remote.staff;
   }
-  // INSCRIPTIONS
+
+  // INSCRIPTIONS : union (ajouter les nouveaux)
   if (remote.compEnroll) {
+    if (!S.compEnroll) S.compEnroll = {};
     Object.keys(remote.compEnroll).forEach(function(cid) {
-      if (!S.compEnroll) S.compEnroll = {};
       if (!S.compEnroll[cid]) S.compEnroll[cid] = [];
-      remote.compEnroll[cid].forEach(function(pid) {
+      (remote.compEnroll[cid] || []).forEach(function(pid) {
         if (!S.compEnroll[cid].includes(pid)) S.compEnroll[cid].push(pid);
       });
     });
   }
-  // MATÉRIEL (par compId, fusion par item.id)
+
+  // MATÉRIEL : toujours prendre le remote s'il a plus d'items
   if (remote.materiel) {
     if (!S.materiel) S.materiel = {};
     Object.keys(remote.materiel).forEach(function(cid) {
-      if (!S.materiel[cid]) { S.materiel[cid] = remote.materiel[cid]; return; }
-      remote.materiel[cid].forEach(function(rm) {
-        if (!S.materiel[cid].find(function(lm){ return lm.id === rm.id; }))
-          S.materiel[cid].push(rm);
-      });
+      var rem = remote.materiel[cid] || [];
+      var loc = S.materiel[cid] || [];
+      if (rem.length >= loc.length) {
+        S.materiel[cid] = rem;
+      } else {
+        // Fusion : ajouter les items manquants localement
+        rem.forEach(function(rm) {
+          if (!loc.find(function(lm){ return lm.id === rm.id; })) loc.push(rm);
+        });
+        S.materiel[cid] = loc;
+      }
     });
   }
-  // ÉVÉNEMENTS (par compId, fusion par item.id)
+
+  // ÉVÉNEMENTS : toujours prendre le remote s'il a plus d'items
   if (remote.evenements) {
     if (!S.evenements) S.evenements = {};
     Object.keys(remote.evenements).forEach(function(cid) {
-      if (!S.evenements[cid]) { S.evenements[cid] = remote.evenements[cid]; return; }
-      remote.evenements[cid].forEach(function(re) {
-        if (!S.evenements[cid].find(function(le){ return le.id === re.id; }))
-          S.evenements[cid].push(re);
-      });
+      var rem = remote.evenements[cid] || [];
+      var loc = S.evenements[cid] || [];
+      if (rem.length >= loc.length) {
+        S.evenements[cid] = rem;
+      } else {
+        rem.forEach(function(re) {
+          if (!loc.find(function(le){ return le.id === re.id; })) loc.push(re);
+        });
+        S.evenements[cid] = loc;
+      }
     });
   }
-  // BUDGETS (par compId, toujours prendre le remote s'il a plus de données)
+
+  // BUDGETS : toujours prendre le remote s'il a plus de lignes
   if (remote.budgets) {
     if (!S.budgets) S.budgets = {};
     Object.keys(remote.budgets).forEach(function(cid) {
-      var remB = remote.budgets[cid];
-      var locB = S.budgets[cid];
-      if (!locB) { S.budgets[cid] = remB; return; }
+      var remB = remote.budgets[cid] || {};
+      var locB = S.budgets[cid] || {};
       var remTotal = ((remB.engagement||[]).length + (remB.ressources||[]).length);
       var locTotal = ((locB.engagement||[]).length + (locB.ressources||[]).length);
-      if (remTotal > locTotal) S.budgets[cid] = remB;
+      if (remTotal >= locTotal) S.budgets[cid] = remB;
     });
   }
-  // PARTENAIRES (par compId, fusion par item.id)
+
+  // PARTENAIRES : toujours prendre le remote s'il a plus d'items
   if (remote.partenaires) {
     if (!S.partenaires) S.partenaires = {};
     Object.keys(remote.partenaires).forEach(function(cid) {
-      if (!S.partenaires[cid]) { S.partenaires[cid] = remote.partenaires[cid]; return; }
-      remote.partenaires[cid].forEach(function(rp) {
-        if (!S.partenaires[cid].find(function(lp){ return lp.id === rp.id; }))
-          S.partenaires[cid].push(rp);
-      });
+      var rem = remote.partenaires[cid] || [];
+      var loc = S.partenaires[cid] || [];
+      if (rem.length >= loc.length) {
+        S.partenaires[cid] = rem;
+      } else {
+        rem.forEach(function(rp) {
+          if (!loc.find(function(lp){ return lp.id === rp.id; })) loc.push(rp);
+        });
+        S.partenaires[cid] = loc;
+      }
     });
   }
-  // MESSAGES (fusion par message.id)
+
+  // MESSAGES : union par id
   if (remote.messages && Array.isArray(remote.messages)) {
     if (!S.messages) S.messages = [];
     remote.messages.forEach(function(rm) {
@@ -10749,7 +10789,8 @@ function mergeRemote(remote) {
         S.messages.push(rm);
     });
   }
-  // SITES SPORTIFS (fusion par site.id)
+
+  // SITES SPORTIFS : union par id
   if (remote.sitesSportifs && Array.isArray(remote.sitesSportifs)) {
     if (!S.sitesSportifs) S.sitesSportifs = [];
     remote.sitesSportifs.forEach(function(rs) {
@@ -10757,7 +10798,8 @@ function mergeRemote(remote) {
         S.sitesSportifs.push(rs);
     });
   }
-  // COLLECTIF (fusion par membre.id)
+
+  // COLLECTIF : union par id
   if (remote.collectif && Array.isArray(remote.collectif)) {
     if (!S.collectif) S.collectif = [];
     remote.collectif.forEach(function(rc) {
@@ -10765,7 +10807,8 @@ function mergeRemote(remote) {
         S.collectif.push(rc);
     });
   }
-  // DOCUMENTS (fusion par doc.id)
+
+  // DOCUMENTS : union par id
   if (remote.documents && Array.isArray(remote.documents)) {
     if (!S.documents) S.documents = [];
     remote.documents.forEach(function(rd) {
@@ -10773,11 +10816,17 @@ function mergeRemote(remote) {
         S.documents.push(rd);
     });
   }
-  // DOCUMENTS OFFICIELS & RÉGLAGES (remplacement si absent localement)
-  if (remote.officialDocs && !S.officialDocs) S.officialDocs = remote.officialDocs;
-  if (remote.docSettings  && !S.docSettings)  S.docSettings  = remote.docSettings;
+
+  // DOCUMENTS OFFICIELS & RÉGLAGES : prendre le remote s'il est plus complet
+  if (remote.officialDocs) {
+    if (!S.officialDocs || Object.keys(S.officialDocs).length === 0) S.officialDocs = remote.officialDocs;
+  }
+  if (remote.docSettings) {
+    if (!S.docSettings || Object.keys(S.docSettings).length === 0) S.docSettings = remote.docSettings;
+  }
 
   updateNationalRanking();
+  console.log('[GestSTOL] mergeRemote DONE — comps total:', S.comps.length);
 }
 
 // Sync auto silencieuse toutes les 60s si connecté
@@ -10801,6 +10850,36 @@ function startAutoSync() {
         }
       }).catch(function(){});
   }, 900000); // 15 minutes pour préserver les ressources serveur
+}
+
+// DIAGNOSTIC : afficher ce qui est dans le cloud Supabase
+async function diagCloud() {
+  var sb = getSB();
+  if (!sb) { alert('⚠️ Supabase non disponible.\n\nVérifiez votre connexion internet.'); return; }
+  try {
+    var { data, error } = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
+    if (error) { alert('❌ Erreur Supabase :\n' + error.message + '\n\nCode : ' + (error.code||'?')); return; }
+    if (!data || !data.data) { alert('☁️ Le cloud est VIDE — aucune donnée.\n\nCliquez "Sync maintenant" sur l\'ordinateur qui a les données pour les envoyer.'); return; }
+    var d = data.data;
+    var lastPush = d._pushAt ? new Date(d._pushAt).toLocaleString('fr-FR') : 'inconnue';
+    var msg = '✅ DONNÉES DANS LE CLOUD\n\n';
+    msg += '📅 Dernière mise à jour : ' + lastPush + '\n';
+    msg += '🏆 Compétitions : ' + (d.comps||[]).length + '\n';
+    if (d.comps && d.comps.length) {
+      d.comps.slice(0,5).forEach(function(c){ msg += '   • ' + (c.name||c.id) + '\n'; });
+      if (d.comps.length > 5) msg += '   … et ' + (d.comps.length-5) + ' autre(s)\n';
+    }
+    msg += '👥 Pilotes : ' + (d.pilots||[]).length + '\n';
+    msg += '🔧 Matériel : ' + Object.keys(d.materiel||{}).length + ' compétition(s)\n';
+    msg += '💰 Budgets : ' + Object.keys(d.budgets||{}).length + ' compétition(s)\n\n';
+    msg += 'LOCAL (cet appareil) :\n';
+    msg += '🏆 Compétitions : ' + S.comps.length + '\n';
+    msg += '👥 Pilotes : ' + S.pilots.length + '\n';
+    msg += '🔧 Matériel : ' + Object.keys(S.materiel||{}).length + ' compétition(s)\n';
+    alert(msg);
+  } catch(e) {
+    alert('❌ Impossible de contacter Supabase :\n' + (e.message||e));
+  }
 }
 
 async function loadUserProfile(sbUser) {
@@ -19016,6 +19095,17 @@ document.addEventListener('DOMContentLoaded', async function() {
   })(); // end REAL_DATA injection
 
   startAutoSync();
+
+  // ── Sync automatique au démarrage (après 2s pour laisser Supabase s'initialiser) ──
+  if (navigator.onLine) {
+    setTimeout(function() {
+      var sb = getSB();
+      if (sb && !_syncInProgress) {
+        console.log('[GestSTOL] Sync automatique au démarrage…');
+        sbSync().catch(function(e){ console.warn('[GestSTOL] Sync startup échouée', e); });
+      }
+    }, 2000);
+  }
   }
 });
 
