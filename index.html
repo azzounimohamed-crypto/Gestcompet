@@ -10500,7 +10500,7 @@ async function pushToCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
 
   var shared = {
-    comps:        S.comps,
+    comps:        S.comps.map(function(c){ var cc=Object.assign({},c); if(cc.affiche&&cc.affiche.startsWith('data:')) delete cc.affiche; return cc; }),
     runs:         S.runs,
     pilots:       S.pilots.map(function(p){ var pp=Object.assign({},p); if(pp.photo&&pp.photo.startsWith('data:')) pp.photo=''; return pp; }),
     ulms:         S.ulms,
@@ -10552,7 +10552,7 @@ async function pushAffiches(sb) {
     for (var i = 0; i < toUpsert.length; i++) {
       await sb.from('stol_medias').upsert(toUpsert[i], { onConflict: 'id' });
     }
-  } catch(e) { console.warn('pushAffiches failed', e); }
+  } catch(e) { console.warn('pushAffiches failed', e.message||e); }
 }
 
 async function pushPhotos(sb) {
