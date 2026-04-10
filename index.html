@@ -5910,11 +5910,17 @@ function hdgAddStaff(compId) {
   }
   toast(entry.prenom+' '+entry.nom+' ajouté au staff ✓','ok');
 }
-function hdgRemoveStaff(compId, idx) {
+async function hdgRemoveStaff(compId, idx) {
   if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
   if(!S.staff[compId]) return;
   S.staff[compId].splice(idx,1);
-  saveState(); silentPush();
+  saveState();
+  // Push immédiat AVANT que l'auto-sync ne repulle les vieilles données cloud
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now(); // bloque l'auto-sync pendant 60s
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+  } catch(e) {}
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
     renderMobileCompDetail();
@@ -6106,10 +6112,10 @@ var REGION_LL = {
 };
 
 function initInfosMaps(cp, enrolled) {
-  var divO = document.getElementById('infos-map-origine');
-  var divR = document.getElementById('infos-map-region');
+  var divR    = document.getElementById('infos-map-region');
   var divBars = document.getElementById('infos-region-bars');
-  if (!divO && !divR) return;
+  if (!divR && !divBars) return;
+  var divBarsWrap = divBars; // alias
 
   // Gather pilot region data
   var pilots = enrolled.map(function(pid){
@@ -6123,29 +6129,7 @@ function initInfosMaps(cp, enrolled) {
     regionCount[r] = (regionCount[r]||0) + 1;
   });
 
-  // ── MAP 1 : individual dots scattered around region centroid ──
-  if (divO && typeof L !== 'undefined') {
-    if (_infoMapO) { try{ _infoMapO.remove(); }catch(e){} _infoMapO=null; }
-    _infoMapO = L.map(divO, {zoomControl:false, attributionControl:false});
-    _infoMapO.fitBounds([[41.3,-5.2],[51.2,9.6]]);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OSM'}).addTo(_infoMapO);
-    pilots.forEach(function(p){
-      var ll = REGION_LL[p.region];
-      if (!ll) return;
-      // Random scatter ±0.6°
-      var lat = ll[0] + (Math.random()-0.5)*1.2;
-      var lng = ll[1] + (Math.random()-0.5)*1.2;
-      var color = p.genre==='Mme.' ? '#ec4899' : '#3b82f6';
-      var marker = L.circleMarker([lat,lng],{
-        radius:7, fillColor:color, color:'#fff', weight:1.5, fillOpacity:0.85
-      }).addTo(_infoMapO);
-      var name = ((p.prenom||'')+' '+(p.nom||'')).trim() || '—';
-      marker.bindTooltip(name+(p.region?'<br><span style="color:#64748b">'+p.region+'</span>':''),{direction:'top'});
-    });
-    setTimeout(function(){ if(_infoMapO) _infoMapO.invalidateSize(); }, 100);
-  }
-
-  // ── MAP 2 : bubble per region ──
+  // ── MAP : bubble par région ──
   if (divR && typeof L !== 'undefined') {
     if (_infoMapR) { try{ _infoMapR.remove(); }catch(e){} _infoMapR=null; }
     _infoMapR = L.map(divR, {zoomControl:false, attributionControl:false});
@@ -6164,34 +6148,39 @@ function initInfosMaps(cp, enrolled) {
     setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 100);
   }
 
-  // ── Anneau de région ──
+  // ── Anneau de région (dans la 3e cellule de la grille) ──
   if (divBars) {
     var regColors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f472b6','#84cc16','#fb923c','#a78bfa','#34d399','#60a5fa','#fbbf24'];
     var sorted = Object.keys(regionCount).sort(function(a,b){ return regionCount[b]-regionCount[a]; });
     var regTotal = sorted.reduce(function(s,r){return s+regionCount[r];},0);
-    var rC = 2*Math.PI*46, rCum = 0;
-    var rSvg = '<svg width="120" height="120" viewBox="0 0 120 120">';
-    rSvg += '<circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18"/>';
+    var rC = 2*Math.PI*34, rCum = 0;
+    var rSvg = '<svg width="86" height="86" viewBox="0 0 86 86" style="flex-shrink:0">';
+    rSvg += '<circle cx="43" cy="43" r="34" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14"/>';
     sorted.forEach(function(reg, i) {
       var frac = regionCount[reg]/regTotal, dl=frac*rC, off=rC*(1-rCum);
-      rSvg += '<circle cx="60" cy="60" r="46" fill="none" stroke="'+regColors[i%regColors.length]+'" stroke-width="18" stroke-dasharray="'+dl+' '+(rC-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 60 60)" stroke-linecap="round"/>';
+      rSvg += '<circle cx="43" cy="43" r="34" fill="none" stroke="'+regColors[i%regColors.length]+'" stroke-width="14" stroke-dasharray="'+dl+' '+(rC-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 43 43)" stroke-linecap="round"/>';
       rCum += frac;
     });
-    rSvg += '<text x="60" y="56" text-anchor="middle" font-size="22" font-weight="800" fill="var(--txt)">'+sorted.length+'</text>';
-    rSvg += '<text x="60" y="70" text-anchor="middle" font-size="9" fill="var(--txt3)">régions</text>';
+    rSvg += '<text x="43" y="40" text-anchor="middle" font-size="16" font-weight="800" fill="var(--txt)">'+sorted.length+'</text>';
+    rSvg += '<text x="43" y="52" text-anchor="middle" font-size="7" fill="var(--txt3)">régions</text>';
     rSvg += '</svg>';
-    var rLegend = '<div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0">';
-    sorted.forEach(function(reg, i) {
+    // Légende compacte (top 5 régions max)
+    var rLegend = '<div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;overflow:hidden">';
+    sorted.slice(0,6).forEach(function(reg, i) {
       var cnt = regionCount[reg], pct = Math.round(cnt/regTotal*100);
-      rLegend += '<div style="display:flex;align-items:center;gap:6px">';
-      rLegend += '<div style="flex-shrink:0;width:9px;height:9px;border-radius:50%;background:'+regColors[i%regColors.length]+'"></div>';
-      rLegend += '<div style="flex:1;font-size:10px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+reg+'</div>';
-      rLegend += '<div style="font-size:10px;font-weight:700;color:var(--txt);min-width:14px;text-align:right">'+cnt+'</div>';
-      rLegend += '<div style="font-size:9px;color:var(--txt3);min-width:28px;text-align:right">'+pct+'%</div>';
+      rLegend += '<div style="display:flex;align-items:center;gap:4px">';
+      rLegend += '<div style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:'+regColors[i%regColors.length]+'"></div>';
+      rLegend += '<div style="flex:1;font-size:9px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(reg.length>14?reg.slice(0,13)+'…':reg)+'</div>';
+      rLegend += '<div style="font-size:9px;font-weight:700;color:var(--txt);flex-shrink:0">'+cnt+'</div>';
       rLegend += '</div>';
     });
+    if (sorted.length > 6) rLegend += '<div style="font-size:8px;color:var(--txt3);margin-top:1px">+'+(sorted.length-6)+' autres</div>';
     rLegend += '</div>';
-    divBars.innerHTML = '<div style="display:flex;gap:14px;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;margin-top:8px">'+rSvg+rLegend+'</div>';
+    var title = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Régions</div>';
+    divBars.innerHTML = '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;height:100%;min-height:160px;display:flex;flex-direction:column;justify-content:center">'
+      + title
+      + '<div style="display:flex;gap:10px;align-items:center">'+rSvg+rLegend+'</div>'
+      + '</div>';
   }
 }
 
@@ -6279,19 +6268,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var visStats = allStats.filter(function(s){ return s.show; });
     var _cidEsc = (cp.id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     var html = '<div style="padding:14px 14px 0">';
-    // Grille 2 colonnes régulières
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">';
+    // ── Indicateurs : largeur égale sur toute la ligne ──
+    html += '<div style="display:flex;gap:6px;margin-bottom:14px">';
     visStats.forEach(function(s){
-      html += '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px 12px;display:flex;align-items:center;gap:10px">';
-      html += '<div style="font-size:26px;line-height:1;flex-shrink:0">'+s.ico+'</div>';
-      html += '<div style="min-width:0">';
-      html += '<div style="font-size:22px;font-weight:800;line-height:1;color:'+s.color+'">'+s.val+'</div>';
-      html += '<div style="font-size:12px;color:var(--txt3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.lbl+'</div>';
-      html += '</div></div>';
+      html += '<div style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--bdr);border-top:2px solid '+s.color+';border-radius:0 0 10px 10px;padding:8px 6px;text-align:center">';
+      html += '<div style="font-size:18px;font-weight:800;line-height:1;color:'+s.color+'">'+s.val+'</div>';
+      html += '<div style="font-size:9.5px;color:var(--txt3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.lbl+'</div>';
+      html += '</div>';
     });
     html += '</div>';
     if (nbH+nbF+ageMoyen === 0 && pilotCount > 0) {
-      html += '<div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:18px;padding:10px 12px;background:var(--navy3);border-radius:10px;line-height:1.5">⏳ Genre et âge disponibles<br>après import du fichier licences FFPLUM</div>';
+      html += '<div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:14px;padding:10px 12px;background:var(--navy3);border-radius:10px;line-height:1.5">⏳ Genre et âge disponibles<br>après import du fichier licences FFPLUM</div>';
     }
     html += '</div>';
     // ── Graphiques ──
@@ -6307,69 +6294,71 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
       return out;
     };
-    html += '<div style="display:flex;gap:10px;margin-bottom:18px">';
-    // Anneau H/F
+    // ── Grille 2×2 : 4 graphiques équilibrés ──
+    var pilotsWithRegion = enrolled.filter(function(pid){
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid; }) || {};
+      return !!p.region;
+    }).length;
+    var boxSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;min-height:160px;justify-content:center';
+    var boxTitSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;align-self:flex-start';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+
+    // ── Box 1 : Genre ──
     if (nbH+nbF > 0) {
       var hfSegs=[{v:nbH,lbl:'Hommes'},{v:nbF,lbl:'Femmes'}];
       var hfCol=['#3b82f6','#f472b6'];
       var hfPct=Math.round(nbH/(nbH+nbF)*100);
-      html += '<div style="flex:1;background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center">';
-      html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Genre</div>';
+      html += '<div style="'+boxSt+'">';
+      html += '<div style="'+boxTitSt+'">Genre</div>';
       html += '<svg width="96" height="96" viewBox="0 0 96 96">';
       html += _donut(hfSegs,hfCol,48,48,36,16);
-      html += '<text x="48" y="42" text-anchor="middle" font-size="16" font-weight="800" fill="var(--txt)">'+hfPct+'%</text>';
-      html += '<text x="48" y="55" text-anchor="middle" font-size="9" fill="var(--txt3)">♂  ♀</text>';
+      html += '<text x="48" y="43" text-anchor="middle" font-size="17" font-weight="800" fill="var(--txt)">'+hfPct+'%</text>';
+      html += '<text x="48" y="56" text-anchor="middle" font-size="9" fill="var(--txt3)">♂  ♀</text>';
       html += '</svg>';
-      html += '<div style="display:flex;gap:8px;margin-top:4px">';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#3b82f6"></div><span style="font-size:10px;color:var(--txt2)">'+nbH+'</span></div>';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#f472b6"></div><span style="font-size:10px;color:var(--txt2)">'+nbF+'</span></div>';
+      html += '<div style="display:flex;gap:12px;margin-top:4px">';
+      html += '<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#3b82f6"></div><span style="font-size:11px;color:var(--txt2)">♂ '+nbH+'</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#f472b6"></div><span style="font-size:11px;color:var(--txt2)">♀ '+nbF+'</span></div>';
       html += '</div></div>';
+    } else {
+      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">♂♀ Genre<br><span style="font-size:9px">Données manquantes</span></div>';
     }
-    // Histogramme des âges
+
+    // ── Box 2 : Tranches d'âge ──
     if (ageCount > 0) {
       var maxN = ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
-      html += '<div style="flex:2;background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px">';
-      html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Âges</div>';
-      html += '<div style="display:flex;align-items:flex-end;gap:4px;height:72px">';
+      html += '<div style="'+boxSt+';align-items:stretch">';
+      html += '<div style="'+boxTitSt+'">Tranches d\'âge</div>';
+      html += '<div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-top:4px">';
       ageBuckets.forEach(function(b){
-        var h = b.n > 0 ? Math.max(6, Math.round((b.n/maxN)*64)) : 3;
+        var h = b.n > 0 ? Math.max(6, Math.round((b.n/maxN)*72)) : 3;
         html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
         html += '<div style="font-size:9px;font-weight:700;color:'+(b.n>0?'var(--txt)':'var(--txt3)')+'">'+(b.n||'')+'</div>';
         html += '<div style="width:100%;height:'+h+'px;background:'+(b.n>0?'var(--stol)':'rgba(255,255,255,0.06)')+';border-radius:3px 3px 0 0"></div>';
         html += '</div>';
       });
       html += '</div>';
-      html += '<div style="display:flex;gap:4px;margin-top:4px">';
+      html += '<div style="display:flex;gap:4px;margin-top:5px">';
       ageBuckets.forEach(function(b){
         html += '<div style="flex:1;text-align:center;font-size:8px;color:var(--txt3)">'+b.lbl+'</div>';
       });
       html += '</div></div>';
+    } else {
+      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">🎂 Tranches d\'âge<br><span style="font-size:9px">Données manquantes</span></div>';
     }
-    // Anneau régions (rempli par initInfosMaps)
-    html += '<div id="infos-region-bars" style="flex:2;min-width:0"></div>';
-    html += '</div>';
-    // ── Cartes géographiques ──
-    var pilotsWithRegion = enrolled.filter(function(pid){
-      var p = (S.pilots||[]).find(function(x){ return x.id===pid; }) || {};
-      return !!p.region;
-    }).length;
-    html += '<div style="margin-bottom:20px">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Répartition géographique</div>';
-    if (pilotsWithRegion === 0) {
-      html += '<div style="text-align:center;padding:22px 16px;background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;color:var(--txt3)">';
-      html += '<div style="font-size:22px;margin-bottom:8px">🗺</div>';
-      html += '<div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:6px">Les cartes arrivent bientôt…</div>';
-      html += '<div style="font-size:12px;line-height:1.5">Complétez les fiches compétiteurs<br>(région, genre, date de naissance)<br>via l\'import du fichier licences FFPLUM.</div>';
+
+    // ── Box 3 : Anneau régions (rempli par initInfosMaps) ──
+    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:160px"></div>';
+
+    // ── Box 4 : Carte par région ──
+    if (pilotsWithRegion > 0) {
+      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:160px">';
+      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:160px"></div>';
       html += '</div>';
     } else {
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-      html += '<div><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--txt2)">📍 Origines</div>';
-      html += '<div id="infos-map-origine" style="width:100%;height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--bdr);background:#e8e8e8"></div></div>';
-      html += '<div><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--txt2)">🗺 Par région</div>';
-      html += '<div id="infos-map-region" style="width:100%;height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--bdr);background:#e8e8e8"></div></div>';
-      html += '</div>';
+      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">🗺 Carte régions<br><span style="font-size:9px">Import licences requis</span></div>';
     }
-    html += '</div>';
+
+    html += '</div>'; // ferme grille 2×2
     html += '</div>'; // ferme padding 0 14px graphiques
     // ── Podiums par classe ULM (run.classe) ──
     return html;
@@ -13357,7 +13346,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</select></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    html += '<div><div style="'+lSt+'">Pratique</div><select id="pd-pratique" style="'+iSt+'">';
+    html += '<div><div style="'+lSt+'">Pratique</div><select id="pd-pratique" style="'+iSt+'" onchange="pdUpdatePratique()">';
     html += '<option value="">— Non précisé —</option>';
     [{v:'microlight',l:'Microlight'},{v:'paramoteur',l:'Paramoteur'}].forEach(function(o){
       html += '<option value="'+o.v+'"'+((pilot.pratique===o.v)?' selected':'')+'>'+o.l+'</option>';
@@ -13367,6 +13356,31 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<option value="">— Non précisé —</option>';
     [{v:'classic',l:'Classic'},{v:'slalom',l:'Slalom'},{v:'stol',l:'STOL'},{v:'cross',l:'Cross'},{v:'precision',l:'Précision'}].forEach(function(o){
       html += '<option value="'+o.v+'"'+((pilot.discipline===o.v)?' selected':'')+'>'+o.l+'</option>';
+    });
+    html += '</select></div>';
+    html += '</div>';
+    // ── Ligne Catégorie / Équipages / Rôle ──
+    var _isMono = (pilot.equipage === 'Monoplace');
+    var _isBi   = (pilot.equipage === 'Biplace');
+    var _isPM   = (pilot.pratique === 'paramoteur');
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+    // Catégorie (visible uniquement si Paramoteur)
+    html += '<div id="pd-categorie-row" style="display:'+(_isPM?'':'none')+'">';
+    html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'">';
+    html += '<option value="">— Non précisé —</option>';
+    ['PF1','PF2','PL1','PL2'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.categorie===o?' selected':'')+'>'+o+'</option>'; });
+    html += '</select></div>';
+    // Équipages
+    html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()">';
+    html += '<option value="">— Non précisé —</option>';
+    ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.equipage===o?' selected':'')+'>'+o+'</option>'; });
+    html += '</select></div>';
+    // Rôle
+    html += '<div><div style="'+lSt+'">Rôle</div><select id="pd-role" style="'+iSt+'"'+(_isMono?' disabled':'')+' title="'+(_isMono?'Monoplace : Pilote automatiquement':'')+'">';
+    html += '<option value="">— Non précisé —</option>';
+    ['Pilote','Navigateur'].forEach(function(o){
+      var sel = (_isMono ? 'Pilote' : pilot.role) === o ? ' selected' : '';
+      html += '<option value="'+o+'"'+sel+'>'+o+'</option>';
     });
     html += '</select></div>';
     html += '</div>';
@@ -13407,7 +13421,9 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     // ── Section Inscription ──
     html += '<div><div style="'+secSt+'">Inscription à la compétition</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px">';
-    html += '<div><div style="'+lSt+'">Copilote</div><input id="pd-copilote" value="'+e2(pilot._pdCopilote||'')+'" placeholder="—" style="'+iSt+'"></div>';
+    html += '<div id="pd-copilote-row" style="display:'+(_isBi?'':'none')+'">';
+    html += '<div style="'+lSt+'">Copilote</div><input id="pd-copilote" value="'+e2(pilot._pdCopilote||'')+'" placeholder="Nom du copilote" style="'+iSt+'">';
+    html += '</div>';
     html += '<div><div style="'+lSt+'">Notes</div><textarea id="pd-notes" style="'+iSt+';min-height:56px;resize:vertical">'+e2(pilot._pdNotes||'')+'</textarea></div>';
     html += '</div></div>';
 
@@ -13510,6 +13526,34 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   document.body.appendChild(div.firstElementChild);
 }
 
+// Gestion dynamique Équipages → Rôle + Copilote
+function pdUpdateEquipageRole() {
+  var eq = document.getElementById('pd-equipage');
+  var roleEl = document.getElementById('pd-role');
+  var copRow = document.getElementById('pd-copilote-row');
+  if (!eq) return;
+  var val = eq.value;
+  if (roleEl) {
+    if (val === 'Monoplace') {
+      roleEl.value    = 'Pilote';
+      roleEl.disabled = true;
+      roleEl.title    = 'Monoplace : Pilote automatiquement';
+    } else {
+      roleEl.disabled = false;
+      roleEl.title    = '';
+    }
+  }
+  if (copRow) copRow.style.display = (val === 'Biplace') ? '' : 'none';
+}
+
+// Affichage conditionnel Catégorie selon Pratique
+function pdUpdatePratique() {
+  var prat   = document.getElementById('pd-pratique');
+  var catRow = document.getElementById('pd-categorie-row');
+  if (!prat || !catRow) return;
+  catRow.style.display = (prat.value === 'paramoteur') ? '' : 'none';
+}
+
 function savePilotDetail(pilotId, compId) {
   var pilot = (S.pilots||[]).find(function(p){ return p.id === pilotId; });
   if (!pilot) { toast('Pilote introuvable', 'err'); return; }
@@ -13531,6 +13575,9 @@ function savePilotDetail(pilotId, compId) {
   pilot.region     = g('pd-region');
   pilot.pratique   = g('pd-pratique');
   pilot.discipline = g('pd-discipline');
+  pilot.categorie  = g('pd-categorie');
+  pilot.equipage   = g('pd-equipage');
+  pilot.role       = g('pd-role');
   // Inscription
   pilot._pdCopilote  = g('pd-copilote');
   pilot._pdNotes     = g('pd-notes');
