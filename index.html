@@ -13360,20 +13360,26 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</select></div>';
     html += '</div>';
     // ── Ligne Catégorie / Équipages / Rôle ──
-    var _isMono = (pilot.equipage === 'Monoplace');
-    var _isBi   = (pilot.equipage === 'Biplace');
+    // PL1/PF1 forcent Monoplace indépendamment de ce qui est stocké
+    var _catForceMono = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    var _isMono = _catForceMono || (pilot.equipage === 'Monoplace');
+    var _isBi   = !_catForceMono && (pilot.equipage === 'Biplace');
     var _isPM   = (pilot.pratique === 'paramoteur');
     html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
     // Catégorie (visible uniquement si Paramoteur)
     html += '<div id="pd-categorie-row" style="display:'+(_isPM?'':'none')+'">';
-    html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'">';
+    html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'" onchange="pdUpdateCategorie()">';
     html += '<option value="">— Non précisé —</option>';
     ['PF1','PF2','PL1','PL2'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.categorie===o?' selected':'')+'>'+o+'</option>'; });
     html += '</select></div>';
     // Équipages
-    html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()">';
+    // Catégorie PL1/PF1 → Monoplace figé dès l'ouverture
+    var _catMonoOnly = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    // Si catégorie force Monoplace, écraser la valeur stockée
+    var _equipageVal = _catMonoOnly ? 'Monoplace' : (pilot.equipage || '');
+    html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()"'+(_catMonoOnly?' disabled title="'+pilot.categorie+' : Monoplace uniquement"':'')+' >';
     html += '<option value="">— Non précisé —</option>';
-    ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.equipage===o?' selected':'')+'>'+o+'</option>'; });
+    ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(_equipageVal===o?' selected':'')+'>'+o+'</option>'; });
     html += '</select></div>';
     // Rôle
     html += '<div><div style="'+lSt+'">Rôle</div><select id="pd-role" style="'+iSt+'"'+(_isMono?' disabled':'')+' title="'+(_isMono?'Monoplace : Pilote automatiquement':'')+'">';
@@ -13544,6 +13550,23 @@ function pdUpdateEquipageRole() {
     }
   }
   if (copRow) copRow.style.display = (val === 'Biplace') ? '' : 'none';
+}
+
+// PL1 / PF1 → Monoplace figé ; PL2 / PF2 → Équipages libre
+function pdUpdateCategorie() {
+  var cat = document.getElementById('pd-categorie');
+  var eq  = document.getElementById('pd-equipage');
+  if (!cat || !eq) return;
+  var monoOnly = (cat.value === 'PL1' || cat.value === 'PF1');
+  if (monoOnly) {
+    eq.value    = 'Monoplace';
+    eq.disabled = true;
+    eq.title    = cat.value + ' : Monoplace uniquement';
+  } else {
+    eq.disabled = false;
+    eq.title    = '';
+  }
+  pdUpdateEquipageRole(); // cascade Rôle + Copilote
 }
 
 // Affichage conditionnel Catégorie selon Pratique
