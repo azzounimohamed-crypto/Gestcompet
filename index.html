@@ -5902,13 +5902,26 @@ function hdgAddStaff(compId) {
   ['hdg-s-nom','hdg-s-role','hdg-s-lic','hdg-s-tel','hdg-s-email'].forEach(function(id){
     var el=document.getElementById(id); if(el){el.value='';if(el.dataset)el.dataset.pid='';}
   });
-  renderHomeDetailPanel(null);
+  var _ovMob = document.getElementById('overlay-comp-mobile');
+  if (window.innerWidth < 768 && _ovMob && _ovMob.style.display !== 'none') {
+    renderMobileCompDetail();
+  } else {
+    renderHomeDetailPanel(null);
+  }
   toast(entry.prenom+' '+entry.nom+' ajouté au staff ✓','ok');
 }
 function hdgRemoveStaff(compId, idx) {
-  if(!S.staff || Array.isArray(S.staff) || !S.staff[compId]) return;
+  if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
+  if(!S.staff[compId]) return;
   S.staff[compId].splice(idx,1);
-  saveState(); silentPush(); renderHomeDetailPanel(null); toast('Encadrant retiré','');
+  saveState(); silentPush();
+  var ov = document.getElementById('overlay-comp-mobile');
+  if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
+    renderMobileCompDetail();
+  } else {
+    renderHomeDetailPanel(null);
+  }
+  toast('Encadrant retiré','');
 }
 
 function showHomeCompDetail(compId) {
@@ -6738,18 +6751,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         return x && (x.compId === cp.id || x.competitionId === cp.id || x.comp_id === cp.id);
       });
     }
-    // Compléter avec les pilotes statut='staff' non encore assignés à cette compét
-    var _assignedPids = compStaffG2.map(function(e){ return e.pilotId||e.id; }).filter(Boolean);
-    var _globalStaff = (S.pilots||[]).filter(function(p){
-      return p.statut === 'staff' && _assignedPids.indexOf(p.id) === -1;
-    });
-    if (_globalStaff.length) {
-      compStaffG2 = compStaffG2.concat(_globalStaff.map(function(p){
-        return { pilotId:p.id, prenom:p.prenom||'', nom:p.nom||'', role:p.role||'', licence:p.licence||'', tel:p.tel||'', email:p.email||'' };
-      }));
-      // Remettre à false pour ne pas déclencher le if(Array.isArray) ci-dessous
-      var _dummyFix = true;
-    }
+
     var canEditS    = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
     var cidS        = escS(cp.id);
     // ── Styles communs (identiques à Équipage) ──
