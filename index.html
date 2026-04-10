@@ -15735,14 +15735,16 @@ function printCompDossier(compId) {
       var items = matCatMap[cat];
       var totalQty = items.reduce(function(s,m){return s+(parseInt(m.quantite)||1);},0);
       matHtml += '<div class="mat-cat-hdr"><span class="mat-cat-name">'+esc(cat)+'</span><span class="mat-cat-count">'+items.length+' article(s) — '+totalQty+' unité(s)</span></div>';
-      matHtml += '<div class="mat-item-hdr"><span>Désignation</span></div>';
+      matHtml += '<div class="mat-item-hdr" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.5fr) 44px minmax(0,1.5fr);gap:4px;padding:2px 7px;font-size:7.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #e5e7eb"><span>Désignation</span><span>Lieu d\'accès</span><span style="text-align:center">Qté</span><span>Marque / Modèle</span></div>';
       items.forEach(function(m,mi){
         var bg = mi%2===0?'':'background:#f5f7fb;';
+        var nomMat = m.materiel || m.nom || m.designation || m.libelle || '—';
+        var marqueModele = [m.marque,m.modele].filter(Boolean).join(' / ') || '';
         matHtml += '<div class="mat-item" style="'+bg+'">';
-        matHtml += '<div style="font-weight:600">'+esc(m.nom||m.designation||'—')+'</div>';
-        matHtml += '<div style="color:#6b7280">'+esc(m.lieu||m.lieuAcces||'—')+'</div>';
+        matHtml += '<div style="font-weight:600">'+esc(nomMat)+'</div>';
+        matHtml += '<div style="color:#6b7280">'+esc(m.lieuAcces||m.lieu||'—')+'</div>';
         matHtml += '<div style="text-align:center;font-weight:700;color:#1a3a6e">'+(parseInt(m.quantite)||1)+'</div>';
-        matHtml += '<div style="color:#9ca3af;font-size:8.5px">'+esc(m.remarque||m.note||'')+'</div>';
+        matHtml += '<div style="color:#9ca3af;font-size:8.5px">'+esc(marqueModele)+'</div>';
         matHtml += '</div>';
       });
     });
