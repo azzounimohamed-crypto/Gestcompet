@@ -5721,10 +5721,9 @@ function hdgPickComp(pilotId, compId) {
   set('hdg-c-lic',p.licence||''); set('hdg-c-immat',ulm.immat||'');
   set('hdg-c-marque',ulm.marque||''); set('hdg-c-modele',ulm.modele||'');
   set('hdg-c-aile',ulm.aile||''); set('hdg-c-places',ulm.places||'');
-  var _clsLbl={paramotor:'Para',paramoteur:'Para',multiaxes:'Multi',pendulaire:'Pend',gyro:'Gyro',autogire:'Gyro',microlight:'Micro'};
-  var _cr=(ulm.classe||'').toLowerCase();
-  set('hdg-c-classe',_clsLbl[_cr]||(_cr?_cr.charAt(0).toUpperCase()+_cr.slice(1):''));
-  set('hdg-c-region',p.region||'');
+  set('hdg-c-categorie', p.categorie||'');
+  set('hdg-c-equipage',  p.equipage||'');
+  set('hdg-c-region',    p.region||'');
   var inp=document.getElementById('hdg-c-nom'); if(inp) inp.dataset.pid=pilotId;
   var box=document.getElementById('hdg-sug-c'); if(box) box.style.display='none';
 }
@@ -6250,6 +6249,24 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         classeStats.push({lbl:lbl, val:classCounts[cls], show:nbClassesDiff>=1});
       });
     }
+    // ── Catégorie (PF1/PF2/PL1/PL2) ──
+    var catPilCounts = {};
+    enrolled.forEach(function(pid) {
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
+      var cat = (p.categorie||'').trim();
+      if (cat) catPilCounts[cat] = (catPilCounts[cat]||0)+1;
+    });
+    var catOrder  = ['PF1','PF2','PL1','PL2'];
+    var catColors = {PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316'};
+    var hasCat = Object.keys(catPilCounts).length > 0;
+    // ── Équipages (Monoplace / Biplace) ──
+    var nbMono = 0, nbBi = 0;
+    enrolled.forEach(function(pid) {
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
+      if (p.equipage==='Monoplace') nbMono++;
+      else if (p.equipage==='Biplace') nbBi++;
+    });
+    var hasEqui = nbMono+nbBi > 0;
     // ── Grille de stats uniforme 2 colonnes ──
     var mixAile  = aileHaute>0 && aileBasse>0;
     var mixGenre = nbH>0 && nbF>0;
@@ -6294,71 +6311,107 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
       return out;
     };
-    // ── Grille 2×2 : 4 graphiques équilibrés ──
+    // ── Grille 3×2 : 6 graphiques ──
     var pilotsWithRegion = enrolled.filter(function(pid){
       var p = (S.pilots||[]).find(function(x){ return x.id===pid; }) || {};
       return !!p.region;
     }).length;
-    var boxSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;min-height:160px;justify-content:center';
+    var boxSt    = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;min-height:150px;justify-content:center';
     var boxTitSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;align-self:flex-start';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+    var emptyBox = function(lbl){ return '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">'+lbl+'<br><span style="font-size:9px">Données manquantes</span></div>'; };
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
 
     // ── Box 1 : Genre ──
     if (nbH+nbF > 0) {
-      var hfSegs=[{v:nbH,lbl:'Hommes'},{v:nbF,lbl:'Femmes'}];
+      var hfSegs=[{v:nbH},{v:nbF}];
       var hfCol=['#3b82f6','#f472b6'];
       var hfPct=Math.round(nbH/(nbH+nbF)*100);
       html += '<div style="'+boxSt+'">';
       html += '<div style="'+boxTitSt+'">Genre</div>';
-      html += '<svg width="96" height="96" viewBox="0 0 96 96">';
-      html += _donut(hfSegs,hfCol,48,48,36,16);
-      html += '<text x="48" y="43" text-anchor="middle" font-size="17" font-weight="800" fill="var(--txt)">'+hfPct+'%</text>';
-      html += '<text x="48" y="56" text-anchor="middle" font-size="9" fill="var(--txt3)">♂  ♀</text>';
+      html += '<svg width="88" height="88" viewBox="0 0 88 88">';
+      html += _donut(hfSegs,hfCol,44,44,33,15);
+      html += '<text x="44" y="40" text-anchor="middle" font-size="15" font-weight="800" fill="var(--txt)">'+hfPct+'%</text>';
+      html += '<text x="44" y="52" text-anchor="middle" font-size="8" fill="var(--txt3)">♂  ♀</text>';
       html += '</svg>';
-      html += '<div style="display:flex;gap:12px;margin-top:4px">';
-      html += '<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#3b82f6"></div><span style="font-size:11px;color:var(--txt2)">♂ '+nbH+'</span></div>';
-      html += '<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#f472b6"></div><span style="font-size:11px;color:var(--txt2)">♀ '+nbF+'</span></div>';
+      html += '<div style="display:flex;gap:10px;margin-top:4px">';
+      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#3b82f6"></div><span style="font-size:10px;color:var(--txt2)">♂ '+nbH+'</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#f472b6"></div><span style="font-size:10px;color:var(--txt2)">♀ '+nbF+'</span></div>';
       html += '</div></div>';
-    } else {
-      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">♂♀ Genre<br><span style="font-size:9px">Données manquantes</span></div>';
-    }
+    } else { html += emptyBox('♂♀ Genre'); }
 
-    // ── Box 2 : Tranches d'âge ──
+    // ── Box 2 : Catégorie ──
+    if (hasCat) {
+      var maxCat = Math.max.apply(null, catOrder.map(function(k){ return catPilCounts[k]||0; }))||1;
+      html += '<div style="'+boxSt+';align-items:stretch">';
+      html += '<div style="'+boxTitSt+'">Catégorie</div>';
+      html += '<div style="display:flex;flex-direction:column;gap:5px;width:100%;margin-top:4px">';
+      catOrder.forEach(function(cat){
+        var n = catPilCounts[cat]||0;
+        var w = Math.round(n/maxCat*100);
+        var col = catColors[cat]||'var(--stol)';
+        html += '<div style="display:flex;align-items:center;gap:6px">';
+        html += '<div style="font-size:9px;font-weight:700;color:var(--txt2);width:26px;flex-shrink:0">'+cat+'</div>';
+        html += '<div style="flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">'
+               +(n>0?'<div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div>':'')
+               +'</div>';
+        html += '<div style="font-size:10px;font-weight:700;color:var(--txt);width:18px;text-align:right;flex-shrink:0">'+n+'</div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    } else { html += emptyBox('📋 Catégorie'); }
+
+    // ── Box 3 : Équipages ──
+    if (hasEqui) {
+      var eqSegs=[{v:nbMono},{v:nbBi}];
+      var eqCol=['#8b5cf6','#10b981'];
+      var eqPct=Math.round(nbMono/(nbMono+nbBi)*100);
+      html += '<div style="'+boxSt+'">';
+      html += '<div style="'+boxTitSt+'">Équipages</div>';
+      html += '<svg width="88" height="88" viewBox="0 0 88 88">';
+      html += _donut(eqSegs,eqCol,44,44,33,15);
+      html += '<text x="44" y="40" text-anchor="middle" font-size="15" font-weight="800" fill="var(--txt)">'+eqPct+'%</text>';
+      html += '<text x="44" y="52" text-anchor="middle" font-size="7.5" fill="var(--txt3)">Mono</text>';
+      html += '</svg>';
+      html += '<div style="display:flex;gap:8px;margin-top:4px">';
+      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#8b5cf6"></div><span style="font-size:10px;color:var(--txt2)">Mono '+nbMono+'</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#10b981"></div><span style="font-size:10px;color:var(--txt2)">Bi '+nbBi+'</span></div>';
+      html += '</div></div>';
+    } else { html += emptyBox('✈️ Équipages'); }
+
+    // ── Box 4 : Tranches d'âge ──
     if (ageCount > 0) {
       var maxN = ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
       html += '<div style="'+boxSt+';align-items:stretch">';
       html += '<div style="'+boxTitSt+'">Tranches d\'âge</div>';
-      html += '<div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-top:4px">';
+      html += '<div style="display:flex;align-items:flex-end;gap:3px;height:72px;margin-top:4px">';
       ageBuckets.forEach(function(b){
-        var h = b.n > 0 ? Math.max(6, Math.round((b.n/maxN)*72)) : 3;
+        var h = b.n > 0 ? Math.max(6, Math.round((b.n/maxN)*64)) : 3;
         html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
-        html += '<div style="font-size:9px;font-weight:700;color:'+(b.n>0?'var(--txt)':'var(--txt3)')+'">'+(b.n||'')+'</div>';
+        html += '<div style="font-size:8px;font-weight:700;color:'+(b.n>0?'var(--txt)':'var(--txt3)')+'">'+(b.n||'')+'</div>';
         html += '<div style="width:100%;height:'+h+'px;background:'+(b.n>0?'var(--stol)':'rgba(255,255,255,0.06)')+';border-radius:3px 3px 0 0"></div>';
         html += '</div>';
       });
       html += '</div>';
-      html += '<div style="display:flex;gap:4px;margin-top:5px">';
+      html += '<div style="display:flex;gap:3px;margin-top:4px">';
       ageBuckets.forEach(function(b){
-        html += '<div style="flex:1;text-align:center;font-size:8px;color:var(--txt3)">'+b.lbl+'</div>';
+        html += '<div style="flex:1;text-align:center;font-size:7.5px;color:var(--txt3)">'+b.lbl+'</div>';
       });
       html += '</div></div>';
-    } else {
-      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">🎂 Tranches d\'âge<br><span style="font-size:9px">Données manquantes</span></div>';
-    }
+    } else { html += emptyBox('🎂 Tranches d\'âge'); }
 
-    // ── Box 3 : Anneau régions (rempli par initInfosMaps) ──
-    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:160px"></div>';
+    // ── Box 5 : Anneau régions (rempli par initInfosMaps) ──
+    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:150px"></div>';
 
-    // ── Box 4 : Carte par région ──
+    // ── Box 6 : Carte par région ──
     if (pilotsWithRegion > 0) {
-      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:160px">';
-      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:160px"></div>';
+      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:150px">';
+      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:150px"></div>';
       html += '</div>';
     } else {
-      html += '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">🗺 Carte régions<br><span style="font-size:9px">Import licences requis</span></div>';
+      html += emptyBox('🗺 Carte régions');
     }
 
-    html += '</div>'; // ferme grille 2×2
+    html += '</div>'; // ferme grille 3×2
     html += '</div>'; // ferme padding 0 14px graphiques
     // ── Podiums par classe ULM (run.classe) ──
     return html;
@@ -6437,8 +6490,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rmBtnSt  = 'background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:2px;display:flex;align-items:center;justify-content:center';
     var _rowInpSt = 'border-bottom:2px solid var(--stol);background:var(--navy4)';
-    var CCOL  = 'grid-template-columns:minmax(0,2fr) 68px 74px minmax(0,1fr) minmax(0,1fr) 60px minmax(0,1fr) 28px';
-    var clsLbl = {paramotor:'Para',paramoteur:'Para',multiaxes:'Multi',pendulaire:'Pend',gyro:'Gyro',autogire:'Gyro',microlight:'Micro'};
+    var CCOL  = 'grid-template-columns:minmax(0,2fr) 68px 74px minmax(0,1fr) minmax(0,1fr) 56px 78px minmax(0,1fr) 28px';
     var html5 = '';
     // ── Barre d'actions ──
     html5 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
@@ -6448,7 +6500,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '</div>';
     // ── En-tête fixe ──
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    ['Nom','Licence','Immat.','Marque','Modèle','Classe','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
+    ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
     html5 += '</div>';
     // ── Zone scrollable ──
     html5 += '<div style="flex:1;overflow-y:auto">';
@@ -6462,8 +6514,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<div><input id="hdg-c-immat"  placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-marque" placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-modele" placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-classe" placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-region" placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-categorie" placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-equipage"  placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-region"    placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<input id="hdg-c-aile" style="display:none" readonly><input id="hdg-c-places" style="display:none" readonly>';
     html5 += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="hdgAddComp(\''+cid+'\')" style="'+_addBtnSt+'" title="Inscrire">+</button></div>';
     html5 += '</div>';
@@ -6476,15 +6529,21 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
       var bg  = i%2===1 ? 'background:var(--navy3)' : '';
       var pidE = escG(pid);
-      var classeRaw   = (ulm.classe||'').toLowerCase();
-      var classeLabel = clsLbl[classeRaw] || (classeRaw ? classeRaw.charAt(0).toUpperCase()+classeRaw.slice(1) : '—');
+      // Couleurs Catégorie
+      var catColMap = {PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316'};
+      var catVal = (p.categorie||'').trim();
+      var catStyle = catVal&&catColMap[catVal] ? 'color:'+catColMap[catVal]+';font-weight:700' : 'color:var(--txt3)';
+      // Couleurs Équipages
+      var equVal = (p.equipage||'').trim();
+      var equStyle = equVal==='Biplace'?'color:#10b981;font-weight:600':equVal==='Monoplace'?'color:#8b5cf6;font-weight:600':'color:var(--txt3)';
       html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
       html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
       html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
       html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
       html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
       html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+classeLabel+'</div>';
+      html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
       html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
       html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
       html5 += '</div>';
@@ -13360,20 +13419,26 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</select></div>';
     html += '</div>';
     // ── Ligne Catégorie / Équipages / Rôle ──
-    var _isMono = (pilot.equipage === 'Monoplace');
-    var _isBi   = (pilot.equipage === 'Biplace');
+    // PL1/PF1 forcent Monoplace indépendamment de ce qui est stocké
+    var _catForceMono = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    var _isMono = _catForceMono || (pilot.equipage === 'Monoplace');
+    var _isBi   = !_catForceMono && (pilot.equipage === 'Biplace');
     var _isPM   = (pilot.pratique === 'paramoteur');
     html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
     // Catégorie (visible uniquement si Paramoteur)
     html += '<div id="pd-categorie-row" style="display:'+(_isPM?'':'none')+'">';
-    html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'">';
+    html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'" onchange="pdUpdateCategorie()">';
     html += '<option value="">— Non précisé —</option>';
     ['PF1','PF2','PL1','PL2'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.categorie===o?' selected':'')+'>'+o+'</option>'; });
     html += '</select></div>';
     // Équipages
-    html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()">';
+    // Catégorie PL1/PF1 → Monoplace figé dès l'ouverture
+    var _catMonoOnly = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    // Si catégorie force Monoplace, écraser la valeur stockée
+    var _equipageVal = _catMonoOnly ? 'Monoplace' : (pilot.equipage || '');
+    html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()"'+(_catMonoOnly?' disabled title="'+pilot.categorie+' : Monoplace uniquement"':'')+' >';
     html += '<option value="">— Non précisé —</option>';
-    ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.equipage===o?' selected':'')+'>'+o+'</option>'; });
+    ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(_equipageVal===o?' selected':'')+'>'+o+'</option>'; });
     html += '</select></div>';
     // Rôle
     html += '<div><div style="'+lSt+'">Rôle</div><select id="pd-role" style="'+iSt+'"'+(_isMono?' disabled':'')+' title="'+(_isMono?'Monoplace : Pilote automatiquement':'')+'">';
@@ -13544,6 +13609,23 @@ function pdUpdateEquipageRole() {
     }
   }
   if (copRow) copRow.style.display = (val === 'Biplace') ? '' : 'none';
+}
+
+// PL1 / PF1 → Monoplace figé ; PL2 / PF2 → Équipages libre
+function pdUpdateCategorie() {
+  var cat = document.getElementById('pd-categorie');
+  var eq  = document.getElementById('pd-equipage');
+  if (!cat || !eq) return;
+  var monoOnly = (cat.value === 'PL1' || cat.value === 'PF1');
+  if (monoOnly) {
+    eq.value    = 'Monoplace';
+    eq.disabled = true;
+    eq.title    = cat.value + ' : Monoplace uniquement';
+  } else {
+    eq.disabled = false;
+    eq.title    = '';
+  }
+  pdUpdateEquipageRole(); // cascade Rôle + Copilote
 }
 
 // Affichage conditionnel Catégorie selon Pratique
