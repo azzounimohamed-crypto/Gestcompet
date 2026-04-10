@@ -5987,6 +5987,7 @@ function renderHomeDetailPanel(cp) {
   if (canEdit) {
     html += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap">';
     html += '<button onclick="editComp(\''+cp.id+'\')" style="background:#2563eb;border:none;border-radius:8px;cursor:pointer;padding:0 14px;height:36px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;font-family:inherit">✏️ Modifier</button>';
+    html += '<button onclick="printCompDossier(\''+cp.id+'\')" title="Imprimer le dossier officiel de compétition" style="height:36px;padding:0 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px">🖨️ Dossier</button>';
     html += '<button onclick="exportCompFull(\''+cp.id+'\')" title="Exporter toutes les données de cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">⬇ Export</button>';
     html += '<label title="Importer des données pour cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center">⬆ Import<input type="file" accept=".json" style="display:none" onchange="importCompFull(this,\''+cp.id+'\')"></label>';
     html += '</div>';
@@ -15372,6 +15373,355 @@ function switchBudgetSubTab(sub) {
 function toggleBgtDomain(key) {
   _bgtOpenDomains[key] = !_bgtOpenDomains[key];
   switchHomeDetailTab('budget');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOSSIER OFFICIEL DE COMPÉTITION — impression multi-sections
+═══════════════════════════════════════════════════════════════ */
+function printCompDossier(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (!cp) return;
+
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var fd  = function(d){ if(!d) return '—'; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; };
+  var num = function(v,d){ var n=parseFloat(v); return isNaN(n)?d:n; };
+
+  // ── Données ──────────────────────────────────────────────────────────
+  var enrolled  = (S.compEnroll||{})[compId] || [];
+  var staffList = (S.staff||{})[compId] || [];
+  var matList   = (S.materiel||{})[compId] || [];
+  var evtList   = (S.evenements||{})[compId] || [];
+  var bdata     = (S.budgets||{})[compId] || {engagement:[], ressources:[]};
+  var partList  = (S.partenaires||{})[compId] || [];
+  var runs      = (S.runs||{})[compId] || [];
+  var logo      = localStorage.getItem('ffplum_logo') || 'https://ffplum.fr/templates/ffplum/images/logo.png';
+
+  var typeLabel = {
+    'comp-internationale':'Compétition internationale','cdf':'Championnat de France',
+    'regional':'Compétition régionale','comp-regionale':'Compétition régionale',
+    'entrainement-national':'Entraînement national','entrainement':'Entraînement','stage':'Stage'
+  }[cp.type] || (cp.type||'');
+  var pratiqueLabel = {microlight:'Microlight',paramoteur:'Paramoteur',paramotor:'Paramoteur'}[cp.pratique] || (cp.pratique||'');
+  var disciplineLabel = cp.discipline ? (' · ' + cp.discipline.charAt(0).toUpperCase()+cp.discipline.slice(1)) : '';
+  var dateStr = fd(cp.dateFrom) + (cp.dateTo && cp.dateTo!==cp.dateFrom ? ' — ' + fd(cp.dateTo) : '');
+
+  // Calculs budget
+  var calcCout = function(l){ return num(l.valeur,0)*num(l.nbjours,1)*num(l.qt,1); };
+  var totalDep = (bdata.engagement||[]).reduce(function(s,l){return s+calcCout(l);},0);
+  var totalRec = (bdata.ressources||[]).reduce(function(s,l){return s+calcCout(l);},0);
+
+  // Budget groupé par domaine (résumé seulement)
+  var makeBudgetGroups = function(lines) {
+    var map={}, order=[];
+    lines.forEach(function(l){
+      var d=(l.domaine||'—').trim()||'—';
+      if(!map[d]){map[d]=0; order.push(d);}
+      map[d]+=calcCout(l);
+    });
+    return {map:map,order:order};
+  };
+  var depGroups = makeBudgetGroups(bdata.engagement||[]);
+  var recGroups = makeBudgetGroups(bdata.ressources||[]);
+
+  // Matériel groupé par catégorie (sans détail)
+  var matGroups={}, matOrder=[];
+  matList.forEach(function(m){
+    var c=(m.categorie||'Autre').trim();
+    if(!matGroups[c]){matGroups[c]=0; matOrder.push(c);}
+    matGroups[c]+=(parseInt(m.quantite)||1);
+  });
+
+  // Partenaires groupés par type
+  var partGroups={}, partOrder=[];
+  partList.forEach(function(p){
+    var t=p.type||'Autre';
+    if(!partGroups[t]){partGroups[t]=[]; partOrder.push(t);}
+    partGroups[t].push(p);
+  });
+
+  // Stats inscrits
+  var classifiedIds={};
+  runs.forEach(function(r){classifiedIds[r.pilotId]=true;});
+  var nbClasses = Object.keys(classifiedIds).length;
+
+  // ── CSS ──────────────────────────────────────────────────────────────
+  var css = [
+    'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:0;font-size:11px}',
+    '@page{size:A4 portrait;margin:18mm 14mm 16mm}',
+    '@media print{.no-print{display:none}.page-break{page-break-before:always}}',
+    '.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:240mm;text-align:center;padding:20mm 15mm}',
+    '.section{margin-bottom:22px}',
+    '.section-title{font-size:13px;font-weight:800;color:#fff;background:#003399;padding:6px 12px;border-radius:4px;letter-spacing:.5px;text-transform:uppercase;margin:0 0 10px}',
+    'table{width:100%;border-collapse:collapse;font-size:10.5px}',
+    'th{background:#003399;color:#fff;padding:5px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px}',
+    'td{padding:4px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}',
+    'tr:nth-child(even) td{background:#f4f7fb}',
+    '.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}',
+    '.stat-box{border:1px solid #d1d9e8;border-radius:6px;padding:10px 8px;text-align:center}',
+    '.stat-val{font-size:22px;font-weight:800;color:#003399}',
+    '.stat-lbl{font-size:9px;color:#6b7280;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}',
+    '.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}',
+    '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}',
+    '.info-row{display:flex;gap:6px;padding:4px 0;border-bottom:1px solid #edf0f5}',
+    '.info-lbl{font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.3px;min-width:120px;flex-shrink:0}',
+    '.info-val{font-size:11px;color:#111;flex:1}',
+    '.budget-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:4px 8px;border-bottom:1px solid #e5e7eb}',
+    '.budget-total{display:flex;justify-content:space-between;padding:6px 8px;font-weight:800;font-size:12px;border-radius:4px;margin-top:4px}',
+    '.solde-box{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:6px;font-size:14px;font-weight:800;margin-top:8px}',
+    'hr.sep{border:none;border-top:1px solid #d1d9e8;margin:18px 0}',
+    '.footer-pg{font-size:9px;color:#9ca3af;text-align:right;padding-top:6px;border-top:1px solid #e5e7eb;margin-top:10px}'
+  ].join('\n');
+
+  // ── Helpers HTML ─────────────────────────────────────────────────────
+  var sectionHdr = function(ico, title) {
+    return '<div class="section-title">'+ico+' '+esc(title)+'</div>';
+  };
+  var infoRow = function(lbl, val) {
+    return val && val !== '—' ? '<div class="info-row"><div class="info-lbl">'+esc(lbl)+'</div><div class="info-val">'+esc(val||'—')+'</div></div>' : '';
+  };
+  var emptyMsg = function(msg){
+    return '<div style="padding:12px 8px;color:#9ca3af;font-style:italic;font-size:11px">'+msg+'</div>';
+  };
+
+  // ── SECTION 1 : COUVERTURE ────────────────────────────────────────────
+  var coverHtml = '<div class="cover">';
+  coverHtml += '<img src="'+esc(logo)+'" height="60" style="margin-bottom:18px" onerror="this.style.display=\'none\'">';
+  if (cp.affiche) {
+    coverHtml += '<img src="'+esc(cp.affiche)+'" style="max-height:180px;max-width:280px;object-fit:contain;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,51,.18);margin-bottom:20px" onerror="this.style.display=\'none\'">';
+  }
+  coverHtml += '<div style="font-size:9px;font-weight:700;color:#003399;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Dossier Officiel de Compétition</div>';
+  coverHtml += '<div style="font-size:24px;font-weight:800;color:#111;line-height:1.2;margin-bottom:10px;max-width:160mm">'+esc(cp.name)+'</div>';
+  if (typeLabel) coverHtml += '<div style="font-size:13px;font-weight:700;color:#003399;margin-bottom:4px">'+esc(typeLabel)+'</div>';
+  if (pratiqueLabel) coverHtml += '<div style="font-size:12px;color:#6b7280;margin-bottom:12px">'+esc(pratiqueLabel)+esc(disciplineLabel)+'</div>';
+  coverHtml += '<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:4px">📅 '+esc(dateStr)+'</div>';
+  if (cp.lieu || cp.oaci) coverHtml += '<div style="font-size:12px;color:#6b7280;margin-bottom:2px">📍 '+(cp.lieu?esc(cp.lieu):'')+(cp.oaci?' ('+esc(cp.oaci)+')':'')+'</div>';
+  if (cp.region) coverHtml += '<div style="font-size:11px;color:#9ca3af">'+esc(cp.region)+'</div>';
+  coverHtml += '<div style="margin-top:24px;font-size:9px;color:#9ca3af;letter-spacing:1px">Généré le '+new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})+'</div>';
+  coverHtml += '</div>';
+
+  // ── SECTION 2 : INDICATEURS ───────────────────────────────────────────
+  var statsHtml = '<div class="section">';
+  statsHtml += sectionHdr('📊','Indicateurs');
+  statsHtml += '<div class="stat-grid">';
+  var stats2 = [
+    {val:enrolled.length, lbl:'Inscrits'},
+    {val:staffList.length, lbl:'Encadrants'},
+    {val:runs.length, lbl:'Résultats'},
+    {val:nbClasses, lbl:'Classés'}
+  ];
+  stats2.forEach(function(s){
+    statsHtml += '<div class="stat-box"><div class="stat-val">'+s.val+'</div><div class="stat-lbl">'+esc(s.lbl)+'</div></div>';
+  });
+  statsHtml += '</div>';
+  // Classes ULM
+  if (enrolled.length) {
+    var clsCounts={};
+    enrolled.forEach(function(pid){
+      var ulms=(S.ulms||{})[pid]||[];
+      ulms.forEach(function(u){
+        var c=(u.classe||'Autre').trim();
+        clsCounts[c]=(clsCounts[c]||0)+1;
+      });
+    });
+    var clsKeys=Object.keys(clsCounts);
+    if (clsKeys.length) {
+      statsHtml += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">';
+      clsKeys.forEach(function(c){
+        statsHtml += '<span class="badge" style="background:#e8eeff;color:#003399">'+esc(c)+' : '+clsCounts[c]+'</span>';
+      });
+      statsHtml += '</div>';
+    }
+  }
+  statsHtml += '</div>';
+
+  // ── SECTION 3 : ENCADREMENT ───────────────────────────────────────────
+  var staffHtml = '<div class="section">';
+  staffHtml += sectionHdr('👥','Encadrement');
+  if (!staffList.length) {
+    staffHtml += emptyMsg('Aucun encadrant enregistré.');
+  } else {
+    staffHtml += '<table><thead><tr><th>Nom — Prénom</th><th>Fonction</th><th>Licence</th><th>Téléphone</th><th>Email</th></tr></thead><tbody>';
+    staffList.forEach(function(s){
+      var pilot=(S.pilots||[]).find(function(p){return p.id===(s.pilotId||s.id);})||{};
+      var nom=((pilot.prenom||s.prenom||'')+' '+(pilot.nom||s.nom||'')).trim()||'—';
+      staffHtml += '<tr><td style="font-weight:600">'+esc(nom)+'</td><td>'+esc(s.role||'—')+'</td><td>'+esc(pilot.licence||s.licence||'—')+'</td><td>'+esc(pilot.tel||s.tel||'—')+'</td><td>'+esc(pilot.email||s.email||'—')+'</td></tr>';
+    });
+    staffHtml += '</tbody></table>';
+  }
+  staffHtml += '</div>';
+
+  // ── SECTION 4 : ÉQUIPAGE ─────────────────────────────────────────────
+  var equipHtml = '<div class="section">';
+  equipHtml += sectionHdr('✈️','Équipage — Pilotes inscrits');
+  if (!enrolled.length) {
+    equipHtml += emptyMsg('Aucun pilote inscrit.');
+  } else {
+    equipHtml += '<table><thead><tr><th>#</th><th>Nom — Prénom</th><th>Licence</th><th>ULM / Classe</th><th>Catégorie</th><th>Téléphone</th></tr></thead><tbody>';
+    enrolled.forEach(function(pid,i){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var nom=((p.prenom||'')+' '+(p.nom||'')).trim()||pid;
+      var ulms=(S.ulms||{})[pid]||[];
+      var cls=ulms.map(function(u){return u.classe||'';}).filter(Boolean).join(', ')||'—';
+      var cat=ulms.map(function(u){return u.categorie||'';}).filter(Boolean).join(', ')||'—';
+      var immat=ulms.map(function(u){return u.immat||'';}).filter(Boolean).join(', ')||'';
+      equipHtml += '<tr><td style="color:#6b7280;text-align:center">'+(i+1)+'</td><td style="font-weight:600">'+esc(nom)+'</td><td>'+esc(p.licence||'—')+'</td><td>'+esc(cls)+(immat?' <span style="color:#6b7280;font-size:9px">'+esc(immat)+'</span>':'')+'</td><td>'+esc(cat)+'</td><td>'+esc(p.tel||'—')+'</td></tr>';
+    });
+    equipHtml += '</tbody></table>';
+  }
+  equipHtml += '</div>';
+
+  // ── SECTION 5 : INSTALLATION ─────────────────────────────────────────
+  var instHtml = '<div class="section">';
+  instHtml += sectionHdr('🏟️','Installation — Site');
+  instHtml += '<div class="info-grid">';
+  var col1=[
+    infoRow('Code OACI',      cp.oaci),
+    infoRow('Lieu / Aérodrome',cp.lieu),
+    infoRow('Région',          cp.region),
+    infoRow('Club organisateur',cp.clubOrga),
+    infoRow('Contact club',    cp.contactClub)
+  ].join('');
+  var col2=[
+    infoRow('Type de piste',   cp.typePiste),
+    infoRow('Longueur de piste',cp.longPiste),
+    infoRow('Services',        cp.services),
+    infoRow('Acteurs locaux',  cp.acteursLocaux)
+  ].join('');
+  instHtml += '<div>'+col1+'</div><div>'+col2+'</div>';
+  instHtml += '</div>';
+  if (cp.remarquesSite) instHtml += '<div style="margin-top:8px;padding:8px 10px;background:#f4f7fb;border-left:3px solid #003399;border-radius:3px;font-size:10.5px">'+esc(cp.remarquesSite)+'</div>';
+  instHtml += '</div>';
+
+  // ── SECTION 6 : MATÉRIEL ─────────────────────────────────────────────
+  var matHtml = '<div class="section">';
+  matHtml += sectionHdr('📦','Matériel');
+  if (!matList.length) {
+    matHtml += emptyMsg('Aucun matériel enregistré.');
+  } else {
+    matHtml += '<table><thead><tr><th>Catégorie</th><th style="text-align:center">Nb articles</th><th style="text-align:right">Total unités</th></tr></thead><tbody>';
+    matOrder.forEach(function(cat,i){
+      var count=(S.materiel[compId]||[]).filter(function(m){return (m.categorie||'Autre')===cat;}).length;
+      var qty=matGroups[cat];
+      matHtml += '<tr><td style="font-weight:600">'+esc(cat)+'</td><td style="text-align:center;color:#003399;font-weight:700">'+count+'</td><td style="text-align:right;color:#6b7280">'+qty+'</td></tr>';
+    });
+    matHtml += '<tr style="background:#e8eeff"><td style="font-weight:800;text-transform:uppercase;letter-spacing:.3px">TOTAL</td><td style="text-align:center;font-weight:800;color:#003399">'+matList.length+'</td><td></td></tr>';
+    matHtml += '</tbody></table>';
+  }
+  matHtml += '</div>';
+
+  // ── SECTION 7 : ÉVÉNEMENTS ────────────────────────────────────────────
+  var typeColors2={'Sécurité':'#ef4444','Matériel':'#f59e0b','Médical':'#3b82f6','Météo':'#8b5cf6','Autre':'#6b7280'};
+  var evtHtml = '<div class="section">';
+  evtHtml += sectionHdr('⚠️','Événements');
+  if (!evtList.length) {
+    evtHtml += emptyMsg('Aucun événement enregistré.');
+  } else {
+    evtHtml += '<table><thead><tr><th>Type</th><th>Nom / Aéronef</th><th>Date</th><th>Immatriculation</th><th>Circonstance</th></tr></thead><tbody>';
+    evtList.forEach(function(e){
+      var tc=typeColors2[e.typeIncident]||'#6b7280';
+      evtHtml += '<tr>';
+      evtHtml += '<td><span class="badge" style="background:'+tc+'22;color:'+tc+'">'+esc(e.typeIncident||'—')+'</span></td>';
+      evtHtml += '<td style="font-weight:600">'+esc(e.nom||'—')+'</td>';
+      evtHtml += '<td style="white-space:nowrap">'+esc(fd(e.date)||'—')+(e.horaire?' '+esc(e.horaire):'')+'</td>';
+      evtHtml += '<td style="font-weight:700;color:#d97706">'+esc(e.immatriculation||'—')+'</td>';
+      evtHtml += '<td>'+esc(e.circonstance||'—')+'</td>';
+      evtHtml += '</tr>';
+    });
+    evtHtml += '</tbody></table>';
+  }
+  evtHtml += '</div>';
+
+  // ── SECTION 8 : BUDGET ───────────────────────────────────────────────
+  var solde = totalRec - totalDep;
+  var budgHtml = '<div class="section">';
+  budgHtml += sectionHdr('💶','Budget — Synthèse');
+  if (!(bdata.engagement||[]).length && !(bdata.ressources||[]).length) {
+    budgHtml += emptyMsg('Aucune donnée budgétaire enregistrée.');
+  } else {
+    budgHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+    // Dépenses
+    budgHtml += '<div>';
+    budgHtml += '<div style="font-size:10px;font-weight:800;color:#ef4444;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Dépenses</div>';
+    if (depGroups.order.length) {
+      depGroups.order.forEach(function(d){
+        budgHtml += '<div class="budget-row"><div>'+esc(d)+'</div><div style="font-weight:700;white-space:nowrap">'+depGroups.map[d].toFixed(2)+' €</div></div>';
+      });
+    } else { budgHtml += emptyMsg('Aucune dépense.'); }
+    budgHtml += '<div class="budget-total" style="background:#fee2e2;color:#991b1b"><span>TOTAL Dépenses</span><span>'+totalDep.toFixed(2)+' €</span></div>';
+    budgHtml += '</div>';
+    // Recettes
+    budgHtml += '<div>';
+    budgHtml += '<div style="font-size:10px;font-weight:800;color:#2563eb;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Recettes</div>';
+    if (recGroups.order.length) {
+      recGroups.order.forEach(function(d){
+        budgHtml += '<div class="budget-row"><div>'+esc(d)+'</div><div style="font-weight:700;white-space:nowrap">'+recGroups.map[d].toFixed(2)+' €</div></div>';
+      });
+    } else { budgHtml += emptyMsg('Aucune recette.'); }
+    budgHtml += '<div class="budget-total" style="background:#dbeafe;color:#1e40af"><span>TOTAL Recettes</span><span>'+totalRec.toFixed(2)+' €</span></div>';
+    budgHtml += '</div>';
+    budgHtml += '</div>';
+    var soldeBg = solde>=0?'#d1fae5':'#fee2e2', soldeClr = solde>=0?'#065f46':'#991b1b';
+    budgHtml += '<div class="solde-box" style="background:'+soldeBg+';color:'+soldeClr+';margin-top:10px">';
+    budgHtml += '<span>SOLDE</span><span>'+(solde>=0?'+':'')+solde.toFixed(2)+' €</span>';
+    budgHtml += '</div>';
+  }
+  budgHtml += '</div>';
+
+  // ── SECTION 9 : PARTENAIRES ──────────────────────────────────────────
+  var partHtml = '<div class="section">';
+  partHtml += sectionHdr('🤝','Partenaires & Acteurs locaux');
+  if (!partList.length) {
+    partHtml += emptyMsg('Aucun partenaire enregistré.');
+  } else {
+    partHtml += '<table><thead><tr><th>Type</th><th>Nom</th><th>Contact</th><th>Site web</th></tr></thead><tbody>';
+    partOrder.forEach(function(type){
+      partGroups[type].forEach(function(p,i){
+        partHtml += '<tr>';
+        partHtml += '<td>'+(i===0?'<span class="badge" style="background:#e8eeff;color:#003399">'+esc(type)+'</span>':'')+'</td>';
+        partHtml += '<td style="font-weight:600">'+esc(p.nom||'—')+'</td>';
+        partHtml += '<td>'+esc(p.contact||p.email||p.tel||'—')+'</td>';
+        partHtml += '<td style="font-size:9px;color:#2563eb">'+(p.site?'<a href="'+esc(p.site)+'" style="color:#2563eb">'+esc(p.site)+'</a>':'—')+'</td>';
+        partHtml += '</tr>';
+      });
+    });
+    partHtml += '</tbody></table>';
+  }
+  partHtml += '</div>';
+
+  // ── FOOTER ───────────────────────────────────────────────────────────
+  var footer = '<div class="footer-pg">FFPLUM — GestSTOL — '+esc(cp.name)+' — Dossier généré le '+new Date().toLocaleDateString('fr-FR')+'</div>';
+
+  // ── ASSEMBLAGE ───────────────────────────────────────────────────────
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    + '<title>Dossier — '+esc(cp.name)+'</title>'
+    + '<style>'+css+'</style>'
+    + '</head><body>'
+    + coverHtml
+    + '<div class="page-break"></div>'
+    + '<div style="padding:4mm 0">'
+    + statsHtml
+    + '<hr class="sep">'
+    + staffHtml
+    + '<hr class="sep">'
+    + equipHtml
+    + '<div class="page-break"></div>'
+    + instHtml
+    + '<hr class="sep">'
+    + matHtml
+    + '<hr class="sep">'
+    + evtHtml
+    + '<div class="page-break"></div>'
+    + budgHtml
+    + '<hr class="sep">'
+    + partHtml
+    + footer
+    + '</div>'
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>';
+
+  var w = window.open('','_blank','width=900,height=700');
+  if (w) { w.document.write(html); w.document.close(); }
+  else { toast('Autorisez les popups pour imprimer le dossier','err'); }
 }
 
 function printBudgetA4(compId) {
