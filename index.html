@@ -2669,7 +2669,7 @@ function saveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
@@ -10624,19 +10624,20 @@ async function pushToCloud() {
     runs:          S.runs         || {},
     pilots:        S.pilots.map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
     ulms:          S.ulms         || {},
-    staff:         S.staff        || [],
-    compEnroll:    S.compEnroll   || {},
-    materiel:      S.materiel     || {},
-    evenements:    S.evenements   || {},
-    budgets:       S.budgets      || {},
-    partenaires:   S.partenaires  || {},
-    messages:      S.messages     || [],
-    sitesSportifs: S.sitesSportifs|| [],
-    collectif:     S.collectif    || [],
-    documents:     S.documents    || [],
-    officialDocs:  S.officialDocs || {},
-    docSettings:   S.docSettings  || {},
-    _pushAt:       Date.now()
+    staff:            S.staff              || {},
+    compEnroll:       S.compEnroll         || {},
+    materiel:         S.materiel           || {},
+    evenements:       S.evenements         || {},
+    budgets:          S.budgets            || {},
+    partenaires:      S.partenaires        || {},
+    messages:         S.messages           || [],
+    sitesSportifs:    S.sitesSportifs      || [],
+    collectif:        S.collectif          || [],
+    documents:        S.documents          || [],
+    officialDocs:     S.officialDocs       || {},
+    docSettings:      S.docSettings        || {},
+    homeTodosByComp:  S.homeTodosByComp    || {},
+    _pushAt:          Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
     { id: 'global', data: payload, updated_at: new Date().toISOString() },
@@ -10666,11 +10667,49 @@ function _mergeById(local, remote) {
   ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
   return Object.keys(map).map(function(k){ return map[k]; });
 }
-// ── FUSION objet : les clés des deux sources sont gardées ──
+// ── FUSION objet simple : les clés des deux sources sont gardées ──
 function _mergeObj(local, remote) {
   var lo = (local  && typeof local  === 'object' && !Array.isArray(local))  ? local  : {};
   var ro = (remote && typeof remote === 'object' && !Array.isArray(remote)) ? remote : {};
   return Object.assign({}, lo, ro);
+}
+
+// ── FUSION objet-de-tableaux : fusionne chaque valeur par tableau (avec _mergeById si items ont .id) ──
+function _mergeObjOfArrays(local, remote) {
+  var lo = (local  && typeof local  === 'object' && !Array.isArray(local))  ? local  : {};
+  var ro = (remote && typeof remote === 'object' && !Array.isArray(remote)) ? remote : {};
+  var result = {};
+  var keys = {};
+  Object.keys(lo).forEach(function(k){ keys[k] = 1; });
+  Object.keys(ro).forEach(function(k){ keys[k] = 1; });
+  Object.keys(keys).forEach(function(key) {
+    var lv = lo[key];
+    var rv = ro[key];
+    if (lv === undefined) { result[key] = rv; return; }
+    if (rv === undefined) { result[key] = lv; return; }
+    if (Array.isArray(lv) && Array.isArray(rv)) {
+      // Si les éléments ont un champ .id → fusion par id
+      var firstWithId = (lv.length > 0 && lv[0] && lv[0].id) || (rv.length > 0 && rv[0] && rv[0].id);
+      if (firstWithId) {
+        result[key] = _mergeById(lv, rv);
+      } else {
+        // Pas d'id : union par sérialisation JSON (dédupliquer sans perdre d'entrée)
+        var seen = {};
+        var merged = [];
+        lv.concat(rv).forEach(function(item) {
+          var k2 = JSON.stringify(item);
+          if (!seen[k2]) { seen[k2] = true; merged.push(item); }
+        });
+        result[key] = merged;
+      }
+    } else if (typeof lv === 'object' && !Array.isArray(lv) && typeof rv === 'object' && !Array.isArray(rv)) {
+      result[key] = Object.assign({}, lv, rv);
+    } else {
+      // Scalaire : garder la valeur non nulle la plus récente (remote en priorité si définie)
+      result[key] = (rv !== null && rv !== undefined) ? rv : lv;
+    }
+  });
+  return result;
 }
 
 // ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
@@ -10695,22 +10734,26 @@ async function pullFromCloud() {
   S.pilots.forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo; });
 
   // ── FUSION : on garde TOUT — local + cloud, jamais de remplacement total ──
+  // Tableaux plats avec .id : _mergeById
   S.comps         = _mergeById(S.comps,         r.comps);
   S.pilots        = _mergeById(S.pilots,        r.pilots);
-  S.staff         = _mergeById(S.staff,         r.staff);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
   S.documents     = _mergeById(S.documents,     r.documents);
   S.messages      = _mergeById(S.messages,      r.messages);
-  S.runs          = _mergeObj(S.runs,       r.runs);
-  S.ulms          = _mergeObj(S.ulms,       r.ulms);
-  S.compEnroll    = _mergeObj(S.compEnroll, r.compEnroll);
-  S.materiel      = _mergeObj(S.materiel,   r.materiel);
-  S.evenements    = _mergeObj(S.evenements, r.evenements);
-  S.budgets       = _mergeObj(S.budgets,    r.budgets);
-  S.partenaires   = _mergeObj(S.partenaires,r.partenaires);
-  S.officialDocs  = _mergeObj(S.officialDocs, r.officialDocs);
-  S.docSettings   = _mergeObj(S.docSettings,  r.docSettings);
+  // Objets indexés par compId dont les valeurs sont des tableaux : _mergeObjOfArrays
+  S.staff              = _mergeObjOfArrays(S.staff,              r.staff);
+  S.runs               = _mergeObjOfArrays(S.runs,               r.runs);
+  S.ulms               = _mergeObjOfArrays(S.ulms,               r.ulms);
+  S.compEnroll         = _mergeObjOfArrays(S.compEnroll,         r.compEnroll);
+  S.materiel           = _mergeObjOfArrays(S.materiel,           r.materiel);
+  S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
+  S.budgets            = _mergeObjOfArrays(S.budgets,            r.budgets);
+  S.partenaires        = _mergeObjOfArrays(S.partenaires,        r.partenaires);
+  S.officialDocs       = _mergeObjOfArrays(S.officialDocs,       r.officialDocs);
+  S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
+  // Objets scalaires simples
+  S.docSettings        = _mergeObj(S.docSettings, r.docSettings);
 
   S._lastPushAt = r._pushAt || 0;
 
