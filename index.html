@@ -6397,11 +6397,14 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html += '</div></div>';
     } else { html += emptyBox('✈️ Équipages'); }
 
-    // ── Fermer la ligne des 3 petits boxes (mobile) ou continuer la grille (desktop) ──
-    if (isMobile) html += '</div>'; // ferme la ligne 3 cols mobile
+    // ── Ligne 2 mobile : ferme les 3 cols, ouvre une grille 2 cols ──
+    if (isMobile) {
+      html += '</div>'; // ferme la ligne 3 cols (Genre|Catégorie|Équipages)
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'; // ligne 2 : Âge + Régions
+    }
 
     // ── Box 4 : Tranches d'âge ──
-    var _ageBoxSt = isMobile ? boxSt.replace('min-height:150px','min-height:120px')+';align-items:stretch' : boxSt+';align-items:stretch';
+    var _ageBoxSt = isMobile ? boxSt.replace('min-height:150px','min-height:130px')+';align-items:stretch' : boxSt+';align-items:stretch';
     if (ageCount > 0) {
       var maxN = ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
       html += '<div style="'+_ageBoxSt+'">';
@@ -6423,8 +6426,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     } else { html += emptyBox('🎂 Tranches d\'âge'); }
 
     // ── Box 5 : Anneau régions (rempli par initInfosMaps) ──
-    var regMinH = isMobile ? '180px' : '150px'; // double en hauteur sur mobile
-    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:'+regMinH+'"></div>';
+    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:150px"></div>';
+
+    // ── Ligne 3 mobile : ferme la grille 2 cols, carte pleine largeur ──
+    if (isMobile) html += '</div>'; // ferme la grille 2 cols (Âge + Régions)
 
     // ── Box 6 : Carte par région ──
     var mapMinH = isMobile ? '220px' : '150px';
