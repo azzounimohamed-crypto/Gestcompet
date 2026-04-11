@@ -3733,6 +3733,12 @@ function renderMobileCompDetail() {
   } else if (Array.isArray(S.staff)) {
     staffList = S.staff.filter(function(x){ return x && x.compId === cp.id; });
   }
+  // Dédoublonnage
+  var _mcdStaffSeen = {};
+  staffList = staffList.filter(function(s) {
+    var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
+    if (_mcdStaffSeen[k]) return false; _mcdStaffSeen[k] = true; return true;
+  });
   var contentEl = document.getElementById('mcd-content');
   if (contentEl) {
     contentEl.innerHTML = renderHDPTabContent(cp, sec.id, runs, enrolled, staffList);
@@ -5887,6 +5893,7 @@ function hdgAddStaff(compId) {
   var parts=val.split(' ');
   var g=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
   var entry={
+    id: 'stf_'+Date.now().toString(36)+Math.random().toString(36).substr(2,5),
     pilotId:pilot?pilot.id:null,
     prenom:pilot?(pilot.prenom||parts[0]||''):(parts[0]||val),
     nom:pilot?(pilot.nom||parts.slice(1).join(' ')||''):(parts.slice(1).join(' ')||''),
@@ -5972,6 +5979,13 @@ function renderHomeDetailPanel(cp) {
       return x && (x.compId === cp.id || x.competitionId === cp.id || x.comp_id === cp.id);
     });
   }
+  // ── Dédoublonnage staff (pilotId ou prenom+nom) ──
+  var _staffSeen = {};
+  staffList = staffList.filter(function(s) {
+    var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
+    if (_staffSeen[k]) return false; _staffSeen[k] = true; return true;
+  });
+
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
   var html = '';
 
@@ -6311,15 +6325,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
       return out;
     };
-    // ── Grille 3×2 : 6 graphiques ──
+    // ── Graphiques : layout adaptatif mobile/desktop ──
     var pilotsWithRegion = enrolled.filter(function(pid){
       var p = (S.pilots||[]).find(function(x){ return x.id===pid; }) || {};
       return !!p.region;
     }).length;
+    var isMobile = window.innerWidth < 768;
     var boxSt    = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;min-height:150px;justify-content:center';
     var boxTitSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;align-self:flex-start';
     var emptyBox = function(lbl){ return '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">'+lbl+'<br><span style="font-size:9px">Données manquantes</span></div>'; };
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
+    // Desktop → grille 3×2 ; Mobile → colonnes séparées
+    if (!isMobile) html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
+    else           html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'
+                         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+    // (sur mobile : 3 petits box en haut, puis âge + région + carte pleine largeur dessous)
 
     // ── Box 1 : Genre ──
     if (nbH+nbF > 0) {
@@ -6378,10 +6397,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html += '</div></div>';
     } else { html += emptyBox('✈️ Équipages'); }
 
+    // ── Ligne 2 mobile : ferme les 3 cols, ouvre une grille 2 cols ──
+    if (isMobile) {
+      html += '</div>'; // ferme la ligne 3 cols (Genre|Catégorie|Équipages)
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'; // ligne 2 : Âge + Régions
+    }
+
     // ── Box 4 : Tranches d'âge ──
+    var _ageBoxSt = isMobile ? boxSt.replace('min-height:150px','min-height:130px')+';align-items:stretch' : boxSt+';align-items:stretch';
     if (ageCount > 0) {
       var maxN = ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
-      html += '<div style="'+boxSt+';align-items:stretch">';
+      html += '<div style="'+_ageBoxSt+'">';
       html += '<div style="'+boxTitSt+'">Tranches d\'âge</div>';
       html += '<div style="display:flex;align-items:flex-end;gap:3px;height:72px;margin-top:4px">';
       ageBuckets.forEach(function(b){
@@ -6402,16 +6428,21 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Box 5 : Anneau régions (rempli par initInfosMaps) ──
     html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:150px"></div>';
 
+    // ── Ligne 3 mobile : ferme la grille 2 cols, carte pleine largeur ──
+    if (isMobile) html += '</div>'; // ferme la grille 2 cols (Âge + Régions)
+
     // ── Box 6 : Carte par région ──
+    var mapMinH = isMobile ? '220px' : '150px';
     if (pilotsWithRegion > 0) {
-      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:150px">';
-      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:150px"></div>';
+      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:'+mapMinH+'">';
+      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:'+mapMinH+'"></div>';
       html += '</div>';
     } else {
       html += emptyBox('🗺 Carte régions');
     }
 
-    html += '</div>'; // ferme grille 3×2
+    if (isMobile) html += '</div>'; // ferme le flex container mobile
+    else          html += '</div>'; // ferme la grille 3×2 desktop
     html += '</div>'; // ferme padding 0 14px graphiques
     // ── Podiums par classe ULM (run.classe) ──
     return html;
@@ -10808,6 +10839,26 @@ async function pullFromCloud() {
 
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
+
+  // ── Nettoyage doublons staff (entrées sans .id ou avec même pilotId) ──
+  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(cid) {
+      var seen = {};
+      S.staff[cid] = (S.staff[cid]||[]).filter(function(s) {
+        var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
+        if (seen[k]) return false; seen[k] = true; return true;
+      });
+    });
+  }
+
+  // ── Nettoyage doublons compétitions (même nom + même dateFrom) ──
+  if (S.comps && S.comps.length > 1) {
+    var compSeen = {};
+    S.comps = S.comps.filter(function(c) {
+      var k = (c.name||'').trim().toLowerCase()+'|'+(c.dateFrom||'');
+      if (compSeen[k]) return false; compSeen[k] = true; return true;
+    });
+  }
 
   // Restaurer les affiches/photos locales si absentes du cloud
   S.comps.forEach(function(c){  if (localAffiches[c.id] && !c.affiche) c.affiche = localAffiches[c.id]; });
