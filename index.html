@@ -3786,7 +3786,11 @@ function toggleMaterielCheck(compId, matId) {
       : ((S.staff||{})[compId]||[]);
     var cpObj = S.comps.find(function(c){ return c.id===compId; });
     var contentArea = document.getElementById('hdp-tab-content');
-    if (cpObj && contentArea) contentArea.innerHTML = renderHDPTabContent(cpObj,'materiel',runs,enrolled,staffList);
+    if (cpObj && contentArea) {
+      var scrollTop = contentArea.scrollTop;
+      contentArea.innerHTML = renderHDPTabContent(cpObj,'materiel',runs,enrolled,staffList);
+      contentArea.scrollTop = scrollTop;
+    }
   }
 }
 
@@ -16893,9 +16897,24 @@ function injectCalendrier2026() {
       region:'Occitanie', type:'entrainement', pratique:'paramoteur', discipline:'slalom',
       saison:'2026', desc:'Club : Terrain occasionnel · Référent : Pôle Sport · DC : Jean-Émile Oulha' }
   ];
+  // Dédoublonnage one-shot : supprimer les entrées injectées si une version
+  // utilisateur avec le même nom existe déjà sous un ID différent
+  var injectedIds = toAdd.map(function(c){ return c.id; });
+  toAdd.forEach(function(cp) {
+    var nameLower = (cp.name||'').trim().toLowerCase();
+    var userVersion = S.comps.find(function(x){
+      return x.id !== cp.id && (x.name||'').trim().toLowerCase() === nameLower;
+    });
+    if (userVersion) {
+      // Supprimer l'entrée injectée si elle existe déjà (doublon de nom)
+      S.comps = S.comps.filter(function(x){ return x.id !== cp.id; });
+    }
+  });
   var added = 0;
   toAdd.forEach(function(cp) {
-    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
+    var nameLower = (cp.name||'').trim().toLowerCase();
+    var nameExists = S.comps.find(function(x){ return (x.name||'').trim().toLowerCase() === nameLower; });
+    if (!nameExists && !S.comps.find(function(x){ return x.id === cp.id; })) {
       S.comps.push(cp);
       S.compEnroll = S.compEnroll || {};
       S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
