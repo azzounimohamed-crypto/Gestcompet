@@ -929,7 +929,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <!-- PAGE STAFF -->
     <div class="page" id="page-staff">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
-        <div style="font-size:18px;font-weight:700">Encadrants</div>
+        <div style="font-size:18px;font-weight:700">Staff</div>
         <button onclick="openNewStaffMemberModal()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
       </div>
       <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;margin:0 12px 8px;padding:0 12px;gap:6px">
@@ -1393,8 +1393,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button class="nav-btn" id="nav-pilots" aria-label="Compétiteurs" title="Compétiteurs" onclick="showPage('page-pilots')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7.5 7.5 0 0113 0"/><path d="M19 11l1.5 1.5L23 10"/></svg></span><span class="nav-lbl">Compétiteurs</span>
     </button>
-    <button class="nav-btn" id="nav-staff" aria-label="Encadrants" title="Encadrants" onclick="showPage('page-staff')">
-      <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Encadrants</span>
+    <button class="nav-btn" id="nav-staff" aria-label="Staff" title="Staff" onclick="showPage('page-staff')">
+      <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Staff</span>
     </button>
 
     <button class="nav-btn" id="nav-sites" aria-label="Sites sportifs" title="Sites sportifs" onclick="showPage('page-sites')">
@@ -2628,6 +2628,10 @@ async function loadState() {
           if (lp && ip.photo) lp.photo = ip.photo;
         });
         if (idbData.licenceDB) S.licenceDB = idbData.licenceDB;
+        // Restaurer deletedCompIds depuis IDB (clé critique pour suppression permanente)
+        if (idbData.deletedCompIds) {
+          S.deletedCompIds = Object.assign({}, idbData.deletedCompIds, S.deletedCompIds || {});
+        }
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
         Object.assign(S, idbData);
@@ -2670,7 +2674,7 @@ function saveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,deletedCompIds:S.deletedCompIds})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
@@ -5915,6 +5919,12 @@ function hdgAddStaff(compId) {
   // Forcer S.staff en objet (peut être un tableau dans les anciennes données)
   if (!S.staff || Array.isArray(S.staff)) S.staff={};
   if (!S.staff[compId]) S.staff[compId]=[];
+  // Empêcher doublon à l'insertion : même pilotId ou même prénom+nom
+  var _alreadyIn = S.staff[compId].some(function(x){
+    if (entry.pilotId && x.pilotId && entry.pilotId === x.pilotId) return true;
+    return (x.prenom||'').toLowerCase()===(entry.prenom||'').toLowerCase() && (x.nom||'').toLowerCase()===(entry.nom||'').toLowerCase() && x.prenom;
+  });
+  if (_alreadyIn) { toast('Cet encadrant est déjà dans la liste', ''); return; }
   S.staff[compId].push(entry);
   saveState(); silentPush();
   ['hdg-s-nom','hdg-s-role','hdg-s-lic','hdg-s-tel','hdg-s-email'].forEach(function(id){
@@ -5991,10 +6001,11 @@ function renderHomeDetailPanel(cp) {
       return x && (x.compId === cp.id || x.competitionId === cp.id || x.comp_id === cp.id);
     });
   }
-  // ── Dédoublonnage staff (pilotId ou prenom+nom) ──
+  // Dédoublonnage staff léger (affichage uniquement, sans modifier S.staff)
   var _staffSeen = {};
   staffList = staffList.filter(function(s) {
-    var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
+    var k = (s.id||'')+'|'+(s.pilotId||'')+'|'+(s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase();
+    if (!k || k === '|||') return true; // garder si pas de clé identifiable
     if (_staffSeen[k]) return false; _staffSeen[k] = true; return true;
   });
 
@@ -6545,6 +6556,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
     ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
     html5 += '</div>';
+    // ── Déduplication enrolled à la source ──
+    var _seenEnr = {};
+    var _enrolledClean = enrolled.filter(function(pid) {
+      if (!pid || _seenEnr[pid]) return false; _seenEnr[pid] = true; return true;
+    });
+    if (_enrolledClean.length !== enrolled.length) {
+      S.compEnroll[cp.id] = _enrolledClean;
+      enrolled = _enrolledClean;
+      saveState();
+    }
     // ── Zone scrollable ──
     html5 += '<div style="flex:1;overflow-y:auto">';
     // Ligne de saisie
@@ -10148,117 +10169,116 @@ function deleteSite() {
 function renderStaffList() {
   var cont = document.getElementById('staff-list'); if (!cont) return;
   var staffObj = (!S.staff || Array.isArray(S.staff)) ? {} : S.staff;
-  // Agréger toutes les compétitions ayant du staff
-  var groups = [];
-  Object.keys(staffObj).forEach(function(compId) {
-    var entries = staffObj[compId] || [];
-    if (!entries.length) return;
-    var comp = (S.comps||[]).find(function(c){ return c.id === compId; });
-    groups.push({ comp:comp, compId:compId, entries:entries });
+
+  // ── Agréger tous les individus, dédoublonner par pilotId ou prenom+nom ──
+  var personMap = {}; // clé → {prenom, nom, photo, licence, tel, email, roles:[], compId, idx}
+  Object.keys(staffObj).forEach(function(cid) {
+    (staffObj[cid] || []).forEach(function(e, ei) {
+      var pilot = (S.pilots||[]).find(function(p){ return p.id === e.pilotId; }) || {};
+      var prenom = (pilot.prenom || e.prenom || '').trim();
+      var nom    = (pilot.nom    || e.nom    || '').trim();
+      // Clé TOUJOURS par nom normalisé — jamais par ID — pour fusionner entrées avec/sans pilotId
+      var key = prenom.toLowerCase().replace(/\s+/g,' ') + '|' + nom.toLowerCase().replace(/\s+/g,' ');
+      if (!key || key === '|') return;
+      if (!personMap[key]) {
+        personMap[key] = {
+          key: key,
+          prenom: prenom,
+          nom: nom,
+          photo: pilot.photo || e.photo || '',
+          licence: pilot.licence || e.licence || '',
+          tel: pilot.tel || e.tel || '',
+          email: pilot.email || e.email || '',
+          roles: [],
+          compId: cid,  // première compétition trouvée → pour ouvrir le détail
+          idx: ei
+        };
+      }
+      var role = (e.role || '').trim();
+      if (role && personMap[key].roles.indexOf(role) === -1) {
+        personMap[key].roles.push(role);
+      }
+      if (pilot.photo && !personMap[key].photo)   personMap[key].photo   = pilot.photo;
+      if (pilot.tel   && !personMap[key].tel)      personMap[key].tel     = pilot.tel;
+      if (pilot.email && !personMap[key].email)    personMap[key].email   = pilot.email;
+    });
   });
-  // Filtrer par recherche
+
+  // Enrichir avec photo/infos des pilots (même clé prenom|nom)
+  (S.pilots||[]).forEach(function(p) {
+    var key = (p.prenom||'').trim().toLowerCase().replace(/\s+/g,' ')+'|'+(p.nom||'').trim().toLowerCase().replace(/\s+/g,' ');
+    if (!key || key === '|') return;
+    if (personMap[key]) {
+      // Enrichir si manquant
+      if (p.photo   && !personMap[key].photo)   personMap[key].photo   = p.photo;
+      if (p.tel     && !personMap[key].tel)      personMap[key].tel     = p.tel;
+      if (p.email   && !personMap[key].email)    personMap[key].email   = p.email;
+      if (p.licence && !personMap[key].licence)  personMap[key].licence = p.licence;
+    } else if (p.statut === 'staff') {
+      // Pilot staff non encore dans la liste
+      personMap[key] = {
+        key: key,
+        prenom: (p.prenom||'').trim(),
+        nom: (p.nom||'').trim(),
+        photo: p.photo || '',
+        licence: p.licence || '',
+        tel: p.tel || '',
+        email: p.email || '',
+        roles: p.role ? [p.role] : [],
+        compId: '', idx: 0
+      };
+    }
+  });
+
+  var persons = Object.keys(personMap).map(function(k){ return personMap[k]; });
+
+  // ── Filtrer par recherche ──
   if (_staffSearch) {
     var sq = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    groups.forEach(function(g){
-      g.entries = g.entries.filter(function(e){
-        var pilot = (S.pilots||[]).find(function(p){ return p.id === (e.pilotId||e.id); }) || {};
-        var hay = [
-          (pilot.prenom||e.prenom||''),
-          (pilot.nom||e.nom||''),
-          (e.role||''),
-          (pilot.club||e.club||''),
-          (pilot.email||e.email||'')
-        ].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        return hay.indexOf(sq) !== -1;
-      });
-    });
-    groups = groups.filter(function(g){ return g.entries.length > 0; });
-  }
-  // Trier par date décroissante
-  groups.sort(function(a, b) {
-    var da = a.comp ? (a.comp.dateFrom||'') : '';
-    var db = b.comp ? (b.comp.dateFrom||'') : '';
-    return db.localeCompare(da);
-  });
-  // ── Membres staff globaux (statut='staff' dans S.pilots, non assignés à une compét) ──
-  var _allAssignedIds = [];
-  Object.keys(staffObj).forEach(function(cid){ (staffObj[cid]||[]).forEach(function(e){ if(e.pilotId||e.id) _allAssignedIds.push(e.pilotId||e.id); }); });
-  var _globalStaffPilots = (S.pilots||[]).filter(function(p){ return p.statut === 'staff' && _allAssignedIds.indexOf(p.id) === -1; });
-  if (_staffSearch) {
-    var sq2 = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    _globalStaffPilots = _globalStaffPilots.filter(function(p){
-      return [(p.prenom||''),(p.nom||''),(p.role||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(sq2) !== -1;
+    persons = persons.filter(function(p) {
+      var hay = [p.prenom, p.nom, p.roles.join(' '), p.tel, p.email, p.licence].join(' ')
+        .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      return hay.indexOf(sq) !== -1;
     });
   }
-  if (!groups.length && !_globalStaffPilots.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+ (_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' : 'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong> pour créer un membre') +'</div>';
+
+  if (!persons.length) {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+
+      (_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' :
+       'Aucun membre de staff — utilisez <strong>+ Nouveau</strong> pour en ajouter un') +'</div>';
     return;
   }
-  var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
-  var html = '';
-  // Bloc "Membres" (staff global non assigné)
-  if (_globalStaffPilots.length) {
-    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">Membres staff</div>';
-    html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">Non assignés à une compétition spécifique</div>';
-    html += '</div>';
-    _globalStaffPilots.forEach(function(p) {
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)">';
-      if (p.photo) {
-        html += '<img src="'+p.photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">';
-      } else {
-        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((p.prenom||'?')[0]).toUpperCase()+'</div>';
-      }
-      html += '<div style="flex:1;min-width:0">';
-      html += '<div style="font-size:13px;font-weight:700">'+((p.prenom||'')+' '+(p.nom||'')).trim()+'</div>';
-      if (p.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+p.role+'</div>';
-      var dets=[]; if(p.licence) dets.push('Lic. '+p.licence); if(p.tel) dets.push('📞 '+p.tel); if(p.email) dets.push('✉️ '+p.email);
-      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
-      html += '</div>';
-      html += '</div>';
-    });
-  }
-  groups.forEach(function(g) {
-    var comp = g.comp;
-    var compName = comp ? comp.name : 'Compétition inconnue';
-    var compDate = comp ? formatDate(comp.dateFrom) + (comp.dateTo && comp.dateTo !== comp.dateFrom ? ' — ' + formatDate(comp.dateTo) : '') : '';
-    // En-tête compétition
-    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">' + compName + '</div>';
-    if (compDate) html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">' + compDate + '</div>';
-    html += '</div>';
-    g.entries.forEach(function(s, si) {
-      var pilot  = (S.pilots||[]).find(function(p){ return p.id === (s.pilotId||s.id); }) || {};
-      var prenom = pilot.prenom || s.prenom || '';
-      var nom    = pilot.nom    || s.nom    || '';
-      var photo  = pilot.photo  || s.photo  || '';
-      var tel    = pilot.tel    || s.tel    || '';
-      var email  = pilot.email  || s.email  || '';
-      var lic    = pilot.licence || s.licence || '';
-      html += '<div onclick="showStaffDetailModal(\''+g.compId+'\','+si+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
-      // Avatar
-      if (photo) {
-        html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+((prenom[0]||'?').toUpperCase())+'</div>\'">';
-      } else {
-        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((prenom[0]||'?').toUpperCase())+'</div>';
-      }
-      // Infos
-      html += '<div style="flex:1;min-width:0">';
-      html += '<div style="font-size:13px;font-weight:700">'+(prenom+' '+nom).trim()+'</div>';
-      if (s.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+s.role+'</div>';
-      var dets=[];
-      if (lic)   dets.push('Lic. '+lic);
-      if (tel)   dets.push('📞 '+tel);
-      if (email) dets.push('✉️ '+email);
-      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
-      html += '</div>';
-      if (canEdit) {
-        html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+g.compId+'\','+si+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Retirer">×</button>';
-      }
-      html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
-      html += '</div>';
-    });
+
+  // ── Trier par nom puis prénom ──
+  persons.sort(function(a, b) {
+    return ((a.nom||'')+(a.prenom||'')).localeCompare((b.nom||'')+(b.prenom||''), 'fr');
   });
+
+  var html = '';
+  persons.forEach(function(p) {
+    var initiale = ((p.prenom[0]||p.nom[0]||'?')).toUpperCase();
+    var cidE = escH(p.compId||'');
+    html += '<div data-cid="'+cidE+'" data-idx="'+p.idx+'" onclick="showStaffDetailModal(this.dataset.cid,parseInt(this.dataset.idx))" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
+    if (p.photo) {
+      html += '<img src="'+escH(p.photo)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">';
+    } else {
+      html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+initiale+'</div>';
+    }
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:13px;font-weight:700">'+escH((p.prenom+' '+p.nom).trim())+'</div>';
+    if (p.roles.length) {
+      html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+p.roles.map(escH).join(' · ')+'</div>';
+    }
+    var dets = [];
+    if (p.licence) dets.push('Lic. '+escH(p.licence));
+    if (p.tel)     dets.push('📞 '+escH(p.tel));
+    if (p.email)   dets.push('✉️ '+escH(p.email));
+    if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
+    html += '</div>';
+    html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
+    html += '</div>';
+  });
+
   cont.innerHTML = html;
 }
 
@@ -13951,17 +13971,50 @@ function saveStaffDetail(compId, idx) {
   var g=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
   var entry = staffObj[compId][idx];
   // Mise à jour de l'entrée staff
-  entry.genre   = g('sdm-genre');
-  entry.prenom  = g('sdm-prenom') || entry.prenom;
-  entry.nom     = g('sdm-nom')    || entry.nom;
-  entry.role    = g('sdm-role');
-  entry.licence = g('sdm-lic');
-  entry.tel     = g('sdm-tel');
-  entry.email   = g('sdm-email');
-  entry.club    = g('sdm-club');
-  entry.region  = g('sdm-region');
-  entry.adresse = g('sdm-adresse');
-  entry.ddn     = g('sdm-ddn');
+  var newGenre  = g('sdm-genre');
+  var newPrenom = g('sdm-prenom') || entry.prenom;
+  var newNom    = g('sdm-nom')    || entry.nom;
+  var newRole   = g('sdm-role');
+  var newLic    = g('sdm-lic');
+  var newTel    = g('sdm-tel');
+  var newEmail  = g('sdm-email');
+  var newClub   = g('sdm-club');
+  var newRegion = g('sdm-region');
+  var newAdresse= g('sdm-adresse');
+  var newDdn    = g('sdm-ddn');
+
+  // ── Propager à TOUTES les entrées du même individu dans toutes les compétitions ──
+  var matchKey = entry.pilotId || (newPrenom.toLowerCase()+'|'+newNom.toLowerCase());
+  Object.keys(staffObj).forEach(function(cid) {
+    (staffObj[cid]||[]).forEach(function(e) {
+      var eKey = e.pilotId || ((e.prenom||'').toLowerCase()+'|'+(e.nom||'').toLowerCase());
+      if (eKey !== matchKey) return;
+      if (newGenre)   e.genre   = newGenre;
+      if (newPrenom)  e.prenom  = newPrenom;
+      if (newNom)     e.nom     = newNom;
+      e.role    = newRole;   // rôle TOUJOURS propagé (même vide)
+      if (newLic)     e.licence = newLic;
+      if (newTel)     e.tel     = newTel;
+      if (newEmail)   e.email   = newEmail;
+      if (newClub)    e.club    = newClub;
+      if (newRegion)  e.region  = newRegion;
+      if (newAdresse) e.adresse = newAdresse;
+      if (newDdn)     e.ddn     = newDdn;
+      if (_sdmPhotoData) e.photo = _sdmPhotoData;
+    });
+  });
+
+  entry.genre   = newGenre;
+  entry.prenom  = newPrenom;
+  entry.nom     = newNom;
+  entry.role    = newRole;
+  entry.licence = newLic;
+  entry.tel     = newTel;
+  entry.email   = newEmail;
+  entry.club    = newClub;
+  entry.region  = newRegion;
+  entry.adresse = newAdresse;
+  entry.ddn     = newDdn;
   if (_sdmPhotoData) { entry.photo = _sdmPhotoData; }
   // Propagation vers le profil pilote lié
   if (entry.pilotId) {
@@ -14233,8 +14286,8 @@ function exportCompFull(compId) {
     _type: 'comp_full', _exportDate: new Date().toISOString(),
     comp:       cp,
     compEnroll: (S.compEnroll||{})[compId] || [],
-    runs:       (S.runs||[]).filter(function(r){ return r.compId===compId; }),
-    staff:      (S.staff||[]).filter(function(s){ return s.compId===compId; }),
+    runs:       (S.runs||{})[compId] || [],
+    staff:      (S.staff && !Array.isArray(S.staff)) ? (S.staff[compId]||[]) : ((S.staff||[]).filter(function(s){ return s&&(s.compId===compId); })),
     materiel:   (S.materiel||{})[compId] || [],
     evenements:  (S.evenements||{})[compId] || [],
     budgets:     (S.budgets||{})[compId] || {engagement:[],ressources:[]},
@@ -14246,7 +14299,10 @@ function exportCompFull(compId) {
   a.href = URL.createObjectURL(blob);
   var safeName = (cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_');
   a.download = 'comp_' + safeName + '_' + new Date().toISOString().substring(0,10) + '.json';
-  a.click(); URL.revokeObjectURL(a.href);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
   toast('Export compétition téléchargé ✓', 'ok');
 }
 
@@ -16908,17 +16964,29 @@ function injectCalendrier2026() {
   var deleted = S.deletedCompIds || {};
   var added = 0;
   toAdd.forEach(function(cp) {
-    if (deleted[cp.id]) return; // supprimée définitivement par l'utilisateur
-    var nameLower = (cp.name||'').trim().toLowerCase();
-    // Si une compétition avec le même nom existe déjà (quel que soit l'ID), ne pas injecter
-    var nameExists = S.comps.find(function(x){ return (x.name||'').trim().toLowerCase() === nameLower; });
-    if (nameExists) return;
-    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
-      S.comps.push(cp);
-      S.compEnroll = S.compEnroll || {};
-      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
-      added++;
+    if (deleted[cp.id]) return;
+    // Doublon si même ID déjà présent
+    if (S.comps.find(function(x){ return x.id === cp.id; })) return;
+    // Doublon si même dateFrom + dateTo + pratique + discipline déjà présent
+    var sameEvent = S.comps.find(function(x){
+      return x.dateFrom === cp.dateFrom
+          && x.dateTo   === cp.dateTo
+          && (x.pratique||'')   === (cp.pratique||'')
+          && (x.discipline||'') === (cp.discipline||'');
+    });
+    if (sameEvent) {
+      // Bloquer définitivement cet ID injecté pour ne plus le revoir
+      S.deletedCompIds = S.deletedCompIds || {};
+      S.deletedCompIds[cp.id] = true;
+      return;
     }
+    // Doublon par nom exact
+    var nameLower = (cp.name||'').trim().toLowerCase();
+    if (S.comps.find(function(x){ return (x.name||'').trim().toLowerCase() === nameLower; })) return;
+    S.comps.push(cp);
+    S.compEnroll = S.compEnroll || {};
+    S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+    added++;
   });
   if (added > 0) saveState();
 }
@@ -17071,8 +17139,42 @@ function injectCalendrierFull() {
   saveState();
 }
 
+function _purgeAllDuplicates() {
+  var dirty = false;
+  // ── 1. S.staff : supprimer doublons dans chaque compétition ──
+  if (S.staff && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(compId) {
+      var arr = S.staff[compId];
+      if (!Array.isArray(arr)) return;
+      var seen = {};
+      var clean = arr.filter(function(e) {
+        var k = (e.prenom||'').trim().toLowerCase().replace(/\s+/g,' ')+'|'+(e.nom||'').trim().toLowerCase().replace(/\s+/g,' ');
+        if (!k || k === '|') return true;
+        if (seen[k]) { dirty = true; return false; }
+        seen[k] = true; return true;
+      });
+      if (clean.length !== arr.length) S.staff[compId] = clean;
+    });
+  }
+  // ── 2. S.compEnroll : supprimer IDs en double dans chaque compétition ──
+  if (S.compEnroll) {
+    Object.keys(S.compEnroll).forEach(function(compId) {
+      var arr = S.compEnroll[compId];
+      if (!Array.isArray(arr)) return;
+      var seen = {};
+      var clean = arr.filter(function(id) {
+        if (!id || seen[id]) { dirty = true; return false; }
+        seen[id] = true; return true;
+      });
+      if (clean.length !== arr.length) S.compEnroll[compId] = clean;
+    });
+  }
+  if (dirty) saveState();
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
   await loadState();
+  _purgeAllDuplicates();
   injectMaisoncelles2026();
   injectCalendrier2026();
   injectCalendrierFull();
