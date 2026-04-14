@@ -7175,7 +7175,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Coût = Valeur × Nb jours × Qt
     var computeCout = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var calcTotal = function(lines){ return lines.reduce(function(s,l){ return s+computeCout(l); }, 0); };
-    var BGRID = 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
+    var _bMob  = window.innerWidth < 768;
+    var BGRID = _bMob
+      ? 'grid-template-columns:minmax(0,1.4fr) minmax(0,1.6fr) 54px 40px 40px 64px 26px 26px'
+      : 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
     var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
     // Sous-onglets + boutons actions dans la même barre
@@ -7200,7 +7203,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var nInpInt  = 'type="number" min="1" step="1"';
       var calcEvt  = function(lid){ return 'recalcBudgetCout(\''+cp.id+'\',\''+section+'\',\''+lid+'\')'; };
       // ── En-tête colonnes ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:540px;flex-shrink:0">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);'+(_bMob?'':'min-width:540px;')+'flex-shrink:0">';
       htmlB += '<div style="'+hStyle+'">Domaine</div>';
       htmlB += '<div style="'+hStyle+'">Libellé</div>';
       htmlB += '<div style="'+hStyle+';text-align:right">Valeur</div>';
@@ -7210,7 +7213,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<div></div><div></div>';
       htmlB += '</div>';
       // ── Ligne de saisie (même système que Staff/Equipage) ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:540px;position:relative">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;'+(_bMob?'':'min-width:540px;')+'position:relative">';
       htmlB += '<div style="position:relative">';
       htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyle+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
       htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
@@ -7237,7 +7240,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           var isOpen   = !!_bgtOpenDomains[domKey];
           var chevron  = isOpen ? '▾' : '▸';
           // Ligne récapitulative du groupe
-          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:540px;background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
+          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;'+(_bMob?'':'min-width:540px;')+'background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
           htmlB += '<div style="font-size:12px;font-weight:800;color:var(--stol);display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-size:11px">'+chevron+'</span>'+bEsc(dom)+'</div>';
           htmlB += '<div style="font-size:11px;color:var(--txt3);font-style:italic">'+grpLines.length+' ligne'+(grpLines.length>1?'s':'')+'</div>';
           htmlB += '<div></div><div></div><div></div>';
@@ -7249,7 +7252,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
             grpLines.forEach(function(l, i){
               var bg = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
               var coutCalc = computeCout(l);
-              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:540px;border-bottom:1px solid rgba(255,255,255,0.04)">';
+              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';'+(_bMob?'':'min-width:540px;')+'border-bottom:1px solid rgba(255,255,255,0.04)">';
               htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
               htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
@@ -13491,8 +13494,16 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   });
   hist.sort(function(a,b){ return b.comp.dateFrom.localeCompare(a.comp.dateFrom); });
 
-  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
-  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
+  var _pdmMob = window.innerWidth < 768;
+  var _pdmOvSt = _pdmMob
+    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
+    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var _pdmPanSt = _pdmMob
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;height:70vh;position:relative;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1);display:flex;flex-direction:column'
+    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
+  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_pdmOvSt+'">';
+  html += '<div style="'+_pdmPanSt+'">';
+  if (_pdmMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px;flex-shrink:0"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13504,7 +13515,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="padding:7px 14px;background:var(--stol);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>';
     html += '</div>';
     html += '</div>';
-    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px">';
+    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto">';
 
     var secSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px';
 
@@ -13676,7 +13687,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</div>';
 
     // Corps
-    html += '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">';
+    html += '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto">';
 
     // Section Identité
     html += '<div><div style="'+vSec+'">Identité</div>';
@@ -14664,12 +14675,52 @@ function openMaterielModal(compId, matId) {
   var prev = g('mat-modal-photo-prev');
   if(prev){ prev.src = m.photo||''; prev.style.display = m.photo ? '' : 'none'; }
   var sh = g('sheet-materiel');
-  if(sh){ sh.style.display='flex'; setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10); }
+  if (!sh) return;
+  var isMob = window.innerWidth < 768;
+  var inner = sh.firstElementChild;
+  if (isMob) {
+    // Bottom sheet mobile : surgit du bas, 70% hauteur
+    sh.style.cssText = 'display:flex;opacity:0;position:fixed;inset:0;z-index:3000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)';
+    if (inner) inner.style.cssText = 'background:var(--navy2);border-radius:16px 16px 0 0;padding:0;width:100%;height:70vh;overflow-y:auto;box-shadow:0 -4px 30px rgba(0,0,0,.4);transform:translateY(100%);transition:transform .28s cubic-bezier(.22,.9,.2,1)';
+    // Ajouter la poignée si pas déjà présente
+    var handle = sh.querySelector('.mat-sheet-handle');
+    if (!handle && inner) {
+      handle = document.createElement('div');
+      handle.className = 'mat-sheet-handle';
+      handle.style.cssText = 'display:flex;justify-content:center;padding:10px 0 6px;flex-shrink:0';
+      handle.innerHTML = '<div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div>';
+      inner.insertBefore(handle, inner.firstChild);
+    }
+    // Wrapper scrollable pour le contenu
+    var wrap = inner.querySelector('.mat-sheet-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'mat-sheet-wrap';
+      wrap.style.cssText = 'padding:0 20px 24px;display:flex;flex-direction:column;gap:12px';
+      while (inner.children.length > 1) wrap.appendChild(inner.children[1]);
+      inner.appendChild(wrap);
+    }
+    setTimeout(function(){ sh.style.opacity='1'; if(inner) inner.style.transform='translateY(0)'; }, 10);
+  } else {
+    // Modal centré desktop
+    sh.style.cssText = 'display:flex;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+    if (inner) inner.style.cssText = 'background:var(--navy2);border-radius:16px;padding:24px;width:min(480px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)';
+    setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10);
+  }
 }
 
 function closeMaterielModal() {
   var sh = document.getElementById('sheet-materiel');
-  if (sh) { sh.style.opacity='0'; sh.style.transform='translateY(20px)'; setTimeout(function(){ sh.style.display='none'; }, 200); }
+  if (!sh) return;
+  var inner = sh.firstElementChild;
+  if (window.innerWidth < 768 && inner) {
+    inner.style.transform = 'translateY(100%)';
+    sh.style.opacity = '0';
+    setTimeout(function(){ sh.style.display='none'; }, 300);
+  } else {
+    sh.style.opacity='0'; sh.style.transform='translateY(20px)';
+    setTimeout(function(){ sh.style.display='none'; }, 200);
+  }
 }
 
 function saveMaterielSheet() {
@@ -14687,7 +14738,7 @@ function saveMaterielSheet() {
   m.marque    = g('mat-modal-marque');
   m.modele    = g('mat-modal-modele');
   // photo handled by mat-modal-file-input
-  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeMaterielModal(); saveState(); silentPush(); _matRefreshView();
   toast('Matériel enregistré ✓','ok');
 }
 
@@ -14698,8 +14749,17 @@ function deleteMaterielFromModal() {
   if (S.materiel && S.materiel[compId]) {
     S.materiel[compId] = S.materiel[compId].filter(function(m){ return m.id !== matId; });
   }
-  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeMaterielModal(); saveState(); silentPush(); _matRefreshView();
   toast('Matériel supprimé','');
+}
+
+function _matRefreshView() {
+  var ov = document.getElementById('overlay-comp-mobile');
+  if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
+    renderMobileCompDetail();
+  } else {
+    renderHomeDetailPanel(null);
+  }
 }
 
 function matHandlePhoto(input) {
