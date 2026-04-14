@@ -6588,6 +6588,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!enrolled.length) {
       html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">Tapez les premières lettres du prénom pour inscrire un pilote</div>';
     }
+    var _isMobEquip = window.innerWidth < 768;
     enrolled.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
@@ -6600,17 +6601,44 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       // Couleurs Équipages
       var equVal = (p.equipage||'').trim();
       var equStyle = equVal==='Biplace'?'color:#10b981;font-weight:600':equVal==='Monoplace'?'color:#8b5cf6;font-weight:600':'color:var(--txt3)';
-      html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
-      html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
-      html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
-      html5 += '</div>';
+
+      if (_isMobEquip) {
+        // ── Affichage carte mobile ──
+        var initials = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
+        var fullName = escG((p.prenom||'')+' '+(p.nom||'').toUpperCase());
+        html5 += '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:64px;border-bottom:1px solid var(--bdr);'+bg+';cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
+        // Avatar
+        html5 += '<div style="width:44px;height:44px;border-radius:50%;background:var(--stol);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+initials+'</div>';
+        // Infos (colonne principale)
+        html5 += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">';
+        // Ligne 1 : Nom en gras (gauche) + Catégorie (droite)
+        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
+        html5 += '<div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName+'</div>';
+        html5 += '<div style="font-size:12px;font-weight:700;flex-shrink:0;'+catStyle+'">'+(catVal||'—')+'</div>';
+        html5 += '</div>';
+        // Ligne 2 : Licence (gauche) + Équipage (milieu/droite)
+        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
+        html5 += '<div style="font-size:11px;color:var(--txt2);white-space:nowrap">🪪 '+(p.licence||'—')+'</div>';
+        html5 += '<div style="font-size:11px;flex-shrink:0;'+equStyle+'">'+(equVal||'—')+'</div>';
+        html5 += '</div>';
+        html5 += '</div>';
+        // Bouton supprimer
+        html5 += '<div onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+';font-size:20px;padding:4px 6px" title="Retirer">×</button></div>';
+        html5 += '</div>';
+      } else {
+        // ── Affichage grille desktop ──
+        html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
+        html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
+        html5 += '</div>';
+      }
     });
     html5 += '</div>';
     return html5;
@@ -6897,18 +6925,55 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!compStaffG2.length) {
       html3 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditS ? 'Tapez les premières lettres du prénom pour ajouter un encadrant' : 'Aucun encadrement enregistré pour cette compétition')+'</div>';
     }
+    var _isMobStaff = window.innerWidth < 768;
     compStaffG2.forEach(function(s, si){
-      var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
-      var nom   = escS(((pilot.prenom||s.prenom||'')+' '+(pilot.nom||s.nom||'')).trim());
-      var bg    = si%2===1 ? 'var(--navy3)' : 'transparent';
-      html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
-      html3 += '<div style="'+_dStS+';font-weight:600">'+nom+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.licence||s.licence||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.tel||s.tel||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.email||s.email||'—')+'</div>';
-      html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
-      html3 += '</div>';
+      var pilot  = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
+      var prenom = (pilot.prenom || s.prenom || '').trim();
+      var nom    = (pilot.nom    || s.nom    || '').trim();
+      var nomAff = escS(prenom + (nom ? ' ' + nom.toUpperCase() : ''));
+      var licVal = pilot.licence || s.licence || '—';
+      var telVal = pilot.tel   || s.tel   || '';
+      var emlVal = pilot.email || s.email || '';
+      var roleVal = s.role || '—';
+      var bg = si%2===1 ? 'var(--navy3)' : 'transparent';
+
+      if (_isMobStaff) {
+        // ── Carte mobile ──
+        var initials = ((prenom[0]||'?')+(nom[0]||'?')).toUpperCase();
+        html3 += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;min-height:72px;border-bottom:1px solid var(--bdr);background:'+bg+';cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" title="Modifier">';
+        // Avatar
+        html3 += '<div style="width:44px;height:44px;border-radius:50%;background:var(--stol);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">'+initials+'</div>';
+        // Bloc infos
+        html3 += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">';
+        // Ligne 1 : Nom en gras (gauche) + Licence (droite)
+        html3 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
+        html3 += '<div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nomAff+'</div>';
+        html3 += '<div style="font-size:11px;color:var(--txt2);flex-shrink:0;white-space:nowrap">🪪 '+escS(licVal)+'</div>';
+        html3 += '</div>';
+        // Ligne 2 : Fonction (gauche, colorée)
+        html3 += '<div style="font-size:12px;font-weight:600;color:var(--stol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escS(roleVal)+'</div>';
+        // Ligne 3 : Contacts (si renseignés)
+        if (telVal || emlVal) {
+          html3 += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:1px">';
+          if (telVal) html3 += '<div style="font-size:11px;color:var(--txt2)">📞 '+escS(telVal)+'</div>';
+          if (emlVal) html3 += '<div style="font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;min-width:0">✉ '+escS(emlVal)+'</div>';
+          html3 += '</div>';
+        }
+        html3 += '</div>';
+        // Bouton supprimer / flèche
+        html3 += '<div style="flex-shrink:0;display:flex;align-items:center" onclick="event.stopPropagation()">'+(canEditS ? '<button onclick="hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+';font-size:20px;padding:4px 6px" title="Retirer">×</button>' : '<span style="font-size:14px;color:var(--txt3)">›</span>')+'</div>';
+        html3 += '</div>';
+      } else {
+        // ── Grille desktop ──
+        html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
+        html3 += '<div style="'+_dStS+';font-weight:600">'+nomAff+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+escS(roleVal)+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(licVal)+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(telVal||'—')+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(emlVal||'—')+'</div>';
+        html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
+        html3 += '</div>';
+      }
     });
     html3 += '</div>';
     return html3;
@@ -17148,12 +17213,16 @@ function _purgeAllDuplicates() {
       if (!Array.isArray(arr)) return;
       var seen = {};
       var clean = arr.filter(function(e) {
-        var k = (e.prenom||'').trim().toLowerCase().replace(/\s+/g,' ')+'|'+(e.nom||'').trim().toLowerCase().replace(/\s+/g,' ');
-        if (!k || k === '|') return true;
+        // Résoudre le nom depuis S.pilots si l'entrée n'a que pilotId (prenom/nom vides)
+        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id === e.pilotId; })||{}) : {};
+        var prenom = (pilot.prenom || e.prenom || '').trim().toLowerCase().replace(/\s+/g,' ');
+        var nom    = (pilot.nom    || e.nom    || '').trim().toLowerCase().replace(/\s+/g,' ');
+        var k = prenom + '|' + nom;
+        if (!k || k === '|') return true; // pas de nom identifiable → garder
         if (seen[k]) { dirty = true; return false; }
         seen[k] = true; return true;
       });
-      if (clean.length !== arr.length) S.staff[compId] = clean;
+      if (clean.length !== arr.length) { S.staff[compId] = clean; dirty = true; }
     });
   }
   // ── 2. S.compEnroll : supprimer IDs en double dans chaque compétition ──
@@ -17169,6 +17238,16 @@ function _purgeAllDuplicates() {
       if (clean.length !== arr.length) S.compEnroll[compId] = clean;
     });
   }
+  // Déduplication S.comps : supprimer doublons par dateFrom+dateTo+pratique+discipline
+  var seenComps = {};
+  var cleanComps = (S.comps||[]).filter(function(c) {
+    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
+    if (k === '|||') return true; // pas assez de données pour dédupliquer
+    if (seenComps[k]) { dirty = true; return false; }
+    seenComps[k] = true; return true;
+  });
+  if (cleanComps.length !== (S.comps||[]).length) S.comps = cleanComps;
+
   if (dirty) saveState();
 }
 
@@ -17312,24 +17391,43 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // ─── Compétitions STOL 2026 pré-chargées (calendrier officiel FFPLUM)
   var STOL2026 = [
-    {id:'stol2026-1', name:'Régionale STOL — La Réole', dateFrom:'2026-05-02', dateTo:'2026-05-03', oaci:'LFDE', region:'Nouvelle-Aquitaine', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
-    {id:'stol2026-2', name:'Championnat de France STOL — Belmont/Rance', dateFrom:'2026-07-03', dateTo:'2026-07-04', oaci:'LFCR', region:'Occitanie', type:'cdf', saison:'2026', desc:'Championnat de France Microlight STOL — Belmont-sur-Rance', affiche:''},
-    {id:'stol2026-3', name:'Régionale STOL — La Ferté-Gaucher', dateFrom:'2026-07-06', dateTo:'2026-07-07', oaci:'LFFE', region:'Île-de-France', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
-    {id:'stol2026-4', name:'Régionale Para-STOL — Plouharnel', dateFrom:'2026-07-25', dateTo:'2026-07-26', oaci:'LFEY', region:'Bretagne', type:'regional', saison:'2026', desc:'Manche régionale Para-STOL', affiche:''},
-    {id:'stol2026-5', name:'Régionale STOL — Argenton', dateFrom:'2026-09-12', dateTo:'2026-09-13', oaci:'LFLV', region:'Bourgogne-Franche-Comté', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''}
+    {id:'stol2026-1', name:'Régionale STOL — La Réole', dateFrom:'2026-05-02', dateTo:'2026-05-03', oaci:'LFDE', region:'Nouvelle-Aquitaine', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
+    {id:'stol2026-2', name:'Championnat de France STOL — Belmont/Rance', dateFrom:'2026-07-03', dateTo:'2026-07-04', oaci:'LFCR', region:'Occitanie', type:'cdf', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Championnat de France Microlight STOL — Belmont-sur-Rance', affiche:''},
+    {id:'stol2026-3', name:'Régionale STOL — La Ferté-Gaucher', dateFrom:'2026-07-06', dateTo:'2026-07-07', oaci:'LFFE', region:'Île-de-France', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
+    {id:'stol2026-4', name:'Régionale Para-STOL — Plouharnel', dateFrom:'2026-07-25', dateTo:'2026-07-26', oaci:'LFEY', region:'Bretagne', type:'regional', pratique:'paramoteur', discipline:'stol', saison:'2026', desc:'Manche régionale Para-STOL', affiche:''},
+    {id:'stol2026-5', name:'Régionale STOL — Argenton', dateFrom:'2026-09-12', dateTo:'2026-09-13', oaci:'LFLV', region:'Bourgogne-Franche-Comté', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''}
   ];
   // Ajouter uniquement celles qui n'existent pas déjà
+  var _stol2026Changed = false;
+  S.deletedCompIds = S.deletedCompIds || {};
   STOL2026.forEach(function(comp) {
+    // 1. Respecter la suppression définitive
+    if (S.deletedCompIds[comp.id]) return;
     var existing = S.comps.find(function(c){ return c.id === comp.id; });
     if (!existing) {
+      // 2. Vérifier doublon par dateFrom+dateTo+pratique+discipline
+      var sameEvent = S.comps.find(function(x) {
+        return x.dateFrom === comp.dateFrom && x.dateTo === comp.dateTo
+            && (x.pratique||'') === (comp.pratique||'')
+            && (x.discipline||'') === (comp.discipline||'');
+      });
+      if (sameEvent) {
+        // Bloquer cet ID définitivement pour éviter re-injection future
+        S.deletedCompIds[comp.id] = true;
+        _stol2026Changed = true;
+        return;
+      }
       S.comps.push(comp);
+      _stol2026Changed = true;
     } else {
-      // Préserver les données utilisateur (affiche, desc modifiés) — ne mettre à jour que les champs fixes
+      // Préserver les données utilisateur — ne mettre à jour que les champs fixes absents
       if (!existing.oaci && comp.oaci) existing.oaci = comp.oaci;
       if (!existing.region && comp.region) existing.region = comp.region;
+      if (!existing.pratique && comp.pratique) { existing.pratique = comp.pratique; _stol2026Changed = true; }
+      if (!existing.discipline && comp.discipline) { existing.discipline = comp.discipline; _stol2026Changed = true; }
     }
   });
-  saveState();
+  if (_stol2026Changed) saveState();
 
   // Initialiser S.messages si absent
   if (!S.messages) S.messages = [];
