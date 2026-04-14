@@ -311,6 +311,7 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
 /* ── Page Compétition Mobile ── */
 #overlay-comp-mobile{animation:slideInRight .28s cubic-bezier(.22,.9,.2,1)}
 @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes slideUpSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
 #mcd-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 /* Points de navigation pilules */
 #mcd-dots{display:flex;align-items:center;gap:4px;padding:0 2px}
@@ -5950,12 +5951,7 @@ async function hdgRemoveStaff(compId, idx) {
   if(!S.staff[compId]) return;
   S.staff[compId].splice(idx,1);
   saveState();
-  // Push immédiat AVANT que l'auto-sync ne repulle les vieilles données cloud
-  try {
-    await pushToCloud();
-    _lastSyncAt = Date.now(); // bloque l'auto-sync pendant 60s
-    if (typeof updateSyncTime === 'function') updateSyncTime();
-  } catch(e) {}
+  // Rafraîchir l'UI immédiatement — sans attendre le push cloud
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
     renderMobileCompDetail();
@@ -5963,6 +5959,12 @@ async function hdgRemoveStaff(compId, idx) {
     renderHomeDetailPanel(null);
   }
   toast('Encadrant retiré','');
+  // Push cloud en arrière-plan
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now();
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+  } catch(e) {}
 }
 
 function showHomeCompDetail(compId) {
@@ -13896,8 +13898,18 @@ function showStaffDetailModal(compId, idx, editMode) {
   staffComps.sort(function(a,b){return b.comp.dateFrom.localeCompare(a.comp.dateFrom);});
 
   var cids = (compId||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;');
-  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
-  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
+  var _sdmMob = window.innerWidth < 768;
+  // Overlay : centré desktop, bottom-sheet mobile
+  var _ovStyle = _sdmMob
+    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
+    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var _panelStyle = _sdmMob
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1);display:flex;flex-direction:column'
+    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
+  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_ovStyle+'">';
+  // Poignée de glissement (mobile uniquement)
+  html += '<div style="'+_panelStyle+'">';
+  if (_sdmMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px;flex-shrink:0"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13912,7 +13924,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="padding:7px 14px;background:#0891b2;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>';
     html += '</div>';
     html += '</div>';
-    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px">';
+    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto">';
 
     // Photo
     html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px">';
@@ -13982,7 +13994,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '</div>';
     html += '</div>';
     // Corps
-    html += '<div style="padding:16px 20px">';
+    html += '<div style="padding:16px 20px;flex:1;overflow-y:auto">';
     var hasContact = lic||tel||email;
     if (hasContact) {
       html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Coordonnées</div>';
