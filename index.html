@@ -15774,18 +15774,20 @@ function toggleBgtDomain(key) {
 /* ═══════════════════════════════════════════════════════════════
    DOSSIER OFFICIEL DE COMPÉTITION — style FFPLUM Pôle Sport v3
 ═══════════════════════════════════════════════════════════════ */
+var _dossierCompId = null;
 function openDossierSelector(compId) {
+  _dossierCompId = compId;
   var existing = document.getElementById('dossier-selector-overlay');
   if (existing) existing.remove();
   var sections = [
-    {id:'synthese',  lbl:'📊 Synthèse & Statistiques', checked:true},
-    {id:'encadrants',lbl:'👥 Encadrants',               checked:true},
-    {id:'equipage',  lbl:'✈️ Équipage',                 checked:true},
-    {id:'materiel',  lbl:'🛠 Matériel',                  checked:true},
-    {id:'budget',    lbl:'💰 Budget',                    checked:true},
-    {id:'partenaires',lbl:'🤝 Partenaires',              checked:true},
-    {id:'evenements',lbl:'⚠️ Événements',                checked:true},
-    {id:'resultats', lbl:'🏆 Résultats',                 checked:true}
+    {id:'synthese',   lbl:'\uD83D\uDCCA Synth\u00e8se & Statistiques'},
+    {id:'encadrants', lbl:'\uD83D\uDC65 Encadrants'},
+    {id:'equipage',   lbl:'\u2708\uFE0F \u00c9quipage'},
+    {id:'materiel',   lbl:'\uD83D\uDEE0 Mat\u00e9riel'},
+    {id:'budget',     lbl:'\uD83D\uDCB0 Budget'},
+    {id:'partenaires',lbl:'\uD83E\uDD1D Partenaires'},
+    {id:'evenements', lbl:'\u26A0\uFE0F \u00c9v\u00e9nements'},
+    {id:'resultats',  lbl:'\uD83C\uDFC6 R\u00e9sultats'}
   ];
   var isMob = window.innerWidth < 768;
   var ovSt  = isMob
@@ -15794,33 +15796,53 @@ function openDossierSelector(compId) {
   var panSt = isMob
     ? 'background:var(--navy2);border-radius:16px 16px 0 0;width:100%;max-height:85vh;overflow-y:auto;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1)'
     : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto';
-  var html = '<div id="dossier-selector-overlay" onclick="if(event.target===this)this.remove()" style="'+ovSt+'">';
+  var html = '<div id="dossier-selector-overlay" style="'+ovSt+'">';
   html += '<div style="'+panSt+'">';
   if (isMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;border-bottom:1px solid var(--bdr)">';
-  html += '<div style="font-size:15px;font-weight:800">🖨️ Contenu du dossier</div>';
-  html += '<button onclick="document.getElementById('dossier-selector-overlay').remove()" style="background:none;border:none;color:var(--txt3);font-size:20px;cursor:pointer;line-height:1;padding:4px">×</button>';
+  html += '<div style="font-size:15px;font-weight:800">\uD83D\uDDB8\uFE0F Contenu du dossier</div>';
+  html += '<button id="dos-close-btn" style="background:none;border:none;color:var(--txt3);font-size:20px;cursor:pointer;line-height:1;padding:4px">\u00d7</button>';
   html += '</div>';
   html += '<div style="padding:14px 18px 8px">';
-  html += '<div style="font-size:11px;color:var(--txt2);margin-bottom:12px">Sélectionnez les volets à inclure dans l'impression :</div>';
+  html += '<div style="font-size:11px;color:var(--txt2);margin-bottom:12px">S\u00e9lectionnez les volets \u00e0 inclure dans l\'impression :</div>';
   html += '<div style="display:flex;flex-direction:column;gap:6px">';
   sections.forEach(function(s) {
     html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;cursor:pointer">';
-    html += '<input type="checkbox" id="dos-chk-'+s.id+'" '+(s.checked?'checked':'')+' style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">';
+    html += '<input type="checkbox" id="dos-chk-'+s.id+'" checked style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">';
     html += '<span style="font-size:13px;font-weight:600">'+s.lbl+'</span>';
     html += '</label>';
   });
-  html += '</div>';
-  html += '</div>';
+  html += '</div></div>';
   html += '<div style="display:flex;gap:8px;padding:14px 18px 20px;border-top:1px solid var(--bdr);margin-top:8px">';
-  html += '<button onclick="var all=document.querySelectorAll('[id^=dos-chk-]');all.forEach(function(c){c.checked=true});" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Tout</button>';
-  html += '<button onclick="var all=document.querySelectorAll('[id^=dos-chk-]');all.forEach(function(c){c.checked=false});" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Aucun</button>';
-  html += '<button onclick="var sel=[];['synthese','encadrants','equipage','materiel','budget','partenaires','evenements','resultats'].forEach(function(id){if(document.getElementById('dos-chk-'+id)&&document.getElementById('dos-chk-'+id).checked)sel.push(id);});document.getElementById('dossier-selector-overlay').remove();printCompDossier(''+compId+'',sel);" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Générer →</button>';
+  html += '<button id="dos-all-btn" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Tout</button>';
+  html += '<button id="dos-none-btn" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Aucun</button>';
+  html += '<button id="dos-gen-btn" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">G\u00e9n\u00e9rer \u2192</button>';
   html += '</div>';
   html += '</div></div>';
   var div = document.createElement('div');
   div.innerHTML = html;
-  document.body.appendChild(div.firstElementChild);
+  var ov = div.firstElementChild;
+  document.body.appendChild(ov);
+  // Fermer en cliquant l'overlay
+  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+  document.getElementById('dos-close-btn').addEventListener('click', function(){ ov.remove(); });
+  // Tout / Aucun
+  document.getElementById('dos-all-btn').addEventListener('click', function(){
+    ov.querySelectorAll('[id^="dos-chk-"]').forEach(function(c){ c.checked = true; });
+  });
+  document.getElementById('dos-none-btn').addEventListener('click', function(){
+    ov.querySelectorAll('[id^="dos-chk-"]').forEach(function(c){ c.checked = false; });
+  });
+  // Générer
+  document.getElementById('dos-gen-btn').addEventListener('click', function(){
+    var sel = [];
+    ['synthese','encadrants','equipage','materiel','budget','partenaires','evenements','resultats'].forEach(function(id){
+      var el = document.getElementById('dos-chk-'+id);
+      if (el && el.checked) sel.push(id);
+    });
+    ov.remove();
+    printCompDossier(_dossierCompId, sel);
+  });
 }
 function printCompDossier(compId, sections) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
