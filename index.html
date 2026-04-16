@@ -2510,7 +2510,7 @@ var S = {
   documents: [],
   officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 },
   deletedCompIds: {},
-  _deletedItems: { staff:{}, compEnroll:{}, partenaires:{}, documents:{} },
+  _deletedItems: { staff:{}, compEnroll:{}, partenaires:{}, documents:{}, pilots:{} },
   docSettings: {
     signataire: { prenom: 'Mohamed', nom: 'AZZOUNI', titre: 'Directeur Technique National', organisation: 'Fédération Française ULM', ville: 'Maisons-Alfort' },
     signatureImage: null,
@@ -10720,6 +10720,10 @@ function deleteUser(pilotId, displayName) {
   if (!confirm('Supprimer ' + label + ' ?\n\nSon compte de connexion reste actif — seule sa fiche locale sera supprimée. Il réapparaîtra s\'il se reconnecte.')) return;
   // Retirer de S.pilots
   S.pilots = S.pilots.filter(function(p){ return p.id !== pilotId; });
+  // Mémoriser la suppression pour qu'elle soit propagée au pull cloud
+  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{},pilots:{}};
+  S._deletedItems.pilots = S._deletedItems.pilots || {};
+  S._deletedItems.pilots[pilotId] = true;
   // Retirer ses machines
   if (S.ulms) delete S.ulms[pilotId];
   // Retirer de toutes les inscriptions aux compétitions
@@ -10960,8 +10964,8 @@ async function pullFromCloud() {
 
   // ── Fusionner d'abord les trackers de suppression (union : toute suppression des deux sources est honorée) ──
   var _rDel = r._deletedItems || {};
-  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-  ['staff','compEnroll','partenaires','documents'].forEach(function(t){
+  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{},pilots:{}};
+  ['staff','compEnroll','partenaires','documents','pilots'].forEach(function(t){
     S._deletedItems[t] = S._deletedItems[t] || {};
     var rd = _rDel[t] || {};
     Object.keys(rd).forEach(function(k){ S._deletedItems[t][k] = true; });
@@ -10974,7 +10978,7 @@ async function pullFromCloud() {
   // ── FUSION : local gagne sur remote (local = plus récent) ──
   // Tableaux plats avec .id : _mergeById (local wins, deleted filtered)
   S.comps         = _mergeById(S.comps,         r.comps);
-  S.pilots        = _mergeById(S.pilots,        r.pilots);
+  S.pilots        = _mergeById(S.pilots,        r.pilots,        S._deletedItems.pilots);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
   S.documents     = _mergeById(S.documents,     r.documents,     S._deletedItems.documents);
@@ -10996,6 +11000,9 @@ async function pullFromCloud() {
   S._lastPushAt = r._pushAt || 0;
 
   // ── Appliquer toutes les suppressions après fusion ──
+  // 0. Filtrer S.pilots par _deletedItems.pilots
+  var _dpilots = (S._deletedItems || {}).pilots || {};
+  S.pilots = (S.pilots||[]).filter(function(p){ return !_dpilots[p.id]; });
   // 1. Filtrer S.comps par deletedCompIds
   var _dc = S.deletedCompIds || {};
   S.comps = S.comps.filter(function(c){ return !_dc[c.id]; });
@@ -11237,7 +11244,7 @@ function startAutoSync() {
           }).catch(function(){});
         }
       }).catch(function(){});
-  }, 60000); // vérification toutes les 60 secondes
+  }, 15000); // vérification toutes les 15 secondes
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -17449,6 +17456,16 @@ function injectCalendrierFull() {
 
 function _purgeAllDuplicates() {
   var dirty = false;
+  // ── 0. S.pilots : filtrer pilotes supprimés + dédupliquer par id ──
+  var _dpil = (S._deletedItems||{}).pilots||{};
+  var seenPil = {};
+  var cleanPil = (S.pilots||[]).filter(function(p) {
+    if (!p || !p.id) return false;
+    if (_dpil[p.id]) { dirty = true; return false; }
+    if (seenPil[p.id]) { dirty = true; return false; }
+    seenPil[p.id] = true; return true;
+  });
+  if (cleanPil.length !== (S.pilots||[]).length) S.pilots = cleanPil;
   // ── 1. S.staff : supprimer doublons dans chaque compétition ──
   if (S.staff && !Array.isArray(S.staff)) {
     Object.keys(S.staff).forEach(function(compId) {
