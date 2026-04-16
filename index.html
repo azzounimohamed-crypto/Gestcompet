@@ -10818,10 +10818,13 @@ async function sbSync() {
   var syncBtn = document.getElementById('sync-status');
   if (syncBtn) syncBtn.textContent = '⏳';
   try {
-    await pullFromCloud();      // 1. Lire le cloud → remplacer local
-    await pushToCloud();        // 2. Écrire local → cloud (merge résolu côté push)
+    await pullFromCloud();      // 1. Lire le cloud → fusionner local
+    await pushToCloud();        // 2. Écrire local → cloud
     _lastSyncAt = Date.now();
     updateSyncTime();
+    // Supprimer bannière d'erreur si elle était affichée
+    var eb = document.getElementById('sync-error-banner');
+    if (eb) eb.remove();
     var sf = document.getElementById('comp-season-filter');
     if (sf) sf.value = 'all';
     renderHome(); renderCompetitions(); renderPilots(); updateHeader();
@@ -10829,12 +10832,26 @@ async function sbSync() {
     toast('Synchronisé ✓ — ' + S.comps.length + ' compétition(s)', 'ok');
     if (syncBtn) syncBtn.textContent = '☁️';
   } catch(e) {
-    console.error('[GestSTOL] sbSync échouée:', e);
-    var errMsg = e.message || 'erreur réseau';
-    toast('Sync échouée : ' + errMsg, 'err');
+    console.warn('[GestSTOL] sbSync échouée:', e);
     if (syncBtn) syncBtn.textContent = '✗';
-    // Afficher dans une bannière lisible qui reste visible
-    showSyncError(errMsg);
+    // Identifier la vraie cause
+    var isOffline = !navigator.onLine;
+    var isFetchErr = e.message && (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1 || e.message.indexOf('réseau') !== -1);
+    if (isOffline || isFetchErr) {
+      // Erreur réseau temporaire : ne pas alarmer, réessayer silencieusement
+      toast('Pas de connexion — données locales conservées', '');
+      showSyncError('Connexion indisponible — nouvelle tentative automatique dans 10 s.', true);
+      setTimeout(function(){
+        if (!_syncInProgress && navigator.onLine) {
+          sbSync().catch(function(){});
+        }
+      }, 10000);
+    } else {
+      // Erreur Supabase réelle (mauvaise clé, quota, etc.)
+      var errMsg = e.message || 'erreur inconnue';
+      toast('Sync échouée : ' + errMsg, 'err');
+      showSyncError(errMsg, false);
+    }
   } finally {
     _syncInProgress = false;
   }
@@ -11092,15 +11109,25 @@ async function _pullMedias(sb) {
 
 // ── SYNC SILENCIEUSE auto toutes les 60s ──────────────
 // ── Affichage erreur sync lisible ────────────────────
-function showSyncError(msg) {
+function showSyncError(msg, autoClose) {
   var existing = document.getElementById('sync-error-banner');
   if (existing) existing.remove();
+  var isWarn = (autoClose === true);
   var banner = document.createElement('div');
   banner.id = 'sync-error-banner';
-  banner.style.cssText = 'position:fixed;top:66px;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:flex-start;gap:10px;max-width:480px;margin:0 auto;box-shadow:0 4px 12px rgba(0,0,0,.3)';
-  banner.innerHTML = '<div style="flex:1"><div style="font-weight:800;margin-bottom:3px">⚠️ Erreur de synchronisation</div><div style="font-weight:400;word-break:break-all;font-size:12px">' + msg + '</div></div><button onclick="document.getElementById(\'sync-error-banner\').remove()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;padding:4px 8px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>';
+  banner.style.cssText = 'position:fixed;top:66px;left:0;right:0;z-index:9999;background:' + (isWarn ? '#f59e0b' : '#ef4444') + ';color:#fff;padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:flex-start;gap:10px;max-width:480px;margin:0 auto;border-radius:0 0 10px 10px;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  var icon = isWarn ? '📶' : '⚠️';
+  var title = isWarn ? 'Connexion interrompue' : 'Erreur de synchronisation';
+  banner.innerHTML = '<div style="flex:1"><div style="font-weight:800;margin-bottom:3px">' + icon + ' ' + title + '</div><div style="font-weight:400;word-break:break-all;font-size:12px">' + msg + '</div></div><button onclick="document.getElementById(\'sync-error-banner\').remove()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;padding:4px 8px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>';
   var app = document.getElementById('app') || document.body;
   app.appendChild(banner);
+  // Auto-disparition pour les erreurs réseau temporaires
+  if (isWarn) {
+    setTimeout(function(){
+      var b = document.getElementById('sync-error-banner');
+      if (b) b.remove();
+    }, 8000);
+  }
 }
 
 // ── Force push : envoie le local vers le cloud SANS pull préalable ──
@@ -20304,16 +20331,15 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   startAutoSync();
 
-  // ── Sync automatique au démarrage (après 2s pour laisser Supabase s'initialiser) ──
-  if (navigator.onLine) {
-    setTimeout(function() {
-      var sb = getSB();
-      if (sb && !_syncInProgress) {
-        console.log('[GestSTOL] Sync automatique au démarrage…');
-        sbSync().catch(function(e){ console.warn('[GestSTOL] Sync startup échouée', e); });
-      }
-    }, 2000);
-  }
+  // ── Sync automatique au démarrage (après 3s pour laisser Supabase s'initialiser) ──
+  setTimeout(function() {
+    if (!navigator.onLine) { console.log('[GestSTOL] Hors ligne au démarrage — sync ignorée'); return; }
+    var sb = getSB();
+    if (sb && !_syncInProgress) {
+      console.log('[GestSTOL] Sync automatique au démarrage…');
+      sbSync().catch(function(e){ console.warn('[GestSTOL] Sync startup échouée', e); });
+    }
+  }, 3000);
   }
 });
 
