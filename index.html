@@ -10810,9 +10810,10 @@ async function sbLogout() {
 // ═══════════════════════════════════════════════════════
 var _syncInProgress = false;
 var _lastSyncAt     = 0;
+var _pushPending    = false;  // données locales non encore envoyées au cloud
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
-// ── Sync silencieuse (arrière-plan) : jamais de bannière d'erreur ──
+// ── Sync silencieuse (arrière-plan) : AUCUN message, AUCUNE bannière ──
 async function _bgSync() {
   if (_syncInProgress) return;
   if (!navigator.onLine) return;
@@ -10821,11 +10822,9 @@ async function _bgSync() {
   try {
     await pullFromCloud();
     await pushToCloud();
+    _pushPending = false;
     _lastSyncAt = Date.now();
     updateSyncTime();
-    // Supprimer bannière d'erreur si présente (succès après panne)
-    var eb = document.getElementById('sync-error-banner');
-    if (eb) eb.remove();
     var sf = document.getElementById('comp-season-filter');
     if (sf) sf.value = 'all';
     renderHome(); renderCompetitions(); renderPilots(); updateHeader();
@@ -10833,13 +10832,14 @@ async function _bgSync() {
     var syncBtn = document.getElementById('sync-status');
     if (syncBtn) syncBtn.textContent = '☁️';
   } catch(e) {
-    console.warn('[GestSTOL] _bgSync échouée (silencieux):', e.message || e);
+    console.warn('[GestSTOL] _bgSync échouée:', e.message || e);
+    // Pas de message UI — l'indicateur ☁️ reste inchangé
   } finally {
     _syncInProgress = false;
   }
 }
 
-// ── Sync manuelle (bouton ☁️) : affiche les résultats et erreurs ──
+// ── Sync manuelle (bouton ☁️) : feedback visuel uniquement ──
 async function sbSync() {
   if (_syncInProgress) { toast('Sync déjà en cours…', ''); return; }
   _syncInProgress = true;
@@ -10848,28 +10848,22 @@ async function sbSync() {
   try {
     await pullFromCloud();
     await pushToCloud();
+    _pushPending = false;
     _lastSyncAt = Date.now();
     updateSyncTime();
-    var eb = document.getElementById('sync-error-banner');
-    if (eb) eb.remove();
     var sf = document.getElementById('comp-season-filter');
     if (sf) sf.value = 'all';
     renderHome(); renderCompetitions(); renderPilots(); updateHeader();
     renderProfileCompte(); renderSettingsCompte(); renderUtilisateursTab();
-    toast('Synchronisé ✓ — ' + S.comps.length + ' compétition(s)', 'ok');
+    toast('Synchronisé ✓', 'ok');
     if (syncBtn) syncBtn.textContent = '☁️';
   } catch(e) {
     console.warn('[GestSTOL] sbSync échouée:', e);
     if (syncBtn) syncBtn.textContent = '✗';
-    var isOffline = !navigator.onLine;
-    var isFetchErr = e.message && (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1);
-    if (isOffline || isFetchErr) {
-      toast('Pas de connexion — données locales conservées', '');
-    } else {
-      var errMsg = e.message || 'erreur inconnue';
-      toast('Sync échouée : ' + errMsg, 'err');
-      showSyncError(errMsg, false);
-    }
+    var errMsg = (!navigator.onLine || (e.message && e.message.indexOf('fetch') !== -1))
+      ? 'Hors ligne — les données seront synchronisées à la reconnexion'
+      : (e.message || 'erreur inconnue');
+    toast(errMsg, '');
   } finally {
     _syncInProgress = false;
   }
@@ -11125,28 +11119,7 @@ async function _pullMedias(sb) {
   } catch(e){ console.warn('_pullMedias', e.message||e); }
 }
 
-// ── SYNC SILENCIEUSE auto toutes les 60s ──────────────
-// ── Affichage erreur sync lisible ────────────────────
-function showSyncError(msg, autoClose) {
-  var existing = document.getElementById('sync-error-banner');
-  if (existing) existing.remove();
-  var isWarn = (autoClose === true);
-  var banner = document.createElement('div');
-  banner.id = 'sync-error-banner';
-  banner.style.cssText = 'position:fixed;top:66px;left:0;right:0;z-index:9999;background:' + (isWarn ? '#f59e0b' : '#ef4444') + ';color:#fff;padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:flex-start;gap:10px;max-width:480px;margin:0 auto;border-radius:0 0 10px 10px;box-shadow:0 4px 12px rgba(0,0,0,.3)';
-  var icon = isWarn ? '📶' : '⚠️';
-  var title = isWarn ? 'Connexion interrompue' : 'Erreur de synchronisation';
-  banner.innerHTML = '<div style="flex:1"><div style="font-weight:800;margin-bottom:3px">' + icon + ' ' + title + '</div><div style="font-weight:400;word-break:break-all;font-size:12px">' + msg + '</div></div><button onclick="document.getElementById(\'sync-error-banner\').remove()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;padding:4px 8px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>';
-  var app = document.getElementById('app') || document.body;
-  app.appendChild(banner);
-  // Auto-disparition pour les erreurs réseau temporaires
-  if (isWarn) {
-    setTimeout(function(){
-      var b = document.getElementById('sync-error-banner');
-      if (b) b.remove();
-    }, 8000);
-  }
-}
+// showSyncError supprimé — les erreurs sync sont silencieuses, visibles uniquement en console
 
 // ── Force push : envoie le local vers le cloud SANS pull préalable ──
 async function forcePushCloud() {
@@ -11273,7 +11246,12 @@ function startAutoSync() {
   setInterval(function(){
     if (!navigator.onLine || _syncInProgress) return;
     var sb = getSB(); if (!sb) return;
-    // Vérifier si le cloud est plus récent avant de puller (évite pulls inutiles)
+    // Si des données locales n'ont pas encore été envoyées → pousser maintenant
+    if (_pushPending) {
+      _bgSync().catch(function(){});
+      return;
+    }
+    // Vérifier si le cloud est plus récent → puller
     sb.from('stol_shared').select('updated_at').eq('id','global').single()
       .then(function(res){
         if (!res.data) return;
@@ -11281,8 +11259,8 @@ function startAutoSync() {
         if (remoteTs > _lastSyncAt) {
           _bgSync().catch(function(){});
         }
-      }).catch(function(){}); // échec réseau → silencieux
-  }, 15000); // vérification toutes les 15 secondes
+      }).catch(function(){}); // échec réseau → silencieux, retenté dans 15s
+  }, 15000); // toutes les 15 secondes
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -13100,8 +13078,14 @@ async function syncBase44All(compId) {
 // Push silencieux sans feedback visuel
 // Note : ne nécessite PAS d'être connecté (anon key suffisant)
 function silentPush() {
-  if (!getSB() || !navigator.onLine) return;
-  pushToCloud().catch(function(){});
+  _pushPending = true; // marquer les données comme non synchronisées
+  if (!getSB() || !navigator.onLine) return; // sera retenté par l'auto-sync
+  pushToCloud().then(function(){
+    _pushPending = false;
+  }).catch(function(e){
+    console.warn('[GestSTOL] silentPush échoué — sera retenté:', e.message || e);
+    // _pushPending reste true → l'auto-sync retentera automatiquement
+  });
 }
 
 // ═══════════════════════════════════
