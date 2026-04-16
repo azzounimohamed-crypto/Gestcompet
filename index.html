@@ -11094,6 +11094,32 @@ async function pullFromCloud() {
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
 
+  // ── Migration ID : si doublon dateFrom+dateTo+pratique+discipline, transférer données vers l'ID qui a du contenu ──
+  // Cas typique : cal26-pareloup-para-slalom (injecté local) vs comp_XXXXXXX (créé par l'user, avec données)
+  var _seenCompKey = {};
+  S.comps.forEach(function(c) {
+    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
+    if (k === '|||') return;
+    if (!_seenCompKey[k]) { _seenCompKey[k] = c; return; }
+    // Doublon détecté : garder celui qui a des données (staff, compEnroll non vides)
+    var existing = _seenCompKey[k];
+    var existingHasData = (S.staff[existing.id]&&S.staff[existing.id].length>0) || (S.compEnroll[existing.id]&&S.compEnroll[existing.id].length>0);
+    var currentHasData  = (S.staff[c.id]&&S.staff[c.id].length>0)         || (S.compEnroll[c.id]&&S.compEnroll[c.id].length>0);
+    var winner = (currentHasData && !existingHasData) ? c : existing;
+    var loser  = (winner.id === existing.id) ? c : existing;
+    // Migrer les données du perdant vers le gagnant
+    if ((S.staff[loser.id]||[]).length > 0 && (S.staff[winner.id]||[]).length === 0)
+      S.staff[winner.id] = S.staff[loser.id];
+    if ((S.compEnroll[loser.id]||[]).length > 0 && (S.compEnroll[winner.id]||[]).length === 0)
+      S.compEnroll[winner.id] = S.compEnroll[loser.id];
+    if ((S.runs[loser.id]||[]).length > 0 && (S.runs[winner.id]||[]).length === 0)
+      S.runs[winner.id] = S.runs[loser.id];
+    // Supprimer le doublon (loser)
+    S.deletedCompIds[loser.id] = true;
+    S.comps = S.comps.filter(function(x){ return x.id !== loser.id; });
+    _seenCompKey[k] = winner;
+  });
+
   // ── Purge globale : doublons staff + compEnroll + comps (après fusion) ──
   _purgeAllDuplicates();
 
@@ -17313,7 +17339,7 @@ function injectCalendrier2026() {
   var added = 0;
   toAdd.forEach(function(cp) {
     if (deleted[cp.id]) return;
-    // Doublon si même ID déjà présent
+    // Doublon si même ID déjà présent → rien à faire
     if (S.comps.find(function(x){ return x.id === cp.id; })) return;
     // Doublon si même dateFrom + dateTo + pratique + discipline déjà présent
     var sameEvent = S.comps.find(function(x){
@@ -17323,9 +17349,26 @@ function injectCalendrier2026() {
           && (x.discipline||'') === (cp.discipline||'');
     });
     if (sameEvent) {
-      // Bloquer définitivement cet ID injecté pour ne plus le revoir
-      S.deletedCompIds = S.deletedCompIds || {};
-      S.deletedCompIds[cp.id] = true;
+      // La compétition existe déjà sous un autre ID (ex: comp_XXXXXXX créé par l'utilisateur)
+      // Migrer staff/compEnroll/runs de l'ID calendrier vers l'ID réel si nécessaire
+      if (sameEvent.id !== cp.id) {
+        S.compEnroll = S.compEnroll || {};
+        S.staff      = S.staff      || {};
+        S.runs       = S.runs       || {};
+        // Si des données existent sous l'ID calendrier → les transférer vers l'ID réel
+        if (S.compEnroll[cp.id] && S.compEnroll[cp.id].length > 0 && (!S.compEnroll[sameEvent.id] || S.compEnroll[sameEvent.id].length === 0)) {
+          S.compEnroll[sameEvent.id] = S.compEnroll[cp.id];
+        }
+        if (S.staff[cp.id] && S.staff[cp.id].length > 0 && (!S.staff[sameEvent.id] || S.staff[sameEvent.id].length === 0)) {
+          S.staff[sameEvent.id] = S.staff[cp.id];
+        }
+        if (S.runs[cp.id] && (!S.runs[sameEvent.id] || S.runs[sameEvent.id].length === 0)) {
+          S.runs[sameEvent.id] = S.runs[cp.id];
+        }
+        // Bloquer définitivement l'ID calendrier
+        S.deletedCompIds = S.deletedCompIds || {};
+        S.deletedCompIds[cp.id] = true;
+      }
       return;
     }
     // Doublon par nom exact
