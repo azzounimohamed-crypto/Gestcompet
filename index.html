@@ -8900,7 +8900,7 @@ async function scLogin() {
     await loadUserProfile(data.user);
     toast('Connecté ✓', 'ok'); updateHeader(); renderHome();
     renderSettingsCompte();
-    setTimeout(function(){ sbSync(); }, 500);
+    setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
   } catch(e) {
     var eMsg = e && e.message ? e.message : String(e);
     scShowLoginError('Exception : ' + eMsg);
@@ -8928,7 +8928,7 @@ async function scSignup() {
   saveState();
   toast((isFirst ? '👑 Compte Gestionnaire' : 'Compte') + ' créé ✓', 'ok');
   updateHeader(); renderHome(); renderSettingsCompte();
-  setTimeout(function(){ sbSync(); }, 500);
+  setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
 }
 async function scReset() {
   var email = (document.getElementById('sc-login-email')||{value:''}).value.trim();
@@ -10476,7 +10476,7 @@ function renderStaffTab() {
 }
 
 function syncAndRefreshUsers() {
-  sbSync().then(function(){ renderUtilisateursTab(); }).catch(function(){});
+  _bgSync().then(function(){ renderUtilisateursTab(); }).catch(function(){});
 }
 
 function toggleUtilCreateForm() {
@@ -10812,17 +10812,44 @@ var _syncInProgress = false;
 var _lastSyncAt     = 0;
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
+// ── Sync silencieuse (arrière-plan) : jamais de bannière d'erreur ──
+async function _bgSync() {
+  if (_syncInProgress) return;
+  if (!navigator.onLine) return;
+  var sb = getSB(); if (!sb) return;
+  _syncInProgress = true;
+  try {
+    await pullFromCloud();
+    await pushToCloud();
+    _lastSyncAt = Date.now();
+    updateSyncTime();
+    // Supprimer bannière d'erreur si présente (succès après panne)
+    var eb = document.getElementById('sync-error-banner');
+    if (eb) eb.remove();
+    var sf = document.getElementById('comp-season-filter');
+    if (sf) sf.value = 'all';
+    renderHome(); renderCompetitions(); renderPilots(); updateHeader();
+    renderProfileCompte(); renderSettingsCompte(); renderUtilisateursTab();
+    var syncBtn = document.getElementById('sync-status');
+    if (syncBtn) syncBtn.textContent = '☁️';
+  } catch(e) {
+    console.warn('[GestSTOL] _bgSync échouée (silencieux):', e.message || e);
+  } finally {
+    _syncInProgress = false;
+  }
+}
+
+// ── Sync manuelle (bouton ☁️) : affiche les résultats et erreurs ──
 async function sbSync() {
   if (_syncInProgress) { toast('Sync déjà en cours…', ''); return; }
   _syncInProgress = true;
   var syncBtn = document.getElementById('sync-status');
   if (syncBtn) syncBtn.textContent = '⏳';
   try {
-    await pullFromCloud();      // 1. Lire le cloud → fusionner local
-    await pushToCloud();        // 2. Écrire local → cloud
+    await pullFromCloud();
+    await pushToCloud();
     _lastSyncAt = Date.now();
     updateSyncTime();
-    // Supprimer bannière d'erreur si elle était affichée
     var eb = document.getElementById('sync-error-banner');
     if (eb) eb.remove();
     var sf = document.getElementById('comp-season-filter');
@@ -10834,20 +10861,11 @@ async function sbSync() {
   } catch(e) {
     console.warn('[GestSTOL] sbSync échouée:', e);
     if (syncBtn) syncBtn.textContent = '✗';
-    // Identifier la vraie cause
     var isOffline = !navigator.onLine;
-    var isFetchErr = e.message && (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1 || e.message.indexOf('réseau') !== -1);
+    var isFetchErr = e.message && (e.message.indexOf('fetch') !== -1 || e.message.indexOf('network') !== -1);
     if (isOffline || isFetchErr) {
-      // Erreur réseau temporaire : ne pas alarmer, réessayer silencieusement
       toast('Pas de connexion — données locales conservées', '');
-      showSyncError('Connexion indisponible — nouvelle tentative automatique dans 10 s.', true);
-      setTimeout(function(){
-        if (!_syncInProgress && navigator.onLine) {
-          sbSync().catch(function(){});
-        }
-      }, 10000);
     } else {
-      // Erreur Supabase réelle (mauvaise clé, quota, etc.)
       var errMsg = e.message || 'erreur inconnue';
       toast('Sync échouée : ' + errMsg, 'err');
       showSyncError(errMsg, false);
@@ -11255,22 +11273,15 @@ function startAutoSync() {
   setInterval(function(){
     if (!navigator.onLine || _syncInProgress) return;
     var sb = getSB(); if (!sb) return;
+    // Vérifier si le cloud est plus récent avant de puller (évite pulls inutiles)
     sb.from('stol_shared').select('updated_at').eq('id','global').single()
       .then(function(res){
         if (!res.data) return;
         var remoteTs = new Date(res.data.updated_at).getTime();
         if (remoteTs > _lastSyncAt) {
-          pullFromCloud().then(function(){
-            _lastSyncAt = Date.now();
-            var sf = document.getElementById('comp-season-filter');
-            if (sf) sf.value = 'all';
-            renderHome(); renderCompetitions(); renderPilots();
-            var btn = document.getElementById('sync-status');
-            if (btn) btn.textContent = '✓';
-            updateSyncTime();
-          }).catch(function(){});
+          _bgSync().catch(function(){});
         }
-      }).catch(function(){});
+      }).catch(function(){}); // échec réseau → silencieux
   }, 15000); // vérification toutes les 15 secondes
 }
 
@@ -11654,7 +11665,7 @@ async function sbLoginFromProfile() {
   toast('Connecté ✓', 'ok');
   syncProfileFields(); renderProfileCompte(); updateHeader();
   // Sync immédiate
-  setTimeout(function(){ sbSync(); }, 500);
+  setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
 }
 async function sbSignupFromProfile() {
   var email = (document.getElementById('pf-login-email')||{}).value || '';
@@ -20331,14 +20342,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   startAutoSync();
 
-  // ── Sync automatique au démarrage (après 3s pour laisser Supabase s'initialiser) ──
+  // ── Sync silencieuse au démarrage (après 3s pour laisser Supabase s'initialiser) ──
   setTimeout(function() {
-    if (!navigator.onLine) { console.log('[GestSTOL] Hors ligne au démarrage — sync ignorée'); return; }
-    var sb = getSB();
-    if (sb && !_syncInProgress) {
-      console.log('[GestSTOL] Sync automatique au démarrage…');
-      sbSync().catch(function(e){ console.warn('[GestSTOL] Sync startup échouée', e); });
-    }
+    _bgSync().catch(function(){});
   }, 3000);
   }
 });
