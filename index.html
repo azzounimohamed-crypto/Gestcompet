@@ -2509,6 +2509,8 @@ var S = {
   collectif: [],
   documents: [],
   officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 },
+  deletedCompIds: {},
+  _deletedItems: { staff:{}, compEnroll:{}, partenaires:{}, documents:{} },
   docSettings: {
     signataire: { prenom: 'Mohamed', nom: 'AZZOUNI', titre: 'Directeur Technique National', organisation: 'Fédération Française ULM', ville: 'Maisons-Alfort' },
     signatureImage: null,
@@ -2632,6 +2634,14 @@ async function loadState() {
         // Restaurer deletedCompIds depuis IDB (clé critique pour suppression permanente)
         if (idbData.deletedCompIds) {
           S.deletedCompIds = Object.assign({}, idbData.deletedCompIds, S.deletedCompIds || {});
+        }
+        // Restaurer _deletedItems depuis IDB
+        if (idbData._deletedItems) {
+          var _di = idbData._deletedItems || {};
+          S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+          ['staff','compEnroll','partenaires','documents'].forEach(function(t){
+            S._deletedItems[t] = Object.assign({}, _di[t]||{}, S._deletedItems[t]||{});
+          });
         }
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
@@ -5452,7 +5462,10 @@ function docDelete(id) {
     clearTimeout(_docDelPending[id]);
     delete _docDelPending[id];
     S.documents = (S.documents||[]).filter(function(d){ return d.id !== id; });
-    saveState();
+    S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+    S._deletedItems.documents = S._deletedItems.documents || {};
+    S._deletedItems.documents[id] = true;
+    saveState(); silentPush();
     renderHomeResultsDrawer();
     toast('Document supprimé', 'ok');
   } else {
@@ -5779,6 +5792,10 @@ function hdgAddComp(compId) {
 function hdgRemoveComp(compId, pilotId) {
   if (!S.compEnroll||!S.compEnroll[compId]) return;
   S.compEnroll[compId]=S.compEnroll[compId].filter(function(id){return id!==pilotId;});
+  // Mémoriser la suppression pour résister au pull cloud
+  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+  S._deletedItems.compEnroll = S._deletedItems.compEnroll || {};
+  S._deletedItems.compEnroll[compId+'::'+pilotId] = true;
   saveState(); silentPush();
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
@@ -5949,7 +5966,15 @@ function hdgAddStaff(compId) {
 async function hdgRemoveStaff(compId, idx) {
   if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
   if(!S.staff[compId]) return;
+  // Mémoriser l'ID avant suppression
+  var _removedEntry = S.staff[compId][idx];
+  var _removedKey = _removedEntry ? (_removedEntry.id || _removedEntry.pilotId || ((_removedEntry.prenom||'')+':'+(_removedEntry.nom||''))) : null;
   S.staff[compId].splice(idx,1);
+  if (_removedKey) {
+    S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+    S._deletedItems.staff = S._deletedItems.staff || {};
+    S._deletedItems.staff[_removedKey] = true;
+  }
   saveState();
   // Rafraîchir l'UI immédiatement — sans attendre le push cloud
   var ov = document.getElementById('overlay-comp-mobile');
@@ -7560,7 +7585,10 @@ function deletePartenaire(compId, partId) {
   if (!confirm('Supprimer ce partenaire ?')) return;
   if (!S.partenaires || !S.partenaires[compId]) return;
   S.partenaires[compId] = S.partenaires[compId].filter(function(x){ return x.id!==partId; });
-  saveState();
+  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+  S._deletedItems.partenaires = S._deletedItems.partenaires || {};
+  S._deletedItems.partenaires[partId] = true;
+  saveState(); silentPush();
   renderHomeDetailPanel(null);
   toast('Partenaire supprimé', 'ok');
 }
@@ -10826,6 +10854,8 @@ async function pushToCloud() {
     officialDocs:     S.officialDocs       || {},
     docSettings:      S.docSettings        || {},
     homeTodosByComp:  S.homeTodosByComp    || {},
+    deletedCompIds:   S.deletedCompIds     || {},
+    _deletedItems:    S._deletedItems      || {},
     _pushAt:          Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
@@ -10848,13 +10878,16 @@ async function _pushMedias(sb) {
 }
 
 // ── FUSION par id : les deux sources sont conservées, jamais de perte ──
-function _mergeById(local, remote) {
+function _mergeById(local, remote, deletedSet) {
   var map = {};
   var la = Array.isArray(local)  ? local  : [];
   var ra = Array.isArray(remote) ? remote : [];
-  la.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  // Remote en premier, local en second → local gagne toujours sur remote
   ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
-  return Object.keys(map).map(function(k){ return map[k]; });
+  la.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  // Supprimer les éléments marqués comme supprimés
+  var ds = deletedSet || {};
+  return Object.keys(map).filter(function(k){ return !ds[k]; }).map(function(k){ return map[k]; });
 }
 // ── FUSION objet simple : les clés des deux sources sont gardées ──
 function _mergeObj(local, remote) {
@@ -10922,13 +10955,26 @@ async function pullFromCloud() {
   S.comps.forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
   S.pilots.forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo; });
 
-  // ── FUSION : on garde TOUT — local + cloud, jamais de remplacement total ──
-  // Tableaux plats avec .id : _mergeById
+  // ── Fusionner d'abord les trackers de suppression (union : toute suppression des deux sources est honorée) ──
+  var _rDel = r._deletedItems || {};
+  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
+  ['staff','compEnroll','partenaires','documents'].forEach(function(t){
+    S._deletedItems[t] = S._deletedItems[t] || {};
+    var rd = _rDel[t] || {};
+    Object.keys(rd).forEach(function(k){ S._deletedItems[t][k] = true; });
+  });
+  // Fusionner deletedCompIds (union)
+  var _rDelComps = r.deletedCompIds || {};
+  S.deletedCompIds = S.deletedCompIds || {};
+  Object.keys(_rDelComps).forEach(function(k){ S.deletedCompIds[k] = true; });
+
+  // ── FUSION : local gagne sur remote (local = plus récent) ──
+  // Tableaux plats avec .id : _mergeById (local wins, deleted filtered)
   S.comps         = _mergeById(S.comps,         r.comps);
   S.pilots        = _mergeById(S.pilots,        r.pilots);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
-  S.documents     = _mergeById(S.documents,     r.documents);
+  S.documents     = _mergeById(S.documents,     r.documents,     S._deletedItems.documents);
   S.messages      = _mergeById(S.messages,      r.messages);
   // Objets indexés par compId dont les valeurs sont des tableaux : _mergeObjOfArrays
   S.staff              = _mergeObjOfArrays(S.staff,              r.staff);
@@ -10945,6 +10991,40 @@ async function pullFromCloud() {
   S.docSettings        = _mergeObj(S.docSettings, r.docSettings);
 
   S._lastPushAt = r._pushAt || 0;
+
+  // ── Appliquer toutes les suppressions après fusion ──
+  // 1. Filtrer S.comps par deletedCompIds
+  var _dc = S.deletedCompIds || {};
+  S.comps = S.comps.filter(function(c){ return !_dc[c.id]; });
+  // 2. Filtrer staff par _deletedItems.staff
+  var _ds = (S._deletedItems || {}).staff || {};
+  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(cid){
+      S.staff[cid] = (S.staff[cid]||[]).filter(function(e){
+        var k = e.id || e.pilotId || ((e.prenom||'')+':'+(e.nom||''));
+        return !_ds[k];
+      });
+    });
+  }
+  // 3. Filtrer compEnroll par _deletedItems.compEnroll
+  var _de = (S._deletedItems || {}).compEnroll || {};
+  if (S.compEnroll && typeof S.compEnroll === 'object') {
+    Object.keys(S.compEnroll).forEach(function(cid){
+      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid){
+        return !_de[cid+'::'+pid];
+      });
+    });
+  }
+  // 4. Filtrer partenaires par _deletedItems.partenaires
+  var _dp = (S._deletedItems || {}).partenaires || {};
+  if (S.partenaires && typeof S.partenaires === 'object') {
+    Object.keys(S.partenaires).forEach(function(cid){
+      S.partenaires[cid] = (S.partenaires[cid]||[]).filter(function(p){ return !_dp[p.id]; });
+    });
+  }
+  // 5. Filtrer documents par _deletedItems.documents (déjà fait via _mergeById mais double sécurité)
+  var _dd = (S._deletedItems || {}).documents || {};
+  S.documents = (S.documents||[]).filter(function(d){ return !_dd[d.id]; });
 
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
