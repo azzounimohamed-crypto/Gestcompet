@@ -5966,14 +5966,17 @@ function hdgAddStaff(compId) {
 async function hdgRemoveStaff(compId, idx) {
   if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
   if(!S.staff[compId]) return;
-  // Mémoriser l'ID avant suppression
+  // Mémoriser toutes les clés possibles avant suppression (pilotId + entry.id + nom)
   var _removedEntry = S.staff[compId][idx];
-  var _removedKey = _removedEntry ? (_removedEntry.id || _removedEntry.pilotId || ((_removedEntry.prenom||'')+':'+(_removedEntry.nom||''))) : null;
   S.staff[compId].splice(idx,1);
-  if (_removedKey) {
+  if (_removedEntry) {
     S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
     S._deletedItems.staff = S._deletedItems.staff || {};
-    S._deletedItems.staff[_removedKey] = true;
+    // Stocker TOUTES les clés pour couvrir entrées avec IDs différents sur le cloud
+    var _pilot = (_removedEntry.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===_removedEntry.pilotId; })||{}) : {};
+    var _pn = (_pilot.prenom || _removedEntry.prenom || '').trim().toLowerCase().replace(/\s+/g,' ');
+    var _nn = (_pilot.nom    || _removedEntry.nom    || '').trim().toLowerCase().replace(/\s+/g,' ');
+    [_removedEntry.id, _removedEntry.pilotId, _pn+'|'+_nn, _pn+':'+_nn].forEach(function(k){ if(k && k!=='|' && k!==':') S._deletedItems.staff[k] = true; });
   }
   saveState();
   // Rafraîchir l'UI immédiatement — sans attendre le push cloud
@@ -10996,13 +10999,28 @@ async function pullFromCloud() {
   // 1. Filtrer S.comps par deletedCompIds
   var _dc = S.deletedCompIds || {};
   S.comps = S.comps.filter(function(c){ return !_dc[c.id]; });
-  // 2. Filtrer staff par _deletedItems.staff
+  // 2. Filtrer staff par _deletedItems.staff (chercher sur toutes les clés possibles)
   var _ds = (S._deletedItems || {}).staff || {};
   if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
     Object.keys(S.staff).forEach(function(cid){
+      // a) Appliquer le filtre suppression (pilotId EN PRIORITÉ sur entry.id)
       S.staff[cid] = (S.staff[cid]||[]).filter(function(e){
-        var k = e.id || e.pilotId || ((e.prenom||'')+':'+(e.nom||''));
-        return !_ds[k];
+        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===e.pilotId; })||{}) : {};
+        var pn = (pilot.prenom||e.prenom||'').trim().toLowerCase();
+        var nn = (pilot.nom   ||e.nom   ||'').trim().toLowerCase();
+        var keys = [e.pilotId, e.id, pn+'|'+nn, pn+':'+nn].filter(Boolean);
+        return !keys.some(function(k){ return _ds[k]; });
+      });
+      // b) Déduplication par nom (même personne avec IDs d'entrée différents)
+      var seenS = {};
+      S.staff[cid] = (S.staff[cid]||[]).filter(function(e){
+        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===e.pilotId; })||{}) : {};
+        var pn = (pilot.prenom||e.prenom||'').trim().toLowerCase().replace(/\s+/g,' ');
+        var nn = (pilot.nom   ||e.nom   ||'').trim().toLowerCase().replace(/\s+/g,' ');
+        var k = pn+'|'+nn;
+        if (!k || k === '|') return true;
+        if (seenS[k]) return false;
+        seenS[k] = true; return true;
       });
     });
   }
@@ -11029,25 +11047,8 @@ async function pullFromCloud() {
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
 
-  // ── Nettoyage doublons staff (entrées sans .id ou avec même pilotId) ──
-  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
-    Object.keys(S.staff).forEach(function(cid) {
-      var seen = {};
-      S.staff[cid] = (S.staff[cid]||[]).filter(function(s) {
-        var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
-        if (seen[k]) return false; seen[k] = true; return true;
-      });
-    });
-  }
-
-  // ── Nettoyage doublons compétitions (même nom + même dateFrom) ──
-  if (S.comps && S.comps.length > 1) {
-    var compSeen = {};
-    S.comps = S.comps.filter(function(c) {
-      var k = (c.name||'').trim().toLowerCase()+'|'+(c.dateFrom||'');
-      if (compSeen[k]) return false; compSeen[k] = true; return true;
-    });
-  }
+  // ── Purge globale : doublons staff + compEnroll + comps (après fusion) ──
+  _purgeAllDuplicates();
 
   // Restaurer les affiches/photos locales si absentes du cloud
   S.comps.forEach(function(c){  if (localAffiches[c.id] && !c.affiche) c.affiche = localAffiches[c.id]; });
@@ -11058,7 +11059,7 @@ async function pullFromCloud() {
 
   updateNationalRanking();
   saveState();
-  console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
+  console.log('[GestSTOL] pullFromCloud OK — comps:', S.comps.length, '| pilots:', S.pilots.length, '| staff keys:', Object.keys(S.staff||{}).length);
 }
 
 async function _pullMedias(sb) {
@@ -17489,6 +17490,17 @@ function _purgeAllDuplicates() {
     seenComps[k] = true; return true;
   });
   if (cleanComps.length !== (S.comps||[]).length) S.comps = cleanComps;
+
+  // Déduplication S.documents : supprimer doublons par id + filtrer supprimés
+  var _ddPurge = (S._deletedItems||{}).documents||{};
+  var seenDocs = {};
+  var cleanDocs = (S.documents||[]).filter(function(d) {
+    if (!d || !d.id) return false;
+    if (_ddPurge[d.id]) { dirty = true; return false; } // supprimé → exclure
+    if (seenDocs[d.id]) { dirty = true; return false; } // doublon id → exclure
+    seenDocs[d.id] = true; return true;
+  });
+  if (cleanDocs.length !== (S.documents||[]).length) S.documents = cleanDocs;
 
   if (dirty) saveState();
 }
