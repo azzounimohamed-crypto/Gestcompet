@@ -454,6 +454,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #sheet-staff .sheet{width:620px!important;max-width:92vw!important;max-height:90vh!important;overflow-y:auto!important}
   #sheet-staff .sheet-body{overflow-y:visible}
 }
+@keyframes slideUpSheet { from { transform: translateY(100%); opacity:0; } to { transform: translateY(0); opacity:1; } }
 </style>
 </head>
 <body>
@@ -5765,7 +5766,13 @@ function hdgAddComp(compId) {
 function hdgRemoveComp(compId, pilotId) {
   if (!S.compEnroll||!S.compEnroll[compId]) return;
   S.compEnroll[compId]=S.compEnroll[compId].filter(function(id){return id!==pilotId;});
-  saveState(); silentPush(); renderHomeDetailPanel(null); toast('Pilote retiré','');
+  saveState(); silentPush();
+  if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
+    renderMobileCompDetail();
+  } else {
+    renderHomeDetailPanel(null);
+  }
+  toast('Pilote retiré','');
 }
 
 function hdgExportEquipageExcel(compId) {
@@ -6558,6 +6565,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!enrolled.length) {
       html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">Tapez les premières lettres du prénom pour inscrire un pilote</div>';
     }
+    var _isMobEquip = window.innerWidth < 768;
     enrolled.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
@@ -6570,17 +6578,38 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       // Couleurs Équipages
       var equVal = (p.equipage||'').trim();
       var equStyle = equVal==='Biplace'?'color:#10b981;font-weight:600':equVal==='Monoplace'?'color:#8b5cf6;font-weight:600':'color:var(--txt3)';
-      html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
-      html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
-      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
-      html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
-      html5 += '</div>';
+      if (_isMobEquip) {
+        // Mobile card layout
+        var ini2 = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase();
+        var avCol = catColMap[catVal]||'#6b7280';
+        html5 += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'+bg+';border-bottom:1px solid var(--bdr);min-height:64px;position:relative;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
+        html5 += '<div style="width:40px;height:40px;border-radius:50%;background:'+avCol+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">'+ini2+'</div>';
+        html5 += '<div style="flex:1;min-width:0">';
+        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
+        html5 += '<div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escG((p.prenom||'')+' '+(p.nom||'').toUpperCase())+'</div>';
+        html5 += '<div style="'+catStyle+';font-size:13px;flex-shrink:0">'+(catVal||'—')+'</div>';
+        html5 += '</div>';
+        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:3px">';
+        html5 += '<div style="font-size:12px;color:var(--txt2)">🪪 '+(p.licence||'—')+'</div>';
+        html5 += '<div style="font-size:12px;'+equStyle+'">'+(equVal||'—')+'</div>';
+        html5 += '</div>';
+        html5 += '</div>';
+        html5 += '<div onclick="event.stopPropagation()" style="flex-shrink:0"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
+        html5 += '</div>';
+      } else {
+        // Desktop grid layout
+        html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
+        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
+        html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
+        html5 += '</div>';
+      }
     });
     html5 += '</div>';
     return html5;
@@ -6867,18 +6896,46 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!compStaffG2.length) {
       html3 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditS ? 'Tapez les premières lettres du prénom pour ajouter un encadrant' : 'Aucun encadrement enregistré pour cette compétition')+'</div>';
     }
+    var _isMobStaff = window.innerWidth < 768;
     compStaffG2.forEach(function(s, si){
       var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
-      var nom   = escS(((pilot.prenom||s.prenom||'')+' '+(pilot.nom||s.nom||'')).trim());
+      var prenomS = pilot.prenom||s.prenom||'';
+      var nomS    = pilot.nom||s.nom||'';
+      var nom   = escS((prenomS+' '+nomS).trim());
       var bg    = si%2===1 ? 'var(--navy3)' : 'transparent';
-      html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
-      html3 += '<div style="'+_dStS+';font-weight:600">'+nom+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.licence||s.licence||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.tel||s.tel||'—')+'</div>';
-      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.email||s.email||'—')+'</div>';
-      html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
-      html3 += '</div>';
+      var lic2  = pilot.licence||s.licence||'';
+      var tel2  = pilot.tel||s.tel||'';
+      var email2= pilot.email||s.email||'';
+      if (_isMobStaff) {
+        // Mobile card layout
+        var iniS = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
+        html3 += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);min-height:72px;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')">';
+        html3 += '<div style="width:40px;height:40px;border-radius:50%;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;margin-top:2px">'+iniS+'</div>';
+        html3 += '<div style="flex:1;min-width:0">';
+        html3 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
+        html3 += '<div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nom+'</div>';
+        html3 += '<div style="font-size:12px;color:var(--txt2);flex-shrink:0">'+(lic2?'🪪 '+escS(lic2):'')+'</div>';
+        html3 += '</div>';
+        html3 += '<div style="font-size:12px;color:var(--stol);font-weight:600;margin-top:2px">'+(s.role||'—')+'</div>';
+        html3 += '<div style="display:flex;align-items:center;gap:10px;margin-top:3px">';
+        if (tel2)   html3 += '<span style="font-size:11px;color:var(--txt2)">📞 '+escS(tel2)+'</span>';
+        if (email2) html3 += '<span style="font-size:11px;color:var(--txt2)">✉ '+escS(email2)+'</span>';
+        html3 += '<div style="flex:1"></div>';
+        html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
+        html3 += '</div>';
+        html3 += '</div>';
+        html3 += '</div>';
+      } else {
+        // Desktop grid layout
+        html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
+        html3 += '<div style="'+_dStS+';font-weight:600">'+nom+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(lic2||'—')+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(tel2||'—')+'</div>';
+        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(email2||'—')+'</div>';
+        html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
+        html3 += '</div>';
+      }
     });
     html3 += '</div>';
     return html3;
@@ -7096,7 +7153,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var nInpInt  = 'type="number" min="1" step="1"';
       var calcEvt  = function(lid){ return 'recalcBudgetCout(\''+cp.id+'\',\''+section+'\',\''+lid+'\')'; };
       // ── En-tête colonnes ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:540px;flex-shrink:0">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:min(540px,100%);flex-shrink:0">';
       htmlB += '<div style="'+hStyle+'">Domaine</div>';
       htmlB += '<div style="'+hStyle+'">Libellé</div>';
       htmlB += '<div style="'+hStyle+';text-align:right">Valeur</div>';
@@ -7106,7 +7163,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<div></div><div></div>';
       htmlB += '</div>';
       // ── Ligne de saisie (même système que Staff/Equipage) ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:540px;position:relative">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:min(540px,100%);position:relative">';
       htmlB += '<div style="position:relative">';
       htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyle+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
       htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
@@ -7133,7 +7190,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           var isOpen   = !!_bgtOpenDomains[domKey];
           var chevron  = isOpen ? '▾' : '▸';
           // Ligne récapitulative du groupe
-          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:540px;background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
+          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:min(540px,100%);background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
           htmlB += '<div style="font-size:12px;font-weight:800;color:var(--stol);display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-size:11px">'+chevron+'</span>'+bEsc(dom)+'</div>';
           htmlB += '<div style="font-size:11px;color:var(--txt3);font-style:italic">'+grpLines.length+' ligne'+(grpLines.length>1?'s':'')+'</div>';
           htmlB += '<div></div><div></div><div></div>';
@@ -7145,7 +7202,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
             grpLines.forEach(function(l, i){
               var bg = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
               var coutCalc = computeCout(l);
-              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:540px;border-bottom:1px solid rgba(255,255,255,0.04)">';
+              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:min(540px,100%);border-bottom:1px solid rgba(255,255,255,0.04)">';
               htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
               htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
@@ -10713,7 +10770,12 @@ async function testSupabase() {
       }
     }
   } catch(e) {
-    show('Erreur: ' + (e.message||'réseau'), '#ef4444');
+    var msg = e.message || 'réseau';
+    if (msg.indexOf('fetch') !== -1) {
+      show('❌ Supabase injoignable — projet probablement EN PAUSE. Allez sur supabase.com → Resuming project', '#ef4444');
+    } else {
+      show('Erreur: ' + msg, '#ef4444');
+    }
   }
 }
 
@@ -10736,10 +10798,13 @@ async function sbSync() {
   } catch(e) {
     console.error('[GestSTOL] sbSync échouée:', e);
     var errMsg = e.message || 'erreur réseau';
-    toast('Sync échouée : ' + errMsg, 'err');
     if (syncBtn) syncBtn.textContent = '✗';
-    // Afficher dans une bannière lisible qui reste visible
-    showSyncError(errMsg);
+    // Détecter si c'est une erreur réseau (Supabase injoignable)
+    if (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1) {
+      toast('Hors ligne ou Supabase injoignable — données locales conservées', 'err');
+    } else {
+      toast('Sync échouée : ' + errMsg, 'err');
+    }
   } finally {
     _syncInProgress = false;
   }
@@ -11102,7 +11167,7 @@ function startAutoSync() {
           }).catch(function(){});
         }
       }).catch(function(){});
-  }, 15000); // sync toutes les 15s // vérification toutes les 60 secondes
+  }, 30000); // sync toutes les 30s
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -13441,8 +13506,16 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   });
   hist.sort(function(a,b){ return b.comp.dateFrom.localeCompare(a.comp.dateFrom); });
 
-  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
-  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
+  var _isMobPilotModal = window.innerWidth < 768;
+  var _overlayPilotSt = _isMobPilotModal
+    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
+    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var _panelPilotSt = _isMobPilotModal
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s ease'
+    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
+  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_overlayPilotSt+'">';
+  html += '<div style="'+_panelPilotSt+'">';
+  if (_isMobPilotModal) html += '<div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 4px"></div>';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13848,8 +13921,16 @@ function showStaffDetailModal(compId, idx, editMode) {
   staffComps.sort(function(a,b){return b.comp.dateFrom.localeCompare(a.comp.dateFrom);});
 
   var cids = (compId||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;');
-  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
-  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
+  var _isMobStaffModal = window.innerWidth < 768;
+  var _overlayStaffSt = _isMobStaffModal
+    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
+    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var _panelStaffSt = _isMobStaffModal
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s ease'
+    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
+  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_overlayStaffSt+'">';
+  html += '<div style="'+_panelStaffSt+'">';
+  if (_isMobStaffModal) html += '<div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 4px"></div>';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -14568,7 +14649,27 @@ function openMaterielModal(compId, matId) {
   var prev = g('mat-modal-photo-prev');
   if(prev){ prev.src = m.photo||''; prev.style.display = m.photo ? '' : 'none'; }
   var sh = g('sheet-materiel');
-  if(sh){ sh.style.display='flex'; setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10); }
+  if(sh){
+    var isMob = window.innerWidth < 768;
+    sh.style.alignItems = isMob ? 'flex-end' : 'center';
+    sh.style.justifyContent = 'center';
+    var panel = sh.querySelector('div');
+    if(panel && isMob){
+      panel.style.borderRadius = '16px 16px 0 0';
+      panel.style.width = '100%';
+      panel.style.maxWidth = '100%';
+      panel.style.height = '70vh';
+      panel.style.maxHeight = '70vh';
+    } else if(panel && !isMob){
+      panel.style.borderRadius = '16px';
+      panel.style.width = '';
+      panel.style.maxWidth = '';
+      panel.style.height = '';
+      panel.style.maxHeight = '90vh';
+    }
+    sh.style.display='flex';
+    setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10);
+  }
 }
 
 function closeMaterielModal() {
