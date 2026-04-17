@@ -311,7 +311,6 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
 /* ── Page Compétition Mobile ── */
 #overlay-comp-mobile{animation:slideInRight .28s cubic-bezier(.22,.9,.2,1)}
 @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
-@keyframes slideUpSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
 #mcd-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 /* Points de navigation pilules */
 #mcd-dots{display:flex;align-items:center;gap:4px;padding:0 2px}
@@ -930,7 +929,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <!-- PAGE STAFF -->
     <div class="page" id="page-staff">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
-        <div style="font-size:18px;font-weight:700">Staff</div>
+        <div style="font-size:18px;font-weight:700">Encadrants</div>
         <button onclick="openNewStaffMemberModal()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
       </div>
       <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;margin:0 12px 8px;padding:0 12px;gap:6px">
@@ -1394,8 +1393,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button class="nav-btn" id="nav-pilots" aria-label="Compétiteurs" title="Compétiteurs" onclick="showPage('page-pilots')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7.5 7.5 0 0113 0"/><path d="M19 11l1.5 1.5L23 10"/></svg></span><span class="nav-lbl">Compétiteurs</span>
     </button>
-    <button class="nav-btn" id="nav-staff" aria-label="Staff" title="Staff" onclick="showPage('page-staff')">
-      <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Staff</span>
+    <button class="nav-btn" id="nav-staff" aria-label="Encadrants" title="Encadrants" onclick="showPage('page-staff')">
+      <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Encadrants</span>
     </button>
 
     <button class="nav-btn" id="nav-sites" aria-label="Sites sportifs" title="Sites sportifs" onclick="showPage('page-sites')">
@@ -1750,8 +1749,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
-          <button class="btn btn-full btn-sm" onclick="showSyncDiag()" style="margin-bottom:6px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);color:#6366f1">🔍 Diagnostic sync</button>
-          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes · <span id="push-pending-indicator"></span></div>
+          <button class="btn btn-full btn-sm" onclick="testSupabase()" style="margin-bottom:6px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981">🔍 Tester la connexion</button>
+          <div id="sync-diag-result" style="font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
+          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
 
         <!-- ── BANNIÈRE AUTO-PROMOTION ── -->
@@ -2510,8 +2510,6 @@ var S = {
   collectif: [],
   documents: [],
   officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 },
-  deletedCompIds: {},
-  _deletedItems: { staff:{}, compEnroll:{}, partenaires:{}, documents:{}, pilots:{} },
   docSettings: {
     signataire: { prenom: 'Mohamed', nom: 'AZZOUNI', titre: 'Directeur Technique National', organisation: 'Fédération Française ULM', ville: 'Maisons-Alfort' },
     signatureImage: null,
@@ -2556,7 +2554,6 @@ async function b44Fetch(path) {
 
 function injectMaisoncelles2026() {
   var cid = 'comp-maisoncelles-2026';
-  if ((S.deletedCompIds||{})[cid]) return; // supprimée définitivement par l'utilisateur
   if ((S.comps||[]).find(function(c){return c.id===cid;})) return; // déjà présente
   S.comps = S.comps||[];
   S.comps.push({id:cid,nom:'Régionale Paramoteur Classic - Maisoncelles en Brie',lieu:'Maisoncelles en Brie',dateFrom:'2026-03-14',dateTo:'2026-03-15',saison:'2026',discipline:'classic',pratique:'paramotor',region:'Île-de-France'});
@@ -2632,18 +2629,6 @@ async function loadState() {
           if (lp && ip.photo) lp.photo = ip.photo;
         });
         if (idbData.licenceDB) S.licenceDB = idbData.licenceDB;
-        // Restaurer deletedCompIds depuis IDB (clé critique pour suppression permanente)
-        if (idbData.deletedCompIds) {
-          S.deletedCompIds = Object.assign({}, idbData.deletedCompIds, S.deletedCompIds || {});
-        }
-        // Restaurer _deletedItems depuis IDB
-        if (idbData._deletedItems) {
-          var _di = idbData._deletedItems || {};
-          S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-          ['staff','compEnroll','partenaires','documents'].forEach(function(t){
-            S._deletedItems[t] = Object.assign({}, _di[t]||{}, S._deletedItems[t]||{});
-          });
-        }
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
         Object.assign(S, idbData);
@@ -2686,7 +2671,7 @@ function saveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,deletedCompIds:S.deletedCompIds})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
@@ -3033,8 +3018,6 @@ function deleteComp() {
   S.comps = S.comps.filter(function(c){ return c.id !== id; });
   if (S.runs) delete S.runs[id];
   if (S.compEnroll) delete S.compEnroll[id];
-  S.deletedCompIds = S.deletedCompIds || {};
-  S.deletedCompIds[id] = true;
   saveState();
   closeSheet('sheet-comp');
   renderCompetitions();
@@ -3274,7 +3257,7 @@ document.addEventListener('click', function(e) {
 function saveComp() {
   var id = document.getElementById('comp-edit-id').value;
   var comp = {
-    id: id || ('usr-' + Date.now().toString(36)),
+    id: id || ('usr' + Date.now().toString(36)),
     _updatedAt: Date.now(),
     name: document.getElementById('comp-name').value.trim(),
     dateFrom: document.getElementById('comp-date-from').value,
@@ -3806,12 +3789,7 @@ function toggleMaterielCheck(compId, matId) {
       : ((S.staff||{})[compId]||[]);
     var cpObj = S.comps.find(function(c){ return c.id===compId; });
     var contentArea = document.getElementById('hdp-tab-content');
-    if (cpObj && contentArea) {
-      contentArea.innerHTML = renderHDPTabContent(cpObj,'materiel',runs,enrolled,staffList);
-      var safeId = 'mat-row-' + matId.replace(/[^a-z0-9]/gi,'');
-      var rowEl = document.getElementById(safeId);
-      if (rowEl) rowEl.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-    }
+    if (cpObj && contentArea) contentArea.innerHTML = renderHDPTabContent(cpObj,'materiel',runs,enrolled,staffList);
   }
 }
 
@@ -3892,15 +3870,13 @@ function deleteCompById(compId, btnEl) {
   S.comps = S.comps.filter(function(c){ return c.id !== compId; });
   if (S.runs) delete S.runs[compId];
   if (S.compEnroll) delete S.compEnroll[compId];
-  S.deletedCompIds = S.deletedCompIds || {};
-  S.deletedCompIds[compId] = true;
   saveState();
   closeSheet('sheet-comp-detail');
   closeSheet('sheet-comp');
   renderCompetitions();
   if (typeof renderHomeComps === 'function') renderHomeComps();
   if (typeof updateNationalRanking === 'function') updateNationalRanking();
-  toast('Compétition supprimée définitivement', 'ok');
+  toast('Compétition supprimée', 'ok');
 }
 
 // deleteComp(compId) is an alias used from sheet-comp-detail — same 2-step logic
@@ -3932,14 +3908,12 @@ function deleteCompDetail(compId) {
   S.comps = S.comps.filter(function(c){ return c.id !== compId; });
   if (S.runs) delete S.runs[compId];
   if (S.compEnroll) delete S.compEnroll[compId];
-  S.deletedCompIds = S.deletedCompIds || {};
-  S.deletedCompIds[compId] = true;
   saveState();
   closeSheet('sheet-comp-detail');
   renderCompetitions();
   if (typeof renderHomeComps === 'function') renderHomeComps();
   if (typeof updateNationalRanking === 'function') updateNationalRanking();
-  toast('Compétition supprimée définitivement', 'ok');
+  toast('Compétition supprimée', '');
 }
 
 function setCDTab(tab, btn) {
@@ -5464,10 +5438,7 @@ function docDelete(id) {
     clearTimeout(_docDelPending[id]);
     delete _docDelPending[id];
     S.documents = (S.documents||[]).filter(function(d){ return d.id !== id; });
-    S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-    S._deletedItems.documents = S._deletedItems.documents || {};
-    S._deletedItems.documents[id] = true;
-    saveState(); silentPush();
+    saveState();
     renderHomeResultsDrawer();
     toast('Document supprimé', 'ok');
   } else {
@@ -5794,18 +5765,7 @@ function hdgAddComp(compId) {
 function hdgRemoveComp(compId, pilotId) {
   if (!S.compEnroll||!S.compEnroll[compId]) return;
   S.compEnroll[compId]=S.compEnroll[compId].filter(function(id){return id!==pilotId;});
-  // Mémoriser la suppression pour résister au pull cloud
-  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-  S._deletedItems.compEnroll = S._deletedItems.compEnroll || {};
-  S._deletedItems.compEnroll[compId+'::'+pilotId] = true;
-  saveState(); silentPush();
-  var ov = document.getElementById('overlay-comp-mobile');
-  if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
-    renderMobileCompDetail();
-  } else {
-    renderHomeDetailPanel(null);
-  }
-  toast('Pilote retiré','');
+  saveState(); silentPush(); renderHomeDetailPanel(null); toast('Pilote retiré','');
 }
 
 function hdgExportEquipageExcel(compId) {
@@ -5946,12 +5906,6 @@ function hdgAddStaff(compId) {
   // Forcer S.staff en objet (peut être un tableau dans les anciennes données)
   if (!S.staff || Array.isArray(S.staff)) S.staff={};
   if (!S.staff[compId]) S.staff[compId]=[];
-  // Empêcher doublon à l'insertion : même pilotId ou même prénom+nom
-  var _alreadyIn = S.staff[compId].some(function(x){
-    if (entry.pilotId && x.pilotId && entry.pilotId === x.pilotId) return true;
-    return (x.prenom||'').toLowerCase()===(entry.prenom||'').toLowerCase() && (x.nom||'').toLowerCase()===(entry.nom||'').toLowerCase() && x.prenom;
-  });
-  if (_alreadyIn) { toast('Cet encadrant est déjà dans la liste', ''); return; }
   S.staff[compId].push(entry);
   saveState(); silentPush();
   ['hdg-s-nom','hdg-s-role','hdg-s-lic','hdg-s-tel','hdg-s-email'].forEach(function(id){
@@ -5968,22 +5922,14 @@ function hdgAddStaff(compId) {
 async function hdgRemoveStaff(compId, idx) {
   if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
   if(!S.staff[compId]) return;
-  // Mémoriser toutes les clés SCOPÉES à la compétition (compId::clé)
-  var _removedEntry = S.staff[compId][idx];
   S.staff[compId].splice(idx,1);
-  if (_removedEntry) {
-    S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-    S._deletedItems.staff = S._deletedItems.staff || {};
-    var _pilot = (_removedEntry.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===_removedEntry.pilotId; })||{}) : {};
-    var _pn = (_pilot.prenom || _removedEntry.prenom || '').trim().toLowerCase().replace(/\s+/g,' ');
-    var _nn = (_pilot.nom    || _removedEntry.nom    || '').trim().toLowerCase().replace(/\s+/g,' ');
-    // Clés SCOPÉES : compId::valeur — évite de supprimer la personne dans d'autres compétitions
-    [_removedEntry.id, _removedEntry.pilotId, _pn+'|'+_nn, _pn+':'+_nn].forEach(function(k){
-      if(k && k!=='|' && k!==':') S._deletedItems.staff[compId+'::'+k] = true;
-    });
-  }
   saveState();
-  // Rafraîchir l'UI immédiatement — sans attendre le push cloud
+  // Push immédiat AVANT que l'auto-sync ne repulle les vieilles données cloud
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now(); // bloque l'auto-sync pendant 60s
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+  } catch(e) {}
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
     renderMobileCompDetail();
@@ -5991,12 +5937,6 @@ async function hdgRemoveStaff(compId, idx) {
     renderHomeDetailPanel(null);
   }
   toast('Encadrant retiré','');
-  // Push cloud en arrière-plan
-  try {
-    await pushToCloud();
-    _lastSyncAt = Date.now();
-    if (typeof updateSyncTime === 'function') updateSyncTime();
-  } catch(e) {}
 }
 
 function showHomeCompDetail(compId) {
@@ -6042,11 +5982,10 @@ function renderHomeDetailPanel(cp) {
       return x && (x.compId === cp.id || x.competitionId === cp.id || x.comp_id === cp.id);
     });
   }
-  // Dédoublonnage staff léger (affichage uniquement, sans modifier S.staff)
+  // ── Dédoublonnage staff (pilotId ou prenom+nom) ──
   var _staffSeen = {};
   staffList = staffList.filter(function(s) {
-    var k = (s.id||'')+'|'+(s.pilotId||'')+'|'+(s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase();
-    if (!k || k === '|||') return true; // garder si pas de clé identifiable
+    var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
     if (_staffSeen[k]) return false; _staffSeen[k] = true; return true;
   });
 
@@ -6070,7 +6009,7 @@ function renderHomeDetailPanel(cp) {
   if (canEdit) {
     html += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap">';
     html += '<button onclick="editComp(\''+cp.id+'\')" style="background:#2563eb;border:none;border-radius:8px;cursor:pointer;padding:0 14px;height:36px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;font-family:inherit">✏️ Modifier</button>';
-    html += '<button onclick="openDossierSelector(\''+cp.id+'\')" title="Imprimer le dossier officiel de compétition" style="height:36px;padding:0 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px">🖨️ Dossier</button>';
+    html += '<button onclick="printCompDossier(\''+cp.id+'\')" title="Imprimer le dossier officiel de compétition" style="height:36px;padding:0 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px">🖨️ Dossier</button>';
     html += '<button onclick="exportCompFull(\''+cp.id+'\')" title="Exporter toutes les données de cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">⬇ Export</button>';
     html += '<label title="Importer des données pour cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center">⬆ Import<input type="file" accept=".json" style="display:none" onchange="importCompFull(this,\''+cp.id+'\')"></label>';
     html += '</div>';
@@ -6597,16 +6536,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
     ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
     html5 += '</div>';
-    // ── Déduplication enrolled à la source ──
-    var _seenEnr = {};
-    var _enrolledClean = enrolled.filter(function(pid) {
-      if (!pid || _seenEnr[pid]) return false; _seenEnr[pid] = true; return true;
-    });
-    if (_enrolledClean.length !== enrolled.length) {
-      S.compEnroll[cp.id] = _enrolledClean;
-      enrolled = _enrolledClean;
-      saveState();
-    }
     // ── Zone scrollable ──
     html5 += '<div style="flex:1;overflow-y:auto">';
     // Ligne de saisie
@@ -6629,7 +6558,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!enrolled.length) {
       html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">Tapez les premières lettres du prénom pour inscrire un pilote</div>';
     }
-    var _isMobEquip = window.innerWidth < 768;
     enrolled.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
@@ -6642,44 +6570,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       // Couleurs Équipages
       var equVal = (p.equipage||'').trim();
       var equStyle = equVal==='Biplace'?'color:#10b981;font-weight:600':equVal==='Monoplace'?'color:#8b5cf6;font-weight:600':'color:var(--txt3)';
-
-      if (_isMobEquip) {
-        // ── Affichage carte mobile ──
-        var initials = ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();
-        var fullName = escG((p.prenom||'')+' '+(p.nom||'').toUpperCase());
-        html5 += '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:64px;border-bottom:1px solid var(--bdr);'+bg+';cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
-        // Avatar
-        html5 += '<div style="width:44px;height:44px;border-radius:50%;background:var(--stol);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+initials+'</div>';
-        // Infos (colonne principale)
-        html5 += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">';
-        // Ligne 1 : Nom en gras (gauche) + Catégorie (droite)
-        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
-        html5 += '<div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fullName+'</div>';
-        html5 += '<div style="font-size:12px;font-weight:700;flex-shrink:0;'+catStyle+'">'+(catVal||'—')+'</div>';
-        html5 += '</div>';
-        // Ligne 2 : Licence (gauche) + Équipage (milieu/droite)
-        html5 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
-        html5 += '<div style="font-size:11px;color:var(--txt2);white-space:nowrap">🪪 '+(p.licence||'—')+'</div>';
-        html5 += '<div style="font-size:11px;flex-shrink:0;'+equStyle+'">'+(equVal||'—')+'</div>';
-        html5 += '</div>';
-        html5 += '</div>';
-        // Bouton supprimer
-        html5 += '<div onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+';font-size:20px;padding:4px 6px" title="Retirer">×</button></div>';
-        html5 += '</div>';
-      } else {
-        // ── Affichage grille desktop ──
-        html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
-        html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
-        html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
-        html5 += '</div>';
-      }
+      html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+      html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
+      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';'+catStyle+'">'+(catVal||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
+      html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.region||'—')+'</div>';
+      html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Retirer">×</button></div>';
+      html5 += '</div>';
     });
     html5 += '</div>';
     return html5;
@@ -6966,55 +6867,18 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!compStaffG2.length) {
       html3 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditS ? 'Tapez les premières lettres du prénom pour ajouter un encadrant' : 'Aucun encadrement enregistré pour cette compétition')+'</div>';
     }
-    var _isMobStaff = window.innerWidth < 768;
     compStaffG2.forEach(function(s, si){
-      var pilot  = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
-      var prenom = (pilot.prenom || s.prenom || '').trim();
-      var nom    = (pilot.nom    || s.nom    || '').trim();
-      var nomAff = escS(prenom + (nom ? ' ' + nom.toUpperCase() : ''));
-      var licVal = pilot.licence || s.licence || '—';
-      var telVal = pilot.tel   || s.tel   || '';
-      var emlVal = pilot.email || s.email || '';
-      var roleVal = s.role || '—';
-      var bg = si%2===1 ? 'var(--navy3)' : 'transparent';
-
-      if (_isMobStaff) {
-        // ── Carte mobile ──
-        var initials = ((prenom[0]||'?')+(nom[0]||'?')).toUpperCase();
-        html3 += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;min-height:72px;border-bottom:1px solid var(--bdr);background:'+bg+';cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" title="Modifier">';
-        // Avatar
-        html3 += '<div style="width:44px;height:44px;border-radius:50%;background:var(--stol);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">'+initials+'</div>';
-        // Bloc infos
-        html3 += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">';
-        // Ligne 1 : Nom en gras (gauche) + Licence (droite)
-        html3 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
-        html3 += '<div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nomAff+'</div>';
-        html3 += '<div style="font-size:11px;color:var(--txt2);flex-shrink:0;white-space:nowrap">🪪 '+escS(licVal)+'</div>';
-        html3 += '</div>';
-        // Ligne 2 : Fonction (gauche, colorée)
-        html3 += '<div style="font-size:12px;font-weight:600;color:var(--stol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escS(roleVal)+'</div>';
-        // Ligne 3 : Contacts (si renseignés)
-        if (telVal || emlVal) {
-          html3 += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:1px">';
-          if (telVal) html3 += '<div style="font-size:11px;color:var(--txt2)">📞 '+escS(telVal)+'</div>';
-          if (emlVal) html3 += '<div style="font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;min-width:0">✉ '+escS(emlVal)+'</div>';
-          html3 += '</div>';
-        }
-        html3 += '</div>';
-        // Bouton supprimer / flèche
-        html3 += '<div style="flex-shrink:0;display:flex;align-items:center" onclick="event.stopPropagation()">'+(canEditS ? '<button onclick="hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+';font-size:20px;padding:4px 6px" title="Retirer">×</button>' : '<span style="font-size:14px;color:var(--txt3)">›</span>')+'</div>';
-        html3 += '</div>';
-      } else {
-        // ── Grille desktop ──
-        html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
-        html3 += '<div style="'+_dStS+';font-weight:600">'+nomAff+'</div>';
-        html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+escS(roleVal)+'</div>';
-        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(licVal)+'</div>';
-        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(telVal||'—')+'</div>';
-        html3 += '<div style="'+_dStS+';color:var(--txt2)">'+escS(emlVal||'—')+'</div>';
-        html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
-        html3 += '</div>';
-      }
+      var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
+      var nom   = escS(((pilot.prenom||s.prenom||'')+' '+(pilot.nom||s.nom||'')).trim());
+      var bg    = si%2===1 ? 'var(--navy3)' : 'transparent';
+      html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
+      html3 += '<div style="'+_dStS+';font-weight:600">'+nom+'</div>';
+      html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
+      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.licence||s.licence||'—')+'</div>';
+      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.tel||s.tel||'—')+'</div>';
+      html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(pilot.email||s.email||'—')+'</div>';
+      html3 += '<div style="display:flex;align-items:center;justify-content:center">'+(canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Retirer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>')+'</div>';
+      html3 += '</div>';
     });
     html3 += '</div>';
     return html3;
@@ -7123,7 +6987,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
               var bg = (matList.indexOf(m) % 2 === 1) ? 'background:rgba(255,255,255,.02);' : '';
               var rowOpacity = isChecked ? 'opacity:.45;' : '';
               var MCOL = 'grid-template-columns:28px minmax(0,1.5fr) 48px minmax(0,1.2fr) 28px 28px';
-              htmlMat += '<div id="'+rowId+'" style="display:grid;'+MCOL+';gap:3px;padding:5px 10px;align-items:center;'+bg+rowOpacity+'">';
+              htmlMat += '<div style="display:grid;'+MCOL+';gap:3px;padding:5px 10px;align-items:center;'+bg+rowOpacity+'">';
               htmlMat += '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;cursor:pointer;padding:2px"><input type="checkbox" class="mat-check" '+(isChecked?'checked':'')+' onchange="toggleMaterielCheck(\''+cp.id+'\',\''+m.id+'\')"></label>';
               htmlMat += '<div style="font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(isChecked?';text-decoration:line-through':'')+'">'+(m.materiel||'—')+'</div>';
               htmlMat += '<div style="font-size:12px;font-weight:700;color:var(--amber);text-align:center">'+(m.quantite||'—')+'</div>';
@@ -7207,10 +7071,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Coût = Valeur × Nb jours × Qt
     var computeCout = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var calcTotal = function(lines){ return lines.reduce(function(s,l){ return s+computeCout(l); }, 0); };
-    var _bMob  = window.innerWidth < 768;
-    var BGRID = _bMob
-      ? 'grid-template-columns:minmax(0,1.4fr) minmax(0,1.6fr) 54px 40px 40px 64px 26px 26px'
-      : 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
+    var BGRID = 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
     var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
     // Sous-onglets + boutons actions dans la même barre
@@ -7235,7 +7096,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var nInpInt  = 'type="number" min="1" step="1"';
       var calcEvt  = function(lid){ return 'recalcBudgetCout(\''+cp.id+'\',\''+section+'\',\''+lid+'\')'; };
       // ── En-tête colonnes ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:'+(_bMob?'8px 8px':'4px 6px')+';border-bottom:2px solid var(--bdr);'+(_bMob?'':'min-width:540px;')+'flex-shrink:0">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:540px;flex-shrink:0">';
       htmlB += '<div style="'+hStyle+'">Domaine</div>';
       htmlB += '<div style="'+hStyle+'">Libellé</div>';
       htmlB += '<div style="'+hStyle+';text-align:right">Valeur</div>';
@@ -7245,7 +7106,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<div></div><div></div>';
       htmlB += '</div>';
       // ── Ligne de saisie (même système que Staff/Equipage) ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:'+(_bMob?'9px 8px':'5px 6px')+';border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;'+(_bMob?'':'min-width:540px;')+'position:relative">';
+      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:540px;position:relative">';
       htmlB += '<div style="position:relative">';
       htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyle+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
       htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
@@ -7272,7 +7133,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           var isOpen   = !!_bgtOpenDomains[domKey];
           var chevron  = isOpen ? '▾' : '▸';
           // Ligne récapitulative du groupe
-          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:'+(_bMob?'11px 10px':'6px 8px')+';align-items:center;'+(_bMob?'':'min-width:540px;')+'background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
+          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:540px;background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
           htmlB += '<div style="font-size:12px;font-weight:800;color:var(--stol);display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-size:11px">'+chevron+'</span>'+bEsc(dom)+'</div>';
           htmlB += '<div style="font-size:11px;color:var(--txt3);font-style:italic">'+grpLines.length+' ligne'+(grpLines.length>1?'s':'')+'</div>';
           htmlB += '<div></div><div></div><div></div>';
@@ -7284,7 +7145,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
             grpLines.forEach(function(l, i){
               var bg = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
               var coutCalc = computeCout(l);
-              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:'+(_bMob?'9px 8px 9px 16px':'4px 6px 4px 20px')+';align-items:center;'+bg+';'+(_bMob?'':'min-width:540px;')+'border-bottom:1px solid rgba(255,255,255,0.04)">';
+              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:540px;border-bottom:1px solid rgba(255,255,255,0.04)">';
               htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
               htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
@@ -7592,10 +7453,7 @@ function deletePartenaire(compId, partId) {
   if (!confirm('Supprimer ce partenaire ?')) return;
   if (!S.partenaires || !S.partenaires[compId]) return;
   S.partenaires[compId] = S.partenaires[compId].filter(function(x){ return x.id!==partId; });
-  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{}};
-  S._deletedItems.partenaires = S._deletedItems.partenaires || {};
-  S._deletedItems.partenaires[partId] = true;
-  saveState(); silentPush();
+  saveState();
   renderHomeDetailPanel(null);
   toast('Partenaire supprimé', 'ok');
 }
@@ -8904,7 +8762,7 @@ async function scLogin() {
     await loadUserProfile(data.user);
     toast('Connecté ✓', 'ok'); updateHeader(); renderHome();
     renderSettingsCompte();
-    setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
+    setTimeout(function(){ sbSync(); }, 500);
   } catch(e) {
     var eMsg = e && e.message ? e.message : String(e);
     scShowLoginError('Exception : ' + eMsg);
@@ -8932,7 +8790,7 @@ async function scSignup() {
   saveState();
   toast((isFirst ? '👑 Compte Gestionnaire' : 'Compte') + ' créé ✓', 'ok');
   updateHeader(); renderHome(); renderSettingsCompte();
-  setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
+  setTimeout(function(){ sbSync(); }, 500);
 }
 async function scReset() {
   var email = (document.getElementById('sc-login-email')||{value:''}).value.trim();
@@ -10281,116 +10139,117 @@ function deleteSite() {
 function renderStaffList() {
   var cont = document.getElementById('staff-list'); if (!cont) return;
   var staffObj = (!S.staff || Array.isArray(S.staff)) ? {} : S.staff;
-
-  // ── Agréger tous les individus, dédoublonner par pilotId ou prenom+nom ──
-  var personMap = {}; // clé → {prenom, nom, photo, licence, tel, email, roles:[], compId, idx}
-  Object.keys(staffObj).forEach(function(cid) {
-    (staffObj[cid] || []).forEach(function(e, ei) {
-      var pilot = (S.pilots||[]).find(function(p){ return p.id === e.pilotId; }) || {};
-      var prenom = (pilot.prenom || e.prenom || '').trim();
-      var nom    = (pilot.nom    || e.nom    || '').trim();
-      // Clé TOUJOURS par nom normalisé — jamais par ID — pour fusionner entrées avec/sans pilotId
-      var key = prenom.toLowerCase().replace(/\s+/g,' ') + '|' + nom.toLowerCase().replace(/\s+/g,' ');
-      if (!key || key === '|') return;
-      if (!personMap[key]) {
-        personMap[key] = {
-          key: key,
-          prenom: prenom,
-          nom: nom,
-          photo: pilot.photo || e.photo || '',
-          licence: pilot.licence || e.licence || '',
-          tel: pilot.tel || e.tel || '',
-          email: pilot.email || e.email || '',
-          roles: [],
-          compId: cid,  // première compétition trouvée → pour ouvrir le détail
-          idx: ei
-        };
-      }
-      var role = (e.role || '').trim();
-      if (role && personMap[key].roles.indexOf(role) === -1) {
-        personMap[key].roles.push(role);
-      }
-      if (pilot.photo && !personMap[key].photo)   personMap[key].photo   = pilot.photo;
-      if (pilot.tel   && !personMap[key].tel)      personMap[key].tel     = pilot.tel;
-      if (pilot.email && !personMap[key].email)    personMap[key].email   = pilot.email;
-    });
+  // Agréger toutes les compétitions ayant du staff
+  var groups = [];
+  Object.keys(staffObj).forEach(function(compId) {
+    var entries = staffObj[compId] || [];
+    if (!entries.length) return;
+    var comp = (S.comps||[]).find(function(c){ return c.id === compId; });
+    groups.push({ comp:comp, compId:compId, entries:entries });
   });
-
-  // Enrichir avec photo/infos des pilots (même clé prenom|nom)
-  (S.pilots||[]).forEach(function(p) {
-    var key = (p.prenom||'').trim().toLowerCase().replace(/\s+/g,' ')+'|'+(p.nom||'').trim().toLowerCase().replace(/\s+/g,' ');
-    if (!key || key === '|') return;
-    if (personMap[key]) {
-      // Enrichir si manquant
-      if (p.photo   && !personMap[key].photo)   personMap[key].photo   = p.photo;
-      if (p.tel     && !personMap[key].tel)      personMap[key].tel     = p.tel;
-      if (p.email   && !personMap[key].email)    personMap[key].email   = p.email;
-      if (p.licence && !personMap[key].licence)  personMap[key].licence = p.licence;
-    } else if (p.statut === 'staff') {
-      // Pilot staff non encore dans la liste
-      personMap[key] = {
-        key: key,
-        prenom: (p.prenom||'').trim(),
-        nom: (p.nom||'').trim(),
-        photo: p.photo || '',
-        licence: p.licence || '',
-        tel: p.tel || '',
-        email: p.email || '',
-        roles: p.role ? [p.role] : [],
-        compId: '', idx: 0
-      };
-    }
-  });
-
-  var persons = Object.keys(personMap).map(function(k){ return personMap[k]; });
-
-  // ── Filtrer par recherche ──
+  // Filtrer par recherche
   if (_staffSearch) {
     var sq = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    persons = persons.filter(function(p) {
-      var hay = [p.prenom, p.nom, p.roles.join(' '), p.tel, p.email, p.licence].join(' ')
-        .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      return hay.indexOf(sq) !== -1;
+    groups.forEach(function(g){
+      g.entries = g.entries.filter(function(e){
+        var pilot = (S.pilots||[]).find(function(p){ return p.id === (e.pilotId||e.id); }) || {};
+        var hay = [
+          (pilot.prenom||e.prenom||''),
+          (pilot.nom||e.nom||''),
+          (e.role||''),
+          (pilot.club||e.club||''),
+          (pilot.email||e.email||'')
+        ].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        return hay.indexOf(sq) !== -1;
+      });
+    });
+    groups = groups.filter(function(g){ return g.entries.length > 0; });
+  }
+  // Trier par date décroissante
+  groups.sort(function(a, b) {
+    var da = a.comp ? (a.comp.dateFrom||'') : '';
+    var db = b.comp ? (b.comp.dateFrom||'') : '';
+    return db.localeCompare(da);
+  });
+  // ── Membres staff globaux (statut='staff' dans S.pilots, non assignés à une compét) ──
+  var _allAssignedIds = [];
+  Object.keys(staffObj).forEach(function(cid){ (staffObj[cid]||[]).forEach(function(e){ if(e.pilotId||e.id) _allAssignedIds.push(e.pilotId||e.id); }); });
+  var _globalStaffPilots = (S.pilots||[]).filter(function(p){ return p.statut === 'staff' && _allAssignedIds.indexOf(p.id) === -1; });
+  if (_staffSearch) {
+    var sq2 = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    _globalStaffPilots = _globalStaffPilots.filter(function(p){
+      return [(p.prenom||''),(p.nom||''),(p.role||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(sq2) !== -1;
     });
   }
-
-  if (!persons.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+
-      (_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' :
-       'Aucun membre de staff — utilisez <strong>+ Nouveau</strong> pour en ajouter un') +'</div>';
+  if (!groups.length && !_globalStaffPilots.length) {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+ (_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' : 'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong> pour créer un membre') +'</div>';
     return;
   }
-
-  // ── Trier par nom puis prénom ──
-  persons.sort(function(a, b) {
-    return ((a.nom||'')+(a.prenom||'')).localeCompare((b.nom||'')+(b.prenom||''), 'fr');
-  });
-
+  var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
   var html = '';
-  persons.forEach(function(p) {
-    var initiale = ((p.prenom[0]||p.nom[0]||'?')).toUpperCase();
-    var cidE = escH(p.compId||'');
-    html += '<div data-cid="'+cidE+'" data-idx="'+p.idx+'" onclick="showStaffDetailModal(this.dataset.cid,parseInt(this.dataset.idx))" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
-    if (p.photo) {
-      html += '<img src="'+escH(p.photo)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">';
-    } else {
-      html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+initiale+'</div>';
-    }
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-size:13px;font-weight:700">'+escH((p.prenom+' '+p.nom).trim())+'</div>';
-    if (p.roles.length) {
-      html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+p.roles.map(escH).join(' · ')+'</div>';
-    }
-    var dets = [];
-    if (p.licence) dets.push('Lic. '+escH(p.licence));
-    if (p.tel)     dets.push('📞 '+escH(p.tel));
-    if (p.email)   dets.push('✉️ '+escH(p.email));
-    if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
+  // Bloc "Membres" (staff global non assigné)
+  if (_globalStaffPilots.length) {
+    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
+    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">Membres staff</div>';
+    html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">Non assignés à une compétition spécifique</div>';
     html += '</div>';
-    html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
+    _globalStaffPilots.forEach(function(p) {
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)">';
+      if (p.photo) {
+        html += '<img src="'+p.photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">';
+      } else {
+        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((p.prenom||'?')[0]).toUpperCase()+'</div>';
+      }
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:13px;font-weight:700">'+((p.prenom||'')+' '+(p.nom||'')).trim()+'</div>';
+      if (p.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+p.role+'</div>';
+      var dets=[]; if(p.licence) dets.push('Lic. '+p.licence); if(p.tel) dets.push('📞 '+p.tel); if(p.email) dets.push('✉️ '+p.email);
+      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+  }
+  groups.forEach(function(g) {
+    var comp = g.comp;
+    var compName = comp ? comp.name : 'Compétition inconnue';
+    var compDate = comp ? formatDate(comp.dateFrom) + (comp.dateTo && comp.dateTo !== comp.dateFrom ? ' — ' + formatDate(comp.dateTo) : '') : '';
+    // En-tête compétition
+    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
+    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">' + compName + '</div>';
+    if (compDate) html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">' + compDate + '</div>';
     html += '</div>';
+    g.entries.forEach(function(s, si) {
+      var pilot  = (S.pilots||[]).find(function(p){ return p.id === (s.pilotId||s.id); }) || {};
+      var prenom = pilot.prenom || s.prenom || '';
+      var nom    = pilot.nom    || s.nom    || '';
+      var photo  = pilot.photo  || s.photo  || '';
+      var tel    = pilot.tel    || s.tel    || '';
+      var email  = pilot.email  || s.email  || '';
+      var lic    = pilot.licence || s.licence || '';
+      html += '<div onclick="showStaffDetailModal(\''+g.compId+'\','+si+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
+      // Avatar
+      if (photo) {
+        html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+((prenom[0]||'?').toUpperCase())+'</div>\'">';
+      } else {
+        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((prenom[0]||'?').toUpperCase())+'</div>';
+      }
+      // Infos
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:13px;font-weight:700">'+(prenom+' '+nom).trim()+'</div>';
+      if (s.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+s.role+'</div>';
+      var dets=[];
+      if (lic)   dets.push('Lic. '+lic);
+      if (tel)   dets.push('📞 '+tel);
+      if (email) dets.push('✉️ '+email);
+      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
+      html += '</div>';
+      if (canEdit) {
+        html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+g.compId+'\','+si+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Retirer">×</button>';
+      }
+      html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
+      html += '</div>';
+    });
   });
-
   cont.innerHTML = html;
 }
 
@@ -10480,7 +10339,7 @@ function renderStaffTab() {
 }
 
 function syncAndRefreshUsers() {
-  _bgSync().then(function(){ renderUtilisateursTab(); }).catch(function(){});
+  sbSync().then(function(){ renderUtilisateursTab(); }).catch(function(){});
 }
 
 function toggleUtilCreateForm() {
@@ -10724,10 +10583,6 @@ function deleteUser(pilotId, displayName) {
   if (!confirm('Supprimer ' + label + ' ?\n\nSon compte de connexion reste actif — seule sa fiche locale sera supprimée. Il réapparaîtra s\'il se reconnecte.')) return;
   // Retirer de S.pilots
   S.pilots = S.pilots.filter(function(p){ return p.id !== pilotId; });
-  // Mémoriser la suppression pour qu'elle soit propagée au pull cloud
-  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{},pilots:{}};
-  S._deletedItems.pilots = S._deletedItems.pilots || {};
-  S._deletedItems.pilots[pilotId] = true;
   // Retirer ses machines
   if (S.ulms) delete S.ulms[pilotId];
   // Retirer de toutes les inscriptions aux compétitions
@@ -10814,67 +10669,77 @@ async function sbLogout() {
 // ═══════════════════════════════════════════════════════
 var _syncInProgress = false;
 var _lastSyncAt     = 0;
-var _pushPending    = false;  // données locales non encore envoyées au cloud
-// _pushPending persisté en localStorage pour survivre aux rechargements de page
-try { if (localStorage.getItem('_gest_pushPending') === '1') _pushPending = true; } catch(e){}
-function _setPushPending(v) {
-  _pushPending = v;
-  try { if (v) localStorage.setItem('_gest_pushPending','1'); else localStorage.removeItem('_gest_pushPending'); } catch(e){}
-  setTimeout(function(){ if(typeof _updatePushIndicator==='function') _updatePushIndicator(); }, 0);
-}
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
-// ── Sync silencieuse (arrière-plan) : AUCUN message, AUCUNE bannière ──
-async function _bgSync() {
-  if (_syncInProgress) return;
-  if (!navigator.onLine) return;
-  var sb = getSB(); if (!sb) return;
-  _syncInProgress = true;
+// ── Horodater S automatiquement à chaque saveState ──────────────────────────
+// Cela garantit que _mergeById peut toujours choisir la version la plus récente
+var _origSaveState = null; // sera initialisé après la définition de saveState
+
+function _touchUpdatedAt() {
+  var now = Date.now();
+  // Horodater chaque comp modifiée récemment (heuristique : pas de _updatedAt)
+  (S.comps||[]).forEach(function(c){ if (!c._updatedAt) c._updatedAt = now; });
+  (S.pilots||[]).forEach(function(p){ if (!p._updatedAt) p._updatedAt = now; });
+}
+
+async function testSupabase() {
+  var el = document.getElementById('sync-diag-result');
+  var show = function(msg, color) { if(el){ el.textContent = msg; el.style.color = color||''; } };
+  show('Test en cours...', '#f59e0b');
+  if (!navigator.onLine) { show('Hors ligne - pas de WiFi/4G', '#ef4444'); return; }
+  var sb = getSB();
+  if (!sb) { show('Supabase non chargé (CDN bloqué?)', '#ef4444'); return; }
   try {
-    await pullFromCloud();
-    await pushToCloud();
-    _setPushPending(false);
-    _lastSyncAt = Date.now();
-    updateSyncTime();
-    var sf = document.getElementById('comp-season-filter');
-    if (sf) sf.value = 'all';
-    renderHome(); renderCompetitions(); renderPilots(); updateHeader();
-    renderProfileCompte(); renderSettingsCompte(); renderUtilisateursTab();
-    var syncBtn = document.getElementById('sync-status');
-    if (syncBtn) syncBtn.textContent = '☁️';
+    var t0 = Date.now();
+    var res = await sb.from('stol_shared').select('updated_at').eq('id','global').single();
+    var ms = Date.now() - t0;
+    if (res.error && res.error.code !== 'PGRST116') {
+      show('Erreur Supabase: ' + res.error.message, '#ef4444');
+      return;
+    }
+    var cloudInfo = res.data ? (' · Cloud: ' + new Date(res.data.updated_at).toLocaleTimeString()) : ' · Cloud vide';
+    show('✓ Connecté (' + ms + 'ms)' + cloudInfo, '#10b981');
+    // Aussi afficher les IDs local vs cloud
+    if (res.data) {
+      var res2 = await sb.from('stol_shared').select('data').eq('id','global').single();
+      if (res2.data && res2.data.data) {
+        var r = res2.data.data;
+        var localN = (S.comps||[]).length;
+        var cloudN = (r.comps||[]).length;
+        var localPilots = (S.pilots||[]).length;
+        var cloudPilots = (r.pilots||[]).length;
+        var msg = 'Local: ' + localN + ' comps / ' + localPilots + ' pilotes  —  Cloud: ' + cloudN + ' comps / ' + cloudPilots + ' pilotes';
+        show('✓ ' + ms + 'ms · ' + msg, cloudN === localN ? '#10b981' : '#f59e0b');
+      }
+    }
   } catch(e) {
-    console.warn('[GestSTOL] _bgSync échouée:', e.message || e);
-    // Pas de message UI — l'indicateur ☁️ reste inchangé
-  } finally {
-    _syncInProgress = false;
+    show('Erreur: ' + (e.message||'réseau'), '#ef4444');
   }
 }
 
-// ── Sync manuelle (bouton ☁️) : feedback visuel uniquement ──
 async function sbSync() {
   if (_syncInProgress) { toast('Sync déjà en cours…', ''); return; }
   _syncInProgress = true;
   var syncBtn = document.getElementById('sync-status');
   if (syncBtn) syncBtn.textContent = '⏳';
   try {
-    await pullFromCloud();
-    await pushToCloud();
-    _setPushPending(false);
+    await pullFromCloud();      // 1. Lire le cloud → remplacer local
+    await pushToCloud();        // 2. Écrire local → cloud (merge résolu côté push)
     _lastSyncAt = Date.now();
     updateSyncTime();
     var sf = document.getElementById('comp-season-filter');
     if (sf) sf.value = 'all';
     renderHome(); renderCompetitions(); renderPilots(); updateHeader();
     renderProfileCompte(); renderSettingsCompte(); renderUtilisateursTab();
-    toast('Synchronisé ✓', 'ok');
+    toast('Synchronisé ✓ — ' + S.comps.length + ' compétition(s)', 'ok');
     if (syncBtn) syncBtn.textContent = '☁️';
   } catch(e) {
-    console.warn('[GestSTOL] sbSync échouée:', e);
+    console.error('[GestSTOL] sbSync échouée:', e);
+    var errMsg = e.message || 'erreur réseau';
+    toast('Sync échouée : ' + errMsg, 'err');
     if (syncBtn) syncBtn.textContent = '✗';
-    var errMsg = (!navigator.onLine || (e.message && e.message.indexOf('fetch') !== -1))
-      ? 'Hors ligne — les données seront synchronisées à la reconnexion'
-      : (e.message || 'erreur inconnue');
-    toast(errMsg, '');
+    // Afficher dans une bannière lisible qui reste visible
+    showSyncError(errMsg);
   } finally {
     _syncInProgress = false;
   }
@@ -10901,8 +10766,6 @@ async function pushToCloud() {
     officialDocs:     S.officialDocs       || {},
     docSettings:      S.docSettings        || {},
     homeTodosByComp:  S.homeTodosByComp    || {},
-    deletedCompIds:   S.deletedCompIds     || {},
-    _deletedItems:    S._deletedItems      || {},
     _pushAt:          Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
@@ -10925,23 +10788,19 @@ async function _pushMedias(sb) {
 }
 
 // ── FUSION par id : les deux sources sont conservées, jamais de perte ──
-function _mergeById(local, remote, deletedSet) {
+function _mergeById(local, remote) {
   var map = {};
   var la = Array.isArray(local)  ? local  : [];
   var ra = Array.isArray(remote) ? remote : [];
-  // Remote d'abord (base)
+  // Les deux sources sont fusionnées : le plus récent (_updatedAt) gagne
   ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
-  // Local ensuite : gagne seulement si _updatedAt plus récent, sinon remote garde la priorité
   la.forEach(function(x){
     if (!x || !x.id) return;
-    if (!map[x.id]) { map[x.id] = x; return; } // nouveau item local → ajouter
-    var localTs  = x._updatedAt  || 0;
-    var remoteTs = map[x.id]._updatedAt || 0;
-    if (localTs > remoteTs) map[x.id] = x; // local plus récent → local gagne
-    // sinon remote garde la priorité
+    if (!map[x.id]) { map[x.id] = x; return; }
+    // Si local a un _updatedAt plus récent → local gagne, sinon cloud garde
+    if ((x._updatedAt||0) > (map[x.id]._updatedAt||0)) map[x.id] = x;
   });
-  var ds = deletedSet || {};
-  return Object.keys(map).filter(function(k){ return !ds[k]; }).map(function(k){ return map[k]; });
+  return Object.keys(map).map(function(k){ return map[k]; });
 }
 // ── FUSION objet simple : les clés des deux sources sont gardées ──
 function _mergeObj(local, remote) {
@@ -11009,33 +10868,13 @@ async function pullFromCloud() {
   S.comps.forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
   S.pilots.forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo; });
 
-  // ── Fusionner d'abord les trackers de suppression (union : toute suppression des deux sources est honorée) ──
-  var _rDel = r._deletedItems || {};
-  S._deletedItems = S._deletedItems || {staff:{},compEnroll:{},partenaires:{},documents:{},pilots:{}};
-  ['staff','compEnroll','partenaires','documents','pilots'].forEach(function(t){
-    S._deletedItems[t] = S._deletedItems[t] || {};
-    var rd = _rDel[t] || {};
-    Object.keys(rd).forEach(function(k){ S._deletedItems[t][k] = true; });
-  });
-  // Fusionner deletedCompIds (union)
-  var _rDelComps = r.deletedCompIds || {};
-  S.deletedCompIds = S.deletedCompIds || {};
-  Object.keys(_rDelComps).forEach(function(k){ S.deletedCompIds[k] = true; });
-
-  // ── Migration : purger les clés staff globales (non scopées) venant du cloud ──
-  if (S._deletedItems && S._deletedItems.staff) {
-    Object.keys(S._deletedItems.staff).forEach(function(k){
-      if (k.indexOf('::') === -1) delete S._deletedItems.staff[k];
-    });
-  }
-
-  // ── FUSION : local gagne sur remote (local = plus récent) ──
-  // Tableaux plats avec .id : _mergeById (local wins, deleted filtered)
+  // ── FUSION : on garde TOUT — local + cloud, jamais de remplacement total ──
+  // Tableaux plats avec .id : _mergeById
   S.comps         = _mergeById(S.comps,         r.comps);
-  S.pilots        = _mergeById(S.pilots,        r.pilots,        S._deletedItems.pilots);
+  S.pilots        = _mergeById(S.pilots,        r.pilots);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
-  S.documents     = _mergeById(S.documents,     r.documents,     S._deletedItems.documents);
+  S.documents     = _mergeById(S.documents,     r.documents);
   S.messages      = _mergeById(S.messages,      r.messages);
   // Objets indexés par compId dont les valeurs sont des tableaux : _mergeObjOfArrays
   S.staff              = _mergeObjOfArrays(S.staff,              r.staff);
@@ -11053,68 +10892,28 @@ async function pullFromCloud() {
 
   S._lastPushAt = r._pushAt || 0;
 
-  // ── Appliquer toutes les suppressions après fusion ──
-  // 0. Filtrer S.pilots par _deletedItems.pilots
-  var _dpilots = (S._deletedItems || {}).pilots || {};
-  S.pilots = (S.pilots||[]).filter(function(p){ return !_dpilots[p.id]; });
-  // 1. Filtrer S.comps par deletedCompIds
-  var _dc = S.deletedCompIds || {};
-  S.comps = S.comps.filter(function(c){ return !_dc[c.id]; });
-  // 2. Filtrer staff par _deletedItems.staff (chercher sur toutes les clés possibles)
-  var _ds = (S._deletedItems || {}).staff || {};
-  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
-    Object.keys(S.staff).forEach(function(cid){
-      // a) Filtre suppression avec clés SCOPÉES (compId::clé) — ne filtre que pour cette compétition
-      S.staff[cid] = (S.staff[cid]||[]).filter(function(e){
-        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===e.pilotId; })||{}) : {};
-        var pn = (pilot.prenom||e.prenom||'').trim().toLowerCase();
-        var nn = (pilot.nom   ||e.nom   ||'').trim().toLowerCase();
-        // Vérifier clés scopées (nouveau format) ET clés globales (ancien format, rétrocompat)
-        var scopedKeys = [e.pilotId, e.id, pn+'|'+nn, pn+':'+nn].filter(Boolean).map(function(k){ return cid+'::'+k; });
-        var globalKeys = [e.pilotId, e.id, pn+'|'+nn, pn+':'+nn].filter(Boolean);
-        return !scopedKeys.concat(globalKeys).some(function(k){ return _ds[k]; });
-      });
-      // b) Déduplication par nom (même personne avec IDs d'entrée différents)
-      var seenS = {};
-      S.staff[cid] = (S.staff[cid]||[]).filter(function(e){
-        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id===e.pilotId; })||{}) : {};
-        var pn = (pilot.prenom||e.prenom||'').trim().toLowerCase().replace(/\s+/g,' ');
-        var nn = (pilot.nom   ||e.nom   ||'').trim().toLowerCase().replace(/\s+/g,' ');
-        var k = pn+'|'+nn;
-        if (!k || k === '|') return true;
-        if (seenS[k]) return false;
-        seenS[k] = true; return true;
-      });
-    });
-  }
-  // 3. Filtrer compEnroll par _deletedItems.compEnroll
-  var _de = (S._deletedItems || {}).compEnroll || {};
-  if (S.compEnroll && typeof S.compEnroll === 'object') {
-    Object.keys(S.compEnroll).forEach(function(cid){
-      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid){
-        return !_de[cid+'::'+pid];
-      });
-    });
-  }
-  // 4. Filtrer partenaires par _deletedItems.partenaires
-  var _dp = (S._deletedItems || {}).partenaires || {};
-  if (S.partenaires && typeof S.partenaires === 'object') {
-    Object.keys(S.partenaires).forEach(function(cid){
-      S.partenaires[cid] = (S.partenaires[cid]||[]).filter(function(p){ return !_dp[p.id]; });
-    });
-  }
-  // 5. Filtrer documents par _deletedItems.documents (déjà fait via _mergeById mais double sécurité)
-  var _dd = (S._deletedItems || {}).documents || {};
-  S.documents = (S.documents||[]).filter(function(d){ return !_dd[d.id]; });
-
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
 
-  // ── Normaliser les IDs (comp_XXXXX → cal26-*/calf-*) puis purger les doublons ──
-  // Nécessite que les injections aient déjà tourné (elles tournent à DOMContentLoaded
-  // avant le pull, et restent dans S.comps pour le pull suivant).
-  _normalizeCompIds();
-  _purgeAllDuplicates();
+  // ── Nettoyage doublons staff (entrées sans .id ou avec même pilotId) ──
+  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(cid) {
+      var seen = {};
+      S.staff[cid] = (S.staff[cid]||[]).filter(function(s) {
+        var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
+        if (seen[k]) return false; seen[k] = true; return true;
+      });
+    });
+  }
+
+  // ── Nettoyage doublons compétitions (même nom + même dateFrom) ──
+  if (S.comps && S.comps.length > 1) {
+    var compSeen = {};
+    S.comps = S.comps.filter(function(c) {
+      var k = (c.name||'').trim().toLowerCase()+'|'+(c.dateFrom||'');
+      if (compSeen[k]) return false; compSeen[k] = true; return true;
+    });
+  }
 
   // Restaurer les affiches/photos locales si absentes du cloud
   S.comps.forEach(function(c){  if (localAffiches[c.id] && !c.affiche) c.affiche = localAffiches[c.id]; });
@@ -11125,7 +10924,7 @@ async function pullFromCloud() {
 
   updateNationalRanking();
   saveState();
-  console.log('[GestSTOL] pullFromCloud OK — comps:', S.comps.length, '| pilots:', S.pilots.length, '| staff keys:', Object.keys(S.staff||{}).length);
+  console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
 }
 
 async function _pullMedias(sb) {
@@ -11149,43 +10948,20 @@ async function _pullMedias(sb) {
   } catch(e){ console.warn('_pullMedias', e.message||e); }
 }
 
-// showSyncError supprimé — les erreurs sync sont silencieuses, visibles uniquement en console
-
-// ── Diagnostic sync ────────────────────────────────────
-async function showSyncDiag() {
-  var msg = '=== DIAGNOSTIC SYNC ===\n';
-  msg += 'En ligne : ' + (navigator.onLine ? 'OUI' : 'NON') + '\n';
-  msg += 'Supabase : ' + (getSB() ? 'OK' : 'NON CHARGE') + '\n';
-  msg += 'Données en attente : ' + (_pushPending ? 'OUI' : 'non') + '\n';
-  msg += 'Dernière sync : ' + (_lastSyncAt ? Math.round((Date.now()-_lastSyncAt)/1000)+'s' : 'jamais') + '\n\n';
-  msg += 'LOCAL : ' + (S.comps||[]).length + ' comps, ' + (S.pilots||[]).length + ' pilotes\n';
-  var sb = getSB();
-  if (!sb || !navigator.onLine) { alert(msg + 'Cloud : non disponible'); return; }
-  try {
-    var res = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
-    if (res.error) { alert(msg + 'ERREUR CLOUD : ' + res.error.message); return; }
-    if (!res.data || !res.data.data) { alert(msg + 'CLOUD : vide'); return; }
-    var r = res.data.data;
-    msg += 'CLOUD : ' + (r.comps||[]).length + ' comps, ' + (r.pilots||[]).length + ' pilotes\n';
-    msg += 'Push cloud : ' + (r._pushAt ? new Date(r._pushAt).toLocaleTimeString() : '?') + '\n';
-    msg += 'updated_at : ' + res.data.updated_at + '\n\n';
-    var cloudIds = (r.comps||[]).map(function(c){return c.id;});
-    var localIds = (S.comps||[]).map(function(c){return c.id;});
-    var onlyLocal = localIds.filter(function(id){ return cloudIds.indexOf(id)===-1; });
-    var onlyCloud = cloudIds.filter(function(id){ return localIds.indexOf(id)===-1; });
-    if (onlyLocal.length) msg += 'LOCAL seulement : ' + onlyLocal.join(', ') + '\n';
-    if (onlyCloud.length) msg += 'CLOUD seulement : ' + onlyCloud.join(', ') + '\n';
-    if (!onlyLocal.length && !onlyCloud.length) msg += 'Comps identiques local/cloud ✓\n';
-    alert(msg);
-  } catch(e) { alert(msg + 'ERREUR : ' + (e.message||e)); }
-}
-function _updatePushIndicator() {
-  var el = document.getElementById('push-pending-indicator');
-  if (!el) return;
-  el.textContent = _pushPending ? 'envoi en attente' : '';
+// ── SYNC SILENCIEUSE auto toutes les 60s ──────────────
+// ── Affichage erreur sync lisible ────────────────────
+function showSyncError(msg) {
+  var existing = document.getElementById('sync-error-banner');
+  if (existing) existing.remove();
+  var banner = document.createElement('div');
+  banner.id = 'sync-error-banner';
+  banner.style.cssText = 'position:fixed;top:66px;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;display:flex;align-items:flex-start;gap:10px;max-width:480px;margin:0 auto;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  banner.innerHTML = '<div style="flex:1"><div style="font-weight:800;margin-bottom:3px">⚠️ Erreur de synchronisation</div><div style="font-weight:400;word-break:break-all;font-size:12px">' + msg + '</div></div><button onclick="document.getElementById(\'sync-error-banner\').remove()" style="background:rgba(255,255,255,.25);border:none;border-radius:6px;color:#fff;padding:4px 8px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>';
+  var app = document.getElementById('app') || document.body;
+  app.appendChild(banner);
 }
 
-// ── Fo// ── Force push : envoie le local vers le cloud SANS pull préalable ──
+// ── Force push : envoie le local vers le cloud SANS pull préalable ──
 async function forcePushCloud() {
   var nb = S.comps ? S.comps.length : 0;
   var ok = confirm('⬆️ FORCER L\'ENVOI VERS LE CLOUD\n\nVos données locales (' + nb + ' compétition(s)) vont écraser le cloud.\n\nContinuer ?');
@@ -11310,21 +11086,23 @@ function startAutoSync() {
   setInterval(function(){
     if (!navigator.onLine || _syncInProgress) return;
     var sb = getSB(); if (!sb) return;
-    // Si des données locales n'ont pas encore été envoyées → pousser maintenant
-    if (_pushPending) {
-      _bgSync().catch(function(){});
-      return;
-    }
-    // Vérifier si le cloud est plus récent → puller
     sb.from('stol_shared').select('updated_at').eq('id','global').single()
       .then(function(res){
         if (!res.data) return;
         var remoteTs = new Date(res.data.updated_at).getTime();
         if (remoteTs > _lastSyncAt) {
-          _bgSync().catch(function(){});
+          pullFromCloud().then(function(){
+            _lastSyncAt = Date.now();
+            var sf = document.getElementById('comp-season-filter');
+            if (sf) sf.value = 'all';
+            renderHome(); renderCompetitions(); renderPilots();
+            var btn = document.getElementById('sync-status');
+            if (btn) btn.textContent = '✓';
+            updateSyncTime();
+          }).catch(function(){});
         }
-      }).catch(function(){}); // échec réseau → silencieux, retenté dans 15s
-  }, 15000); // toutes les 15 secondes
+      }).catch(function(){});
+  }, 15000); // sync toutes les 15s // vérification toutes les 60 secondes
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -11707,7 +11485,7 @@ async function sbLoginFromProfile() {
   toast('Connecté ✓', 'ok');
   syncProfileFields(); renderProfileCompte(); updateHeader();
   // Sync immédiate
-  setTimeout(function(){ _bgSync().catch(function(){}); }, 500);
+  setTimeout(function(){ sbSync(); }, 500);
 }
 async function sbSignupFromProfile() {
   var email = (document.getElementById('pf-login-email')||{}).value || '';
@@ -13142,14 +12920,9 @@ async function syncBase44All(compId) {
 // Push silencieux sans feedback visuel
 // Note : ne nécessite PAS d'être connecté (anon key suffisant)
 function silentPush() {
-  _setPushPending(true); // marquer les données comme non synchronisées (persiste aux rechargements)
-  if (!getSB() || !navigator.onLine) return; // sera retenté par l'auto-sync ou au prochain démarrage
-  pushToCloud().then(function(){
-    _setPushPending(false);
-  }).catch(function(e){
-    console.warn('[GestSTOL] silentPush échoué — sera retenté:', e.message || e);
-    // _pushPending reste true → retenté au prochain démarrage ou cycle auto-sync
-  });
+  if (!getSB() || !navigator.onLine) return;
+  _touchUpdatedAt(); // s'assurer que tout a un timestamp avant d'envoyer
+  pushToCloud().catch(function(){});
 }
 
 // ═══════════════════════════════════
@@ -13668,16 +13441,8 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   });
   hist.sort(function(a,b){ return b.comp.dateFrom.localeCompare(a.comp.dateFrom); });
 
-  var _pdmMob = window.innerWidth < 768;
-  var _pdmOvSt = _pdmMob
-    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
-    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  var _pdmPanSt = _pdmMob
-    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;height:70vh;position:relative;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1);display:flex;flex-direction:column'
-    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
-  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_pdmOvSt+'">';
-  html += '<div style="'+_pdmPanSt+'">';
-  if (_pdmMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px;flex-shrink:0"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
+  var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
+  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13689,7 +13454,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="padding:7px 14px;background:var(--stol);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>';
     html += '</div>';
     html += '</div>';
-    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto">';
+    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px">';
 
     var secSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px';
 
@@ -13861,7 +13626,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</div>';
 
     // Corps
-    html += '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto">';
+    html += '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">';
 
     // Section Identité
     html += '<div><div style="'+vSec+'">Identité</div>';
@@ -14083,18 +13848,8 @@ function showStaffDetailModal(compId, idx, editMode) {
   staffComps.sort(function(a,b){return b.comp.dateFrom.localeCompare(a.comp.dateFrom);});
 
   var cids = (compId||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;');
-  var _sdmMob = window.innerWidth < 768;
-  // Overlay : centré desktop, bottom-sheet mobile
-  var _ovStyle = _sdmMob
-    ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
-    : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  var _panelStyle = _sdmMob
-    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1);display:flex;flex-direction:column'
-    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
-  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_ovStyle+'">';
-  // Poignée de glissement (mobile uniquement)
-  html += '<div style="'+_panelStyle+'">';
-  if (_sdmMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px;flex-shrink:0"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
+  var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
+  html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative">';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -14109,7 +13864,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="padding:7px 14px;background:#0891b2;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>';
     html += '</div>';
     html += '</div>';
-    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto">';
+    html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px">';
 
     // Photo
     html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px">';
@@ -14179,7 +13934,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '</div>';
     html += '</div>';
     // Corps
-    html += '<div style="padding:16px 20px;flex:1;overflow-y:auto">';
+    html += '<div style="padding:16px 20px">';
     var hasContact = lic||tel||email;
     if (hasContact) {
       html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Coordonnées</div>';
@@ -14240,50 +13995,17 @@ function saveStaffDetail(compId, idx) {
   var g=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
   var entry = staffObj[compId][idx];
   // Mise à jour de l'entrée staff
-  var newGenre  = g('sdm-genre');
-  var newPrenom = g('sdm-prenom') || entry.prenom;
-  var newNom    = g('sdm-nom')    || entry.nom;
-  var newRole   = g('sdm-role');
-  var newLic    = g('sdm-lic');
-  var newTel    = g('sdm-tel');
-  var newEmail  = g('sdm-email');
-  var newClub   = g('sdm-club');
-  var newRegion = g('sdm-region');
-  var newAdresse= g('sdm-adresse');
-  var newDdn    = g('sdm-ddn');
-
-  // ── Propager à TOUTES les entrées du même individu dans toutes les compétitions ──
-  var matchKey = entry.pilotId || (newPrenom.toLowerCase()+'|'+newNom.toLowerCase());
-  Object.keys(staffObj).forEach(function(cid) {
-    (staffObj[cid]||[]).forEach(function(e) {
-      var eKey = e.pilotId || ((e.prenom||'').toLowerCase()+'|'+(e.nom||'').toLowerCase());
-      if (eKey !== matchKey) return;
-      if (newGenre)   e.genre   = newGenre;
-      if (newPrenom)  e.prenom  = newPrenom;
-      if (newNom)     e.nom     = newNom;
-      e.role    = newRole;   // rôle TOUJOURS propagé (même vide)
-      if (newLic)     e.licence = newLic;
-      if (newTel)     e.tel     = newTel;
-      if (newEmail)   e.email   = newEmail;
-      if (newClub)    e.club    = newClub;
-      if (newRegion)  e.region  = newRegion;
-      if (newAdresse) e.adresse = newAdresse;
-      if (newDdn)     e.ddn     = newDdn;
-      if (_sdmPhotoData) e.photo = _sdmPhotoData;
-    });
-  });
-
-  entry.genre   = newGenre;
-  entry.prenom  = newPrenom;
-  entry.nom     = newNom;
-  entry.role    = newRole;
-  entry.licence = newLic;
-  entry.tel     = newTel;
-  entry.email   = newEmail;
-  entry.club    = newClub;
-  entry.region  = newRegion;
-  entry.adresse = newAdresse;
-  entry.ddn     = newDdn;
+  entry.genre   = g('sdm-genre');
+  entry.prenom  = g('sdm-prenom') || entry.prenom;
+  entry.nom     = g('sdm-nom')    || entry.nom;
+  entry.role    = g('sdm-role');
+  entry.licence = g('sdm-lic');
+  entry.tel     = g('sdm-tel');
+  entry.email   = g('sdm-email');
+  entry.club    = g('sdm-club');
+  entry.region  = g('sdm-region');
+  entry.adresse = g('sdm-adresse');
+  entry.ddn     = g('sdm-ddn');
   if (_sdmPhotoData) { entry.photo = _sdmPhotoData; }
   // Propagation vers le profil pilote lié
   if (entry.pilotId) {
@@ -14555,8 +14277,8 @@ function exportCompFull(compId) {
     _type: 'comp_full', _exportDate: new Date().toISOString(),
     comp:       cp,
     compEnroll: (S.compEnroll||{})[compId] || [],
-    runs:       (S.runs||{})[compId] || [],
-    staff:      (S.staff && !Array.isArray(S.staff)) ? (S.staff[compId]||[]) : ((S.staff||[]).filter(function(s){ return s&&(s.compId===compId); })),
+    runs:       (S.runs||[]).filter(function(r){ return r.compId===compId; }),
+    staff:      (S.staff||[]).filter(function(s){ return s.compId===compId; }),
     materiel:   (S.materiel||{})[compId] || [],
     evenements:  (S.evenements||{})[compId] || [],
     budgets:     (S.budgets||{})[compId] || {engagement:[],ressources:[]},
@@ -14568,10 +14290,7 @@ function exportCompFull(compId) {
   a.href = URL.createObjectURL(blob);
   var safeName = (cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_');
   a.download = 'comp_' + safeName + '_' + new Date().toISOString().substring(0,10) + '.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
+  a.click(); URL.revokeObjectURL(a.href);
   toast('Export compétition téléchargé ✓', 'ok');
 }
 
@@ -14849,52 +14568,12 @@ function openMaterielModal(compId, matId) {
   var prev = g('mat-modal-photo-prev');
   if(prev){ prev.src = m.photo||''; prev.style.display = m.photo ? '' : 'none'; }
   var sh = g('sheet-materiel');
-  if (!sh) return;
-  var isMob = window.innerWidth < 768;
-  var inner = sh.firstElementChild;
-  if (isMob) {
-    // Bottom sheet mobile : surgit du bas, 70% hauteur
-    sh.style.cssText = 'display:flex;opacity:0;position:fixed;inset:0;z-index:3000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)';
-    if (inner) inner.style.cssText = 'background:var(--navy2);border-radius:16px 16px 0 0;padding:0;width:100%;height:70vh;overflow-y:auto;box-shadow:0 -4px 30px rgba(0,0,0,.4);transform:translateY(100%);transition:transform .28s cubic-bezier(.22,.9,.2,1)';
-    // Ajouter la poignée si pas déjà présente
-    var handle = sh.querySelector('.mat-sheet-handle');
-    if (!handle && inner) {
-      handle = document.createElement('div');
-      handle.className = 'mat-sheet-handle';
-      handle.style.cssText = 'display:flex;justify-content:center;padding:10px 0 6px;flex-shrink:0';
-      handle.innerHTML = '<div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div>';
-      inner.insertBefore(handle, inner.firstChild);
-    }
-    // Wrapper scrollable pour le contenu
-    var wrap = inner.querySelector('.mat-sheet-wrap');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.className = 'mat-sheet-wrap';
-      wrap.style.cssText = 'padding:0 20px 24px;display:flex;flex-direction:column;gap:12px';
-      while (inner.children.length > 1) wrap.appendChild(inner.children[1]);
-      inner.appendChild(wrap);
-    }
-    setTimeout(function(){ sh.style.opacity='1'; if(inner) inner.style.transform='translateY(0)'; }, 10);
-  } else {
-    // Modal centré desktop
-    sh.style.cssText = 'display:flex;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
-    if (inner) inner.style.cssText = 'background:var(--navy2);border-radius:16px;padding:24px;width:min(480px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)';
-    setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10);
-  }
+  if(sh){ sh.style.display='flex'; setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10); }
 }
 
 function closeMaterielModal() {
   var sh = document.getElementById('sheet-materiel');
-  if (!sh) return;
-  var inner = sh.firstElementChild;
-  if (window.innerWidth < 768 && inner) {
-    inner.style.transform = 'translateY(100%)';
-    sh.style.opacity = '0';
-    setTimeout(function(){ sh.style.display='none'; }, 300);
-  } else {
-    sh.style.opacity='0'; sh.style.transform='translateY(20px)';
-    setTimeout(function(){ sh.style.display='none'; }, 200);
-  }
+  if (sh) { sh.style.opacity='0'; sh.style.transform='translateY(20px)'; setTimeout(function(){ sh.style.display='none'; }, 200); }
 }
 
 function saveMaterielSheet() {
@@ -14912,7 +14591,7 @@ function saveMaterielSheet() {
   m.marque    = g('mat-modal-marque');
   m.modele    = g('mat-modal-modele');
   // photo handled by mat-modal-file-input
-  closeMaterielModal(); saveState(); silentPush(); _matRefreshView();
+  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
   toast('Matériel enregistré ✓','ok');
 }
 
@@ -14923,17 +14602,8 @@ function deleteMaterielFromModal() {
   if (S.materiel && S.materiel[compId]) {
     S.materiel[compId] = S.materiel[compId].filter(function(m){ return m.id !== matId; });
   }
-  closeMaterielModal(); saveState(); silentPush(); _matRefreshView();
+  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
   toast('Matériel supprimé','');
-}
-
-function _matRefreshView() {
-  var ov = document.getElementById('overlay-comp-mobile');
-  if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
-    renderMobileCompDetail();
-  } else {
-    renderHomeDetailPanel(null);
-  }
 }
 
 function matHandlePhoto(input) {
@@ -15362,7 +15032,7 @@ async function exportData() {
     var full = Object.assign({}, S, idbData || {});
     // 3. S'assurer que les champs de S qui ne sont pas dans IDB sont inclus
     //    (officialDocs, documents, collectif, budgets, sitesSportifs…)
-    var keysToForceFromS = ['officialDocs','documents','collectif','budgets','sitesSportifs','messages','partenaires','deletedCompIds'];
+    var keysToForceFromS = ['officialDocs','documents','collectif','budgets','sitesSportifs','messages','partenaires'];
     keysToForceFromS.forEach(function(k) { if (S[k] !== undefined) full[k] = S[k]; });
     // 4. Ajouter métadonnées de migration
     full._exportMeta = {
@@ -15934,94 +15604,19 @@ var _budgetSubTab = 'engagement';
 var _bgtOpenDomains = {}; // {compId_section_domain: true/false}
 function switchBudgetSubTab(sub) {
   _budgetSubTab = sub;
-  var _ov = document.getElementById('overlay-comp-mobile');
-  if (window.innerWidth < 768 && _ov && _ov.style.display !== 'none') { renderMobileCompDetail(); }
-  else { switchHomeDetailTab('budget'); }
+  switchHomeDetailTab('budget');
 }
 function toggleBgtDomain(key) {
   _bgtOpenDomains[key] = !_bgtOpenDomains[key];
-  var _ov = document.getElementById('overlay-comp-mobile');
-  if (window.innerWidth < 768 && _ov && _ov.style.display !== 'none') { renderMobileCompDetail(); }
-  else { switchHomeDetailTab('budget'); }
+  switchHomeDetailTab('budget');
 }
 
 /* ═══════════════════════════════════════════════════════════════
    DOSSIER OFFICIEL DE COMPÉTITION — style FFPLUM Pôle Sport v3
 ═══════════════════════════════════════════════════════════════ */
-var _dossierCompId = null;
-function openDossierSelector(compId) {
-  _dossierCompId = compId;
-  var existing = document.getElementById('dossier-selector-overlay');
-  if (existing) existing.remove();
-  var sections = [
-    {id:'synthese',   lbl:'\uD83D\uDCCA Synth\u00e8se & Statistiques'},
-    {id:'encadrants', lbl:'\uD83D\uDC65 Encadrants'},
-    {id:'equipage',   lbl:'\u2708\uFE0F \u00c9quipage'},
-    {id:'materiel',   lbl:'\uD83D\uDEE0 Mat\u00e9riel'},
-    {id:'budget',     lbl:'\uD83D\uDCB0 Budget'},
-    {id:'partenaires',lbl:'\uD83E\uDD1D Partenaires'},
-    {id:'evenements', lbl:'\u26A0\uFE0F \u00c9v\u00e9nements'},
-    {id:'resultats',  lbl:'\uD83C\uDFC6 R\u00e9sultats'}
-  ];
-  var isMob = window.innerWidth < 768;
-  var ovSt  = isMob
-    ? 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
-    : 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  var panSt = isMob
-    ? 'background:var(--navy2);border-radius:16px 16px 0 0;width:100%;max-height:85vh;overflow-y:auto;animation:slideUpSheet .28s cubic-bezier(.22,.9,.2,1)'
-    : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto';
-  var html = '<div id="dossier-selector-overlay" style="'+ovSt+'">';
-  html += '<div style="'+panSt+'">';
-  if (isMob) html += '<div style="display:flex;justify-content:center;padding:10px 0 4px"><div style="width:40px;height:4px;border-radius:2px;background:var(--bdr)"></div></div>';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;border-bottom:1px solid var(--bdr)">';
-  html += '<div style="font-size:15px;font-weight:800">\uD83D\uDDB8\uFE0F Contenu du dossier</div>';
-  html += '<button id="dos-close-btn" style="background:none;border:none;color:var(--txt3);font-size:20px;cursor:pointer;line-height:1;padding:4px">\u00d7</button>';
-  html += '</div>';
-  html += '<div style="padding:14px 18px 8px">';
-  html += '<div style="font-size:11px;color:var(--txt2);margin-bottom:12px">S\u00e9lectionnez les volets \u00e0 inclure dans l\'impression :</div>';
-  html += '<div style="display:flex;flex-direction:column;gap:6px">';
-  sections.forEach(function(s) {
-    html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;cursor:pointer">';
-    html += '<input type="checkbox" id="dos-chk-'+s.id+'" checked style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">';
-    html += '<span style="font-size:13px;font-weight:600">'+s.lbl+'</span>';
-    html += '</label>';
-  });
-  html += '</div></div>';
-  html += '<div style="display:flex;gap:8px;padding:14px 18px 20px;border-top:1px solid var(--bdr);margin-top:8px">';
-  html += '<button id="dos-all-btn" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Tout</button>';
-  html += '<button id="dos-none-btn" style="flex:1;padding:10px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Aucun</button>';
-  html += '<button id="dos-gen-btn" style="flex:2;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">G\u00e9n\u00e9rer \u2192</button>';
-  html += '</div>';
-  html += '</div></div>';
-  var div = document.createElement('div');
-  div.innerHTML = html;
-  var ov = div.firstElementChild;
-  document.body.appendChild(ov);
-  // Fermer en cliquant l'overlay
-  ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
-  document.getElementById('dos-close-btn').addEventListener('click', function(){ ov.remove(); });
-  // Tout / Aucun
-  document.getElementById('dos-all-btn').addEventListener('click', function(){
-    ov.querySelectorAll('[id^="dos-chk-"]').forEach(function(c){ c.checked = true; });
-  });
-  document.getElementById('dos-none-btn').addEventListener('click', function(){
-    ov.querySelectorAll('[id^="dos-chk-"]').forEach(function(c){ c.checked = false; });
-  });
-  // Générer
-  document.getElementById('dos-gen-btn').addEventListener('click', function(){
-    var sel = [];
-    ['synthese','encadrants','equipage','materiel','budget','partenaires','evenements','resultats'].forEach(function(id){
-      var el = document.getElementById('dos-chk-'+id);
-      if (el && el.checked) sel.push(id);
-    });
-    ov.remove();
-    printCompDossier(_dossierCompId, sel);
-  });
-}
-function printCompDossier(compId, sections) {
+function printCompDossier(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
-  var _has = function(id){ return !sections || sections.indexOf(id) !== -1; };
 
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var fd  = function(d){ if(!d) return '—'; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; };
@@ -16352,15 +15947,7 @@ function printCompDossier(compId, sections) {
     +'<title>Dossier — '+esc(cp.name)+'</title>'
     +'<style>'+css+'</style>'
     +'</head><body>'
-    +(_has('synthese')?hdrHtml+chartsHtml:'')
-  +(_has('encadrants')?staffHtml:'')
-  +(_has('equipage')?svcHtml+equipHtml:'')
-  +(_has('evenements')?evtHtml:'')
-  +(_has('budget')?budgHtml:'')
-  +(_has('partenaires')?partHtml:'')
-  +(_has('materiel')?matHtml:'')
-  +(_has('resultats')?'' /* résultats intégrés via runs si disponible */ :'')
-  +footerHtml
+    +hdrHtml+chartsHtml+staffHtml+svcHtml+equipHtml+evtHtml+budgHtml+partHtml+matHtml+footerHtml
     +'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script>'
     +'</body></html>';
 
@@ -17362,53 +16949,21 @@ function injectCalendrier2026() {
       region:'Occitanie', type:'entrainement', pratique:'paramoteur', discipline:'slalom',
       saison:'2026', desc:'Club : Terrain occasionnel · Référent : Pôle Sport · DC : Jean-Émile Oulha' }
   ];
-  var deleted = S.deletedCompIds || {};
   var added = 0;
   toAdd.forEach(function(cp) {
-    if (deleted[cp.id]) return;
-    // Doublon si même ID déjà présent → rien à faire
-    if (S.comps.find(function(x){ return x.id === cp.id; })) return;
-    // Doublon si même dateFrom + dateTo + pratique + discipline déjà présent
-    var sameEvent = S.comps.find(function(x){
-      return x.dateFrom === cp.dateFrom
-          && x.dateTo   === cp.dateTo
-          && (x.pratique||'')   === (cp.pratique||'')
-          && (x.discipline||'') === (cp.discipline||'');
-    });
-    if (sameEvent) {
-      if (sameEvent.id !== cp.id) {
-        var _isCanonicalId = /^(cal26-|calf-|stol202[0-9]-|mais|comp-maisoncelles|comp-montpezat)/.test(sameEvent.id);
-        if (!_isCanonicalId) {
-          // L'existant est un ID auto-généré (timestamp, etc.) → migrer ses données vers l'ID canonique cp.id
-          _migrateCompId(sameEvent.id, cp.id);
-          // Remplacer dans S.comps
-          var _sidx = S.comps.indexOf(sameEvent);
-          if (_sidx !== -1) { S.comps[_sidx] = cp; added++; }
-          else { S.comps.push(cp); added++; }
-          S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
-        } else {
-          // Les deux sont canoniques → bloquer le nouveau (garder l'existant)
-          S.deletedCompIds[cp.id] = true;
-        }
-      }
-      return;
+    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
+      S.comps.push(cp);
+      S.compEnroll = S.compEnroll || {};
+      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+      added++;
     }
-    // Doublon par nom exact
-    var nameLower = (cp.name||'').trim().toLowerCase();
-    if (S.comps.find(function(x){ return (x.name||'').trim().toLowerCase() === nameLower; })) return;
-    S.comps.push(cp);
-    S.compEnroll = S.compEnroll || {};
-    S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
-    added++;
   });
   if (added > 0) saveState();
 }
 
 function injectCalendrierFull() {
   S.comps = S.comps || []; S.compEnroll = S.compEnroll || {};
-  var _deletedIds = S.deletedCompIds || {};
   function _add(cp) {
-    if (_deletedIds[cp.id]) return; // supprimée définitivement
     if (!S.comps.find(function(x){ return x.id === cp.id; })) {
       S.comps.push(cp);
       S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
@@ -17552,201 +17107,11 @@ function injectCalendrierFull() {
   saveState();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// _migrateCompId(fromId, toId)
-// Transfère TOUTES les données associées à fromId vers toId dans l'état S.
-// Utilisé pour converger les IDs comp_XXXXX vers les IDs canoniques cal26-*/calf-*.
-// ═══════════════════════════════════════════════════════════════════════════════
-function _migrateCompId(fromId, toId) {
-  if (!fromId || !toId || fromId === toId) return;
-  // Tous les champs de S indexés par compId
-  var _arrayKeys = ['compEnroll','staff','runs','materiel','evenements','partenaires','officialDocs','homeTodosByComp'];
-  _arrayKeys.forEach(function(key) {
-    if (!S[key]) return;
-    var src = S[key][fromId];
-    if (!src) return;
-    var dst = S[key][toId];
-    if (!dst || (Array.isArray(dst) && dst.length === 0)) {
-      // Destination vide → copie directe
-      S[key][toId] = src;
-    } else if (Array.isArray(src) && src.length > 0 && Array.isArray(dst)) {
-      // Fusion sans doublons
-      var merged = dst.slice();
-      src.forEach(function(item) {
-        if (!item) return;
-        var found = false;
-        if (item.id) found = merged.some(function(x){ return x && x.id === item.id; });
-        else if (typeof item === 'string') found = merged.indexOf(item) !== -1;
-        else found = merged.some(function(x){ return JSON.stringify(x) === JSON.stringify(item); });
-        if (!found) merged.push(item);
-      });
-      S[key][toId] = merged;
-    }
-    delete S[key][fromId];
-  });
-  // Budgets : structure spéciale {engagement:[], recettes:[], depenses:[], ...}
-  if (S.budgets && S.budgets[fromId]) {
-    if (!S.budgets[toId]) {
-      S.budgets[toId] = S.budgets[fromId];
-    } else {
-      var _bsrc = S.budgets[fromId];
-      var _bdst = S.budgets[toId];
-      Object.keys(_bsrc).forEach(function(bk) {
-        if (!Array.isArray(_bsrc[bk]) || _bsrc[bk].length === 0) return;
-        _bdst[bk] = _bdst[bk] || [];
-        _bsrc[bk].forEach(function(item) {
-          if (!_bdst[bk].some(function(x){ return x && x.id && x.id === (item&&item.id); })) {
-            _bdst[bk].push(item);
-          }
-        });
-      });
-    }
-    delete S.budgets[fromId];
-  }
-  // Bloquer l'ancien ID pour ne pas le ré-injecter
-  S.deletedCompIds = S.deletedCompIds || {};
-  S.deletedCompIds[fromId] = true;
-  console.log('[GestSTOL] _migrateCompId:', fromId, '→', toId);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// _normalizeCompIds()
-// Migre les compétitions avec ID auto-généré (comp_XXXXX) vers l'ID canonique
-// du calendrier si le même événement existe (dateFrom+dateTo+pratique+discipline).
-// À appeler après chaque loadState()+injections et après chaque pullFromCloud().
-// Résultat : tous les appareils utilisent les mêmes IDs → sync parfaite.
-// ═══════════════════════════════════════════════════════════════════════════════
-function _normalizeCompIds() {
-  // ID canonique = préfixe fixe du calendrier injecté
-  // ID auto-généré = tout le reste (timestamp numérique, comp_xxx, etc.)
-  function _isCanonical(id) {
-    if (!id) return false;
-    return /^(cal26-|calf-|stol202[0-9]-|mais|comp-maisoncelles|comp-montpezat)/.test(id);
-  }
-  // Construire la map : fingerprint → ID canonique
-  var canonMap = {};
-  (S.comps||[]).forEach(function(c) {
-    if (!_isCanonical(c.id)) return; // non canonique → ignorer
-    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
-    if (k !== '|||' && !canonMap[k]) canonMap[k] = c.id;
-  });
-  // Trouver les comps non-canoniques qui ont un équivalent canonique
-  var toMigrate = [];
-  (S.comps||[]).forEach(function(c) {
-    if (_isCanonical(c.id)) return; // déjà canonique
-    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
-    if (k !== '|||' && canonMap[k] && canonMap[k] !== c.id) {
-      toMigrate.push({from: c.id, to: canonMap[k], src: c});
-    }
-  });
-  if (toMigrate.length === 0) return false;
-  toMigrate.forEach(function(m) {
-    // Migrer toutes les données compId-indexées
-    _migrateCompId(m.from, m.to);
-    // Récupérer l'affiche de la comp utilisateur si absente du canonique
-    var calComp = (S.comps||[]).find(function(c){ return c.id === m.to; });
-    if (calComp && m.src && m.src.affiche && !calComp.affiche) calComp.affiche = m.src.affiche;
-    // Supprimer la comp auto-générée de S.comps
-    S.comps = (S.comps||[]).filter(function(c){ return c.id !== m.from; });
-  });
-  saveState();
-  return true;
-}
-
-function _purgeAllDuplicates() {
-  var dirty = false;
-  // ── 0. S.pilots : filtrer pilotes supprimés + dédupliquer par id ──
-  var _dpil = (S._deletedItems||{}).pilots||{};
-  var seenPil = {};
-  var cleanPil = (S.pilots||[]).filter(function(p) {
-    if (!p || !p.id) return false;
-    if (_dpil[p.id]) { dirty = true; return false; }
-    if (seenPil[p.id]) { dirty = true; return false; }
-    seenPil[p.id] = true; return true;
-  });
-  if (cleanPil.length !== (S.pilots||[]).length) S.pilots = cleanPil;
-  // ── 1. S.staff : supprimer doublons dans chaque compétition ──
-  if (S.staff && !Array.isArray(S.staff)) {
-    Object.keys(S.staff).forEach(function(compId) {
-      var arr = S.staff[compId];
-      if (!Array.isArray(arr)) return;
-      var seen = {};
-      var clean = arr.filter(function(e) {
-        // Résoudre le nom depuis S.pilots si l'entrée n'a que pilotId (prenom/nom vides)
-        var pilot = (e.pilotId && S.pilots) ? (S.pilots.find(function(p){ return p.id === e.pilotId; })||{}) : {};
-        var prenom = (pilot.prenom || e.prenom || '').trim().toLowerCase().replace(/\s+/g,' ');
-        var nom    = (pilot.nom    || e.nom    || '').trim().toLowerCase().replace(/\s+/g,' ');
-        var k = prenom + '|' + nom;
-        if (!k || k === '|') return true; // pas de nom identifiable → garder
-        if (seen[k]) { dirty = true; return false; }
-        seen[k] = true; return true;
-      });
-      if (clean.length !== arr.length) { S.staff[compId] = clean; dirty = true; }
-    });
-  }
-  // ── 2. S.compEnroll : supprimer IDs en double dans chaque compétition ──
-  if (S.compEnroll) {
-    Object.keys(S.compEnroll).forEach(function(compId) {
-      var arr = S.compEnroll[compId];
-      if (!Array.isArray(arr)) return;
-      var seen = {};
-      var clean = arr.filter(function(id) {
-        if (!id || seen[id]) { dirty = true; return false; }
-        seen[id] = true; return true;
-      });
-      if (clean.length !== arr.length) S.compEnroll[compId] = clean;
-    });
-  }
-  // Déduplication S.comps : supprimer doublons par dateFrom+dateTo+pratique+discipline
-  // Migrer les données de l'ID supprimé vers l'ID conservé avant de supprimer
-  var seenComps = {};
-  var cleanComps = (S.comps||[]).filter(function(c) {
-    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
-    if (k === '|||') return true;
-    if (seenComps[k]) {
-      // Doublon : migrer les données vers le premier trouvé avant suppression
-      _migrateCompId(c.id, seenComps[k].id);
-      dirty = true;
-      return false;
-    }
-    seenComps[k] = c; return true;
-  });
-  if (cleanComps.length !== (S.comps||[]).length) S.comps = cleanComps;
-
-  // Déduplication S.documents : supprimer doublons par id + filtrer supprimés
-  var _ddPurge = (S._deletedItems||{}).documents||{};
-  var seenDocs = {};
-  var cleanDocs = (S.documents||[]).filter(function(d) {
-    if (!d || !d.id) return false;
-    if (_ddPurge[d.id]) { dirty = true; return false; } // supprimé → exclure
-    if (seenDocs[d.id]) { dirty = true; return false; } // doublon id → exclure
-    seenDocs[d.id] = true; return true;
-  });
-  if (cleanDocs.length !== (S.documents||[]).length) S.documents = cleanDocs;
-
-  if (dirty) saveState();
-}
-
 document.addEventListener('DOMContentLoaded', async function() {
   await loadState();
-  // ── Migration : supprimer les anciennes clés de suppression staff GLOBALES (non scopées)
-  // Elles causaient la suppression de staff dans toutes les compétitions par erreur
-  if (S._deletedItems && S._deletedItems.staff) {
-    var _oldStaffKeys = Object.keys(S._deletedItems.staff).filter(function(k){ return k.indexOf('::') === -1; });
-    if (_oldStaffKeys.length > 0) {
-      _oldStaffKeys.forEach(function(k){ delete S._deletedItems.staff[k]; });
-      console.log('[GestSTOL] Migration: supprimé', _oldStaffKeys.length, 'clé(s) staff globales → données staff restaurées');
-      saveState();
-    }
-  }
-  // Injecter le calendrier en premier (garantit que les IDs canoniques sont présents)
   injectMaisoncelles2026();
   injectCalendrier2026();
   injectCalendrierFull();
-  // Normaliser les IDs : comp_XXXXX → IDs canoniques (cal26-*, calf-*, etc.)
-  _normalizeCompIds();
-  // Nettoyer les doublons restants
-  _purgeAllDuplicates();
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
@@ -17881,43 +17246,24 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // ─── Compétitions STOL 2026 pré-chargées (calendrier officiel FFPLUM)
   var STOL2026 = [
-    {id:'stol2026-1', name:'Régionale STOL — La Réole', dateFrom:'2026-05-02', dateTo:'2026-05-03', oaci:'LFDE', region:'Nouvelle-Aquitaine', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
-    {id:'stol2026-2', name:'Championnat de France STOL — Belmont/Rance', dateFrom:'2026-07-03', dateTo:'2026-07-04', oaci:'LFCR', region:'Occitanie', type:'cdf', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Championnat de France Microlight STOL — Belmont-sur-Rance', affiche:''},
-    {id:'stol2026-3', name:'Régionale STOL — La Ferté-Gaucher', dateFrom:'2026-07-06', dateTo:'2026-07-07', oaci:'LFFE', region:'Île-de-France', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
-    {id:'stol2026-4', name:'Régionale Para-STOL — Plouharnel', dateFrom:'2026-07-25', dateTo:'2026-07-26', oaci:'LFEY', region:'Bretagne', type:'regional', pratique:'paramoteur', discipline:'stol', saison:'2026', desc:'Manche régionale Para-STOL', affiche:''},
-    {id:'stol2026-5', name:'Régionale STOL — Argenton', dateFrom:'2026-09-12', dateTo:'2026-09-13', oaci:'LFLV', region:'Bourgogne-Franche-Comté', type:'regional', pratique:'microlight', discipline:'stol', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''}
+    {id:'stol2026-1', name:'Régionale STOL — La Réole', dateFrom:'2026-05-02', dateTo:'2026-05-03', oaci:'LFDE', region:'Nouvelle-Aquitaine', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
+    {id:'stol2026-2', name:'Championnat de France STOL — Belmont/Rance', dateFrom:'2026-07-03', dateTo:'2026-07-04', oaci:'LFCR', region:'Occitanie', type:'cdf', saison:'2026', desc:'Championnat de France Microlight STOL — Belmont-sur-Rance', affiche:''},
+    {id:'stol2026-3', name:'Régionale STOL — La Ferté-Gaucher', dateFrom:'2026-07-06', dateTo:'2026-07-07', oaci:'LFFE', region:'Île-de-France', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''},
+    {id:'stol2026-4', name:'Régionale Para-STOL — Plouharnel', dateFrom:'2026-07-25', dateTo:'2026-07-26', oaci:'LFEY', region:'Bretagne', type:'regional', saison:'2026', desc:'Manche régionale Para-STOL', affiche:''},
+    {id:'stol2026-5', name:'Régionale STOL — Argenton', dateFrom:'2026-09-12', dateTo:'2026-09-13', oaci:'LFLV', region:'Bourgogne-Franche-Comté', type:'regional', saison:'2026', desc:'Manche régionale Microlight STOL', affiche:''}
   ];
   // Ajouter uniquement celles qui n'existent pas déjà
-  var _stol2026Changed = false;
-  S.deletedCompIds = S.deletedCompIds || {};
   STOL2026.forEach(function(comp) {
-    // 1. Respecter la suppression définitive
-    if (S.deletedCompIds[comp.id]) return;
     var existing = S.comps.find(function(c){ return c.id === comp.id; });
     if (!existing) {
-      // 2. Vérifier doublon par dateFrom+dateTo+pratique+discipline
-      var sameEvent = S.comps.find(function(x) {
-        return x.dateFrom === comp.dateFrom && x.dateTo === comp.dateTo
-            && (x.pratique||'') === (comp.pratique||'')
-            && (x.discipline||'') === (comp.discipline||'');
-      });
-      if (sameEvent) {
-        // Bloquer cet ID définitivement pour éviter re-injection future
-        S.deletedCompIds[comp.id] = true;
-        _stol2026Changed = true;
-        return;
-      }
       S.comps.push(comp);
-      _stol2026Changed = true;
     } else {
-      // Préserver les données utilisateur — ne mettre à jour que les champs fixes absents
+      // Préserver les données utilisateur (affiche, desc modifiés) — ne mettre à jour que les champs fixes
       if (!existing.oaci && comp.oaci) existing.oaci = comp.oaci;
       if (!existing.region && comp.region) existing.region = comp.region;
-      if (!existing.pratique && comp.pratique) { existing.pratique = comp.pratique; _stol2026Changed = true; }
-      if (!existing.discipline && comp.discipline) { existing.discipline = comp.discipline; _stol2026Changed = true; }
     }
   });
-  if (_stol2026Changed) saveState();
+  saveState();
 
   // Initialiser S.messages si absent
   if (!S.messages) S.messages = [];
@@ -20523,23 +19869,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   startAutoSync();
 
-  // ── Sync au démarrage (après 3s pour laisser Supabase s'initialiser) ──
-  // Si des données locales n'ont pas été envoyées (page rechargée pendant un push),
-  // on pousse d'abord, puis on fait le sync bidirectionnel.
-  setTimeout(function() {
-    if (!navigator.onLine || !getSB()) return;
-    var _doStartupSync = function() {
-      if (_pushPending) {
-        // Données locales non envoyées → push d'abord, puis sync complet
-        pushToCloud()
-          .then(function(){ _setPushPending(false); return _bgSync(); })
-          .catch(function(){ _bgSync().catch(function(){}); });
-      } else {
-        _bgSync().catch(function(){});
+  // ── Sync automatique au démarrage (après 2s pour laisser Supabase s'initialiser) ──
+  if (navigator.onLine) {
+    setTimeout(function() {
+      var sb = getSB();
+      if (sb && !_syncInProgress) {
+        console.log('[GestSTOL] Sync automatique au démarrage…');
+        sbSync().catch(function(e){ console.warn('[GestSTOL] Sync startup échouée', e); });
       }
-    };
-    _doStartupSync();
-  }, 3000);
+    }, 2000);
+  }
   }
 });
 
