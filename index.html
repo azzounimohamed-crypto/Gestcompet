@@ -11151,72 +11151,41 @@ async function _pullMedias(sb) {
 
 // showSyncError supprimé — les erreurs sync sont silencieuses, visibles uniquement en console
 
-// ── Diagnostic sync : affiche l'état cloud vs local ──────────────────────────
+// ── Diagnostic sync ────────────────────────────────────
 async function showSyncDiag() {
-  var lines = [];
-  lines.push('=== DIAGNOSTIC SYNC ===');
-  lines.push('En ligne : ' + (navigator.onLine ? 'OUI' : 'NON'));
-  lines.push('Supabase chargé : ' + (getSB() ? 'OUI' : 'NON'));
-  lines.push('Données en attente (push) : ' + (_pushPending ? 'OUI ⚠️' : 'non'));
-  lines.push('Dernière sync : ' + (_lastSyncAt ? Math.round((Date.now()-_lastSyncAt)/1000)+'s' : 'jamais'));
-  lines.push('');
-  lines.push('LOCAL :');
-  lines.push('  Compétitions : ' + (S.comps||[]).length);
-  lines.push('  Pilotes : ' + (S.pilots||[]).length);
-  lines.push('  Staff clés : ' + Object.keys(S.staff||{}).length);
-  lines.push('  IDs supprimés : ' + Object.keys(S.deletedCompIds||{}).length);
-  lines.push('');
+  var msg = '=== DIAGNOSTIC SYNC ===\n';
+  msg += 'En ligne : ' + (navigator.onLine ? 'OUI' : 'NON') + '\n';
+  msg += 'Supabase : ' + (getSB() ? 'OK' : 'NON CHARGE') + '\n';
+  msg += 'Données en attente : ' + (_pushPending ? 'OUI' : 'non') + '\n';
+  msg += 'Dernière sync : ' + (_lastSyncAt ? Math.round((Date.now()-_lastSyncAt)/1000)+'s' : 'jamais') + '\n\n';
+  msg += 'LOCAL : ' + (S.comps||[]).length + ' comps, ' + (S.pilots||[]).length + ' pilotes\n';
   var sb = getSB();
-  if (sb) {
-    lines.push('CLOUD (lecture en cours...)');
-    var modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px';
-    modal.innerHTML = '<div style="background:var(--navy2);border-radius:12px;padding:20px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;font-family:monospace;font-size:12px;white-space:pre-wrap;color:var(--txt)">' + lines.join('\n') + '\n\nRécupération cloud...' + '<br><button onclick="this.closest('div').parentNode.remove()" style="margin-top:12px;padding:8px 20px;background:var(--stol);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;width:100%">Fermer</button></div>';
-    document.body.appendChild(modal);
-    try {
-      var res = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
-      if (res.error) {
-        lines.push('ERREUR CLOUD : ' + res.error.message);
-      } else if (res.data && res.data.data) {
-        var r = res.data.data;
-        lines.push('CLOUD :');
-        lines.push('  Compétitions : ' + (r.comps||[]).length);
-        lines.push('  Pilotes : ' + (r.pilots||[]).length);
-        lines.push('  Staff clés : ' + Object.keys(r.staff||{}).length);
-        lines.push('  Dernière push : ' + (r._pushAt ? new Date(r._pushAt).toLocaleTimeString() : 'inconnue'));
-        lines.push('  updated_at : ' + res.data.updated_at);
-        lines.push('');
-        // Comps en local mais pas dans cloud
-        var cloudIds = (r.comps||[]).map(function(c){return c.id;});
-        var localIds = (S.comps||[]).map(function(c){return c.id;});
-        var onlyLocal = localIds.filter(function(id){ return cloudIds.indexOf(id)===-1; });
-        var onlyCloud = cloudIds.filter(function(id){ return localIds.indexOf(id)===-1; });
-        if (onlyLocal.length) lines.push('LOCAL seulement (' + onlyLocal.length + ') : ' + onlyLocal.slice(0,3).join(', '));
-        if (onlyCloud.length) lines.push('CLOUD seulement (' + onlyCloud.length + ') : ' + onlyCloud.slice(0,3).join(', '));
-        if (!onlyLocal.length && !onlyCloud.length) lines.push('✓ Compétitions identiques local/cloud');
-      } else {
-        lines.push('CLOUD : vide');
-      }
-    } catch(e) {
-      lines.push('ERREUR : ' + (e.message || e));
-    }
-    var box = modal.querySelector('div');
-    box.innerHTML = '<div style="margin-bottom:12px">' + lines.join('\n').replace(/\n/g,'<br>') + '</div><button onclick="this.closest('div').parentNode.remove()" style="padding:8px 20px;background:var(--stol);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;width:100%">Fermer</button>';
-  } else {
-    lines.push('CLOUD : Supabase non disponible');
-    alert(lines.join('\n'));
-  }
+  if (!sb || !navigator.onLine) { alert(msg + 'Cloud : non disponible'); return; }
+  try {
+    var res = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
+    if (res.error) { alert(msg + 'ERREUR CLOUD : ' + res.error.message); return; }
+    if (!res.data || !res.data.data) { alert(msg + 'CLOUD : vide'); return; }
+    var r = res.data.data;
+    msg += 'CLOUD : ' + (r.comps||[]).length + ' comps, ' + (r.pilots||[]).length + ' pilotes\n';
+    msg += 'Push cloud : ' + (r._pushAt ? new Date(r._pushAt).toLocaleTimeString() : '?') + '\n';
+    msg += 'updated_at : ' + res.data.updated_at + '\n\n';
+    var cloudIds = (r.comps||[]).map(function(c){return c.id;});
+    var localIds = (S.comps||[]).map(function(c){return c.id;});
+    var onlyLocal = localIds.filter(function(id){ return cloudIds.indexOf(id)===-1; });
+    var onlyCloud = cloudIds.filter(function(id){ return localIds.indexOf(id)===-1; });
+    if (onlyLocal.length) msg += 'LOCAL seulement : ' + onlyLocal.join(', ') + '\n';
+    if (onlyCloud.length) msg += 'CLOUD seulement : ' + onlyCloud.join(', ') + '\n';
+    if (!onlyLocal.length && !onlyCloud.length) msg += 'Comps identiques local/cloud ✓\n';
+    alert(msg);
+  } catch(e) { alert(msg + 'ERREUR : ' + (e.message||e)); }
 }
-
-// Mettre à jour l'indicateur push pending dans l'UI
 function _updatePushIndicator() {
   var el = document.getElementById('push-pending-indicator');
   if (!el) return;
-  el.textContent = _pushPending ? '⚠️ envoi en attente' : '';
-  el.style.color = _pushPending ? '#f59e0b' : '';
+  el.textContent = _pushPending ? 'envoi en attente' : '';
 }
 
-// ── Force push : envoie le local vers le cloud SANS pull préalable ──
+// ── Fo// ── Force push : envoie le local vers le cloud SANS pull préalable ──
 async function forcePushCloud() {
   var nb = S.comps ? S.comps.length : 0;
   var ok = confirm('⬆️ FORCER L\'ENVOI VERS LE CLOUD\n\nVos données locales (' + nb + ' compétition(s)) vont écraser le cloud.\n\nContinuer ?');
