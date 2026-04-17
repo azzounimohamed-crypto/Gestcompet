@@ -312,8 +312,6 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
 #overlay-comp-mobile{animation:slideInRight .28s cubic-bezier(.22,.9,.2,1)}
 @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
 #mcd-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-#mcd-tabs-bar::-webkit-scrollbar{display:none}
-#mcd-tabs-bar{-ms-overflow-style:none;scrollbar-width:none}
 /* Points de navigation pilules */
 #mcd-dots{display:flex;align-items:center;gap:4px;padding:0 2px}
 /* Checkbox matériel */
@@ -2127,11 +2125,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   <!-- Safe area top -->
   <div style="height:env(safe-area-inset-top);background:var(--navy2);flex-shrink:0"></div>
 
-  <!-- ── Tabs sections (tout en haut, scrollable horizontalement) ── -->
-  <div id="mcd-tabs-bar" style="background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;white-space:nowrap;display:flex;align-items:center;padding:0 8px;min-height:46px;scrollbar-width:none">
+  <!-- ── Barre sections TOUT EN HAUT : ☰ + nom section + compteur ── -->
+  <div style="background:var(--navy3);border-bottom:1px solid var(--bdr);flex-shrink:0;padding:0 12px;min-height:44px;display:flex;align-items:center;gap:10px">
+    <button onclick="openMCDDrawer()" style="background:none;border:none;padding:6px;cursor:pointer;color:var(--txt2);display:flex;align-items:center;border-radius:8px;flex-shrink:0;touch-action:manipulation" aria-label="Sections">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <span id="mcd-section-ico" style="font-size:18px;line-height:1;flex-shrink:0"></span>
+    <span id="mcd-section-name" style="font-size:14px;font-weight:800;flex:1;color:var(--txt)"></span>
+    <span id="mcd-section-counter" style="font-size:11px;font-weight:700;color:var(--stol);background:rgba(0,87,255,.1);border-radius:20px;padding:2px 9px;flex-shrink:0"></span>
+    <span id="mcd-section-extra" style="flex-shrink:0"></span>
   </div>
 
-  <!-- ── Header : affiche + titre + edit + retour à droite ── -->
+  <!-- ── Header : affiche + titre + edit + retour À DROITE ── -->
   <div style="background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;padding:0 12px;min-height:52px;display:flex;align-items:center;gap:10px">
     <div id="mcd-affiche-wrap" style="width:30px;height:40px;border-radius:6px;overflow:hidden;background:#fff;flex-shrink:0;display:none;box-shadow:0 2px 5px rgba(0,0,0,.2)">
       <img id="mcd-affiche-img" style="width:100%;height:100%;object-fit:contain">
@@ -2143,18 +2148,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="mcd-edit-btn" onclick="editCompMobile()" title="Modifier" style="display:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--bdr);background:var(--navy3);color:var(--stol);align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
     </button>
-    <!-- Bouton retour complètement à droite -->
+    <!-- Bouton retour à droite -->
     <button onclick="closeMobileCompDetail()" title="Retour"
       style="width:40px;height:40px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
   </div>
-
-  <!-- Spans cachés conservés pour compatibilité avec renderMobileCompDetail -->
-  <span id="mcd-section-ico" style="display:none"></span>
-  <span id="mcd-section-name" style="display:none"></span>
-  <span id="mcd-section-counter" style="display:none"></span>
-  <span id="mcd-section-extra" style="display:none"></span>
 
   <!-- ── Contenu section (scrollable) ── -->
   <div id="mcd-content" style="flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative"></div>
@@ -3693,29 +3692,7 @@ function renderMobileCompDetail() {
   }
   if (editBtn) { editBtn.style.display = canEditComp() ? 'flex' : 'none'; }
 
-  // ── Tabs bar (haut) ──
-  var tabsBar = document.getElementById('mcd-tabs-bar');
-  if (tabsBar) {
-    tabsBar.innerHTML = '';
-    _MOBILE_COMP_SECTIONS.forEach(function(s, i) {
-      var isActive = (i === _mobileCompSectionIdx);
-      var btn = document.createElement('button');
-      btn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:0 14px;height:46px;border:none;border-bottom:3px solid '+(isActive?'var(--stol)':'transparent')+';background:transparent;color:'+(isActive?'var(--stol)':'var(--txt3)')+';font-size:12px;font-weight:'+(isActive?'800':'600')+';cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;touch-action:manipulation;transition:color .15s,border-color .15s';
-      btn.innerHTML = '<span style="font-size:16px;line-height:1">'+s.ico+'</span><span>'+s.lbl+'</span>';
-      btn.onclick = (function(idx){ return function(){
-        _mobileCompSectionIdx = idx;
-        renderMobileCompDetail();
-        // Scroll le tab actif dans la vue
-        setTimeout(function(){ btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}); }, 50);
-      }; })(i);
-      tabsBar.appendChild(btn);
-      if (isActive) {
-        setTimeout(function(){ btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}); }, 30);
-      }
-    });
-  }
-
-  // ── Drawer sections (toujours présent pour rétrocompatibilité) ──
+  // ── Drawer sections ──
   var drawerList = document.getElementById('mcd-drawer-list');
   if (drawerList) {
     drawerList.innerHTML = '';
