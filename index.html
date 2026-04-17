@@ -1749,7 +1749,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
-          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 60 secondes</div>
+          <button class="btn btn-full btn-sm" onclick="testSupabase()" style="margin-bottom:6px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981">🔍 Tester la connexion</button>
+          <div id="sync-diag-result" style="font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
+          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
 
         <!-- ── BANNIÈRE AUTO-PROMOTION ── -->
@@ -10678,6 +10680,41 @@ function _touchUpdatedAt() {
   // Horodater chaque comp modifiée récemment (heuristique : pas de _updatedAt)
   (S.comps||[]).forEach(function(c){ if (!c._updatedAt) c._updatedAt = now; });
   (S.pilots||[]).forEach(function(p){ if (!p._updatedAt) p._updatedAt = now; });
+}
+
+async function testSupabase() {
+  var el = document.getElementById('sync-diag-result');
+  var show = function(msg, color) { if(el){ el.textContent = msg; el.style.color = color||''; } };
+  show('Test en cours...', '#f59e0b');
+  if (!navigator.onLine) { show('Hors ligne - pas de WiFi/4G', '#ef4444'); return; }
+  var sb = getSB();
+  if (!sb) { show('Supabase non chargé (CDN bloqué?)', '#ef4444'); return; }
+  try {
+    var t0 = Date.now();
+    var res = await sb.from('stol_shared').select('updated_at').eq('id','global').single();
+    var ms = Date.now() - t0;
+    if (res.error && res.error.code !== 'PGRST116') {
+      show('Erreur Supabase: ' + res.error.message, '#ef4444');
+      return;
+    }
+    var cloudInfo = res.data ? (' · Cloud: ' + new Date(res.data.updated_at).toLocaleTimeString()) : ' · Cloud vide';
+    show('✓ Connecté (' + ms + 'ms)' + cloudInfo, '#10b981');
+    // Aussi afficher les IDs local vs cloud
+    if (res.data) {
+      var res2 = await sb.from('stol_shared').select('data').eq('id','global').single();
+      if (res2.data && res2.data.data) {
+        var r = res2.data.data;
+        var localN = (S.comps||[]).length;
+        var cloudN = (r.comps||[]).length;
+        var localPilots = (S.pilots||[]).length;
+        var cloudPilots = (r.pilots||[]).length;
+        var msg = 'Local: ' + localN + ' comps / ' + localPilots + ' pilotes  —  Cloud: ' + cloudN + ' comps / ' + cloudPilots + ' pilotes';
+        show('✓ ' + ms + 'ms · ' + msg, cloudN === localN ? '#10b981' : '#f59e0b');
+      }
+    }
+  } catch(e) {
+    show('Erreur: ' + (e.message||'réseau'), '#ef4444');
+  }
 }
 
 async function sbSync() {
