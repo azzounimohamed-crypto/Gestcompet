@@ -3756,6 +3756,34 @@ function renderMobileCompDetail() {
         footerEl.innerHTML = '';
         footerEl.style.display = 'none';
       }
+    } else if (sec.id === 'staff') {
+      var canEditStf = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      if (canEditStf) {
+        var fStf = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openStaffAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#3b82f6,#2563eb);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouvel encadrant</button></div>';
+        footerEl.innerHTML = fStf; footerEl.style.display = '';
+      } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
+
+    } else if (sec.id === 'gestion') {
+      var canEditCrew = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      if (canEditCrew) {
+        var fCrew = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openCrewAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter un compétiteur</button></div>';
+        footerEl.innerHTML = fCrew; footerEl.style.display = '';
+      } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
+
+    } else if (sec.id === 'evenements') {
+      var canEditEvtMob = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      if (canEditEvtMob) {
+        var fEvt = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openEvtAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouvel événement</button></div>';
+        footerEl.innerHTML = fEvt; footerEl.style.display = '';
+      } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
+
+    } else if (sec.id === 'partenaires') {
+      var canEditPart = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      if (canEditPart) {
+        var fPart = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openPartAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouveau partenaire</button></div>';
+        footerEl.innerHTML = fPart; footerEl.style.display = '';
+      } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
+
     } else {
       footerEl.innerHTML = '';
       footerEl.style.display = 'none';
@@ -16630,6 +16658,229 @@ function saveBgtLineFromSheet(compId, section, lineId) {
 function deleteBgtLineFromSheet(compId, section, lineId) {
   closeBgtLineSheet();
   removeBudgetLine(compId, section, lineId);
+}
+// ════════════════════════════════════════════════════════════════
+// BOTTOM SHEETS MOBILES — Encadrant / Équipage / Événement / Partenaire
+// ════════════════════════════════════════════════════════════════
+function _mobileSheet(id, title, subtitle, color, bodyHtml, saveFn) {
+  var old = document.getElementById(id+'-overlay');
+  if (old) old.remove();
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var lSt = 'font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:12px;display:block';
+  var html = '<div id="'+id+'-overlay" onclick="if(event.target===this)_closeSheet(\''+id+'\')" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center">';
+  html += '<div id="'+id+'-panel" style="background:var(--navy2);border-radius:16px 16px 0 0;width:100%;height:80vh;display:flex;flex-direction:column;animation:slideUpSheet .25s ease;padding-bottom:env(safe-area-inset-bottom)">';
+  html += '<div style="flex-shrink:0"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:12px auto 0"></div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">';
+  html += '<div><div style="font-size:17px;font-weight:800;color:var(--txt)">'+title+'</div>';
+  if (subtitle) html += '<div style="font-size:13px;color:'+color+';font-weight:600;margin-top:2px">'+subtitle+'</div>';
+  html += '</div><button onclick="_closeSheet(\''+id+'\')" style="min-width:40px;min-height:40px;border:none;background:var(--navy3);border-radius:10px;color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>';
+  html += '</div></div>';
+  html += '<div style="flex:1;overflow-y:auto;padding:0 18px 8px">'+bodyHtml+'</div>';
+  html += '<div style="flex-shrink:0;padding:12px 18px 16px;border-top:1px solid var(--bdr)">';
+  html += '<button onclick="'+saveFn+'" style="width:100%;min-height:54px;border-radius:14px;border:none;background:'+color+';color:#fff;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation">✓ Enregistrer</button>';
+  html += '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  var LABEL = lSt; // expose pour réutilisation dans bodyHtml (non applicable ici, passé en param)
+  setTimeout(function(){ var f = document.querySelector('#'+id+'-panel input, #'+id+'-panel select'); if(f) f.focus(); }, 350);
+}
+function _closeSheet(id) {
+  var el = document.getElementById(id+'-overlay');
+  if (!el) return;
+  var panel = document.getElementById(id+'-panel');
+  if (panel) { panel.style.transition='transform .2s ease'; panel.style.transform='translateY(100%)'; }
+  setTimeout(function(){ if(el.parentNode) el.remove(); }, 210);
+}
+
+// ── ENCADRANT ─────────────────────────────────────────────────
+function openStaffAddSheet(compId) {
+  var lSt = 'display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:12px';
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var sel  = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box;appearance:none';
+  var body = '';
+  body += '<label style="'+lSt+'">Prénom</label><input id="sas-prenom" placeholder="Prénom…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Nom</label><input id="sas-nom" placeholder="Nom…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Fonction / Rôle</label>';
+  body += '<select id="sas-poste" style="'+sel+'"><option value="">— Choisir —</option><option>Directeur de compétition</option><option>Directeur adjoint</option><option>Directeur de course</option><option>Commissaire Chef</option><option>Commissaire</option><option>Juge arbitre</option><option>Chronométreur</option><option>Médecin</option><option>Secouriste</option><option>Bénévole</option><option>Autre</option></select>';
+  body += '<label style="'+lSt+'">N° Licence</label><input id="sas-licence" placeholder="Licence…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Téléphone</label><input id="sas-tel" type="tel" placeholder="06 …" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Email</label><input id="sas-email" type="email" placeholder="email@…" style="'+iSt+'">';
+  _mobileSheet('staff-add', 'Nouvel encadrant', '👥 Encadrants', '#3b82f6', body,
+    'saveStaffFromSheet(\''+compId.replace(/'/g,"\\'")+'\')');
+}
+function saveStaffFromSheet(compId) {
+  var prenom = (document.getElementById('sas-prenom')||{}).value||'';
+  var nom    = (document.getElementById('sas-nom')||{}).value||'';
+  if (!prenom.trim() && !nom.trim()) { toast('Saisissez au moins un nom',''); return; }
+  if (!S.staff) S.staff = {};
+  if (!S.staff[compId]) S.staff[compId] = [];
+  S.staff[compId].push({
+    id: 'stf-'+Date.now(),
+    prenom: prenom.trim(), nom: nom.trim(),
+    poste: (document.getElementById('sas-poste')||{}).value||'',
+    licence: (document.getElementById('sas-licence')||{}).value||'',
+    tel: (document.getElementById('sas-tel')||{}).value||'',
+    email: (document.getElementById('sas-email')||{}).value||'',
+    compId: compId, _updatedAt: Date.now()
+  });
+  saveState(); silentPush();
+  _closeSheet('staff-add');
+  renderMobileCompDetail();
+  toast('Encadrant ajouté ✓','ok');
+}
+
+// ── ÉQUIPAGE ──────────────────────────────────────────────────
+function openCrewAddSheet(compId) {
+  var lSt = 'display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:12px';
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var sel  = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box;appearance:none';
+  var enrolled = (S.compEnroll||{})[compId] || [];
+  // Pilotes existants non encore inscrits
+  var available = (S.pilots||[]).filter(function(p){ return enrolled.indexOf(p.id)===-1; });
+  var body = '';
+  if (available.length > 0) {
+    body += '<label style="'+lSt+'">Inscrire un pilote existant</label>';
+    body += '<input id="cas-search" placeholder="Rechercher nom, prénom…" style="'+iSt+';margin-bottom:6px" oninput="crewSheetFilter()">';
+    body += '<div id="cas-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--bdr);border-radius:10px;margin-bottom:4px">';
+    available.forEach(function(p){
+      body += '<div data-pid="'+p.id+'" onclick="crewSheetSelect(this)" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;transition:background .1s" onmousedown="event.preventDefault()">';
+      body += '<div style="width:36px;height:36px;border-radius:50%;background:var(--stol);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase()+'</div>';
+      body += '<div><div style="font-weight:700;color:var(--txt);font-size:14px">'+escH(p.prenom||'')+'&nbsp;'+escH(p.nom||'')+'</div>';
+      body += '<div style="font-size:12px;color:var(--txt3)">🪪&nbsp;'+(p.licence||'—')+'</div></div></div>';
+    });
+    body += '</div>';
+    body += '<div id="cas-selected" style="display:none;padding:10px 14px;background:rgba(139,92,246,.12);border:1px solid #8b5cf6;border-radius:10px;font-size:14px;font-weight:700;color:#8b5cf6;margin-bottom:8px"></div>';
+  }
+  body += '<div style="border-top:1px solid var(--bdr);margin-top:12px;padding-top:12px"><div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:10px">— ou créer un nouveau pilote —</div>';
+  body += '<label style="'+lSt+'">Prénom</label><input id="cas-prenom" placeholder="Prénom…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Nom</label><input id="cas-nom" placeholder="Nom…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">N° Licence</label><input id="cas-lic" placeholder="Licence…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Catégorie</label>';
+  body += '<select id="cas-cat" style="'+sel+'"><option value="">—</option><option>PF1</option><option>PF2</option><option>PL1</option><option>PL2</option><option>Loisir</option></select>';
+  body += '<label style="'+lSt+'">Équipage</label>';
+  body += '<select id="cas-equi" style="'+sel+'"><option value="Monoplace">Monoplace</option><option value="Biplace">Biplace</option></select>';
+  body += '</div>';
+  _mobileSheet('crew-add', 'Ajouter un compétiteur', '✈️ Équipage', '#8b5cf6', body,
+    'saveCrewFromSheet(\''+compId.replace(/'/g,"\\'")+'\')');
+}
+var _crewSheetSelectedId = null;
+function crewSheetSelect(el) {
+  _crewSheetSelectedId = el.dataset.pid;
+  var p = (S.pilots||[]).find(function(x){ return x.id===_crewSheetSelectedId; })||{};
+  var disp = document.getElementById('cas-selected');
+  if (disp) { disp.textContent = '✓ Sélectionné : '+(p.prenom||'')+' '+(p.nom||''); disp.style.display=''; }
+  document.querySelectorAll('#cas-list div[data-pid]').forEach(function(d){
+    d.style.background = d.dataset.pid===_crewSheetSelectedId ? 'rgba(139,92,246,.15)' : '';
+  });
+}
+function crewSheetFilter() {
+  var q = ((document.getElementById('cas-search')||{}).value||'').toLowerCase();
+  document.querySelectorAll('#cas-list div[data-pid]').forEach(function(d){
+    d.style.display = d.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+  });
+}
+function saveCrewFromSheet(compId) {
+  if (!S.compEnroll) S.compEnroll = {};
+  if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+  var pid = _crewSheetSelectedId;
+  if (pid) {
+    if (S.compEnroll[compId].indexOf(pid)===-1) S.compEnroll[compId].push(pid);
+    saveState(); silentPush();
+    _crewSheetSelectedId = null;
+    _closeSheet('crew-add'); renderMobileCompDetail(); toast('Compétiteur inscrit ✓','ok');
+    return;
+  }
+  var prenom = (document.getElementById('cas-prenom')||{}).value||'';
+  var nom    = (document.getElementById('cas-nom')||{}).value||'';
+  if (!prenom.trim() && !nom.trim()) { toast('Sélectionnez un pilote ou saisissez un nom',''); return; }
+  var newPilot = {
+    id: 'p-'+Date.now(), prenom: prenom.trim(), nom: nom.trim(),
+    licence: (document.getElementById('cas-lic')||{}).value||'',
+    categorie: (document.getElementById('cas-cat')||{}).value||'',
+    _updatedAt: Date.now()
+  };
+  var equi = (document.getElementById('cas-equi')||{}).value||'Monoplace';
+  if (!S.pilots) S.pilots = [];
+  S.pilots.push(newPilot);
+  if (!S.ulms) S.ulms = {};
+  S.ulms[newPilot.id] = [{ id:'u-'+Date.now(), places: equi==='Biplace'?2:1, equi: equi }];
+  S.compEnroll[compId].push(newPilot.id);
+  saveState(); silentPush();
+  _closeSheet('crew-add'); renderMobileCompDetail(); toast('Compétiteur créé et inscrit ✓','ok');
+}
+
+// ── ÉVÉNEMENT ─────────────────────────────────────────────────
+function openEvtAddSheet(compId) {
+  var lSt = 'display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:12px';
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var sel  = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box;appearance:none';
+  var today = new Date().toISOString().slice(0,10);
+  var body = '';
+  body += '<label style="'+lSt+'">Type d\'événement</label>';
+  body += '<select id="eas-type" style="'+sel+'"><option value="">— Choisir —</option><option>Sécurité</option><option>Matériel</option><option>Médical</option><option>Météo</option><option>Administratif</option><option>Mécanique</option><option>Autre</option></select>';
+  body += '<label style="'+lSt+'">Nom concerné</label><input id="eas-nom" placeholder="Nom du pilote ou de l\'appareil…" style="'+iSt+'">';
+  body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  body += '<div><label style="'+lSt+'">Date</label><input id="eas-date" type="date" value="'+today+'" style="'+iSt+'"></div>';
+  body += '<div><label style="'+lSt+'">Heure</label><input id="eas-heure" type="time" style="'+iSt+'"></div>';
+  body += '</div>';
+  body += '<label style="'+lSt+'">Immatriculation</label><input id="eas-immat" placeholder="F-XXXX…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Circonstance</label><textarea id="eas-circ" placeholder="Décrivez les circonstances…" rows="3" style="'+iSt+';resize:none;line-height:1.5"></textarea>';
+  body += '<label style="'+lSt+'">Commentaires</label><textarea id="eas-comm" placeholder="Commentaires complémentaires…" rows="2" style="'+iSt+';resize:none;line-height:1.5"></textarea>';
+  _mobileSheet('evt-add', 'Nouvel événement', '📋 Événements', '#f59e0b', body,
+    'saveEvtFromSheet(\''+compId.replace(/'/g,"\\'")+'\')');
+}
+function saveEvtFromSheet(compId) {
+  var type = (document.getElementById('eas-type')||{}).value||'';
+  var nom  = (document.getElementById('eas-nom')||{}).value||'';
+  if (!type && !nom) { toast('Saisissez un type ou un nom',''); return; }
+  if (!S.evenements) S.evenements = {};
+  if (!S.evenements[compId]) S.evenements[compId] = [];
+  S.evenements[compId].push({
+    id: 'evt-'+Date.now(),
+    typeIncident: type, nom: nom,
+    date: (document.getElementById('eas-date')||{}).value||'',
+    horaire: (document.getElementById('eas-heure')||{}).value||'',
+    immatriculation: (document.getElementById('eas-immat')||{}).value||'',
+    circonstance: (document.getElementById('eas-circ')||{}).value||'',
+    commentaires: (document.getElementById('eas-comm')||{}).value||'',
+    _updatedAt: Date.now()
+  });
+  saveState(); silentPush();
+  _closeSheet('evt-add'); renderMobileCompDetail(); toast('Événement enregistré ✓','ok');
+}
+
+// ── PARTENAIRE ────────────────────────────────────────────────
+function openPartAddSheet(compId) {
+  var lSt = 'display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:12px';
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var sel  = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box;appearance:none';
+  var body = '';
+  body += '<label style="'+lSt+'">Type</label>';
+  body += '<select id="pas-type" style="'+sel+'"><option value="Autre">Autre</option><option value="Institutionnel">Institutionnel</option><option value="Sponsor">Sponsor</option><option value="Médias">Médias</option><option value="Aéroclub">Aéroclub</option><option value="Collectivité">Collectivité</option></select>';
+  body += '<label style="'+lSt+'">Organisme / Structure</label><input id="pas-org" placeholder="Nom de l\'organisme…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Représentant</label><input id="pas-rep" placeholder="Prénom Nom…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Téléphone</label><input id="pas-tel" type="tel" placeholder="06 …" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Email</label><input id="pas-email" type="email" placeholder="email@…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Proposition / Note</label><textarea id="pas-note" placeholder="Notes, proposition de partenariat…" rows="3" style="'+iSt+';resize:none;line-height:1.5"></textarea>';
+  _mobileSheet('part-add', 'Nouveau partenaire', '🤝 Partenaires', '#10b981', body,
+    'savePartFromSheet(\''+compId.replace(/'/g,"\\'")+'\')');
+}
+function savePartFromSheet(compId) {
+  var org = (document.getElementById('pas-org')||{}).value||'';
+  var rep = (document.getElementById('pas-rep')||{}).value||'';
+  if (!org.trim() && !rep.trim()) { toast('Saisissez un organisme ou un représentant',''); return; }
+  if (!S.partenaires) S.partenaires = {};
+  if (!S.partenaires[compId]) S.partenaires[compId] = [];
+  S.partenaires[compId].push({
+    id: 'pt-'+Date.now(),
+    type: (document.getElementById('pas-type')||{}).value||'Autre',
+    organisme: org.trim(), representant: rep.trim(),
+    telephone: (document.getElementById('pas-tel')||{}).value||'',
+    email: (document.getElementById('pas-email')||{}).value||'',
+    proposition: (document.getElementById('pas-note')||{}).value||'',
+    _updatedAt: Date.now()
+  });
+  saveState(); silentPush();
+  _closeSheet('part-add'); renderMobileCompDetail(); toast('Partenaire ajouté ✓','ok');
 }
 function budgetLineInput(compId, section, lineId, field, value) {
   if (!S.budgets || !S.budgets[compId]) return;
