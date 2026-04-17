@@ -2638,6 +2638,7 @@ async function loadState() {
   } catch(e) {
     console.warn('loadState error', e);
   }
+  if (!S._deletedComps) S._deletedComps = [];
 }
 
 function clearLocalStorageQuota() {
@@ -3017,6 +3018,8 @@ function deleteComp() {
   var cp = S.comps.find(function(c){ return c.id === id; });
   if (!cp) return;
   S.comps = S.comps.filter(function(c){ return c.id !== id; });
+  if (!S._deletedComps) S._deletedComps = [];
+  S._deletedComps.push({ id: id, deletedAt: Date.now() });
   if (S.runs) delete S.runs[id];
   if (S.compEnroll) delete S.compEnroll[id];
   saveState();
@@ -3869,6 +3872,8 @@ function deleteCompById(compId, btnEl) {
   _dcbPending = false; _dcbId = null;
   if (btnEl) { btnEl.innerHTML = btnEl._savedHTML || '🗑'; btnEl.setAttribute('style', btnEl._savedStyle || ''); }
   S.comps = S.comps.filter(function(c){ return c.id !== compId; });
+  if (!S._deletedComps) S._deletedComps = [];
+  S._deletedComps.push({ id: compId, deletedAt: Date.now() });
   if (S.runs) delete S.runs[compId];
   if (S.compEnroll) delete S.compEnroll[compId];
   saveState();
@@ -3907,6 +3912,8 @@ function deleteCompDetail(compId) {
   _deleteCompDetailId = null;
   if (btn) { btn.textContent = 'Supprimer'; btn.style.background = ''; btn.style.color = ''; }
   S.comps = S.comps.filter(function(c){ return c.id !== compId; });
+  if (!S._deletedComps) S._deletedComps = [];
+  S._deletedComps.push({ id: compId, deletedAt: Date.now() });
   if (S.runs) delete S.runs[compId];
   if (S.compEnroll) delete S.compEnroll[compId];
   saveState();
@@ -7123,13 +7130,79 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var bdata = S.budgets[cp.id];
     var bSub  = _budgetSubTab || 'engagement';
     var iStyle = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box';
-    var bTabBtn = function(id,lbl){ var a=bSub===id; return '<button onclick="switchBudgetSubTab(\''+id+'\')" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s">'+lbl+'</button>'; };
+    var bTabBtn = function(id,lbl){ var a=bSub===id; return '<button onclick="switchBudgetSubTab(\''+id+'\')" style="flex:1;padding:8px 6px;border-radius:8px;border:none;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;min-height:44px">'+lbl+'</button>'; };
     var bEsc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
     // Coût = Valeur × Nb jours × Qt
     var computeCout = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var calcTotal = function(lines){ return lines.reduce(function(s,l){ return s+computeCout(l); }, 0); };
     var BGRID = 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
     var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var isMobBgt = window.innerWidth < 768;
+
+    // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
+    if (isMobBgt) {
+      var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
+      // Sub-tabs as pills
+      htmlB += '<div style="display:flex;gap:4px;margin:10px 12px 0;flex-shrink:0;background:var(--navy3);border-radius:10px;padding:3px">';
+      htmlB += bTabBtn('engagement','💸 Dépenses');
+      htmlB += bTabBtn('ressources','💰 Recettes');
+      htmlB += bTabBtn('synthese','⚖️ Solde');
+      htmlB += '</div>';
+      htmlB += '<div style="flex:1;overflow-y:auto;padding:12px 12px 20px">';
+
+      if (bSub === 'engagement' || bSub === 'ressources') {
+        var section  = bSub;
+        var lines    = bdata[section];
+        var secColor = section === 'engagement' ? '#ef4444' : '#3b82f6';
+        var iStyleMob = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:10px 12px;outline:none;width:100%;box-sizing:border-box';
+        // ── Formulaire d'ajout empilé ──
+        htmlB += '<div style="background:var(--navy4);border-radius:10px;padding:12px;margin-bottom:14px;border:1px solid var(--stol)">';
+        htmlB += '<div style="font-size:11px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Nouvelle ligne</div>';
+        htmlB += '<div style="position:relative;margin-bottom:8px">';
+        htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyleMob+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
+        htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
+        htmlB += '</div>';
+        htmlB += '<input id="bgt-inp-lib-'+section+'" placeholder="Libellé…" style="'+iStyleMob+';margin-bottom:8px" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')">';
+        htmlB += '<button onclick="bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" style="width:100%;min-height:48px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter</button>';
+        htmlB += '</div>';
+        // ── Liste des lignes en cartes ──
+        if (lines.length === 0) {
+          htmlB += '<div style="text-align:center;padding:24px 0;color:var(--txt3);font-size:13px">Aucune ligne — saisissez un domaine ci-dessus</div>';
+        } else {
+          lines.forEach(function(l){
+            var coutCalc = computeCout(l);
+            htmlB += '<div style="padding:12px;border-radius:10px;background:var(--navy3);margin-bottom:8px;border:1px solid var(--bdr)">';
+            htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+            htmlB += '<span style="font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">🏷 '+bEsc(l.domaine||'—')+' / '+bEsc(l.libelle||'—')+'</span>';
+            htmlB += '<button onclick="removeBudgetLine(\''+cp.id+'\',\''+section+'\',\''+l.id+'\')" style="min-width:44px;min-height:44px;border:none;border-radius:8px;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>';
+            htmlB += '</div>';
+            htmlB += '<div style="font-size:18px;font-weight:900;color:'+secColor+'">💶 '+coutCalc.toFixed(2)+' €</div>';
+            htmlB += '</div>';
+          });
+        }
+        // ── Total ──
+        var tot = calcTotal(lines);
+        htmlB += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px;padding:12px 14px;border:1px solid var(--bdr);border-radius:10px;border-top:2px solid '+secColor+'">';
+        htmlB += '<span style="font-size:13px;font-weight:700;color:var(--txt2)">TOTAL</span>';
+        htmlB += '<span id="budget-total-'+section+'" style="font-size:20px;font-weight:900;color:'+secColor+'">'+tot.toFixed(2)+' €</span>';
+        htmlB += '</div>';
+
+      } else { // synthese mobile
+        var totEng = calcTotal(bdata.engagement);
+        var totRes = calcTotal(bdata.ressources);
+        var solde  = totRes - totEng;
+        var soldeColor = solde >= 0 ? '#10b981' : '#ef4444';
+        htmlB += '<div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">';
+        htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid #ef4444;text-align:center"><div style="font-size:11px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total Dépenses</div><div style="font-size:28px;font-weight:900;color:#ef4444">'+totEng.toFixed(2)+' €</div></div>';
+        htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid #3b82f6;text-align:center"><div style="font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total Recettes</div><div style="font-size:28px;font-weight:900;color:#3b82f6">'+totRes.toFixed(2)+' €</div></div>';
+        htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid '+soldeColor+';text-align:center"><div style="font-size:11px;font-weight:700;color:'+soldeColor+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Solde</div><div style="font-size:32px;font-weight:900;color:'+soldeColor+'">'+(solde>=0?'+':'')+solde.toFixed(2)+' €</div></div>';
+        htmlB += '</div>';
+      }
+      htmlB += '</div></div>';
+      return htmlB;
+    }
+
+    // ── DESKTOP LAYOUT (≥768px) ────────────────────────────────────────────────
     var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
     // Sous-onglets + boutons actions dans la même barre
     htmlB += '<div style="display:flex;align-items:center;gap:2px;margin:10px 12px 0;flex-shrink:0;background:var(--navy3);border-radius:10px;padding:3px">';
@@ -7336,6 +7409,51 @@ function renderPartenairesTab(cp) {
   if (!S.partenaires[cp.id]) S.partenaires[cp.id] = [];
   var list = S.partenaires[cp.id];
   var isGest = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+  var isMob = window.innerWidth < 768;
+
+  // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
+  if (isMob) {
+    var html = '<div style="flex:1;overflow-y:auto;padding:12px 12px 20px">';
+    // Add button at top
+    if (isGest) {
+      html += '<button data-cpid="'+escH(cp.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,null)" style="width:100%;min-height:48px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:12px">＋ Ajouter un partenaire</button>';
+    }
+    if (list.length === 0) {
+      html += '<div style="text-align:center;padding:40px 20px;color:var(--txt3);font-size:13px">Aucun partenaire enregistré.</div>';
+      html += '</div>';
+      return html;
+    }
+    var typeColors = {'Institutionnel':'#3b82f6','Sponsor':'#f59e0b','Médias':'#8b5cf6','Aéroclub':'#10b981','Collectivité':'#ef4444','Autre':'#6b7280'};
+    list.forEach(function(p) {
+      var typeColor = typeColors[p.type||'Autre'] || '#6b7280';
+      html += '<div style="padding:12px 14px;background:var(--navy3);border-radius:10px;margin-bottom:8px;border:1px solid var(--bdr)">';
+      // Line 1: name/org + type badge
+      html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:14px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(p.organisme||p.representant||'—')+'</div>';
+      if (p.representant && p.organisme) html += '<div style="font-size:12px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(p.representant)+'</div>';
+      html += '</div>';
+      html += '<span style="flex-shrink:0;padding:3px 8px;border-radius:20px;background:'+typeColor+'22;color:'+typeColor+';font-size:10px;font-weight:700;border:1px solid '+typeColor+'44">'+escH(p.type||'Autre')+'</span>';
+      html += '</div>';
+      // Line 2: phone
+      if (p.telephone) html += '<div style="font-size:13px;color:var(--txt2);margin-bottom:3px">📞 '+escH(p.telephone)+'</div>';
+      // Line 3: email + action buttons
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">';
+      html += '<div style="font-size:12px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+(p.email ? '✉ '+escH(p.email) : '')+'</div>';
+      if (isGest) {
+        html += '<div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px">';
+        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,this.dataset.pid)" title="Modifier" style="min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt2);font-size:14px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;justify-content:center">✏️</button>';
+        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="deletePartenaire(this.dataset.cpid,this.dataset.pid)" title="Supprimer" style="min-width:44px;min-height:44px;border-radius:8px;border:none;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;padding:0;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center">×</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // ── DESKTOP LAYOUT ─────────────────────────────────────────────────────────
   var html = '<div style="flex:1;overflow-y:auto;padding:14px 16px">';
 
   // Header
@@ -10831,6 +10949,7 @@ async function pushToCloud() {
     officialDocs:     S.officialDocs       || {},
     docSettings:      S.docSettings        || {},
     homeTodosByComp:  S.homeTodosByComp    || {},
+    _deletedComps:    S._deletedComps      || [],
     _pushAt:          Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
@@ -10926,6 +11045,18 @@ async function pullFromCloud() {
 
   var r = data.data; // données distantes
 
+  // ── Tombstones : fusion des compétitions supprimées (union locale + cloud) ──
+  var remoteDeleted = r._deletedComps || [];
+  var localDeleted = S._deletedComps || [];
+  var allDeletedIds = {};
+  localDeleted.forEach(function(t){ allDeletedIds[t.id] = t.deletedAt; });
+  remoteDeleted.forEach(function(t){
+    if (!allDeletedIds[t.id] || t.deletedAt > allDeletedIds[t.id]) {
+      allDeletedIds[t.id] = t.deletedAt;
+    }
+  });
+  S._deletedComps = Object.keys(allDeletedIds).map(function(id){ return {id:id, deletedAt:allDeletedIds[id]}; });
+
   // Sauvegarder les médias locaux (base64 — non stockés dans le JSON principal)
   var localUser     = S.user;
   var localAffiches = {};
@@ -10936,6 +11067,8 @@ async function pullFromCloud() {
   // ── FUSION : on garde TOUT — local + cloud, jamais de remplacement total ──
   // Tableaux plats avec .id : _mergeById
   S.comps         = _mergeById(S.comps,         r.comps);
+  // Supprimer les compétitions tombstoned
+  S.comps = S.comps.filter(function(c){ return !allDeletedIds[c.id]; });
   S.pilots        = _mergeById(S.pilots,        r.pilots);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
@@ -10959,6 +11092,18 @@ async function pullFromCloud() {
 
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
+
+  // ── Nettoyer les données liées aux compétitions tombstoned (après fusion cloud) ──
+  if (Object.keys(allDeletedIds).length > 0) {
+    Object.keys(allDeletedIds).forEach(function(id){
+      if (S.runs && S.runs[id]) delete S.runs[id];
+      if (S.compEnroll && S.compEnroll[id]) delete S.compEnroll[id];
+      if (S.staff && S.staff[id]) delete S.staff[id];
+      if (S.materiel && S.materiel[id]) delete S.materiel[id];
+      if (S.budgets && S.budgets[id]) delete S.budgets[id];
+      if (S.partenaires && S.partenaires[id]) delete S.partenaires[id];
+    });
+  }
 
   // ── Nettoyage doublons staff (entrées sans .id ou avec même pilotId) ──
   if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
