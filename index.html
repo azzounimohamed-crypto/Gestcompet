@@ -10713,7 +10713,12 @@ async function testSupabase() {
       }
     }
   } catch(e) {
-    show('Erreur: ' + (e.message||'réseau'), '#ef4444');
+    var msg = e.message || 'réseau';
+    if (msg.indexOf('fetch') !== -1) {
+      show('❌ Supabase injoignable — projet probablement EN PAUSE. Allez sur supabase.com → Resuming project', '#ef4444');
+    } else {
+      show('Erreur: ' + msg, '#ef4444');
+    }
   }
 }
 
@@ -10736,10 +10741,13 @@ async function sbSync() {
   } catch(e) {
     console.error('[GestSTOL] sbSync échouée:', e);
     var errMsg = e.message || 'erreur réseau';
-    toast('Sync échouée : ' + errMsg, 'err');
     if (syncBtn) syncBtn.textContent = '✗';
-    // Afficher dans une bannière lisible qui reste visible
-    showSyncError(errMsg);
+    // Détecter si c'est une erreur réseau (Supabase injoignable)
+    if (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1) {
+      toast('Hors ligne ou Supabase injoignable — données locales conservées', 'err');
+    } else {
+      toast('Sync échouée : ' + errMsg, 'err');
+    }
   } finally {
     _syncInProgress = false;
   }
