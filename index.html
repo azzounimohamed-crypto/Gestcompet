@@ -15889,11 +15889,19 @@ var _budgetSubTab = 'engagement';
 var _bgtOpenDomains = {}; // {compId_section_domain: true/false}
 function switchBudgetSubTab(sub) {
   _budgetSubTab = sub;
-  switchHomeDetailTab('budget');
+  if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
+    renderMobileCompDetail();
+  } else {
+    _refreshBudgetView();
+  }
 }
 function toggleBgtDomain(key) {
   _bgtOpenDomains[key] = !_bgtOpenDomains[key];
-  switchHomeDetailTab('budget');
+  if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
+    renderMobileCompDetail();
+  } else {
+    _refreshBudgetView();
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -16339,7 +16347,7 @@ function importBudgetExcel(evt, compId) {
     if (eng.length) S.budgets[compId].engagement = S.budgets[compId].engagement.concat(eng);
     if (res.length) S.budgets[compId].ressources  = S.budgets[compId].ressources.concat(res);
     saveState(); silentPush();
-    switchHomeDetailTab('budget');
+    _refreshBudgetView();
     toast((eng.length+res.length)+' lignes importées ✓','ok');
   };
   reader.readAsText(file, 'UTF-8');
@@ -16393,7 +16401,7 @@ function bgtAddLineFromRow(compId, section) {
   if (libEl) { libEl.value=''; }
   var isNDF = dom.toUpperCase() === 'NDF';
   _budgetSubTab = section;
-  switchHomeDetailTab('budget');
+  _refreshBudgetView();
   if (isNDF) {
     setTimeout(function(){ showBudgetDetail(compId, section, newLine.id); }, 120);
   } else {
@@ -16426,7 +16434,7 @@ function bgtMobAdd(compId, section) {
   if (nbjEl) nbjEl.value = '1';
   if (qtEl)  qtEl.value  = '1';
   _budgetSubTab = section;
-  switchHomeDetailTab('budget');
+  _refreshBudgetView();
 }
 function addBudgetLine(compId, section) {
   if (!S.budgets) S.budgets = {};
@@ -16434,14 +16442,21 @@ function addBudgetLine(compId, section) {
   S.budgets[compId][section].push({id:'bl-'+Date.now(), domaine:'', libelle:'', valeur:0, nbjours:1, qt:1, detail:''});
   saveState();
   _budgetSubTab = section;
-  switchHomeDetailTab('budget');
+  _refreshBudgetView();
 }
 function removeBudgetLine(compId, section, lineId) {
   if (!S.budgets || !S.budgets[compId]) return;
   S.budgets[compId][section] = S.budgets[compId][section].filter(function(l){ return l.id !== lineId; });
   saveState();
   _budgetSubTab = section;
-  switchHomeDetailTab('budget');
+  _refreshBudgetView();
+}
+function _refreshBudgetView() {
+  if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
+    renderMobileCompDetail();
+  } else {
+    switchHomeDetailTab('budget');
+  }
 }
 function budgetLineInput(compId, section, lineId, field, value) {
   if (!S.budgets || !S.budgets[compId]) return;
@@ -17067,7 +17082,7 @@ function saveBudgetDetailModal() {
   saveState();
   closeBudgetDetailModal();
   _budgetSubTab = _bdmSection;
-  switchHomeDetailTab('budget');
+  _refreshBudgetView();
 }
 
 // ═══════════════════════════════════════════════════
