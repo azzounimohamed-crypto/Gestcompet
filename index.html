@@ -1750,7 +1750,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
-          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
+          <button class="btn btn-full btn-sm" onclick="showSyncDiag()" style="margin-bottom:6px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);color:#6366f1">🔍 Diagnostic sync</button>
+          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes · <span id="push-pending-indicator"></span></div>
         </div>
 
         <!-- ── BANNIÈRE AUTO-PROMOTION ── -->
@@ -3274,6 +3275,7 @@ function saveComp() {
   var id = document.getElementById('comp-edit-id').value;
   var comp = {
     id: id || ('usr-' + Date.now().toString(36)),
+    _updatedAt: Date.now(),
     name: document.getElementById('comp-name').value.trim(),
     dateFrom: document.getElementById('comp-date-from').value,
     dateTo: document.getElementById('comp-date-to').value,
@@ -10813,6 +10815,13 @@ async function sbLogout() {
 var _syncInProgress = false;
 var _lastSyncAt     = 0;
 var _pushPending    = false;  // données locales non encore envoyées au cloud
+// _pushPending persisté en localStorage pour survivre aux rechargements de page
+try { if (localStorage.getItem('_gest_pushPending') === '1') _pushPending = true; } catch(e){}
+function _setPushPending(v) {
+  _pushPending = v;
+  try { if (v) localStorage.setItem('_gest_pushPending','1'); else localStorage.removeItem('_gest_pushPending'); } catch(e){}
+  setTimeout(function(){ if(typeof _updatePushIndicator==='function') _updatePushIndicator(); }, 0);
+}
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
 // ── Sync silencieuse (arrière-plan) : AUCUN message, AUCUNE bannière ──
@@ -10824,7 +10833,7 @@ async function _bgSync() {
   try {
     await pullFromCloud();
     await pushToCloud();
-    _pushPending = false;
+    _setPushPending(false);
     _lastSyncAt = Date.now();
     updateSyncTime();
     var sf = document.getElementById('comp-season-filter');
@@ -10850,7 +10859,7 @@ async function sbSync() {
   try {
     await pullFromCloud();
     await pushToCloud();
-    _pushPending = false;
+    _setPushPending(false);
     _lastSyncAt = Date.now();
     updateSyncTime();
     var sf = document.getElementById('comp-season-filter');
@@ -10920,10 +10929,17 @@ function _mergeById(local, remote, deletedSet) {
   var map = {};
   var la = Array.isArray(local)  ? local  : [];
   var ra = Array.isArray(remote) ? remote : [];
-  // Remote en premier, local en second → local gagne toujours sur remote
+  // Remote d'abord (base)
   ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
-  la.forEach(function(x){ if (x && x.id) map[x.id] = x; });
-  // Supprimer les éléments marqués comme supprimés
+  // Local ensuite : gagne seulement si _updatedAt plus récent, sinon remote garde la priorité
+  la.forEach(function(x){
+    if (!x || !x.id) return;
+    if (!map[x.id]) { map[x.id] = x; return; } // nouveau item local → ajouter
+    var localTs  = x._updatedAt  || 0;
+    var remoteTs = map[x.id]._updatedAt || 0;
+    if (localTs > remoteTs) map[x.id] = x; // local plus récent → local gagne
+    // sinon remote garde la priorité
+  });
   var ds = deletedSet || {};
   return Object.keys(map).filter(function(k){ return !ds[k]; }).map(function(k){ return map[k]; });
 }
@@ -11134,6 +11150,71 @@ async function _pullMedias(sb) {
 }
 
 // showSyncError supprimé — les erreurs sync sont silencieuses, visibles uniquement en console
+
+// ── Diagnostic sync : affiche l'état cloud vs local ──────────────────────────
+async function showSyncDiag() {
+  var lines = [];
+  lines.push('=== DIAGNOSTIC SYNC ===');
+  lines.push('En ligne : ' + (navigator.onLine ? 'OUI' : 'NON'));
+  lines.push('Supabase chargé : ' + (getSB() ? 'OUI' : 'NON'));
+  lines.push('Données en attente (push) : ' + (_pushPending ? 'OUI ⚠️' : 'non'));
+  lines.push('Dernière sync : ' + (_lastSyncAt ? Math.round((Date.now()-_lastSyncAt)/1000)+'s' : 'jamais'));
+  lines.push('');
+  lines.push('LOCAL :');
+  lines.push('  Compétitions : ' + (S.comps||[]).length);
+  lines.push('  Pilotes : ' + (S.pilots||[]).length);
+  lines.push('  Staff clés : ' + Object.keys(S.staff||{}).length);
+  lines.push('  IDs supprimés : ' + Object.keys(S.deletedCompIds||{}).length);
+  lines.push('');
+  var sb = getSB();
+  if (sb) {
+    lines.push('CLOUD (lecture en cours...)');
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = '<div style="background:var(--navy2);border-radius:12px;padding:20px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;font-family:monospace;font-size:12px;white-space:pre-wrap;color:var(--txt)">' + lines.join('\n') + '\n\nRécupération cloud...' + '<br><button onclick="this.closest('div').parentNode.remove()" style="margin-top:12px;padding:8px 20px;background:var(--stol);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;width:100%">Fermer</button></div>';
+    document.body.appendChild(modal);
+    try {
+      var res = await sb.from('stol_shared').select('data,updated_at').eq('id','global').single();
+      if (res.error) {
+        lines.push('ERREUR CLOUD : ' + res.error.message);
+      } else if (res.data && res.data.data) {
+        var r = res.data.data;
+        lines.push('CLOUD :');
+        lines.push('  Compétitions : ' + (r.comps||[]).length);
+        lines.push('  Pilotes : ' + (r.pilots||[]).length);
+        lines.push('  Staff clés : ' + Object.keys(r.staff||{}).length);
+        lines.push('  Dernière push : ' + (r._pushAt ? new Date(r._pushAt).toLocaleTimeString() : 'inconnue'));
+        lines.push('  updated_at : ' + res.data.updated_at);
+        lines.push('');
+        // Comps en local mais pas dans cloud
+        var cloudIds = (r.comps||[]).map(function(c){return c.id;});
+        var localIds = (S.comps||[]).map(function(c){return c.id;});
+        var onlyLocal = localIds.filter(function(id){ return cloudIds.indexOf(id)===-1; });
+        var onlyCloud = cloudIds.filter(function(id){ return localIds.indexOf(id)===-1; });
+        if (onlyLocal.length) lines.push('LOCAL seulement (' + onlyLocal.length + ') : ' + onlyLocal.slice(0,3).join(', '));
+        if (onlyCloud.length) lines.push('CLOUD seulement (' + onlyCloud.length + ') : ' + onlyCloud.slice(0,3).join(', '));
+        if (!onlyLocal.length && !onlyCloud.length) lines.push('✓ Compétitions identiques local/cloud');
+      } else {
+        lines.push('CLOUD : vide');
+      }
+    } catch(e) {
+      lines.push('ERREUR : ' + (e.message || e));
+    }
+    var box = modal.querySelector('div');
+    box.innerHTML = '<div style="margin-bottom:12px">' + lines.join('\n').replace(/\n/g,'<br>') + '</div><button onclick="this.closest('div').parentNode.remove()" style="padding:8px 20px;background:var(--stol);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;width:100%">Fermer</button>';
+  } else {
+    lines.push('CLOUD : Supabase non disponible');
+    alert(lines.join('\n'));
+  }
+}
+
+// Mettre à jour l'indicateur push pending dans l'UI
+function _updatePushIndicator() {
+  var el = document.getElementById('push-pending-indicator');
+  if (!el) return;
+  el.textContent = _pushPending ? '⚠️ envoi en attente' : '';
+  el.style.color = _pushPending ? '#f59e0b' : '';
+}
 
 // ── Force push : envoie le local vers le cloud SANS pull préalable ──
 async function forcePushCloud() {
@@ -13092,13 +13173,13 @@ async function syncBase44All(compId) {
 // Push silencieux sans feedback visuel
 // Note : ne nécessite PAS d'être connecté (anon key suffisant)
 function silentPush() {
-  _pushPending = true; // marquer les données comme non synchronisées
-  if (!getSB() || !navigator.onLine) return; // sera retenté par l'auto-sync
+  _setPushPending(true); // marquer les données comme non synchronisées (persiste aux rechargements)
+  if (!getSB() || !navigator.onLine) return; // sera retenté par l'auto-sync ou au prochain démarrage
   pushToCloud().then(function(){
-    _pushPending = false;
+    _setPushPending(false);
   }).catch(function(e){
     console.warn('[GestSTOL] silentPush échoué — sera retenté:', e.message || e);
-    // _pushPending reste true → l'auto-sync retentera automatiquement
+    // _pushPending reste true → retenté au prochain démarrage ou cycle auto-sync
   });
 }
 
@@ -20473,9 +20554,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   startAutoSync();
 
-  // ── Sync silencieuse au démarrage (après 3s pour laisser Supabase s'initialiser) ──
+  // ── Sync au démarrage (après 3s pour laisser Supabase s'initialiser) ──
+  // Si des données locales n'ont pas été envoyées (page rechargée pendant un push),
+  // on pousse d'abord, puis on fait le sync bidirectionnel.
   setTimeout(function() {
-    _bgSync().catch(function(){});
+    if (!navigator.onLine || !getSB()) return;
+    var _doStartupSync = function() {
+      if (_pushPending) {
+        // Données locales non envoyées → push d'abord, puis sync complet
+        pushToCloud()
+          .then(function(){ _setPushPending(false); return _bgSync(); })
+          .catch(function(){ _bgSync().catch(function(){}); });
+      } else {
+        _bgSync().catch(function(){});
+      }
+    };
+    _doStartupSync();
   }, 3000);
   }
 });
