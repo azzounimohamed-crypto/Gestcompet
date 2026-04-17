@@ -3744,6 +3744,21 @@ function renderMobileCompDetail() {
       fHtml += '</div>';
       footerEl.innerHTML = fHtml;
       footerEl.style.display = '';
+    } else if (sec.id === 'budget') {
+      var bSubCur = _budgetSubTab || 'engagement';
+      var canEditBgt = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      if (canEditBgt && (bSubCur === 'engagement' || bSubCur === 'ressources')) {
+        var secLbl = bSubCur === 'engagement' ? '💸 Dépense' : '💰 Recette';
+        var secCol = bSubCur === 'engagement' ? '#ef4444' : '#10b981';
+        var fHtml2 = '<div style="border-top:1px solid var(--bdr)">';
+        fHtml2 += '<button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" data-sec="'+bSubCur+'" onclick="openBgtAddSheet(this.dataset.cpid,this.dataset.sec)" style="width:100%;padding:16px;background:linear-gradient(135deg,'+secCol+','+secCol+'cc);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter une '+secLbl+'</button>';
+        fHtml2 += '</div>';
+        footerEl.innerHTML = fHtml2;
+        footerEl.style.display = '';
+      } else {
+        footerEl.innerHTML = '';
+        footerEl.style.display = 'none';
+      }
     } else {
       footerEl.innerHTML = '';
       footerEl.style.display = 'none';
@@ -7128,24 +7143,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var section  = bSub;
         var lines    = bdata[section];
         var secColor = section === 'engagement' ? '#ef4444' : '#10b981';
-        var iStyleMob = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:10px 12px;outline:none;width:100%;box-sizing:border-box;margin-bottom:8px';
-
-        // ── Formulaire d'ajout empilé ──
-        htmlB += '<div style="background:var(--navy4);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--stol)">';
-        htmlB += '<div style="font-size:11px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">＋ Nouvelle ligne</div>';
-        htmlB += '<div style="position:relative">';
-        htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine (ex: Transport, Hébergement…)" autocomplete="off" style="'+iStyleMob+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cpIdS2+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')document.getElementById(\'bgt-inp-lib-'+section+'\').focus()" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
-        htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
-        htmlB += '</div>';
-        htmlB += '<input id="bgt-inp-lib-'+section+'" placeholder="Libellé (ex: Location véhicule…)" style="'+iStyleMob+'" onkeydown="if(event.key===\'Enter\')document.getElementById(\'bgt-inp-val-mob-'+section+'\').focus()">';
-        htmlB += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
-        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Montant €</div><input id="bgt-inp-val-mob-'+section+'" type="number" min="0" step="0.01" placeholder="0.00" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
-        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Jours</div><input id="bgt-inp-nbj-mob-'+section+'" type="number" min="1" step="1" placeholder="1" value="1" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
-        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Qté</div><input id="bgt-inp-qt-mob-'+section+'" type="number" min="1" step="1" placeholder="1" value="1" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
-        htmlB += '</div>';
-        htmlB += '<button data-cpid="'+cpIdS2+'" data-sec="'+section+'" onclick="bgtMobAdd(this.dataset.cpid,this.dataset.sec)" style="width:100%;min-height:48px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter</button>';
-        htmlB += '</div>';
-
         // ── Lignes groupées par domaine (accordion) ──
         if (lines.length === 0) {
           htmlB += '<div style="text-align:center;padding:32px 0;color:var(--txt3);font-size:13px">Aucune ligne — saisissez un domaine ci-dessus</div>';
@@ -16433,6 +16430,112 @@ function _refreshBudgetView() {
   } else {
     switchHomeDetailTab('budget');
   }
+}
+// ── Bottom sheet AJOUT ligne budget (mobile) ─────────────────
+function openBgtAddSheet(compId, section) {
+  if (!S.budgets) S.budgets = {};
+  if (!S.budgets[compId]) S.budgets[compId] = {engagement:[], ressources:[]};
+  var secColor = section === 'engagement' ? '#ef4444' : '#10b981';
+  var secLabel = section === 'engagement' ? '💸 Dépense' : '💰 Recette';
+  var old = document.getElementById('bgt-add-sheet-overlay');
+  if (old) old.remove();
+  // Domaines existants pour suggestions
+  var existingDoms = [];
+  ((S.budgets[compId]||{})[section]||[]).forEach(function(l){
+    var d = (l.domaine||'').trim();
+    if (d && existingDoms.indexOf(d) === -1) existingDoms.push(d);
+  });
+  var iSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;width:100%;box-sizing:border-box';
+  var esc3 = function(s){ return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+  var html = '<div id="bgt-add-sheet-overlay" onclick="if(event.target===this)closeBgtAddSheet()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center">';
+  html += '<div id="bgt-add-sheet-panel" style="background:var(--navy2);border-radius:16px 16px 0 0;width:100%;height:80vh;display:flex;flex-direction:column;animation:slideUpSheet .25s ease;padding-bottom:env(safe-area-inset-bottom)">';
+  // Poignée
+  html += '<div style="flex-shrink:0"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:12px auto 0"></div>';
+  // Header
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px">';
+  html += '<div><div style="font-size:17px;font-weight:800;color:var(--txt)">Nouvelle ligne</div>';
+  html += '<div style="font-size:13px;font-weight:600;color:'+secColor+';margin-top:2px">'+secLabel+'</div></div>';
+  html += '<button onclick="closeBgtAddSheet()" style="min-width:40px;min-height:40px;border:none;background:var(--navy3);border-radius:10px;color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>';
+  html += '</div></div>';
+  // Corps scrollable
+  html += '<div style="flex:1;overflow-y:auto;padding:0 18px 16px">';
+  // Domaine avec suggestions
+  html += '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Domaine</div>';
+  html += '<div style="position:relative;margin-bottom:12px">';
+  html += '<input id="bga-dom" placeholder="Ex: Transport, Hébergement, Repas…" autocomplete="off" style="'+iSt+'" oninput="bgtAddSheetDomSug(\''+esc3(compId)+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bga-dom-drop\');if(d)d.style.display=\'none\'},200)">';
+  html += '<div id="bga-dom-drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 10px 10px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:160px;overflow-y:auto"></div>';
+  html += '</div>';
+  // Libellé
+  html += '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Libellé</div>';
+  html += '<input id="bga-lib" placeholder="Ex: Location véhicule, Hôtel nuit 1…" style="'+iSt+';margin-bottom:12px">';
+  // Montant / Jours / Qté
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">';
+  html += '<div><div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Montant €</div>';
+  html += '<input id="bga-val" type="number" min="0" step="0.01" placeholder="0.00" style="'+iSt+'" oninput="bgtAddSheetCalc()"></div>';
+  html += '<div><div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Jours</div>';
+  html += '<input id="bga-nbj" type="number" min="1" step="1" value="1" style="'+iSt+'" oninput="bgtAddSheetCalc()"></div>';
+  html += '<div><div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Qté</div>';
+  html += '<input id="bga-qt" type="number" min="1" step="1" value="1" style="'+iSt+'" oninput="bgtAddSheetCalc()"></div>';
+  html += '</div>';
+  // Total calculé
+  html += '<div id="bga-total" style="text-align:center;font-size:24px;font-weight:900;color:'+secColor+';padding:14px;background:var(--navy3);border-radius:12px;margin-bottom:16px">0.00 €</div>';
+  html += '</div>';
+  // Bouton enregistrer fixe en bas du sheet
+  html += '<div style="flex-shrink:0;padding:12px 18px 16px;border-top:1px solid var(--bdr)">';
+  html += '<button data-cpid="'+esc3(compId)+'" data-sec="'+section+'" onclick="bgtAddSheetSave(this.dataset.cpid,this.dataset.sec)" style="width:100%;min-height:54px;border-radius:14px;border:none;background:'+secColor+';color:#fff;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter la ligne</button>';
+  html += '</div>';
+  html += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(function(){ var el = document.getElementById('bga-dom'); if(el) el.focus(); }, 300);
+}
+function closeBgtAddSheet() {
+  var el = document.getElementById('bgt-add-sheet-overlay');
+  if (!el) return;
+  var panel = document.getElementById('bgt-add-sheet-panel');
+  if (panel) { panel.style.transition='transform .2s ease'; panel.style.transform='translateY(100%)'; }
+  setTimeout(function(){ if(el.parentNode) el.remove(); }, 200);
+}
+function bgtAddSheetCalc() {
+  var v = parseFloat((document.getElementById('bga-val')||{}).value)||0;
+  var j = parseFloat((document.getElementById('bga-nbj')||{}).value)||1;
+  var q = parseFloat((document.getElementById('bga-qt')||{}).value)||1;
+  var tot = document.getElementById('bga-total');
+  if (tot) tot.textContent = (v*j*q).toFixed(2)+' €';
+}
+function bgtAddSheetDomSug(compId, section) {
+  var val = (document.getElementById('bga-dom')||{}).value || '';
+  var drop = document.getElementById('bga-dom-drop');
+  if (!drop) return;
+  var doms = [];
+  ((S.budgets||{})[compId]||{})[section] && ((S.budgets[compId]||{})[section]||[]).forEach(function(l){
+    var d = (l.domaine||'').trim();
+    if (d && doms.indexOf(d)===-1) doms.push(d);
+  });
+  var filtered = val ? doms.filter(function(d){ return d.toLowerCase().indexOf(val.toLowerCase())===0; }) : doms;
+  if (!filtered.length) { drop.style.display='none'; return; }
+  drop.innerHTML = filtered.map(function(d){
+    return '<div onclick="document.getElementById(\'bga-dom\').value=\''+d.replace(/'/g,"\\'")+'\';" style="padding:10px 14px;cursor:pointer;font-size:14px;color:var(--txt)" onmousedown="event.preventDefault()">'+ d +'</div>';
+  }).join('');
+  drop.style.display = '';
+}
+function bgtAddSheetSave(compId, section) {
+  var dom = ((document.getElementById('bga-dom')||{}).value||'').trim();
+  var lib = ((document.getElementById('bga-lib')||{}).value||'').trim();
+  if (!dom && !lib) { toast('Saisissez un domaine ou un libellé',''); return; }
+  var val = parseFloat((document.getElementById('bga-val')||{}).value)||0;
+  var nbj = parseInt((document.getElementById('bga-nbj')||{}).value)||1;
+  var qt  = parseInt((document.getElementById('bga-qt')||{}).value)||1;
+  if (!S.budgets) S.budgets = {};
+  if (!S.budgets[compId]) S.budgets[compId] = {engagement:[], ressources:[]};
+  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:val, nbjours:nbj, qt:qt, detail:'' };
+  var domKey = (compId+'_'+section+'_'+(dom||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
+  _bgtOpenDomains[domKey] = true;
+  S.budgets[compId][section].push(newLine);
+  saveState(); silentPush();
+  closeBgtAddSheet();
+  _budgetSubTab = section;
+  _refreshBudgetView();
+  toast('Ligne ajoutée ✓','ok');
 }
 // ── Bottom sheet édition ligne budget (mobile) ────────────────
 function openBgtLineSheet(compId, section, lineId) {
