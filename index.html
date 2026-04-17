@@ -1750,7 +1750,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
-          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 60 secondes</div>
+          <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
 
         <!-- ── BANNIÈRE AUTO-PROMOTION ── -->
@@ -11094,33 +11094,10 @@ async function pullFromCloud() {
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
 
-  // ── Migration ID : si doublon dateFrom+dateTo+pratique+discipline, transférer données vers l'ID qui a du contenu ──
-  // Cas typique : cal26-pareloup-para-slalom (injecté local) vs comp_XXXXXXX (créé par l'user, avec données)
-  var _seenCompKey = {};
-  S.comps.forEach(function(c) {
-    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
-    if (k === '|||') return;
-    if (!_seenCompKey[k]) { _seenCompKey[k] = c; return; }
-    // Doublon détecté : garder celui qui a des données (staff, compEnroll non vides)
-    var existing = _seenCompKey[k];
-    var existingHasData = (S.staff[existing.id]&&S.staff[existing.id].length>0) || (S.compEnroll[existing.id]&&S.compEnroll[existing.id].length>0);
-    var currentHasData  = (S.staff[c.id]&&S.staff[c.id].length>0)         || (S.compEnroll[c.id]&&S.compEnroll[c.id].length>0);
-    var winner = (currentHasData && !existingHasData) ? c : existing;
-    var loser  = (winner.id === existing.id) ? c : existing;
-    // Migrer les données du perdant vers le gagnant
-    if ((S.staff[loser.id]||[]).length > 0 && (S.staff[winner.id]||[]).length === 0)
-      S.staff[winner.id] = S.staff[loser.id];
-    if ((S.compEnroll[loser.id]||[]).length > 0 && (S.compEnroll[winner.id]||[]).length === 0)
-      S.compEnroll[winner.id] = S.compEnroll[loser.id];
-    if ((S.runs[loser.id]||[]).length > 0 && (S.runs[winner.id]||[]).length === 0)
-      S.runs[winner.id] = S.runs[loser.id];
-    // Supprimer le doublon (loser)
-    S.deletedCompIds[loser.id] = true;
-    S.comps = S.comps.filter(function(x){ return x.id !== loser.id; });
-    _seenCompKey[k] = winner;
-  });
-
-  // ── Purge globale : doublons staff + compEnroll + comps (après fusion) ──
+  // ── Normaliser les IDs (comp_XXXXX → cal26-*/calf-*) puis purger les doublons ──
+  // Nécessite que les injections aient déjà tourné (elles tournent à DOMContentLoaded
+  // avant le pull, et restent dans S.comps pour le pull suivant).
+  _normalizeCompIds();
   _purgeAllDuplicates();
 
   // Restaurer les affiches/photos locales si absentes du cloud
@@ -17349,25 +17326,19 @@ function injectCalendrier2026() {
           && (x.discipline||'') === (cp.discipline||'');
     });
     if (sameEvent) {
-      // La compétition existe déjà sous un autre ID (ex: comp_XXXXXXX créé par l'utilisateur)
-      // Migrer staff/compEnroll/runs de l'ID calendrier vers l'ID réel si nécessaire
       if (sameEvent.id !== cp.id) {
-        S.compEnroll = S.compEnroll || {};
-        S.staff      = S.staff      || {};
-        S.runs       = S.runs       || {};
-        // Si des données existent sous l'ID calendrier → les transférer vers l'ID réel
-        if (S.compEnroll[cp.id] && S.compEnroll[cp.id].length > 0 && (!S.compEnroll[sameEvent.id] || S.compEnroll[sameEvent.id].length === 0)) {
-          S.compEnroll[sameEvent.id] = S.compEnroll[cp.id];
+        if (/^comp_[a-z0-9]+$/.test(sameEvent.id)) {
+          // L'existant est un ID auto-généré → migrer ses données vers l'ID canonique cp.id
+          _migrateCompId(sameEvent.id, cp.id);
+          // Remplacer dans S.comps
+          var _sidx = S.comps.indexOf(sameEvent);
+          if (_sidx !== -1) { S.comps[_sidx] = cp; added++; }
+          else { S.comps.push(cp); added++; }
+          S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+        } else {
+          // Les deux sont canoniques → bloquer le nouveau (garder l'existant)
+          S.deletedCompIds[cp.id] = true;
         }
-        if (S.staff[cp.id] && S.staff[cp.id].length > 0 && (!S.staff[sameEvent.id] || S.staff[sameEvent.id].length === 0)) {
-          S.staff[sameEvent.id] = S.staff[cp.id];
-        }
-        if (S.runs[cp.id] && (!S.runs[sameEvent.id] || S.runs[sameEvent.id].length === 0)) {
-          S.runs[sameEvent.id] = S.runs[cp.id];
-        }
-        // Bloquer définitivement l'ID calendrier
-        S.deletedCompIds = S.deletedCompIds || {};
-        S.deletedCompIds[cp.id] = true;
       }
       return;
     }
@@ -17530,6 +17501,102 @@ function injectCalendrierFull() {
   saveState();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// _migrateCompId(fromId, toId)
+// Transfère TOUTES les données associées à fromId vers toId dans l'état S.
+// Utilisé pour converger les IDs comp_XXXXX vers les IDs canoniques cal26-*/calf-*.
+// ═══════════════════════════════════════════════════════════════════════════════
+function _migrateCompId(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  // Tous les champs de S indexés par compId
+  var _arrayKeys = ['compEnroll','staff','runs','materiel','evenements','partenaires','officialDocs','homeTodosByComp'];
+  _arrayKeys.forEach(function(key) {
+    if (!S[key]) return;
+    var src = S[key][fromId];
+    if (!src) return;
+    var dst = S[key][toId];
+    if (!dst || (Array.isArray(dst) && dst.length === 0)) {
+      // Destination vide → copie directe
+      S[key][toId] = src;
+    } else if (Array.isArray(src) && src.length > 0 && Array.isArray(dst)) {
+      // Fusion sans doublons
+      var merged = dst.slice();
+      src.forEach(function(item) {
+        if (!item) return;
+        var found = false;
+        if (item.id) found = merged.some(function(x){ return x && x.id === item.id; });
+        else if (typeof item === 'string') found = merged.indexOf(item) !== -1;
+        else found = merged.some(function(x){ return JSON.stringify(x) === JSON.stringify(item); });
+        if (!found) merged.push(item);
+      });
+      S[key][toId] = merged;
+    }
+    delete S[key][fromId];
+  });
+  // Budgets : structure spéciale {engagement:[], recettes:[], depenses:[], ...}
+  if (S.budgets && S.budgets[fromId]) {
+    if (!S.budgets[toId]) {
+      S.budgets[toId] = S.budgets[fromId];
+    } else {
+      var _bsrc = S.budgets[fromId];
+      var _bdst = S.budgets[toId];
+      Object.keys(_bsrc).forEach(function(bk) {
+        if (!Array.isArray(_bsrc[bk]) || _bsrc[bk].length === 0) return;
+        _bdst[bk] = _bdst[bk] || [];
+        _bsrc[bk].forEach(function(item) {
+          if (!_bdst[bk].some(function(x){ return x && x.id && x.id === (item&&item.id); })) {
+            _bdst[bk].push(item);
+          }
+        });
+      });
+    }
+    delete S.budgets[fromId];
+  }
+  // Bloquer l'ancien ID pour ne pas le ré-injecter
+  S.deletedCompIds = S.deletedCompIds || {};
+  S.deletedCompIds[fromId] = true;
+  console.log('[GestSTOL] _migrateCompId:', fromId, '→', toId);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// _normalizeCompIds()
+// Migre les compétitions avec ID auto-généré (comp_XXXXX) vers l'ID canonique
+// du calendrier si le même événement existe (dateFrom+dateTo+pratique+discipline).
+// À appeler après chaque loadState()+injections et après chaque pullFromCloud().
+// Résultat : tous les appareils utilisent les mêmes IDs → sync parfaite.
+// ═══════════════════════════════════════════════════════════════════════════════
+function _normalizeCompIds() {
+  // Construire la map : fingerprint → ID canonique
+  // ID canonique = tout ce qui n'est PAS auto-généré (pattern comp_[alphanum])
+  var canonMap = {};
+  (S.comps||[]).forEach(function(c) {
+    if (/^comp_[a-z0-9]+$/.test(c.id)) return; // auto-généré → pas canonique
+    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
+    if (k !== '|||' && !canonMap[k]) canonMap[k] = c.id;
+  });
+  // Trouver les comps auto-générés qui ont un équivalent canonique
+  var toMigrate = [];
+  (S.comps||[]).forEach(function(c) {
+    if (!/^comp_[a-z0-9]+$/.test(c.id)) return;
+    var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
+    if (k !== '|||' && canonMap[k] && canonMap[k] !== c.id) {
+      toMigrate.push({from: c.id, to: canonMap[k], src: c});
+    }
+  });
+  if (toMigrate.length === 0) return false;
+  toMigrate.forEach(function(m) {
+    // Migrer toutes les données compId-indexées
+    _migrateCompId(m.from, m.to);
+    // Récupérer l'affiche de la comp utilisateur si absente du canonique
+    var calComp = (S.comps||[]).find(function(c){ return c.id === m.to; });
+    if (calComp && m.src && m.src.affiche && !calComp.affiche) calComp.affiche = m.src.affiche;
+    // Supprimer la comp auto-générée de S.comps
+    S.comps = (S.comps||[]).filter(function(c){ return c.id !== m.from; });
+  });
+  saveState();
+  return true;
+}
+
 function _purgeAllDuplicates() {
   var dirty = false;
   // ── 0. S.pilots : filtrer pilotes supprimés + dédupliquer par id ──
@@ -17575,12 +17642,18 @@ function _purgeAllDuplicates() {
     });
   }
   // Déduplication S.comps : supprimer doublons par dateFrom+dateTo+pratique+discipline
+  // Migrer les données de l'ID supprimé vers l'ID conservé avant de supprimer
   var seenComps = {};
   var cleanComps = (S.comps||[]).filter(function(c) {
     var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
-    if (k === '|||') return true; // pas assez de données pour dédupliquer
-    if (seenComps[k]) { dirty = true; return false; }
-    seenComps[k] = true; return true;
+    if (k === '|||') return true;
+    if (seenComps[k]) {
+      // Doublon : migrer les données vers le premier trouvé avant suppression
+      _migrateCompId(c.id, seenComps[k].id);
+      dirty = true;
+      return false;
+    }
+    seenComps[k] = c; return true;
   });
   if (cleanComps.length !== (S.comps||[]).length) S.comps = cleanComps;
 
@@ -17610,10 +17683,14 @@ document.addEventListener('DOMContentLoaded', async function() {
       saveState();
     }
   }
-  _purgeAllDuplicates();
+  // Injecter le calendrier en premier (garantit que les IDs canoniques sont présents)
   injectMaisoncelles2026();
   injectCalendrier2026();
   injectCalendrierFull();
+  // Normaliser les IDs : comp_XXXXX → IDs canoniques (cal26-*, calf-*, etc.)
+  _normalizeCompIds();
+  // Nettoyer les doublons restants
+  _purgeAllDuplicates();
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
