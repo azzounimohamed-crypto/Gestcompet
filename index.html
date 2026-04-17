@@ -7153,38 +7153,77 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       if (bSub === 'engagement' || bSub === 'ressources') {
         var section  = bSub;
         var lines    = bdata[section];
-        var secColor = section === 'engagement' ? '#ef4444' : '#3b82f6';
-        var iStyleMob = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:10px 12px;outline:none;width:100%;box-sizing:border-box';
+        var secColor = section === 'engagement' ? '#ef4444' : '#10b981';
+        var iStyleMob = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:10px 12px;outline:none;width:100%;box-sizing:border-box;margin-bottom:8px';
+
         // ── Formulaire d'ajout empilé ──
-        htmlB += '<div style="background:var(--navy4);border-radius:10px;padding:12px;margin-bottom:14px;border:1px solid var(--stol)">';
-        htmlB += '<div style="font-size:11px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Nouvelle ligne</div>';
-        htmlB += '<div style="position:relative;margin-bottom:8px">';
-        htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyleMob+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
+        htmlB += '<div style="background:var(--navy4);border-radius:12px;padding:14px;margin-bottom:14px;border:1px solid var(--stol)">';
+        htmlB += '<div style="font-size:11px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">＋ Nouvelle ligne</div>';
+        htmlB += '<div style="position:relative">';
+        htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine (ex: Transport, Hébergement…)" autocomplete="off" style="'+iStyleMob+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cpIdS2+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')document.getElementById(\'bgt-inp-lib-'+section+'\').focus()" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
         htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
         htmlB += '</div>';
-        htmlB += '<input id="bgt-inp-lib-'+section+'" placeholder="Libellé…" style="'+iStyleMob+';margin-bottom:8px" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')">';
-        htmlB += '<button onclick="bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" style="width:100%;min-height:48px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter</button>';
+        htmlB += '<input id="bgt-inp-lib-'+section+'" placeholder="Libellé (ex: Location véhicule…)" style="'+iStyleMob+'" onkeydown="if(event.key===\'Enter\')document.getElementById(\'bgt-inp-val-mob-'+section+'\').focus()">';
+        htmlB += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
+        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Montant €</div><input id="bgt-inp-val-mob-'+section+'" type="number" min="0" step="0.01" placeholder="0.00" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
+        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Jours</div><input id="bgt-inp-nbj-mob-'+section+'" type="number" min="1" step="1" placeholder="1" value="1" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
+        htmlB += '<div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Qté</div><input id="bgt-inp-qt-mob-'+section+'" type="number" min="1" step="1" placeholder="1" value="1" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box"></div>';
         htmlB += '</div>';
-        // ── Liste des lignes en cartes ──
+        htmlB += '<button data-cpid="'+cpIdS2+'" data-sec="'+section+'" onclick="bgtMobAdd(this.dataset.cpid,this.dataset.sec)" style="width:100%;min-height:48px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter</button>';
+        htmlB += '</div>';
+
+        // ── Lignes groupées par domaine (accordion) ──
         if (lines.length === 0) {
-          htmlB += '<div style="text-align:center;padding:24px 0;color:var(--txt3);font-size:13px">Aucune ligne — saisissez un domaine ci-dessus</div>';
+          htmlB += '<div style="text-align:center;padding:32px 0;color:var(--txt3);font-size:13px">Aucune ligne — saisissez un domaine ci-dessus</div>';
         } else {
+          var domOrder2 = [], domGroups2 = {};
           lines.forEach(function(l){
-            var coutCalc = computeCout(l);
-            htmlB += '<div style="padding:12px;border-radius:10px;background:var(--navy3);margin-bottom:8px;border:1px solid var(--bdr)">';
-            htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
-            htmlB += '<span style="font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">🏷 '+bEsc(l.domaine||'—')+' / '+bEsc(l.libelle||'—')+'</span>';
-            htmlB += '<button onclick="removeBudgetLine(\''+cp.id+'\',\''+section+'\',\''+l.id+'\')" style="min-width:44px;min-height:44px;border:none;border-radius:8px;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>';
+            var d = (l.domaine||'—').trim() || '—';
+            if (!domGroups2[d]) { domGroups2[d] = []; domOrder2.push(d); }
+            domGroups2[d].push(l);
+          });
+          domOrder2.forEach(function(dom){
+            var grpLines2 = domGroups2[dom];
+            var grpTotal2 = grpLines2.reduce(function(s,l){ return s+computeCout(l); }, 0);
+            var domKey2 = (cp.id+'_'+section+'_'+dom).replace(/[^a-zA-Z0-9_]/g,'_');
+            var isOpen2 = !!_bgtOpenDomains[domKey2];
+            // En-tête domaine tactile
+            htmlB += '<div style="margin-bottom:8px;border-radius:12px;overflow:hidden;border:1px solid var(--bdr)">';
+            htmlB += '<div data-dk="'+domKey2+'" onclick="toggleBgtDomain(this.dataset.dk)" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--navy3);cursor:pointer;user-select:none;-webkit-user-select:none;min-height:52px">';
+            htmlB += '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">';
+            htmlB += '<span style="font-size:16px;font-weight:900;color:var(--stol);transition:transform .2s;display:inline-block;transform:rotate('+(isOpen2?'90':'0')+'deg)">›</span>';
+            htmlB += '<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+bEsc(dom)+'</div>';
+            htmlB += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">'+grpLines2.length+' ligne'+(grpLines2.length>1?'s':'')+'</div></div>';
             htmlB += '</div>';
-            htmlB += '<div style="font-size:18px;font-weight:900;color:'+secColor+'">💶 '+coutCalc.toFixed(2)+' €</div>';
+            htmlB += '<span style="font-size:17px;font-weight:900;color:'+secColor+';white-space:nowrap;flex-shrink:0">'+grpTotal2.toFixed(2)+' €</span>';
+            htmlB += '</div>';
+            if (isOpen2) {
+              grpLines2.forEach(function(l){
+                var coutCalc2 = computeCout(l);
+                htmlB += '<div style="padding:12px 14px;border-top:1px solid var(--bdr);background:var(--navy2)">';
+                htmlB += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+                htmlB += '<div style="flex:1;min-width:0">';
+                htmlB += '<div style="font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+bEsc(l.libelle||'—')+'</div>';
+                htmlB += '<div style="font-size:12px;color:var(--txt3);margin-top:3px">';
+                if ((l.valeur||0)>0) htmlB += bEsc(String(l.valeur))+'€';
+                if ((l.nbjours||1)>1) htmlB += ' × '+bEsc(String(l.nbjours))+'j';
+                if ((l.qt||1)>1) htmlB += ' × qté'+bEsc(String(l.qt));
+                htmlB += '</div>';
+                htmlB += '<div style="font-size:18px;font-weight:900;color:'+secColor+';margin-top:6px">'+coutCalc2.toFixed(2)+' €</div>';
+                htmlB += '</div>';
+                htmlB += '<button data-cpid="'+cpIdS2+'" data-sec="'+section+'" data-lid="'+l.id+'" onclick="removeBudgetLine(this.dataset.cpid,this.dataset.sec,this.dataset.lid)" style="min-width:44px;min-height:44px;border:none;border-radius:8px;background:none;color:#ef4444;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>';
+                htmlB += '</div></div>';
+              });
+            }
             htmlB += '</div>';
           });
         }
+
         // ── Total ──
         var tot = calcTotal(lines);
-        htmlB += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px;padding:12px 14px;border:1px solid var(--bdr);border-radius:10px;border-top:2px solid '+secColor+'">';
-        htmlB += '<span style="font-size:13px;font-weight:700;color:var(--txt2)">TOTAL</span>';
-        htmlB += '<span id="budget-total-'+section+'" style="font-size:20px;font-weight:900;color:'+secColor+'">'+tot.toFixed(2)+' €</span>';
+        htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:14px 16px;background:var(--navy3);border-radius:12px;border-top:3px solid '+secColor+'">';
+        htmlB += '<span style="font-size:13px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px">Total</span>';
+        htmlB += '<span style="font-size:22px;font-weight:900;color:'+secColor+'">'+tot.toFixed(2)+' €</span>';
         htmlB += '</div>';
 
       } else { // synthese mobile
@@ -16360,6 +16399,34 @@ function bgtAddLineFromRow(compId, section) {
   } else {
     setTimeout(function(){ var el=document.getElementById('bgt-inp-dom-'+section); if(el)el.focus(); }, 80);
   }
+}
+// ── Mobile budget add (avec valeur/jours/qt) ──────────────
+function bgtMobAdd(compId, section) {
+  if (!S.budgets || !S.budgets[compId]) return;
+  var domEl = document.getElementById('bgt-inp-dom-'+section);
+  var libEl = document.getElementById('bgt-inp-lib-'+section);
+  var valEl = document.getElementById('bgt-inp-val-mob-'+section);
+  var nbjEl = document.getElementById('bgt-inp-nbj-mob-'+section);
+  var qtEl  = document.getElementById('bgt-inp-qt-mob-'+section);
+  var dom = domEl ? domEl.value.trim() : '';
+  var lib = libEl ? libEl.value.trim() : '';
+  if (!dom && !lib) { toast('Saisissez un domaine ou un libellé', ''); return; }
+  var val = valEl ? (parseFloat(valEl.value)||0) : 0;
+  var nbj = nbjEl ? (parseInt(nbjEl.value)||1) : 1;
+  var qt  = qtEl  ? (parseInt(qtEl.value)||1)  : 1;
+  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:val, nbjours:nbj, qt:qt, detail:'' };
+  // Auto-ouvrir le groupe dans l'accordéon
+  var domKey = (compId+'_'+section+'_'+(dom||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
+  _bgtOpenDomains[domKey] = true;
+  S.budgets[compId][section].push(newLine);
+  saveState();
+  if (domEl) domEl.value = '';
+  if (libEl) libEl.value = '';
+  if (valEl) valEl.value = '';
+  if (nbjEl) nbjEl.value = '1';
+  if (qtEl)  qtEl.value  = '1';
+  _budgetSubTab = section;
+  switchHomeDetailTab('budget');
 }
 function addBudgetLine(compId, section) {
   if (!S.budgets) S.budgets = {};
