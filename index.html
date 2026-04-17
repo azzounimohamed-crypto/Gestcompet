@@ -3255,7 +3255,8 @@ document.addEventListener('click', function(e) {
 function saveComp() {
   var id = document.getElementById('comp-edit-id').value;
   var comp = {
-    id: id || Date.now().toString(),
+    id: id || ('usr' + Date.now().toString(36)),
+    _updatedAt: Date.now(),
     name: document.getElementById('comp-name').value.trim(),
     dateFrom: document.getElementById('comp-date-from').value,
     dateTo: document.getElementById('comp-date-to').value,
@@ -10668,6 +10669,17 @@ var _syncInProgress = false;
 var _lastSyncAt     = 0;
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
+// ── Horodater S automatiquement à chaque saveState ──────────────────────────
+// Cela garantit que _mergeById peut toujours choisir la version la plus récente
+var _origSaveState = null; // sera initialisé après la définition de saveState
+
+function _touchUpdatedAt() {
+  var now = Date.now();
+  // Horodater chaque comp modifiée récemment (heuristique : pas de _updatedAt)
+  (S.comps||[]).forEach(function(c){ if (!c._updatedAt) c._updatedAt = now; });
+  (S.pilots||[]).forEach(function(p){ if (!p._updatedAt) p._updatedAt = now; });
+}
+
 async function sbSync() {
   if (_syncInProgress) { toast('Sync déjà en cours…', ''); return; }
   _syncInProgress = true;
@@ -10743,8 +10755,14 @@ function _mergeById(local, remote) {
   var map = {};
   var la = Array.isArray(local)  ? local  : [];
   var ra = Array.isArray(remote) ? remote : [];
-  la.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  // Les deux sources sont fusionnées : le plus récent (_updatedAt) gagne
   ra.forEach(function(x){ if (x && x.id) map[x.id] = x; });
+  la.forEach(function(x){
+    if (!x || !x.id) return;
+    if (!map[x.id]) { map[x.id] = x; return; }
+    // Si local a un _updatedAt plus récent → local gagne, sinon cloud garde
+    if ((x._updatedAt||0) > (map[x.id]._updatedAt||0)) map[x.id] = x;
+  });
   return Object.keys(map).map(function(k){ return map[k]; });
 }
 // ── FUSION objet simple : les clés des deux sources sont gardées ──
@@ -11047,7 +11065,7 @@ function startAutoSync() {
           }).catch(function(){});
         }
       }).catch(function(){});
-  }, 60000); // vérification toutes les 60 secondes
+  }, 15000); // sync toutes les 15s // vérification toutes les 60 secondes
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -12866,6 +12884,7 @@ async function syncBase44All(compId) {
 // Note : ne nécessite PAS d'être connecté (anon key suffisant)
 function silentPush() {
   if (!getSB() || !navigator.onLine) return;
+  _touchUpdatedAt(); // s'assurer que tout a un timestamp avant d'envoyer
   pushToCloud().catch(function(){});
 }
 
