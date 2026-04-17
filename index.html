@@ -3273,7 +3273,7 @@ document.addEventListener('click', function(e) {
 function saveComp() {
   var id = document.getElementById('comp-edit-id').value;
   var comp = {
-    id: id || Date.now().toString(),
+    id: id || ('usr-' + Date.now().toString(36)),
     name: document.getElementById('comp-name').value.trim(),
     dateFrom: document.getElementById('comp-date-from').value,
     dateTo: document.getElementById('comp-date-to').value,
@@ -17327,8 +17327,9 @@ function injectCalendrier2026() {
     });
     if (sameEvent) {
       if (sameEvent.id !== cp.id) {
-        if (/^comp_[a-z0-9]+$/.test(sameEvent.id)) {
-          // L'existant est un ID auto-généré → migrer ses données vers l'ID canonique cp.id
+        var _isCanonicalId = /^(cal26-|calf-|stol202[0-9]-|mais|comp-maisoncelles|comp-montpezat)/.test(sameEvent.id);
+        if (!_isCanonicalId) {
+          // L'existant est un ID auto-généré (timestamp, etc.) → migrer ses données vers l'ID canonique cp.id
           _migrateCompId(sameEvent.id, cp.id);
           // Remplacer dans S.comps
           var _sidx = S.comps.indexOf(sameEvent);
@@ -17566,18 +17567,23 @@ function _migrateCompId(fromId, toId) {
 // Résultat : tous les appareils utilisent les mêmes IDs → sync parfaite.
 // ═══════════════════════════════════════════════════════════════════════════════
 function _normalizeCompIds() {
+  // ID canonique = préfixe fixe du calendrier injecté
+  // ID auto-généré = tout le reste (timestamp numérique, comp_xxx, etc.)
+  function _isCanonical(id) {
+    if (!id) return false;
+    return /^(cal26-|calf-|stol202[0-9]-|mais|comp-maisoncelles|comp-montpezat)/.test(id);
+  }
   // Construire la map : fingerprint → ID canonique
-  // ID canonique = tout ce qui n'est PAS auto-généré (pattern comp_[alphanum])
   var canonMap = {};
   (S.comps||[]).forEach(function(c) {
-    if (/^comp_[a-z0-9]+$/.test(c.id)) return; // auto-généré → pas canonique
+    if (!_isCanonical(c.id)) return; // non canonique → ignorer
     var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
     if (k !== '|||' && !canonMap[k]) canonMap[k] = c.id;
   });
-  // Trouver les comps auto-générés qui ont un équivalent canonique
+  // Trouver les comps non-canoniques qui ont un équivalent canonique
   var toMigrate = [];
   (S.comps||[]).forEach(function(c) {
-    if (!/^comp_[a-z0-9]+$/.test(c.id)) return;
+    if (_isCanonical(c.id)) return; // déjà canonique
     var k = (c.dateFrom||'')+'|'+(c.dateTo||'')+'|'+(c.pratique||'')+'|'+(c.discipline||'');
     if (k !== '|||' && canonMap[k] && canonMap[k] !== c.id) {
       toMigrate.push({from: c.id, to: canonMap[k], src: c});
