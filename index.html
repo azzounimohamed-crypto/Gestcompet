@@ -6562,14 +6562,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _rmBtnSt  = 'background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:2px;display:flex;align-items:center;justify-content:center';
     var _rowInpSt = 'border-bottom:2px solid var(--stol);background:var(--navy4)';
     var CCOL  = 'grid-template-columns:minmax(0,2fr) 68px 74px minmax(0,1fr) minmax(0,1fr) 56px 78px minmax(0,1fr) 28px';
+    var _isMobEquip = window.innerWidth < 768;
     var html5 = '';
+    if (!_isMobEquip) {
     // ── Barre d'actions ──
     html5 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
     html5 += '<button onclick="hdgExportEquipageExcel(\''+cid+'\')" title="Exporter l\'équipage en Excel" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📗 Export Excel</button>';
     html5 += '<label title="Importer un équipage depuis Excel" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📂 Import Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="hdgImportEquipageExcel(this,\''+cid+'\')"></label>';
     html5 += '<button onclick="hdgPrintEquipage(\''+cid+'\')" title="Imprimer la liste de l\'équipage" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🖨 Imprimer</button>';
     html5 += '</div>';
-    var _isMobEquip = window.innerWidth < 768;
+    }
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobEquip) {
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
@@ -7138,6 +7140,18 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     evtList.forEach(function(evt, ei) {
       var bg = ei%2===1 ? 'background:rgba(255,255,255,0.03);' : '';
       var tc = typeColors[evt.typeIncident] || '#6b7280';
+      if (_isMobEvt) {
+        // Carte mobile
+        htmlEvt += '<div style="padding:12px;border-bottom:1px solid var(--bdr);cursor:pointer;'+bg+'" onclick="openEvenementModal(\''+cp.id+'\',\''+evt.id+'\')">';
+        htmlEvt += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">';
+        htmlEvt += '<span style="font-size:11px;font-weight:700;color:'+tc+';background:'+tc+'22;padding:2px 8px;border-radius:10px">'+(evt.typeIncident||'—')+'</span>';
+        htmlEvt += '<span style="font-size:11px;color:var(--txt3)">'+(evt.date||'—')+(evt.horaire?' · '+evt.horaire:'')+'</span>';
+        htmlEvt += '</div>';
+        htmlEvt += '<div style="font-size:14px;font-weight:700;margin-bottom:3px">'+(evt.nom||'—')+'</div>';
+        if (evt.immatriculation) htmlEvt += '<div style="font-size:12px;color:var(--amber);font-weight:600">✈️ '+evt.immatriculation+'</div>';
+        if (evt.circonstance)   htmlEvt += '<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+(evt.circonstance||'')+'</div>';
+        htmlEvt += '</div>';
+      } else {
       htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;align-items:center;'+bg+'">';
       htmlEvt += '<div><span style="font-size:10px;font-weight:700;color:'+tc+';background:'+tc+'22;padding:2px 7px;border-radius:10px;white-space:nowrap">'+(evt.typeIncident||'—')+'</span></div>';
       htmlEvt += '<div style="font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(evt.nom||'—')+'</div>';
@@ -7151,6 +7165,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlEvt += '<div></div>';
       }
       htmlEvt += '</div>';
+      } // fin else desktop
     });
     htmlEvt += '</div>';
     return htmlEvt;
