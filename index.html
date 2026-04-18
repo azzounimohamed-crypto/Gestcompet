@@ -6569,13 +6569,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<label title="Importer un équipage depuis Excel" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📂 Import Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="hdgImportEquipageExcel(this,\''+cid+'\')"></label>';
     html5 += '<button onclick="hdgPrintEquipage(\''+cid+'\')" title="Imprimer la liste de l\'équipage" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🖨 Imprimer</button>';
     html5 += '</div>';
-    // ── En-tête fixe ──
+    var _isMobEquip = window.innerWidth < 768;
+    // ── En-tête fixe (desktop uniquement) ──
+    if (!_isMobEquip) {
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
     ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
     html5 += '</div>';
+    }
     // ── Zone scrollable ──
     html5 += '<div style="flex:1;overflow-y:auto">';
-    // Ligne de saisie
+    // Ligne de saisie (desktop uniquement)
+    if (!_isMobEquip) {
     html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;align-items:center;'+_rowInpSt+'">';
     html5 += '<div style="position:relative">';
     html5 += '<input id="hdg-c-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
@@ -6591,11 +6595,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<input id="hdg-c-aile" style="display:none" readonly><input id="hdg-c-places" style="display:none" readonly>';
     html5 += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="hdgAddComp(\''+cid+'\')" style="'+_addBtnSt+'" title="Inscrire">+</button></div>';
     html5 += '</div>';
+    }
     // Lignes inscrites
     if (!enrolled.length) {
-      html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">Tapez les premières lettres du prénom pour inscrire un pilote</div>';
+      html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(_isMobEquip ? 'Appuyez sur ＋ pour ajouter un compétiteur' : 'Tapez les premières lettres du prénom pour inscrire un pilote')+'</div>';
     }
-    var _isMobEquip = window.innerWidth < 768;
     enrolled.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
@@ -6903,11 +6907,14 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _addBS = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rmBS  = 'background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:2px;display:flex;align-items:center;justify-content:center';
     var SCOL   = 'grid-template-columns:minmax(0,1.8fr) minmax(0,1.3fr) 68px 90px minmax(0,1.4fr) 28px';
+    var _isMobStaff = window.innerWidth < 768;
     var html3  = '';
-    // ── En-tête fixe ──
+    // ── En-tête fixe (desktop uniquement) ──
+    if (!_isMobStaff) {
     html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
     ['Nom','Fonction','Licence','Téléphone','Email',''].forEach(function(h){ html3 += '<div style="'+_hStS+'">'+h+'</div>'; });
     html3 += '</div>';
+    }
     html3 += '<div style="flex:1;overflow-y:auto">';
     // ── Ligne de saisie ──
     if (canEditS && !_isMobStaff) {
@@ -6926,7 +6933,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!compStaffG2.length) {
       html3 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditS ? (_isMobStaff ? 'Appuyez sur ＋ Nouvel encadrant pour ajouter' : 'Tapez les premières lettres du prénom pour ajouter un encadrant') : 'Aucun encadrement enregistré pour cette compétition')+'</div>';
     }
-    var _isMobStaff = window.innerWidth < 768;
     compStaffG2.forEach(function(s, si){
       var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
       var prenomS = pilot.prenom||s.prenom||'';
@@ -7102,17 +7108,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var iStE = 'background:var(--navy3);border:1.5px solid var(--stol);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box';
     var addBtnE = 'width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--stol),#059669);border:none;color:#fff;font-size:20px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25)';
     var typeColors = {'Sécurité':'#ef4444','Matériel':'#f59e0b','Médical':'#3b82f6','Météo':'#8b5cf6','Autre':'#6b7280'};
+    var _isMobEvt = window.innerWidth < 768;
     var htmlEvt = '';
-    // Fixed header
+    // Fixed header (desktop uniquement)
+    if (!_isMobEvt) {
     htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
     ['Type','Nom / Aéronef','Date','Immat.','Circonstance','',''].forEach(function(h){
       htmlEvt += '<div style="'+hStE+'">'+h+'</div>';
     });
     htmlEvt += '</div>';
+    }
     // Scrollable body
     htmlEvt += '<div style="flex:1;overflow-y:auto">';
-    // Input row
-    if (canEditEvt) {
+    // Input row (desktop uniquement)
+    if (canEditEvt && !_isMobEvt) {
       htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center">';
       htmlEvt += '<div><input id="evt-inp-type" list="evt-type-list" placeholder="Type…" value="Sécurité" style="'+iStE+'"><datalist id="evt-type-list"><option value="Sécurité"/><option value="Matériel"/><option value="Médical"/><option value="Météo"/><option value="Administratif"/><option value="Mécanique"/><option value="Autre"/></datalist></div>';
       htmlEvt += '<div><input id="evt-inp-nom" placeholder="Nom concerné…" autocomplete="off" style="'+iStE+'"></div>';
@@ -7124,7 +7133,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlEvt += '</div>';
     }
     if (!evtList.length) {
-      htmlEvt += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditEvt ? 'Saisissez les informations ci-dessus pour enregistrer un événement' : 'Aucun événement enregistré pour cette compétition')+'</div>';
+      htmlEvt += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditEvt ? (_isMobEvt ? 'Appuyez sur ＋ Nouvel événement pour ajouter' : 'Saisissez les informations ci-dessus pour enregistrer un événement') : 'Aucun événement enregistré pour cette compétition')+'</div>';
     }
     evtList.forEach(function(evt, ei) {
       var bg = ei%2===1 ? 'background:rgba(255,255,255,0.03);' : '';
@@ -13702,11 +13711,11 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
     : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   var _panelPilotSt = _isMobPilotModal
-    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s ease'
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;position:relative;animation:slideUpSheet .28s ease;transition:height .3s ease'
     : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative';
   var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_overlayPilotSt+'">';
-  html += '<div style="'+_panelPilotSt+'">';
-  if (_isMobPilotModal) html += '<div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:10px auto 4px"></div>';
+  html += '<div id="pdm-panel" style="'+_panelPilotSt+'">';
+  if (_isMobPilotModal) html += '<div id="pdm-handle" style="width:100%;padding:14px 0 6px;display:flex;justify-content:center;cursor:grab;touch-action:none"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px"></div></div>';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13885,7 +13894,6 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</div>';
     html += '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
     if (canEdit) html += '<button onclick="showPilotDetailModal(\''+pidS+'\',\''+cidS+'\',true)" style="background:var(--stol);border:none;border-radius:8px;cursor:pointer;padding:6px 12px;font-size:12px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Modifier</button>';
-    html += '<button onclick="closePilotDetailModal()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;cursor:pointer;padding:6px 10px;font-size:14px;color:var(--txt2);font-family:inherit">✕</button>';
     html += '</div>';
     html += '</div>';
 
@@ -13960,6 +13968,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   var div = document.createElement('div');
   div.innerHTML = html;
   document.body.appendChild(div.firstElementChild);
+  if (_isMobPilotModal) setTimeout(_initPilotSheetDrag, 50);
 }
 
 // Gestion dynamique Équipages → Rôle + Copilote
@@ -14446,6 +14455,39 @@ function closeStaffDetailModal() {
   _sdmPhotoData = null;
 }
 
+function _initPilotSheetDrag() {
+  var panel  = document.getElementById('pdm-panel');
+  var handle = document.getElementById('pdm-handle');
+  if (!panel || !handle) return;
+  var startY = 0, startH = 0, dragging = false;
+  var initH  = panel.offsetHeight;
+  handle.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY; startH = panel.offsetHeight;
+    dragging = true; panel.style.transition = 'none';
+  }, {passive: true});
+  handle.addEventListener('touchmove', function(e) {
+    if (!dragging) return;
+    var newH = startH - (e.touches[0].clientY - startY);
+    if (newH < 100) newH = 100;
+    var maxH = Math.round(window.innerHeight * 0.96);
+    if (newH > maxH) newH = maxH;
+    panel.style.height = newH + 'px';
+  }, {passive: true});
+  handle.addEventListener('touchend', function(e) {
+    if (!dragging) return;
+    dragging = false;
+    panel.style.transition = 'height .3s ease';
+    var dy = startY - e.changedTouches[0].clientY;
+    if (dy > 60) {
+      panel.style.height = Math.round(window.innerHeight * 0.95) + 'px';
+    } else if (dy < -80) {
+      panel.style.height = '0px';
+      setTimeout(function() { closePilotDetailModal(); }, 280);
+    } else {
+      panel.style.height = initH + 'px';
+    }
+  }, {passive: true});
+}
 function closePilotDetailModal() {
   var el = document.getElementById('pilot-detail-overlay');
   if (el) el.remove();
@@ -14979,9 +15021,70 @@ function openEvenementModal(compId, evtId) {
   if(g('evt-modal-circ')) g('evt-modal-circ').value = e.circonstance||'';
   if(g('evt-modal-comm')) g('evt-modal-comm').value = e.commentaires||'';
   var sh = g('sheet-evenement');
-  if(sh){ sh.style.display='flex'; setTimeout(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }, 10); }
+  if (sh) {
+    var isMobEvtSh = window.innerWidth < 768;
+    var evtPan = document.getElementById('evt-panel');
+    var evtHdl = document.getElementById('evt-handle');
+    if (isMobEvtSh && evtPan) {
+      sh.style.alignItems = 'flex-end';
+      evtPan.style.width = '100%';
+      evtPan.style.maxWidth = '100%';
+      evtPan.style.borderRadius = '16px 16px 0 0';
+      evtPan.style.height = '80vh';
+      evtPan.style.maxHeight = 'none';
+      evtPan.style.boxShadow = 'none';
+      if (evtHdl) evtHdl.style.display = 'flex';
+    } else {
+      sh.style.alignItems = 'center';
+      if (evtPan) { evtPan.style.width=''; evtPan.style.maxWidth=''; evtPan.style.borderRadius='16px'; evtPan.style.height=''; evtPan.style.maxHeight='90vh'; evtPan.style.boxShadow='0 20px 60px rgba(0,0,0,.5)'; }
+      if (evtHdl) evtHdl.style.display = 'none';
+    }
+    sh.style.display = 'flex';
+    sh.style.transform = isMobEvtSh ? 'translateY(100%)' : 'translateY(20px)';
+    setTimeout(function() {
+      sh.style.opacity = '1';
+      sh.style.transform = 'translateY(0)';
+      if (isMobEvtSh) setTimeout(_initEvtSheetDrag, 50);
+    }, 10);
+  }
 }
 
+function _initEvtSheetDrag() {
+  var panel  = document.getElementById('evt-panel');
+  var handle = document.getElementById('evt-handle');
+  if (!panel || !handle) return;
+  var startY = 0, startH = 0, dragging = false;
+  var initH  = panel.offsetHeight;
+  // Retirer ancien listener si réouverture
+  var newHandle = handle.cloneNode(true);
+  handle.parentNode.replaceChild(newHandle, handle);
+  newHandle.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY; startH = panel.offsetHeight;
+    dragging = true; panel.style.transition = 'none';
+  }, {passive: true});
+  newHandle.addEventListener('touchmove', function(e) {
+    if (!dragging) return;
+    var newH = startH - (e.touches[0].clientY - startY);
+    if (newH < 100) newH = 100;
+    var maxH = Math.round(window.innerHeight * 0.96);
+    if (newH > maxH) newH = maxH;
+    panel.style.height = newH + 'px';
+  }, {passive: true});
+  newHandle.addEventListener('touchend', function(e) {
+    if (!dragging) return;
+    dragging = false;
+    panel.style.transition = 'height .3s ease';
+    var dy = startY - e.changedTouches[0].clientY;
+    if (dy > 60) {
+      panel.style.height = Math.round(window.innerHeight * 0.95) + 'px';
+    } else if (dy < -80) {
+      panel.style.height = '0px';
+      setTimeout(function() { closeEvenementModal(); }, 280);
+    } else {
+      panel.style.height = initH + 'px';
+    }
+  }, {passive: true});
+}
 function closeEvenementModal() {
   var sh = document.getElementById('sheet-evenement');
   if(sh){ sh.style.opacity='0'; sh.style.transform='translateY(20px)'; setTimeout(function(){ sh.style.display='none'; }, 200); }
@@ -20835,8 +20938,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 </div>
 
 <!-- ══ MODAL ÉVÉNEMENT ══ -->
-<div id="sheet-evenement" style="display:none;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
-  <div style="background:var(--navy2);border-radius:16px;padding:24px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+<div id="sheet-evenement" style="display:none;opacity:0;transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
+  <div id="evt-panel" style="background:var(--navy2);border-radius:16px;padding:24px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);transition:height .3s ease">
+    <div id="evt-handle" style="display:none;width:100%;padding-bottom:12px;justify-content:center;cursor:grab;touch-action:none"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto"></div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h3 style="margin:0;font-size:16px;font-weight:800;color:var(--txt)">Événement / Incident</h3>
       <button onclick="closeEvenementModal()" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;line-height:1;padding:4px">×</button>
