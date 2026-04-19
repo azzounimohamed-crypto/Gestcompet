@@ -6247,6 +6247,77 @@ function initInfosMaps(cp, enrolled) {
   }
 }
 
+// ── Tri Encadrants ────────────────────────────────────────────────────────
+var _staffSortCol = ''; var _staffSortDir = 1;
+function _staffToggleSort(col) {
+  if (_staffSortCol===col) _staffSortDir=-_staffSortDir; else { _staffSortCol=col; _staffSortDir=1; }
+  renderHomeDetailPanel(null);
+}
+
+// ── Redimensionnement colonnes Encadrants ──────────────────────────────────
+var _staffColWidths = [40, 170, 130, 68, 92, 150, 30]; // avatar|nom|fonction|licence|tel|email|btn
+var _staffResizing  = null;
+function _staffGetTpl() { return _staffColWidths.map(function(w){ return w+'px'; }).join(' '); }
+function _staffApplyTpl() {
+  var tpl = _staffGetTpl();
+  var rows = document.querySelectorAll('[data-stf-row]');
+  rows.forEach(function(el){ el.style.gridTemplateColumns = tpl; });
+}
+function _staffResizeStart(e, idx) {
+  e.preventDefault(); e.stopPropagation();
+  _staffResizing = {idx:idx, x0:e.clientX, w0:_staffColWidths[idx]};
+  document.addEventListener('mousemove', _staffResizeMove);
+  document.addEventListener('mouseup',   _staffResizeEnd);
+  document.body.style.cursor     = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+function _staffResizeMove(e) {
+  if (!_staffResizing) return;
+  _staffColWidths[_staffResizing.idx] = Math.max(36, _staffResizing.w0 + e.clientX - _staffResizing.x0);
+  _staffApplyTpl();
+}
+function _staffResizeEnd() {
+  _staffResizing = null;
+  document.removeEventListener('mousemove', _staffResizeMove);
+  document.removeEventListener('mouseup',   _staffResizeEnd);
+  document.body.style.cursor = document.body.style.userSelect = '';
+}
+
+// ── Redimensionnement colonnes Équipage ───────────────────────────────────
+var _equipColWidths = [175, 68, 74, 100, 100, 60, 80, 110, 30]; // nom|lic|immat|marque|modele|cat|equip|region|btn
+var _equipResizing  = null;
+function _equipGetTpl() { return _equipColWidths.map(function(w){ return w+'px'; }).join(' '); }
+function _equipApplyTpl() {
+  var tpl = _equipGetTpl();
+  document.querySelectorAll('[data-eqp-row]').forEach(function(el){ el.style.gridTemplateColumns = tpl; });
+}
+function _equipResizeStart(e, idx) {
+  e.preventDefault(); e.stopPropagation();
+  _equipResizing = {idx:idx, x0:e.clientX, w0:_equipColWidths[idx]};
+  document.addEventListener('mousemove', _equipResizeMove);
+  document.addEventListener('mouseup',   _equipResizeEnd);
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+function _equipResizeMove(e) {
+  if (!_equipResizing) return;
+  _equipColWidths[_equipResizing.idx] = Math.max(36, _equipResizing.w0 + e.clientX - _equipResizing.x0);
+  _equipApplyTpl();
+}
+function _equipResizeEnd() {
+  _equipResizing = null;
+  document.removeEventListener('mousemove', _equipResizeMove);
+  document.removeEventListener('mouseup',   _equipResizeEnd);
+  document.body.style.cursor = document.body.style.userSelect = '';
+}
+
+// ── Tri Équipage ──────────────────────────────────────────────────────────
+var _equipSortCol = ''; var _equipSortDir = 1;
+function _equipToggleSort(col) {
+  if (_equipSortCol===col) _equipSortDir=-_equipSortDir; else { _equipSortCol=col; _equipSortDir=1; }
+  renderHomeDetailPanel(null);
+}
+
 function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
   if (tab === 'infos') {
     var pilotCount = enrolled.length;
@@ -6580,7 +6651,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rmBtnSt  = 'width:28px;height:28px;border-radius:50%;background:rgba(239,68,68,.15);border:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rowInpSt = 'border-bottom:2px solid var(--stol);background:var(--navy4)';
-    var CCOL  = 'grid-template-columns:minmax(0,2fr) 68px 74px minmax(0,1fr) minmax(0,1fr) 56px 78px minmax(0,1fr) 28px';
+    var _eqpTpl = _equipGetTpl();
     var _isMobEquip = window.innerWidth < 768;
     var html5 = '';
     // ── Barre d'actions (desktop uniquement) ──
@@ -6593,15 +6664,29 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobEquip) {
-    html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région',''].forEach(function(h){ html5 += '<div style="'+_hSt+'">'+h+'</div>'; });
+    var _erh = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
+    var _erl = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
+    var _eqIco = function(col){ return _equipSortCol===col ? (_equipSortDir===1?' ↑':' ↓') : ''; };
+    var _eqHdrs = ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région'];
+    var _eqSort  = ['nom','','','','','categorie','',''];
+    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
+    _eqHdrs.forEach(function(h, i) {
+      var sortCol = _eqSort[i];
+      var clickable = sortCol ? 'cursor:pointer;user-select:none;' : '';
+      var click = sortCol ? ' onclick="_equipToggleSort(\''+sortCol+'\')"' : '';
+      html5 += '<div style="'+_hSt+';position:relative;'+clickable+'"'+click+'>'
+        + h + (sortCol ? '<span style="color:var(--stol)">'+_eqIco(sortCol)+'</span>' : '')
+        + '<div onmousedown="_equipResizeStart(event,'+i+')" style="'+_erh+'"><div style="'+_erl+'"></div></div>'
+        + '</div>';
+    });
+    html5 += '<div></div>';
     html5 += '</div>';
     }
     // ── Zone scrollable ──
     html5 += '<div style="flex:1;overflow-y:auto">';
     // Ligne de saisie (desktop uniquement)
     if (!_isMobEquip) {
-    html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:5px 12px;align-items:center;'+_rowInpSt+'">';
+    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;align-items:center;'+_rowInpSt+'">';
     html5 += '<div style="position:relative">';
     html5 += '<input id="hdg-c-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
     html5 += '<div id="hdg-sug-c" style="display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
@@ -6621,7 +6706,22 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!enrolled.length) {
       html5 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(_isMobEquip ? 'Appuyez sur ＋ pour ajouter un compétiteur' : 'Tapez les premières lettres du prénom pour inscrire un pilote')+'</div>';
     }
-    enrolled.forEach(function(pid, i){
+    // Tri équipage
+    var _eqpList = enrolled.slice();
+    if (_equipSortCol) {
+      _eqpList.sort(function(a, b) {
+        var pa = (S.pilots||[]).find(function(x){ return x.id===a; })||{};
+        var pb = (S.pilots||[]).find(function(x){ return x.id===b; })||{};
+        var va = _equipSortCol==='nom'
+          ? ((pa.nom||'')+(pa.prenom||'')).toLowerCase()
+          : (pa.categorie||'').toLowerCase();
+        var vb = _equipSortCol==='nom'
+          ? ((pb.nom||'')+(pb.prenom||'')).toLowerCase()
+          : (pb.categorie||'').toLowerCase();
+        return va < vb ? -_equipSortDir : va > vb ? _equipSortDir : 0;
+      });
+    }
+    _eqpList.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
       var bg  = i%2===1 ? 'background:var(--navy3)' : '';
@@ -6653,7 +6753,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html5 += '</div>';
       } else {
         // Desktop grid layout
-        html5 += '<div style="display:grid;'+CCOL+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
         html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
         html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
         html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
@@ -6927,19 +7027,40 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _dStS  = 'font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     var _addBS = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rmBS  = 'width:28px;height:28px;border-radius:50%;background:rgba(239,68,68,.15);border:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
-    var SCOL   = 'grid-template-columns:minmax(0,1.8fr) minmax(0,1.3fr) 68px 90px minmax(0,1.4fr) 28px';
     var _isMobStaff = window.innerWidth < 768;
+    var _stfTpl = _staffGetTpl();
     var html3  = '';
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobStaff) {
-    html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    ['Nom','Fonction','Licence','Téléphone','Email',''].forEach(function(h){ html3 += '<div style="'+_hStS+'">'+h+'</div>'; });
+    var _rh = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
+    var _rl = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
+    var _srtIco = function(col){ return _staffSortCol===col ? (_staffSortDir===1?' ↑':' ↓') : ''; };
+    html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:5px 8px 5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
+    html3 += '<div></div>'; // avatar col
+    // Nom — cliquable
+    html3 += '<div style="'+_hStS+';position:relative;cursor:pointer;user-select:none" onclick="_staffToggleSort(\'nom\')">'
+      + 'Nom<span style="color:var(--stol)">'+_srtIco('nom')+'</span>'
+      + '<div onmousedown="_staffResizeStart(event,1)" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
+      + '</div>';
+    // Fonction — cliquable
+    html3 += '<div style="'+_hStS+';position:relative;cursor:pointer;user-select:none" onclick="_staffToggleSort(\'role\')">'
+      + 'Fonction<span style="color:var(--stol)">'+_srtIco('role')+'</span>'
+      + '<div onmousedown="_staffResizeStart(event,2)" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
+      + '</div>';
+    // Colonnes fixes
+    ['Licence','Téléphone','Email'].forEach(function(h, i) {
+      html3 += '<div style="'+_hStS+';position:relative">' + h
+        + '<div onmousedown="_staffResizeStart(event,'+(i+3)+')" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
+        + '</div>';
+    });
+    html3 += '<div></div>';
     html3 += '</div>';
     }
     html3 += '<div style="flex:1;overflow-y:auto">';
     // ── Ligne de saisie ──
     if (canEditS && !_isMobStaff) {
-      html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center">';
+      html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:5px 8px 5px 12px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center">';
+      html3 += '<div></div>'; // avatar placeholder
       html3 += '<div style="position:relative">';
       html3 += '<input id="hdg-s-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iStS+';border-color:var(--stol)" oninput="hdgShowSuggestS(\''+cidS+'\')" onkeydown="if(event.key===\'Enter\')hdgAddStaff(\''+cidS+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-s\');if(d)d.style.display=\'none\'},180)">';
       html3 += '<div id="hdg-sug-s" style="display:none;position:absolute;top:100%;left:0;min-width:240px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
@@ -6955,7 +7076,23 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html3 += '<div style="padding:24px;text-align:center;color:var(--txt3);font-size:12px">'+(canEditS ? (_isMobStaff ? 'Appuyez sur ＋ Nouvel encadrant pour ajouter' : 'Tapez les premières lettres du prénom pour ajouter un encadrant') : 'Aucun encadrement enregistré pour cette compétition')+'</div>';
     }
     var _isMobStaff = window.innerWidth < 768;
-    compStaffG2.forEach(function(s, si){
+    // Tri — on conserve l'index original pour la suppression
+    var _stfRows = compStaffG2.map(function(s, origIdx){ return {s:s, origIdx:origIdx}; });
+    if (_staffSortCol) {
+      _stfRows.sort(function(a, b) {
+        var pa = (S.pilots||[]).find(function(p){ return p.id===(a.s.pilotId||a.s.id); })||{};
+        var pb = (S.pilots||[]).find(function(p){ return p.id===(b.s.pilotId||b.s.id); })||{};
+        var va = _staffSortCol==='nom'
+          ? ((pa.nom||a.s.nom||'')+(pa.prenom||a.s.prenom||'')).toLowerCase()
+          : (a.s.role||'').toLowerCase();
+        var vb = _staffSortCol==='nom'
+          ? ((pb.nom||b.s.nom||'')+(pb.prenom||b.s.prenom||'')).toLowerCase()
+          : (b.s.role||'').toLowerCase();
+        return va < vb ? -_staffSortDir : va > vb ? _staffSortDir : 0;
+      });
+    }
+    _stfRows.forEach(function(row){
+      var s = row.s; var si = row.origIdx;
       var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
       var prenomS = pilot.prenom||s.prenom||'';
       var nomS    = pilot.nom||s.nom||'';
@@ -6985,7 +7122,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html3 += '</div>';
       } else {
         // Desktop grid layout
-        html3 += '<div style="display:grid;'+SCOL+';gap:3px;padding:6px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
+        var photoS = pilot.photo || s.photo || '';
+        var iniS2  = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
+        html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:4px 8px 4px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
+        // Avatar
+        html3 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid #0891b2">';
+        html3 += photoS ? '<img src="'+photoS+'" style="width:100%;height:100%;object-fit:cover">' : iniS2;
+        html3 += '</div>';
         html3 += '<div style="'+_dStS+';font-weight:600">'+nom+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(lic2||'—')+'</div>';
