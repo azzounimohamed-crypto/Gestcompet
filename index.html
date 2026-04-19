@@ -11221,7 +11221,7 @@ async function pullFromCloud() {
       });
       la.forEach(function(x) {
         if (x && x.id) {
-          if (!byId[x.id] || (x._updatedAt||0) > (byId[x.id]._updatedAt||0)) byId[x.id] = x;
+          if (!byId[x.id] || (x._updatedAt||0) >= (byId[x.id]._updatedAt||0)) byId[x.id] = x;
         } else {
           var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); }
         }
@@ -16679,9 +16679,9 @@ function bgtAddLineFromRow(compId, section) {
   var dom   = domEl ? domEl.value.trim() : '';
   var lib   = libEl ? libEl.value.trim() : '';
   if (!dom && !lib) { toast('Saisissez un domaine ou un libellé', ''); return; }
-  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:0, nbjours:1, qt:1, detail:'' };
+  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() };
   S.budgets[compId][section].push(newLine);
-  saveState();
+  saveState(); silentPush();
   if (domEl) { domEl.value=''; }
   if (libEl) { libEl.value=''; }
   var isNDF = dom.toUpperCase() === 'NDF';
@@ -16707,12 +16707,12 @@ function bgtMobAdd(compId, section) {
   var val = valEl ? (parseFloat(valEl.value)||0) : 0;
   var nbj = nbjEl ? (parseInt(nbjEl.value)||1) : 1;
   var qt  = qtEl  ? (parseInt(qtEl.value)||1)  : 1;
-  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:val, nbjours:nbj, qt:qt, detail:'' };
+  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:val, nbjours:nbj, qt:qt, detail:'', _updatedAt:Date.now() };
   // Auto-ouvrir le groupe dans l'accordéon
   var domKey = (compId+'_'+section+'_'+(dom||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
   _bgtOpenDomains[domKey] = true;
   S.budgets[compId][section].push(newLine);
-  saveState();
+  saveState(); silentPush();
   if (domEl) domEl.value = '';
   if (libEl) libEl.value = '';
   if (valEl) valEl.value = '';
@@ -16724,8 +16724,8 @@ function bgtMobAdd(compId, section) {
 function addBudgetLine(compId, section) {
   if (!S.budgets) S.budgets = {};
   if (!S.budgets[compId]) S.budgets[compId] = {engagement:[], ressources:[]};
-  S.budgets[compId][section].push({id:'bl-'+Date.now(), domaine:'', libelle:'', valeur:0, nbjours:1, qt:1, detail:''});
-  saveState();
+  S.budgets[compId][section].push({id:'bl-'+Date.now(), domaine:'', libelle:'', valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now()});
+  saveState(); silentPush();
   _budgetSubTab = section;
   _refreshBudgetView();
 }
@@ -16929,6 +16929,7 @@ function saveBgtLineFromSheet(compId, section, lineId) {
   l.valeur  = parseFloat(document.getElementById('bls-val').value)||0;
   l.nbjours = parseInt(document.getElementById('bls-nbj').value)||1;
   l.qt      = parseInt(document.getElementById('bls-qt').value)||1;
+  l._updatedAt = Date.now();
   // Mettre à jour le domKey ouvert si le domaine a changé
   var domKey = (compId+'_'+section+'_'+(l.domaine||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
   _bgtOpenDomains[domKey] = true;
