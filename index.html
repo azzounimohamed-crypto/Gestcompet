@@ -5787,6 +5787,9 @@ function hdgAddComp(compId) {
 }
 function hdgRemoveComp(compId, pilotId) {
   if (!S.compEnroll||!S.compEnroll[compId]) return;
+  if (!S._deletedEnroll) S._deletedEnroll = {};
+  if (!S._deletedEnroll[compId]) S._deletedEnroll[compId] = {};
+  S._deletedEnroll[compId][pilotId] = Date.now();
   S.compEnroll[compId]=S.compEnroll[compId].filter(function(id){return id!==pilotId;});
   saveState(); silentPush();
   if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
@@ -5951,6 +5954,13 @@ function hdgAddStaff(compId) {
 async function hdgRemoveStaff(compId, idx) {
   if(!S.staff || Array.isArray(S.staff)) { S.staff = {}; }
   if(!S.staff[compId]) return;
+  var _s = S.staff[compId][idx];
+  if (_s) {
+    var _k = _s.pilotId || ((_s.prenom||'').trim().toLowerCase()+'|'+(_s.nom||'').trim().toLowerCase()+'|'+(_s.role||'').trim().toLowerCase());
+    if (!S._deletedStaff) S._deletedStaff = {};
+    if (!S._deletedStaff[compId]) S._deletedStaff[compId] = {};
+    S._deletedStaff[compId][_k] = Date.now();
+  }
   S.staff[compId].splice(idx,1);
   saveState();
   // Push immédiat AVANT que l'auto-sync ne repulle les vieilles données cloud
@@ -11116,7 +11126,7 @@ async function pullFromCloud() {
 
   var r = data.data; // données distantes
 
-  // ── Tombstones : fusion des compétitions supprimées (union locale + cloud) ──
+  // ── Tombstones compétitions ──
   var remoteDeleted = r._deletedComps || [];
   var localDeleted = S._deletedComps || [];
   var allDeletedIds = {};
@@ -11127,6 +11137,34 @@ async function pullFromCloud() {
     }
   });
   S._deletedComps = Object.keys(allDeletedIds).map(function(id){ return {id:id, deletedAt:allDeletedIds[id]}; });
+
+  // ── Tombstones staff (encadrants supprimés) ──
+  var rDS = (r._deletedStaff && typeof r._deletedStaff==='object') ? r._deletedStaff : {};
+  var lDS = (S._deletedStaff && typeof S._deletedStaff==='object') ? S._deletedStaff : {};
+  S._deletedStaff = {};
+  var allStaffCids = Object.assign({}, lDS, rDS);
+  Object.keys(allStaffCids).forEach(function(cid) {
+    S._deletedStaff[cid] = {};
+    var lK = lDS[cid]||{}; var rK = rDS[cid]||{};
+    Object.keys(lK).forEach(function(k){ S._deletedStaff[cid][k] = lK[k]; });
+    Object.keys(rK).forEach(function(k){
+      if (!S._deletedStaff[cid][k] || rK[k] > S._deletedStaff[cid][k]) S._deletedStaff[cid][k] = rK[k];
+    });
+  });
+
+  // ── Tombstones compEnroll (pilotes retirés) ──
+  var rDE = (r._deletedEnroll && typeof r._deletedEnroll==='object') ? r._deletedEnroll : {};
+  var lDE = (S._deletedEnroll && typeof S._deletedEnroll==='object') ? S._deletedEnroll : {};
+  S._deletedEnroll = {};
+  var allEnrollCids = Object.assign({}, lDE, rDE);
+  Object.keys(allEnrollCids).forEach(function(cid) {
+    S._deletedEnroll[cid] = {};
+    var lK = lDE[cid]||{}; var rK = rDE[cid]||{};
+    Object.keys(lK).forEach(function(k){ S._deletedEnroll[cid][k] = lK[k]; });
+    Object.keys(rK).forEach(function(k){
+      if (!S._deletedEnroll[cid][k] || rK[k] > S._deletedEnroll[cid][k]) S._deletedEnroll[cid][k] = rK[k];
+    });
+  });
 
   // Sauvegarder les médias locaux (base64 — non stockés dans le JSON principal)
   var localUser     = S.user;
@@ -11176,16 +11214,26 @@ async function pullFromCloud() {
     });
   }
 
-  // ── Nettoyage doublons staff : clé composite nom+prénom+rôle (insensible à la casse) ──
+  // ── Appliquer tombstones staff ──
   if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
     Object.keys(S.staff).forEach(function(cid) {
-      var best = {}; // clé → entrée la plus récente
+      var tombs = (S._deletedStaff && S._deletedStaff[cid]) ? S._deletedStaff[cid] : {};
+      var best = {};
       (S.staff[cid]||[]).forEach(function(s) {
         var k = s.pilotId
           || ((s.prenom||'').trim().toLowerCase()+'|'+(s.nom||'').trim().toLowerCase()+'|'+(s.role||'').trim().toLowerCase());
+        if (tombs[k]) return; // entrée supprimée — ignorer
         if (!best[k] || (s._updatedAt||0) > (best[k]._updatedAt||0)) best[k] = s;
       });
       S.staff[cid] = Object.keys(best).map(function(k){ return best[k]; });
+    });
+  }
+
+  // ── Appliquer tombstones compEnroll ──
+  if (S.compEnroll && typeof S.compEnroll === 'object') {
+    Object.keys(S.compEnroll).forEach(function(cid) {
+      var tombs = (S._deletedEnroll && S._deletedEnroll[cid]) ? S._deletedEnroll[cid] : {};
+      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid){ return !tombs[pid]; });
     });
   }
 
