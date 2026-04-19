@@ -5455,7 +5455,8 @@ function docRename(id, newName) {
   var doc = (S.documents||[]).find(function(d){ return d.id === id; });
   if (doc && newName.trim() && newName.trim() !== doc.name) {
     doc.name = newName.trim();
-    saveState();
+    doc._updatedAt = Date.now();
+    saveState(); silentPush();
   }
 }
 
@@ -5466,8 +5467,10 @@ function docDelete(id) {
   if (_docDelPending[id]) {
     clearTimeout(_docDelPending[id]);
     delete _docDelPending[id];
+    if (!S._deletedDocuments) S._deletedDocuments = {};
+    S._deletedDocuments[id] = Date.now();
     S.documents = (S.documents||[]).filter(function(d){ return d.id !== id; });
-    saveState();
+    saveState(); silentPush();
     renderHomeResultsDrawer();
     toast('Document supprimé', 'ok');
   } else {
@@ -7897,19 +7900,54 @@ function savePartenaire() {
   var email = document.getElementById('pe-email').value.trim();
   var proposition = document.getElementById('pe-proposition').value.trim();
   if (!organisme && !representant) { toast('Veuillez saisir au moins un organisme ou un représentant', 'err'); return; }
+  // Récupérer le fichier joint (nouveau partenaire ou modification sans upload immédiat)
+  var _fileInp = document.getElementById('pe-file-input');
+  var _fileData = _fileInp && _fileInp._fileData;
+  var _fileName = _fileInp && _fileInp._fileName;
+  var _fileType = _fileInp && _fileInp._fileType;
+  var _fileSize = _fileInp && _fileInp._fileSize;
+
+  var savedId = partId;
   if (partId) {
     var idx = S.partenaires[compId].findIndex(function(x){ return x.id===partId; });
     if (idx >= 0) {
       var existing = S.partenaires[compId][idx];
-      S.partenaires[compId][idx] = Object.assign({}, existing, {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()});
+      var upd = {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()};
+      if (_fileData) { upd.propositionFile=_fileData; upd.propositionFileName=_fileName; upd.propositionFileType=_fileType; upd.propositionFileSize=_fileSize; }
+      S.partenaires[compId][idx] = Object.assign({}, existing, upd);
     }
   } else {
-    S.partenaires[compId].push({id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()});
+    savedId = 'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    var newPart = {id:savedId,type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()};
+    if (_fileData) { newPart.propositionFile=_fileData; newPart.propositionFileName=_fileName; newPart.propositionFileType=_fileType; newPart.propositionFileSize=_fileSize; }
+    S.partenaires[compId].push(newPart);
   }
+  _syncPartDoc(compId, savedId);
   saveState(); silentPush();
   closePartenaireEdit();
   renderHomeDetailPanel(null);
   toast(partId ? 'Partenaire modifié ✓' : 'Partenaire ajouté ✓', 'ok');
+}
+
+function _syncPartDoc(compId, partId) {
+  var p = ((S.partenaires||{})[compId]||[]).find(function(x){ return x.id===partId; });
+  if (!p) return;
+  var docId = 'doc_part_' + partId;
+  if (!S.documents) S.documents = [];
+  if (p.propositionFile) {
+    var label = (p.organisme || p.representant || 'Partenaire').trim();
+    if (p.propositionFileName) label += ' — ' + p.propositionFileName;
+    var existing = S.documents.find(function(d){ return d.id===docId; });
+    var doc = {id:docId, name:label, type:p.propositionFileType||'', size:p.propositionFileSize||0,
+               data:p.propositionFile, _partRef:{compId:compId,partId:partId}, _updatedAt:Date.now()};
+    if (existing) { Object.assign(existing, doc); }
+    else { S.documents.push(doc); }
+    if (S._deletedDocuments) delete S._deletedDocuments[docId];
+  } else {
+    if (!S._deletedDocuments) S._deletedDocuments = {};
+    S._deletedDocuments[docId] = Date.now();
+    S.documents = (S.documents||[]).filter(function(d){ return d.id !== docId; });
+  }
 }
 
 function uploadPartenaireFile(input) {
@@ -7917,19 +7955,23 @@ function uploadPartenaireFile(input) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    // Store file data temporarily on the input element
     input._fileData = e.target.result;
     input._fileName = file.name;
+    input._fileType = file.type;
+    input._fileSize = file.size;
     document.getElementById('pe-file-name').textContent = file.name;
-    // If editing, persist immediately
+    // If editing an existing partenaire, persist immediately
     if (_partEditId && _partEditCompId) {
       if (!S.partenaires) S.partenaires = {};
       if (!S.partenaires[_partEditCompId]) S.partenaires[_partEditCompId] = [];
       var idx = S.partenaires[_partEditCompId].findIndex(function(x){ return x.id===_partEditId; });
       if (idx>=0) {
-        S.partenaires[_partEditCompId][idx].propositionFile = e.target.result;
+        S.partenaires[_partEditCompId][idx].propositionFile     = e.target.result;
         S.partenaires[_partEditCompId][idx].propositionFileName = file.name;
-        saveState();
+        S.partenaires[_partEditCompId][idx].propositionFileType = file.type;
+        S.partenaires[_partEditCompId][idx].propositionFileSize = file.size;
+        _syncPartDoc(_partEditCompId, _partEditId);
+        saveState(); silentPush();
       }
     }
   };
@@ -7952,6 +7994,11 @@ function deletePartenaire(compId, partId) {
   if (!S._deletedPartenaires[compId]) S._deletedPartenaires[compId] = {};
   S._deletedPartenaires[compId][partId] = Date.now();
   S.partenaires[compId] = S.partenaires[compId].filter(function(x){ return x.id!==partId; });
+  // Supprimer aussi le document lié
+  var _docId = 'doc_part_' + partId;
+  if (!S._deletedDocuments) S._deletedDocuments = {};
+  S._deletedDocuments[_docId] = Date.now();
+  S.documents = (S.documents||[]).filter(function(d){ return d.id !== _docId; });
   saveState(); silentPush();
   if (window.innerWidth < 768) { renderMobileCompDetail(); } else { renderHomeDetailPanel(null); }
   toast('Partenaire supprimé', 'ok');
@@ -11278,6 +11325,7 @@ async function pushToCloud() {
     _deletedEnroll:       S._deletedEnroll       || {},
     _deletedBudgetLines:  S._deletedBudgetLines  || {},
     _deletedPartenaires:  S._deletedPartenaires  || {},
+    _deletedDocuments:    S._deletedDocuments    || {},
     partenaireTypes:      S.partenaireTypes       || null,
     _pushAt:              Date.now()
   };
@@ -11376,7 +11424,16 @@ function _cleanupAllDuplicates() {
     });
   }
 
-  // 2. Pilotes : dédup par id + dédup par prenom+nom (insensible à la casse)
+  // 2. Documents : tombstones + dédup par id
+  if (Array.isArray(S.documents) && S._deletedDocuments) {
+    var seenDoc = {};
+    S.documents = S.documents.filter(function(d) {
+      if (!d || !d.id || S._deletedDocuments[d.id] || seenDoc[d.id]) return false;
+      seenDoc[d.id] = true; return true;
+    });
+  }
+
+  // 3. Pilotes : dédup par id + dédup par prenom+nom (insensible à la casse)
   if (Array.isArray(S.pilots)) {
     var seenPId = {}, seenPName = {};
     S.pilots = S.pilots.filter(function(p) {
@@ -11533,6 +11590,14 @@ async function pullFromCloud() {
     });
   });
 
+  // ── Tombstones documents supprimés ──
+  var rDD = (r._deletedDocuments && typeof r._deletedDocuments==='object') ? r._deletedDocuments : {};
+  var lDD = (S._deletedDocuments && typeof S._deletedDocuments==='object') ? S._deletedDocuments : {};
+  S._deletedDocuments = {};
+  Object.keys(Object.assign({}, lDD, rDD)).forEach(function(id) {
+    S._deletedDocuments[id] = Math.max(lDD[id]||0, rDD[id]||0);
+  });
+
   // ── Tombstones partenaires (partenaires supprimés) ──
   var rDP = (r._deletedPartenaires && typeof r._deletedPartenaires==='object') ? r._deletedPartenaires : {};
   var lDP = (S._deletedPartenaires && typeof S._deletedPartenaires==='object') ? S._deletedPartenaires : {};
@@ -11563,6 +11628,10 @@ async function pullFromCloud() {
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
   S.documents     = _mergeById(S.documents,     r.documents);
+  // Appliquer les tombstones documents
+  if (S._deletedDocuments && S.documents) {
+    S.documents = S.documents.filter(function(d){ return !S._deletedDocuments[d.id]; });
+  }
   S.messages      = _mergeById(S.messages,      r.messages);
   // Objets indexés par compId dont les valeurs sont des tableaux : _mergeObjOfArrays
   S.staff              = _mergeObjOfArrays(S.staff,              r.staff);
