@@ -6056,7 +6056,7 @@ function renderHomeDetailPanel(cp) {
   if (canEdit) {
     html += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;flex-wrap:wrap">';
     html += '<button onclick="editComp(\''+cp.id+'\')" style="background:#2563eb;border:none;border-radius:8px;cursor:pointer;padding:0 14px;height:36px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;font-family:inherit">✏️ Modifier</button>';
-    html += '<button onclick="printCompDossier(\''+cp.id+'\')" title="Imprimer le dossier officiel de compétition" style="height:36px;padding:0 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px">🖨️ Dossier</button>';
+    html += '<button onclick="openDossierDialog(\''+cp.id+'\')" title="Imprimer le dossier officiel de compétition" style="height:36px;padding:0 13px;border-radius:8px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px">🖨️ Dossier</button>';
     html += '<button onclick="exportCompFull(\''+cp.id+'\')" title="Exporter toutes les données de cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">⬇ Export</button>';
     html += '<label title="Importer des données pour cette compétition" style="height:36px;padding:0 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center">⬆ Import<input type="file" accept=".json" style="display:none" onchange="importCompFull(this,\''+cp.id+'\')"></label>';
     html += '</div>';
@@ -7515,24 +7515,22 @@ function renderPartenairesTab(cp) {
     var typeColors = {'Institutionnel':'#3b82f6','Sponsor':'#f59e0b','Médias':'#8b5cf6','Aéroclub':'#10b981','Collectivité':'#ef4444','Autre':'#6b7280'};
     list.forEach(function(p) {
       var typeColor = typeColors[p.type||'Autre'] || '#6b7280';
-      html += '<div style="padding:12px 14px;background:var(--navy3);border-radius:10px;margin-bottom:8px;border:1px solid var(--bdr)">';
-      // Line 1: name/org + type badge
-      html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">';
-      html += '<div style="flex:1;min-width:0">';
-      html += '<div style="font-size:14px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(p.organisme||p.representant||'—')+'</div>';
-      if (p.representant && p.organisme) html += '<div style="font-size:12px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(p.representant)+'</div>';
+      html += '<div style="background:var(--navy3);border-radius:12px;margin-bottom:8px;border:1px solid var(--bdr);overflow:hidden">';
+      // Top band: type badge
+      html += '<div style="padding:6px 12px;background:'+typeColor+'18;border-bottom:1px solid '+typeColor+'33;display:flex;align-items:center;gap:6px">';
+      html += '<span style="width:7px;height:7px;border-radius:50%;background:'+typeColor+';flex-shrink:0"></span>';
+      html += '<span style="font-size:10px;font-weight:700;color:'+typeColor+'">'+escH(p.type||'Autre')+'</span>';
       html += '</div>';
-      html += '<span style="flex-shrink:0;padding:3px 8px;border-radius:20px;background:'+typeColor+'22;color:'+typeColor+';font-size:10px;font-weight:700;border:1px solid '+typeColor+'44">'+escH(p.type||'Autre')+'</span>';
-      html += '</div>';
-      // Line 2: phone
-      if (p.telephone) html += '<div style="font-size:13px;color:var(--txt2);margin-bottom:3px">📞 '+escH(p.telephone)+'</div>';
-      // Line 3: email + action buttons
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">';
-      html += '<div style="font-size:12px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+(p.email ? '✉ '+escH(p.email) : '')+'</div>';
+      // Body
+      html += '<div style="padding:10px 12px">';
+      html += '<div style="font-size:14px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px">'+escH(p.organisme||p.representant||'—')+'</div>';
+      if (p.representant && p.organisme) html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">'+escH(p.representant)+'</div>';
+      if (p.telephone) html += '<div style="font-size:12px;color:var(--txt2);margin-bottom:2px">📞 '+escH(p.telephone)+'</div>';
+      if (p.email)     html += '<div style="font-size:12px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">✉ '+escH(p.email)+'</div>';
       if (isGest) {
-        html += '<div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px">';
-        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,this.dataset.pid)" title="Modifier" style="min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt2);font-size:14px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;justify-content:center">✏️</button>';
-        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="deletePartenaire(this.dataset.cpid,this.dataset.pid)" title="Supprimer" style="min-width:44px;min-height:44px;border-radius:8px;border:none;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;padding:0;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center">×</button>';
+        html += '<div style="display:flex;gap:8px;margin-top:10px">';
+        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,this.dataset.pid)" style="flex:1;height:38px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">✏️ Modifier</button>';
+        html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="deletePartenaire(this.dataset.cpid,this.dataset.pid)" style="width:38px;height:38px;border-radius:8px;border:none;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;font-family:inherit;flex-shrink:0">×</button>';
         html += '</div>';
       }
       html += '</div>';
@@ -7585,26 +7583,27 @@ function renderPartenairesTab(cp) {
     html += '</div>';
 
     if (open) {
-      // Column headers
-      html += '<div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) 90px 120px 28px 28px;gap:6px;padding:6px 12px 4px;border-top:1px solid var(--bdr)">';
-      html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px">Organisme</span>';
-      html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px">Représentant</span>';
+      // Column headers: Organisme/Représentant | Téléphone | Email | actions
+      var gcols = isGest ? 'minmax(0,2fr) 120px minmax(0,1.6fr) 32px 32px' : 'minmax(0,2fr) 120px minmax(0,1.6fr)';
+      html += '<div style="display:grid;grid-template-columns:'+gcols+';gap:6px;padding:6px 12px 4px;border-top:1px solid var(--bdr)">';
+      html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px">Organisme / Représentant</span>';
       html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px">Téléphone</span>';
       html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px">Email</span>';
-      html += '<span></span><span></span>';
+      if (isGest) html += '<span></span><span></span>';
       html += '</div>';
 
       items.forEach(function(p) {
-        html += '<div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) 90px 120px 28px 28px;gap:6px;padding:6px 12px;align-items:center;border-top:1px solid var(--bdr)">';
-        html += '<span style="font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(p.organisme||'')+'">'+escH(p.organisme||'—')+'</span>';
-        html += '<span style="font-size:12px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(p.representant||'')+'">'+escH(p.representant||'—')+'</span>';
+        html += '<div style="display:grid;grid-template-columns:'+gcols+';gap:6px;padding:7px 12px;align-items:center;border-top:1px solid var(--bdr)">';
+        // Organisme + représentant stacked
+        html += '<div style="min-width:0">';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(p.organisme||'')+'">'+escH(p.organisme||p.representant||'—')+'</div>';
+        if (p.representant && p.organisme) html += '<div style="font-size:10px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(p.representant)+'">'+escH(p.representant)+'</div>';
+        html += '</div>';
         html += '<span style="font-size:11px;color:var(--txt2)">'+escH(p.telephone||'—')+'</span>';
         html += '<span style="font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(p.email||'')+'">'+escH(p.email||'—')+'</span>';
         if (isGest) {
-          html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,this.dataset.pid)" title="Modifier" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;padding:0;font-family:inherit">✏️</button>';
-          html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="deletePartenaire(this.dataset.cpid,this.dataset.pid)" title="Supprimer" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr);background:var(--navy3);color:#ef4444;font-size:13px;cursor:pointer;padding:0;font-family:inherit">🗑</button>';
-        } else {
-          html += '<span></span><span></span>';
+          html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="openPartenaireEdit(this.dataset.cpid,this.dataset.pid)" title="Modifier" style="width:32px;height:32px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;padding:0;font-family:inherit">✏️</button>';
+          html += '<button data-cpid="'+escH(cp.id)+'" data-pid="'+escH(p.id)+'" onclick="deletePartenaire(this.dataset.cpid,this.dataset.pid)" title="Supprimer" style="width:32px;height:32px;border-radius:7px;border:none;background:none;color:#ef4444;font-size:15px;font-weight:900;cursor:pointer;padding:0;font-family:inherit">×</button>';
         }
         html += '</div>';
       });
@@ -16297,7 +16296,59 @@ function toggleBgtDomain(key) {
 /* ═══════════════════════════════════════════════════════════════
    DOSSIER OFFICIEL DE COMPÉTITION — style FFPLUM Pôle Sport v3
 ═══════════════════════════════════════════════════════════════ */
-function printCompDossier(compId) {
+function openDossierDialog(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (!cp) return;
+  var existing = document.getElementById('dossier-dialog-overlay');
+  if (existing) existing.remove();
+
+  var sections = [
+    {id:'stats', label:'📊 Statistiques &amp; KPIs'},
+    {id:'equip', label:'👥 Participants (Équipage)'},
+    {id:'staff', label:'🏅 Encadrants'},
+    {id:'mat',   label:'🔧 Matériel'},
+    {id:'evt',   label:'⚠️ Événements'},
+    {id:'budg',  label:'💰 Budget'},
+    {id:'part',  label:'🤝 Partenaires'},
+    {id:'svc',   label:'🏟 Services &amp; Logistique'}
+  ];
+
+  var overlay = document.createElement('div');
+  overlay.id = 'dossier-dialog-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.addEventListener('click', function(e){ if(e.target===overlay) overlay.remove(); });
+
+  var h = '<div style="background:var(--navy2);border-radius:16px;padding:22px;width:min(420px,100%);border:1px solid var(--bdr);box-shadow:0 24px 70px rgba(0,0,0,.6)">';
+  h += '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:4px">🖨️ Dossier de compétition</div>';
+  h += '<div style="font-size:11px;color:var(--txt3);margin-bottom:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escH(cp.name)+'</div>';
+  h += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Volets à inclure</div>';
+  sections.forEach(function(s) {
+    h += '<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none">';
+    h += '<input type="checkbox" id="doss-cb-'+s.id+'" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--stol);flex-shrink:0">';
+    h += '<span style="font-size:13px;color:var(--txt)">'+s.label+'</span>';
+    h += '</label>';
+  });
+  h += '<div style="display:flex;gap:8px;margin-top:18px">';
+  h += '<button onclick="document.getElementById(\'dossier-dialog-overlay\').remove()" style="flex:1;height:46px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>';
+  h += '<button onclick="_dossierPrintFromDialog(\''+escH(compId)+'\')" style="flex:2;height:46px;border-radius:10px;border:none;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Imprimer</button>';
+  h += '</div></div>';
+  overlay.innerHTML = h;
+  document.body.appendChild(overlay);
+}
+
+function _dossierPrintFromDialog(compId) {
+  var opts = {};
+  ['stats','equip','staff','mat','evt','budg','part','svc'].forEach(function(id) {
+    var cb = document.getElementById('doss-cb-'+id);
+    opts[id] = cb ? cb.checked : true;
+  });
+  var overlay = document.getElementById('dossier-dialog-overlay');
+  if (overlay) overlay.remove();
+  printCompDossier(compId, opts);
+}
+
+function printCompDossier(compId, opts) {
+  opts = opts || {stats:true,equip:true,staff:true,mat:true,evt:true,budg:true,part:true,svc:true};
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
 
@@ -16626,11 +16677,22 @@ function printCompDossier(compId) {
     +'</div>';
 
   // ── ASSEMBLAGE ───────────────────────────────────────────────────────
+  var body = hdrHtml;
+  if(opts.stats) body += chartsHtml;
+  if(opts.staff) body += staffHtml;
+  if(opts.svc)   body += svcHtml;
+  if(opts.equip) body += equipHtml;
+  if(opts.evt)   body += evtHtml;
+  if(opts.budg)  body += budgHtml;
+  if(opts.part)  body += partHtml;
+  if(opts.mat)   body += matHtml;
+  body += footerHtml;
+
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
     +'<title>Dossier — '+esc(cp.name)+'</title>'
     +'<style>'+css+'</style>'
     +'</head><body>'
-    +hdrHtml+chartsHtml+staffHtml+svcHtml+equipHtml+evtHtml+budgHtml+partHtml+matHtml+footerHtml
+    +body
     +'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script>'
     +'</body></html>';
 
