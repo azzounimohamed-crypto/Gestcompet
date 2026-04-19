@@ -11031,8 +11031,11 @@ async function pushToCloud() {
     officialDocs:     S.officialDocs       || {},
     docSettings:      S.docSettings        || {},
     homeTodosByComp:  S.homeTodosByComp    || {},
-    _deletedComps:    S._deletedComps      || [],
-    _pushAt:          Date.now()
+    _deletedComps:        S._deletedComps        || [],
+    _deletedStaff:        S._deletedStaff        || {},
+    _deletedEnroll:       S._deletedEnroll       || {},
+    _deletedBudgetLines:  S._deletedBudgetLines  || {},
+    _pushAt:              Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
     { id: 'global', data: payload, updated_at: new Date().toISOString() },
@@ -17990,13 +17993,14 @@ function injectCalendrier2026() {
   var deleted = S._deletedComps || [];
   var added = 0;
   toAdd.forEach(function(cp) {
-    if (deleted.find(function(t){ return t.id === cp.id; })) return; // supprimée
-    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
-      S.comps.push(cp);
-      S.compEnroll = S.compEnroll || {};
-      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
-      added++;
-    }
+    if (deleted.find(function(t){ return t.id === cp.id; })) return; // supprimée par id
+    // Vérifier aussi par nom+date pour ne pas créer de doublon si l'entrée existe avec un autre id
+    var nameKey = (cp.name||'').trim().toLowerCase()+'|'+(cp.dateFrom||'');
+    if (S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; })) return;
+    S.comps.push(cp);
+    S.compEnroll = S.compEnroll || {};
+    S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
+    added++;
   });
   if (added > 0) saveState();
 }
@@ -18007,10 +18011,10 @@ function injectCalendrierFull() {
   (S._deletedComps||[]).forEach(function(t){ _deletedIds[t.id] = true; });
   function _add(cp) {
     if (_deletedIds[cp.id]) return; // supprimée définitivement
-    if (!S.comps.find(function(x){ return x.id === cp.id; })) {
-      S.comps.push(cp);
-      S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
-    }
+    var nameKey = (cp.name||'').trim().toLowerCase()+'|'+(cp.dateFrom||'');
+    if (S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; })) return;
+    S.comps.push(cp);
+    S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
   }
   // ── 2027 ──
   _add({id:'calf-2027-roanne-para-classic',name:'Régionale Paramoteur Classic - Roanne (suspendue)',dateFrom:'2027-04-11',dateTo:'2027-04-12',oaci:'LFLO',lieu:'Roanne',region:'Auvergne Rhône Alpes',type:'regional',pratique:'paramoteur',discipline:'classic',saison:'2027',desc:'Club : Paramoteur Roanne · Référent : Serge DAVID · Compétition suspendue'});
