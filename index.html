@@ -10764,12 +10764,21 @@ function renderStaffList() {
     var comp = g.comp;
     var compName = comp ? comp.name : 'Compétition inconnue';
     var compDate = comp ? formatDate(comp.dateFrom) + (comp.dateTo && comp.dateTo !== comp.dateFrom ? ' — ' + formatDate(comp.dateTo) : '') : '';
+    // Tri des encadrants par nom dans chaque groupe
+    var sortedEntries = g.entries.slice().sort(function(a, b) {
+      var pa = (S.pilots||[]).find(function(p){ return p.id===(a.pilotId||a.id); })||{};
+      var pb = (S.pilots||[]).find(function(p){ return p.id===(b.pilotId||b.id); })||{};
+      var na = ((pa.nom||a.nom||'')+(pa.prenom||a.prenom||'')).toLowerCase();
+      var nb = ((pb.nom||b.nom||'')+(pb.prenom||b.prenom||'')).toLowerCase();
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    });
     // En-tête compétition
     html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
     html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">' + compName + '</div>';
     if (compDate) html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">' + compDate + '</div>';
     html += '</div>';
-    g.entries.forEach(function(s, si) {
+    sortedEntries.forEach(function(s, si) {
+      var origIdx = g.entries.indexOf(s);
       var pilot  = (S.pilots||[]).find(function(p){ return p.id === (s.pilotId||s.id); }) || {};
       var prenom = pilot.prenom || s.prenom || '';
       var nom    = pilot.nom    || s.nom    || '';
@@ -10777,7 +10786,7 @@ function renderStaffList() {
       var tel    = pilot.tel    || s.tel    || '';
       var email  = pilot.email  || s.email  || '';
       var lic    = pilot.licence || s.licence || '';
-      html += '<div onclick="showStaffDetailModal(\''+g.compId+'\','+si+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
+      html += '<div onclick="showStaffDetailModal(\''+g.compId+'\','+origIdx+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
       // Avatar
       if (photo) {
         html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+((prenom[0]||'?').toUpperCase())+'</div>\'">';
@@ -10795,7 +10804,7 @@ function renderStaffList() {
       if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
       html += '</div>';
       if (canEdit) {
-        html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+g.compId+'\','+si+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Supprimer">×</button>';
+        html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+g.compId+'\','+origIdx+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Supprimer">×</button>';
       }
       html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
       html += '</div>';
