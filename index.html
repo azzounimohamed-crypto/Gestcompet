@@ -3712,9 +3712,10 @@ function renderMobileCompDetail() {
   } else if (Array.isArray(S.staff)) {
     staffList = S.staff.filter(function(x){ return x && x.compId === cp.id; });
   }
-  // Dédoublonnage
+  // Dédoublonnage + exclure les entrées NDF (budget, pas encadrants)
   var _mcdStaffSeen = {};
   staffList = staffList.filter(function(s) {
+    if ((s.role||'').toUpperCase() === 'NDF') return false;
     var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
     if (_mcdStaffSeen[k]) return false; _mcdStaffSeen[k] = true; return true;
   });
@@ -6022,9 +6023,10 @@ function renderHomeDetailPanel(cp) {
       return x && (x.compId === cp.id || x.competitionId === cp.id || x.comp_id === cp.id);
     });
   }
-  // ── Dédoublonnage staff (pilotId ou prenom+nom) ──
+  // ── Dédoublonnage staff + exclure les entrées NDF (budget) ──
   var _staffSeen = {};
   staffList = staffList.filter(function(s) {
+    if ((s.role||'').toUpperCase() === 'NDF') return false; // NDF = budget, pas encadrant
     var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
     if (_staffSeen[k]) return false; _staffSeen[k] = true; return true;
   });
