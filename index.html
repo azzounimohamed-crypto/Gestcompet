@@ -11153,6 +11153,22 @@ async function pullFromCloud() {
     });
   });
 
+  // ── Tombstones budget lines ──
+  var rDB = (r._deletedBudgetLines && typeof r._deletedBudgetLines==='object') ? r._deletedBudgetLines : {};
+  var lDB = (S._deletedBudgetLines && typeof S._deletedBudgetLines==='object') ? S._deletedBudgetLines : {};
+  S._deletedBudgetLines = {};
+  Object.keys(Object.assign({}, lDB, rDB)).forEach(function(cid) {
+    S._deletedBudgetLines[cid] = {};
+    ['engagement','ressources'].forEach(function(sec) {
+      S._deletedBudgetLines[cid][sec] = {};
+      var lS = (lDB[cid]&&lDB[cid][sec]) ? lDB[cid][sec] : {};
+      var rS = (rDB[cid]&&rDB[cid][sec]) ? rDB[cid][sec] : {};
+      Object.keys(Object.assign({}, lS, rS)).forEach(function(id) {
+        S._deletedBudgetLines[cid][sec][id] = Math.max(lS[id]||0, rS[id]||0);
+      });
+    });
+  });
+
   // ── Tombstones compEnroll (pilotes retirés) ──
   var rDE = (r._deletedEnroll && typeof r._deletedEnroll==='object') ? r._deletedEnroll : {};
   var lDE = (S._deletedEnroll && typeof S._deletedEnroll==='object') ? S._deletedEnroll : {};
@@ -11191,7 +11207,25 @@ async function pullFromCloud() {
   S.compEnroll         = _mergeObjOfArrays(S.compEnroll,         r.compEnroll);
   S.materiel           = _mergeObjOfArrays(S.materiel,           r.materiel);
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
-  S.budgets            = _mergeObjOfArrays(S.budgets,            r.budgets);
+  // Merge profond pour budgets : {compId: {engagement:[...], ressources:[...]}}
+  (function() {
+    var lb = (S.budgets && typeof S.budgets==='object') ? S.budgets : {};
+    var rb = (r.budgets && typeof r.budgets==='object') ? r.budgets : {};
+    var res = {};
+    var cids = {};
+    Object.keys(lb).forEach(function(k){ cids[k]=1; });
+    Object.keys(rb).forEach(function(k){ cids[k]=1; });
+    Object.keys(cids).forEach(function(cid) {
+      var lv = lb[cid]; var rv = rb[cid];
+      if (!rv) { res[cid] = lv; return; }
+      if (!lv) { res[cid] = rv; return; }
+      res[cid] = {
+        engagement: _mergeById(Array.isArray(lv.engagement)?lv.engagement:[], Array.isArray(rv.engagement)?rv.engagement:[]),
+        ressources: _mergeById(Array.isArray(lv.ressources)?lv.ressources:[], Array.isArray(rv.ressources)?rv.ressources:[])
+      };
+    });
+    S.budgets = res;
+  })();
   S.partenaires        = _mergeObjOfArrays(S.partenaires,        r.partenaires);
   S.officialDocs       = _mergeObjOfArrays(S.officialDocs,       r.officialDocs);
   S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
@@ -11227,6 +11261,18 @@ async function pullFromCloud() {
         if (!best[k] || (s._updatedAt||0) > (best[k]._updatedAt||0)) best[k] = s;
       });
       S.staff[cid] = Object.keys(best).map(function(k){ return best[k]; });
+    });
+  }
+
+  // ── Appliquer tombstones budget lines ──
+  if (S.budgets && S._deletedBudgetLines) {
+    Object.keys(S.budgets).forEach(function(cid) {
+      var ct = S._deletedBudgetLines[cid];
+      if (!ct) return;
+      ['engagement','ressources'].forEach(function(sec) {
+        if (!ct[sec] || !Array.isArray(S.budgets[cid][sec])) return;
+        S.budgets[cid][sec] = S.budgets[cid][sec].filter(function(l){ return !ct[sec][l.id]; });
+      });
     });
   }
 
@@ -16666,6 +16712,10 @@ function addBudgetLine(compId, section) {
 }
 function removeBudgetLine(compId, section, lineId) {
   if (!S.budgets || !S.budgets[compId]) return;
+  if (!S._deletedBudgetLines) S._deletedBudgetLines = {};
+  if (!S._deletedBudgetLines[compId]) S._deletedBudgetLines[compId] = {};
+  if (!S._deletedBudgetLines[compId][section]) S._deletedBudgetLines[compId][section] = {};
+  S._deletedBudgetLines[compId][section][lineId] = Date.now();
   S.budgets[compId][section] = S.budgets[compId][section].filter(function(l){ return l.id !== lineId; });
   saveState();
   _budgetSubTab = section;
