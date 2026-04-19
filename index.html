@@ -5963,12 +5963,7 @@ async function hdgRemoveStaff(compId, idx) {
   }
   S.staff[compId].splice(idx,1);
   saveState();
-  // Push immédiat AVANT que l'auto-sync ne repulle les vieilles données cloud
-  try {
-    await pushToCloud();
-    _lastSyncAt = Date.now(); // bloque l'auto-sync pendant 60s
-    if (typeof updateSyncTime === 'function') updateSyncTime();
-  } catch(e) {}
+  // Rendu immédiat — l'utilisateur voit la suppression sans attendre le réseau
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
     renderMobileCompDetail();
@@ -5976,6 +5971,12 @@ async function hdgRemoveStaff(compId, idx) {
     renderHomeDetailPanel(null);
   }
   toast('Encadrant retiré','');
+  // Push en arrière-plan
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now();
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+  } catch(e) {}
 }
 
 function showHomeCompDetail(compId) {
@@ -6570,7 +6571,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _hSt  = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     var _dSt  = 'font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     var _addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
-    var _rmBtnSt  = 'background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:2px;display:flex;align-items:center;justify-content:center';
+    var _rmBtnSt  = 'width:28px;height:28px;border-radius:50%;background:rgba(239,68,68,.15);border:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rowInpSt = 'border-bottom:2px solid var(--stol);background:var(--navy4)';
     var CCOL  = 'grid-template-columns:minmax(0,2fr) 68px 74px minmax(0,1fr) minmax(0,1fr) 56px 78px minmax(0,1fr) 28px';
     var _isMobEquip = window.innerWidth < 768;
@@ -6918,7 +6919,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _hStS  = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
     var _dStS  = 'font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     var _addBS = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
-    var _rmBS  = 'background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:2px;display:flex;align-items:center;justify-content:center';
+    var _rmBS  = 'width:28px;height:28px;border-radius:50%;background:rgba(239,68,68,.15);border:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var SCOL   = 'grid-template-columns:minmax(0,1.8fr) minmax(0,1.3fr) 68px 90px minmax(0,1.4fr) 28px';
     var _isMobStaff = window.innerWidth < 768;
     var html3  = '';
