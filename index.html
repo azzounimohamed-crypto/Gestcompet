@@ -9963,7 +9963,7 @@ function _renderDocumentFromTemplate(tpl, pilote, extraVars) {
   var ds = S.docSettings || {};
   var sig = Object.assign({ prenom:'Mohamed', nom:'AZZOUNI', titre:'Directeur Technique National', organisation:'Fédération Française ULM', ville:'Maisons-Alfort' }, ds.signataire || {});
   var orgBlock = Object.assign({ nom:"Fédération Française d'ULM", adresse:'96 bis rue Marc Sangnier', cp:'94700', ville:'Maisons-Alfort', tel:'01 49 81 74 43', email:'ffplum@ffplum.org', www:'www.ffplum.fr', accent:'#c0392b' }, ds.orgBlock || {});
-  var police = ds.police || 'Times New Roman,Times,serif';
+  var police = ds.police || 'Arial,Helvetica,sans-serif';
   var sigImage = ds.signatureImage || null;
   var bv = _buildVarMap(pilote, sig, extraVars);
   var vars = bv.vars;
@@ -10061,7 +10061,7 @@ function renderDocModeles() {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">';
   h += '<div><div style="' + lSt + '">Police de caractère</div>';
   var polices = [['Times New Roman,Times,serif','Times New Roman'],['Georgia,serif','Georgia'],['Garamond,serif','Garamond'],['Arial,Helvetica,sans-serif','Arial']];
-  var curPolice = ds.police || 'Times New Roman,Times,serif';
+  var curPolice = ds.police || 'Arial,Helvetica,sans-serif';
   h += '<select style="' + iSt + '" onchange="saveDocSetting(\'police\',this.value)">';
   polices.forEach(function(o){ h += '<option value="' + escH(o[0]) + '"' + (curPolice === o[0] ? ' selected' : '') + '>' + escH(o[1]) + '</option>'; });
   h += '</select></div>';
@@ -18663,6 +18663,11 @@ function injectCalendrierFull() {
 
 document.addEventListener('DOMContentLoaded', async function() {
   await loadState();
+  // Migration police → Arial
+  if (!S.docSettings) S.docSettings = {};
+  if (!S.docSettings.police || S.docSettings.police.indexOf('Times') !== -1 || S.docSettings.police.indexOf('Georgia') !== -1 || S.docSettings.police.indexOf('Garamond') !== -1) {
+    S.docSettings.police = 'Arial,Helvetica,sans-serif';
+  }
   _cleanupAllDuplicates(); // nettoyage au démarrage avant toute injection
   injectMaisoncelles2026();
   injectCalendrier2026();
