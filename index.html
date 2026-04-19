@@ -13735,11 +13735,27 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
     if (_isMobPilotModal) {
-      html += '<div style="padding:10px 14px;border-bottom:1px solid var(--bdr)">';
-      html += '<div style="font-size:14px;font-weight:800;margin-bottom:10px">✏️ Modifier le pilote</div>';
-      html += '<div style="display:flex;gap:8px">';
-      html += '<button onclick="closeAllModals()" style="flex:1;padding:10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>';
-      html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="flex:2;padding:10px;background:var(--stol);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>';
+      // En-tête identique à la fiche vue
+      html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:16px 16px 14px;border-bottom:1px solid var(--bdr)">';
+      // Photo cliquable
+      html += '<div id="pd-photo-wrap" onclick="document.getElementById(\'pd-photo-inp\').click()" style="width:80px;height:80px;border-radius:50%;border:3px solid var(--stol);overflow:hidden;cursor:pointer;background:var(--navy4);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:var(--stol);flex-shrink:0">';
+      if (pilot.photo) { html += '<img id="pd-photo-img" src="'+pilot.photo+'" style="width:100%;height:100%;object-fit:cover"><span id="pd-photo-icon" style="display:none;font-size:22px">📷</span>'; }
+      else { html += '<img id="pd-photo-img" style="display:none;width:100%;height:100%;object-fit:cover"><span id="pd-photo-icon" style="font-size:22px">📷</span>'; }
+      html += '</div>';
+      html += '<input type="file" id="pd-photo-inp" accept="image/*" style="display:none" onchange="handlePDPhoto(this)">';
+      // Champs centre
+      html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">';
+      html += '<div style="display:grid;grid-template-columns:72px 1fr;gap:6px">';
+      html += '<select id="pd-genre" style="'+iSt+'"><option value=""'+(!(pilot.genre)?' selected':'')+'>—</option><option value="M."'+(pilot.genre==="M."?' selected':'')+'>M.</option><option value="Mme."'+(pilot.genre==="Mme."?' selected':'')+'>Mme.</option></select>';
+      html += '<input id="pd-prenom" value="'+e2(pilot.prenom)+'" placeholder="Prénom" style="'+iSt+'">';
+      html += '</div>';
+      html += '<input id="pd-nom" value="'+e2(pilot.nom)+'" placeholder="NOM" style="'+iSt+';font-weight:700;text-transform:uppercase">';
+      html += '<input id="pd-dob" type="date" value="'+e2(pilot.ddn)+'" style="'+iSt+'">';
+      html += '</div>';
+      // Boutons droite
+      html += '<div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">';
+      html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="background:var(--stol);border:none;border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Enregistrer</button>';
+      html += '<button onclick="closeAllModals()" style="background:none;border:1px solid var(--bdr);border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:var(--txt2);font-family:inherit;white-space:nowrap">Annuler</button>';
       html += '</div>';
       html += '</div>';
     } else {
@@ -13756,6 +13772,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
 
     var secSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px';
 
+    if (!_isMobPilotModal) {
     // ── Photo ──
     var photoCircSt = 'width:72px;height:72px;border-radius:50%;background:var(--navy3);border:2px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0';
     html += '<div style="display:flex;align-items:center;gap:14px">';
@@ -13775,7 +13792,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     // ── Section Identité ──
     html += '<div><div style="'+secSt+'">Identité</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px">';
-    html += '<div style="display:grid;grid-template-columns:'+(_isMobPilotModal?'80px 1fr 1fr':'120px 1fr 1fr')+';gap:8px">';
+    html += '<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px">';
     html += '<div><div style="'+lSt+'">Genre</div><select id="pd-genre" style="'+iSt+'">';
     html += '<option value=""'+(!(pilot.genre)?' selected':'')+'>—</option>';
     html += '<option value="M."'+(pilot.genre==='M.'?' selected':'')+'>M.</option>';
@@ -13784,9 +13801,9 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<div><div style="'+lSt+'">Prénom</div><input id="pd-prenom" value="'+e2(pilot.prenom)+'" style="'+iSt+'"></div>';
     html += '<div><div style="'+lSt+'">Nom</div><input id="pd-nom" value="'+e2(pilot.nom)+'" style="'+iSt+'"></div>';
     html += '</div>';
-    html += '<div style="display:grid;grid-template-columns:'+(_isMobPilotModal?'1fr 1fr':'1fr auto 1fr')+';gap:8px;align-items:end">';
+    html += '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end">';
     html += '<div><div style="'+lSt+'">Date de naissance</div><input id="pd-dob" type="date" value="'+e2(pilot.ddn)+'" style="'+iSt+'"></div>';
-    if (!_isMobPilotModal) html += age ? '<div style="padding-bottom:9px;font-size:18px;font-weight:800;color:var(--stol);white-space:nowrap;text-align:center">'+age+' ans</div>' : '<div></div>';
+    html += age ? '<div style="padding-bottom:9px;font-size:18px;font-weight:800;color:var(--stol);white-space:nowrap;text-align:center">'+age+' ans</div>' : '<div></div>';
     html += '<div><div style="'+lSt+'">Adresse</div><input id="pd-adresse" value="'+e2(pilot.adresse||'')+'" placeholder="—" oninput="autoRegionFromAdresse()" style="'+iSt+'"></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
@@ -13794,6 +13811,17 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<div><div style="'+lSt+'">Email</div><input id="pd-email" type="email" value="'+e2(pilot.email)+'" style="'+iSt+'"></div>';
     html += '</div>';
     html += '</div></div>';
+    } // fin !mobile
+    // Sur mobile : DDN + Adresse + Téléphone + Email directement
+    if (_isMobPilotModal) {
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html += '<div><div style="'+lSt+'">Téléphone</div><input id="pd-tel" type="tel" value="'+e2(pilot.tel)+'" style="'+iSt+'"></div>';
+    html += '<div><div style="'+lSt+'">Email</div><input id="pd-email" type="email" value="'+e2(pilot.email)+'" style="'+iSt+'"></div>';
+    html += '</div>';
+    html += '<div><div style="'+lSt+'">Adresse</div><input id="pd-adresse" value="'+e2(pilot.adresse||'')+'" placeholder="—" oninput="autoRegionFromAdresse()" style="'+iSt+'"></div>';
+    html += '</div>';
+    }
 
     // ── Section Licences & Club ──
     html += '<div><div style="'+secSt+'">Licences &amp; Club</div>';
@@ -14164,11 +14192,27 @@ function showStaffDetailModal(compId, idx, editMode) {
     var lSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px';
 
     if (_isMobStaffModal) {
-      html += '<div style="padding:10px 14px;border-bottom:1px solid var(--bdr)">';
-      html += '<div style="font-size:14px;font-weight:800;margin-bottom:10px">✏️ Modifier l\'encadrant</div>';
-      html += '<div style="display:flex;gap:8px">';
-      html += '<button onclick="closeAllModals()" style="flex:1;padding:10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>';
-      html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="flex:2;padding:10px;background:#0891b2;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>';
+      // En-tête identique à la fiche vue
+      html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:16px 16px 14px;border-bottom:1px solid var(--bdr)">';
+      // Photo cliquable
+      html += '<div id="sdm-photo-preview" onclick="document.getElementById(\'sdm-photo-inp\').click()" style="width:80px;height:80px;border-radius:50%;border:3px solid #0891b2;overflow:hidden;cursor:pointer;background:var(--navy4);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#0891b2;flex-shrink:0">';
+      if (photo) { html += '<img id="sdm-photo-img" src="'+photo+'" style="width:100%;height:100%;object-fit:cover">'; html += '<span id="sdm-photo-ini" style="display:none">'+ini+'</span>'; }
+      else       { html += '<img id="sdm-photo-img" style="display:none;width:100%;height:100%;object-fit:cover">'; html += '<span id="sdm-photo-ini">'+ini+'</span>'; }
+      html += '</div>';
+      html += '<input type="file" id="sdm-photo-inp" accept="image/*" style="display:none" onchange="sdmLoadPhoto(this)">';
+      // Champs nom/rôle au centre
+      html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">';
+      html += '<div style="display:grid;grid-template-columns:72px 1fr;gap:6px">';
+      html += '<select id="sdm-genre" style="'+iSt+'"><option value=""'+(!genre?' selected':'')+'>—</option><option value="M."'+(genre==="M."?' selected':'')+'>M.</option><option value="Mme."'+(genre==="Mme."?' selected':'')+'>Mme.</option></select>';
+      html += '<input id="sdm-prenom" value="'+_esc(prenom)+'" placeholder="Prénom" style="'+iSt+'">';
+      html += '</div>';
+      html += '<input id="sdm-nom" value="'+_esc(nom)+'" placeholder="NOM" style="'+iSt+';font-weight:700;text-transform:uppercase">';
+      html += '<input id="sdm-role" value="'+_esc(entry.role||'')+'" placeholder="Fonction / Rôle" style="'+iSt+';color:#0891b2;font-weight:600">';
+      html += '</div>';
+      // Boutons droite
+      html += '<div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">';
+      html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="background:#0891b2;border:none;border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Enregistrer</button>';
+      html += '<button onclick="closeAllModals()" style="background:none;border:1px solid var(--bdr);border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:var(--txt2);font-family:inherit;white-space:nowrap">Annuler</button>';
       html += '</div>';
       html += '</div>';
     } else {
@@ -14183,6 +14227,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     }
     html += '<div style="padding:16px 18px 20px;display:flex;flex-direction:column;gap:12px">';
 
+    if (!_isMobStaffModal) {
     // Photo
     html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px">';
     html += '<div id="sdm-photo-preview" onclick="document.getElementById(\'sdm-photo-inp\').click()" style="width:80px;height:80px;border-radius:50%;border:3px solid #0891b2;overflow:hidden;cursor:pointer;background:var(--navy4);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#0891b2;flex-shrink:0">';
@@ -14194,7 +14239,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '</div>';
 
     // Genre + Prénom + Nom
-    html += '<div style="display:grid;grid-template-columns:'+(_isMobStaffModal?'80px 1fr 1fr':'120px 1fr 1fr')+';gap:8px">';
+    html += '<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:8px">';
     html += '<div><div style="'+lSt+'">Genre</div><select id="sdm-genre" style="'+iSt+'">';
     html += '<option value=""'+(!genre?' selected':'')+'>—</option>';
     html += '<option value="M."'+(genre==='M.'?' selected':'')+'>M.</option>';
@@ -14205,6 +14250,7 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '</div>';
     // Fonction
     html += '<div><div style="'+lSt+'">Fonction / Rôle</div><input id="sdm-role" value="'+_esc(entry.role||'')+'" placeholder="DC, Starter, Juge…" style="'+iSt+'"></div>';
+    } // fin !mobile
     // Licence + DDN + âge
     html += '<div style="display:grid;grid-template-columns:'+(_isMobStaffModal?'1fr 1fr':'1fr auto 1fr')+';gap:8px;align-items:end">';
     html += '<div><div style="'+lSt+'">N° Licence</div><input id="sdm-lic" value="'+_esc(lic)+'" style="'+iSt+'"></div>';
