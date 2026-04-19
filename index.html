@@ -7926,6 +7926,7 @@ function savePartenaire() {
   saveState(); silentPush();
   closePartenaireEdit();
   renderHomeDetailPanel(null);
+  if (_homeCompDrawerOpen) renderHomeResultsDrawer();
   toast(partId ? 'Partenaire modifié ✓' : 'Partenaire ajouté ✓', 'ok');
 }
 
@@ -7944,9 +7945,13 @@ function _syncPartDoc(compId, partId) {
     else { S.documents.push(doc); }
     if (S._deletedDocuments) delete S._deletedDocuments[docId];
   } else {
-    if (!S._deletedDocuments) S._deletedDocuments = {};
-    S._deletedDocuments[docId] = Date.now();
-    S.documents = (S.documents||[]).filter(function(d){ return d.id !== docId; });
+    // Only tombstone if the doc previously existed
+    var hadDoc = (S.documents||[]).some(function(d){ return d.id === docId; });
+    if (hadDoc) {
+      if (!S._deletedDocuments) S._deletedDocuments = {};
+      S._deletedDocuments[docId] = Date.now();
+      S.documents = (S.documents||[]).filter(function(d){ return d.id !== docId; });
+    }
   }
 }
 
