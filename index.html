@@ -11116,6 +11116,96 @@ function _mergeObjOfArrays(local, remote) {
   return result;
 }
 
+// ── NETTOYAGE COMPLET : supprime tous les doublons sur toutes les entités ──
+function _cleanupAllDuplicates() {
+  // 1. Compétitions : tombstones + dédup par id + dédup par nom+date
+  var deletedCompIds = {};
+  (S._deletedComps||[]).forEach(function(t){ deletedCompIds[t.id] = true; });
+  if (Array.isArray(S.comps)) {
+    var seenId = {}, seenName = {};
+    S.comps = S.comps.filter(function(c) {
+      if (!c || !c.id || deletedCompIds[c.id]) return false;
+      if (seenId[c.id]) return false; seenId[c.id] = true;
+      var nk = (c.name||c.nom||'').trim().toLowerCase()+'|'+(c.dateFrom||'');
+      if (seenName[nk] && nk !== '|') return false; seenName[nk] = true;
+      return true;
+    });
+  }
+
+  // 2. Pilotes : dédup par id + dédup par prenom+nom (insensible à la casse)
+  if (Array.isArray(S.pilots)) {
+    var seenPId = {}, seenPName = {};
+    S.pilots = S.pilots.filter(function(p) {
+      if (!p || !p.id) return false;
+      if (seenPId[p.id]) return false; seenPId[p.id] = true;
+      var nk = (p.prenom||'').trim().toLowerCase()+'|'+(p.nom||'').trim().toLowerCase();
+      if (nk !== '|' && seenPName[nk]) return false; seenPName[nk] = true;
+      return true;
+    });
+  }
+
+  // 3. Staff : tombstones + dédup par compId × (pilotId || prenom+nom+role)
+  if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(cid) {
+      if (deletedCompIds[cid]) { delete S.staff[cid]; return; }
+      var tombs = (S._deletedStaff && S._deletedStaff[cid]) || {};
+      var best = {};
+      (S.staff[cid]||[]).forEach(function(s) {
+        if (!s || typeof s !== 'object') return;
+        var k = s.pilotId ||
+          ((s.prenom||'').trim().toLowerCase()+'|'+(s.nom||'').trim().toLowerCase()+'|'+(s.role||'').trim().toLowerCase());
+        if (!k || k === '||') return;
+        if (tombs[k]) return;
+        if (!best[k] || (s._updatedAt||0) >= (best[k]._updatedAt||0)) best[k] = s;
+      });
+      S.staff[cid] = Object.values(best);
+    });
+  }
+
+  // 4. Budget : tombstones + dédup par domaine+libelle+valeur+nbjours+qt
+  if (S.budgets && typeof S.budgets === 'object') {
+    Object.keys(S.budgets).forEach(function(cid) {
+      if (deletedCompIds[cid]) { delete S.budgets[cid]; return; }
+      var bgt = S.budgets[cid]; if (!bgt) return;
+      ['engagement','ressources'].forEach(function(sec) {
+        if (!Array.isArray(bgt[sec])) return;
+        var tombs = ((S._deletedBudgetLines||{})[cid]||{})[sec]||{};
+        var byContent = {};
+        bgt[sec].forEach(function(l) {
+          if (!l) return;
+          if (l.id && tombs[l.id]) return;
+          var ck = (l.domaine||'').trim().toLowerCase()+'|'+(l.libelle||'').trim().toLowerCase()
+                 +'|'+String(l.valeur||0)+'|'+String(l.nbjours||1)+'|'+String(l.qt||1);
+          if (!byContent[ck] || (l._updatedAt||0) >= (byContent[ck]._updatedAt||0)) byContent[ck] = l;
+        });
+        bgt[sec] = Object.values(byContent);
+      });
+    });
+  }
+
+  // 5. compEnroll : tombstones + dédup
+  if (S.compEnroll && typeof S.compEnroll === 'object') {
+    Object.keys(S.compEnroll).forEach(function(cid) {
+      if (deletedCompIds[cid]) { delete S.compEnroll[cid]; return; }
+      var tombs = (S._deletedEnroll && S._deletedEnroll[cid]) || {};
+      var seen = {};
+      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid) {
+        if (!pid || tombs[pid] || seen[pid]) return false;
+        seen[pid] = true; return true;
+      });
+    });
+  }
+
+  // 6. Nettoyer staff/runs/materiel/partenaires des comps supprimées
+  ['runs','materiel','partenaires','evenements'].forEach(function(key) {
+    if (S[key] && typeof S[key] === 'object') {
+      Object.keys(S[key]).forEach(function(cid) {
+        if (deletedCompIds[cid]) delete S[key][cid];
+      });
+    }
+  });
+}
+
 // ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
 async function pullFromCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
@@ -11231,7 +11321,15 @@ async function pullFromCloud() {
           var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); }
         }
       });
-      return Object.keys(byId).map(function(k){ return byId[k]; }).concat(noId);
+      var merged = Object.keys(byId).map(function(k){ return byId[k]; }).concat(noId);
+      // Dédup secondaire par contenu : si deux lignes ont même domaine+libelle+valeur+nbjours+qt
+      // (IDs différents = doublons issus de bugs de sync passés), garder la plus récente
+      var byContent = {};
+      merged.forEach(function(x) {
+        var ck = (x.domaine||'').trim().toLowerCase()+'|'+(x.libelle||'').trim().toLowerCase()+'|'+String(x.valeur||0)+'|'+String(x.nbjours||1)+'|'+String(x.qt||1);
+        if (!byContent[ck] || (x._updatedAt||0) > (byContent[ck]._updatedAt||0)) byContent[ck] = x;
+      });
+      return Object.keys(byContent).map(function(k){ return byContent[k]; });
     }
     var lb = (S.budgets && typeof S.budgets==='object') ? S.budgets : {};
     var rb = (r.budgets && typeof r.budgets==='object') ? r.budgets : {};
@@ -11309,18 +11407,12 @@ async function pullFromCloud() {
     });
   }
 
-  // ── Nettoyage doublons compétitions (même nom + même dateFrom) ──
-  if (S.comps && S.comps.length > 1) {
-    var compSeen = {};
-    S.comps = S.comps.filter(function(c) {
-      var k = (c.name||'').trim().toLowerCase()+'|'+(c.dateFrom||'');
-      if (compSeen[k]) return false; compSeen[k] = true; return true;
-    });
-  }
-
   // Restaurer les affiches/photos locales si absentes du cloud
   S.comps.forEach(function(c){  if (localAffiches[c.id] && !c.affiche) c.affiche = localAffiches[c.id]; });
   S.pilots.forEach(function(p){ if (localPhotos[p.id]   && !p.photo)   p.photo   = localPhotos[p.id];  });
+
+  // ── Nettoyage complet des doublons (toutes les catégories) ──
+  _cleanupAllDuplicates();
 
   // Récupérer les médias depuis stol_medias
   await _pullMedias(sb);
@@ -18156,9 +18248,11 @@ function injectCalendrierFull() {
 
 document.addEventListener('DOMContentLoaded', async function() {
   await loadState();
+  _cleanupAllDuplicates(); // nettoyage au démarrage avant toute injection
   injectMaisoncelles2026();
   injectCalendrier2026();
   injectCalendrierFull();
+  _cleanupAllDuplicates(); // second passage après injections
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
