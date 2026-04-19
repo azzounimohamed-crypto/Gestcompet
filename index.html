@@ -13726,11 +13726,12 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
     : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   var _panelPilotSt = _isMobPilotModal
-    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;overflow-x:hidden;position:relative;animation:slideUpSheet .28s ease;transition:height .3s ease'
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow:hidden;display:flex;flex-direction:column;position:relative;animation:slideUpSheet .28s ease;transition:height .3s ease'
     : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:min(680px,95vw);max-height:90vh;overflow-y:auto;overflow-x:hidden;position:relative';
   var html = '<div id="pilot-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_overlayPilotSt+'">';
   html += '<div id="pdm-panel" style="'+_panelPilotSt+'">';
   if (_isMobPilotModal) html += '<div id="pdm-handle" style="width:100%;padding:14px 0 6px;display:flex;justify-content:center;cursor:grab;touch-action:none"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px"></div></div>';
+  if (_isMobPilotModal) html += '<div id="pdm-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -13751,11 +13752,6 @@ function showPilotDetailModal(pilotId, compId, editMode) {
       html += '</div>';
       html += '<input id="pd-nom" value="'+e2(pilot.nom)+'" placeholder="NOM" style="'+iSt+';font-weight:700;text-transform:uppercase">';
       html += '<input id="pd-dob" type="date" value="'+e2(pilot.ddn)+'" style="'+iSt+'">';
-      html += '</div>';
-      // Boutons droite
-      html += '<div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">';
-      html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="background:var(--stol);border:none;border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Enregistrer</button>';
-      html += '<button onclick="closeAllModals()" style="background:none;border:1px solid var(--bdr);border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:var(--txt2);font-family:inherit;white-space:nowrap">Annuler</button>';
       html += '</div>';
       html += '</div>';
     } else {
@@ -13945,10 +13941,12 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     if (pilot.club) html += '<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+pilot.club+'</div>';
     if (pilot.region) html += '<div style="font-size:12px;color:var(--txt3)">'+pilot.region+'</div>';
     html += '</div>';
+    if (!_isMobPilotModal) {
     html += '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
     html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}showPilotDetailModal(\''+pidS+'\',\''+cidS+'\',true)" style="background:var(--stol);border:none;border-radius:8px;cursor:pointer;padding:6px 12px;font-size:12px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Modifier</button>';
     if (cidS) html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}hdgRemoveComp(\''+cidS+'\',\''+pidS+'\');closeAllModals()" style="background:none;border:1px solid #ef4444;border-radius:8px;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;color:#ef4444;font-family:inherit;white-space:nowrap">Supprimer</button>';
     html += '</div>';
+    } // fin !mobile
     html += '</div>';
 
     // Corps
@@ -14015,6 +14013,18 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</div>';
   }
 
+  if (_isMobPilotModal) {
+    html += '</div>'; // fin pdm-scroll
+    html += '<div style="flex-shrink:0;display:grid;grid-template-columns:'+(editMode?'1fr 2fr':'1fr 2fr')+';gap:10px;padding:12px 16px 28px;background:var(--navy2);border-top:1px solid var(--bdr)">';
+    if (!editMode) {
+      html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}showPilotDetailModal(\''+pidS+'\',\''+cidS+'\',true)" style="height:54px;border-radius:12px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Modifier</button>';
+      html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}hdgRemoveComp(\''+cidS+'\',\''+pidS+'\');closeAllModals()" style="height:54px;border-radius:12px;border:1px solid #ef4444;background:none;color:#ef4444;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Supprimer</button>';
+    } else {
+      html += '<button onclick="closeAllModals()" style="height:54px;border-radius:12px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>';
+      html += '<button onclick="savePilotDetail(\''+pidS+'\',\''+cidS+'\')" style="height:54px;border-radius:12px;border:none;background:var(--stol);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>';
+    }
+    html += '</div>';
+  }
   html += '</div></div>';
 
   var existing = document.getElementById('pilot-detail-overlay');
@@ -14180,11 +14190,12 @@ function showStaffDetailModal(compId, idx, editMode) {
     ? 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center'
     : 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   var _panelStaffSt = _isMobStaffModal
-    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow-y:auto;overflow-x:hidden;position:relative;animation:slideUpSheet .28s ease;transition:height .3s ease'
+    ? 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px 16px 0 0;width:100%;max-width:100%;height:70vh;overflow:hidden;display:flex;flex-direction:column;position:relative;animation:slideUpSheet .28s ease;transition:height .3s ease'
     : 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:min(680px,95vw);max-height:90vh;overflow-y:auto;overflow-x:hidden;position:relative';
   var html = '<div id="staff-detail-overlay" onclick="if(event.target===this)closeAllModals()" style="'+_overlayStaffSt+'">';
   html += '<div id="sdm-panel" style="'+_panelStaffSt+'">';
   if (_isMobStaffModal) html += '<div id="sdm-handle" style="width:100%;padding:14px 0 6px;display:flex;justify-content:center;cursor:grab;touch-action:none"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px"></div></div>';
+  if (_isMobStaffModal) html += '<div id="sdm-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">';
 
   if (editMode) {
     // ══════════ MODE ÉDITION ══════════
@@ -14208,11 +14219,6 @@ function showStaffDetailModal(compId, idx, editMode) {
       html += '</div>';
       html += '<input id="sdm-nom" value="'+_esc(nom)+'" placeholder="NOM" style="'+iSt+';font-weight:700;text-transform:uppercase">';
       html += '<input id="sdm-role" value="'+_esc(entry.role||'')+'" placeholder="Fonction / Rôle" style="'+iSt+';color:#0891b2;font-weight:600">';
-      html += '</div>';
-      // Boutons droite
-      html += '<div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">';
-      html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="background:#0891b2;border:none;border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Enregistrer</button>';
-      html += '<button onclick="closeAllModals()" style="background:none;border:1px solid var(--bdr);border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;color:var(--txt2);font-family:inherit;white-space:nowrap">Annuler</button>';
       html += '</div>';
       html += '</div>';
     } else {
@@ -14291,10 +14297,12 @@ function showStaffDetailModal(compId, idx, editMode) {
     if (club)   html += '<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+club+'</div>';
     if (region) html += '<div style="font-size:12px;color:var(--txt3)">'+region+'</div>';
     html += '</div>';
+    if (!_isMobStaffModal) {
     html += '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
     html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}showStaffDetailModal(\''+cids+'\','+idx+',true)" style="background:#0891b2;border:none;border-radius:8px;cursor:pointer;padding:6px 12px;font-size:12px;font-weight:700;color:#fff;font-family:inherit;white-space:nowrap">Modifier</button>';
     html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}hdgRemoveStaff(\''+cids+'\','+idx+');closeAllModals()" style="background:none;border:1px solid #ef4444;border-radius:8px;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;color:#ef4444;font-family:inherit;white-space:nowrap">Supprimer</button>';
     html += '</div>';
+    } // fin !mobile
     html += '</div>';
     // Corps
     html += '<div style="padding:16px 20px">';
@@ -14332,6 +14340,18 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '</div>';
   }
 
+  if (_isMobStaffModal) {
+    html += '</div>'; // fin sdm-scroll
+    html += '<div style="flex-shrink:0;display:grid;grid-template-columns:1fr 2fr;gap:10px;padding:12px 16px 28px;background:var(--navy2);border-top:1px solid var(--bdr)">';
+    if (!editMode) {
+      html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}showStaffDetailModal(\''+cids+'\','+idx+',true)" style="height:54px;border-radius:12px;border:none;background:#0891b2;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Modifier</button>';
+      html += '<button onclick="if(!S.user){toast(\'Non autorisé\',\'\');return;}hdgRemoveStaff(\''+cids+'\','+idx+');closeAllModals()" style="height:54px;border-radius:12px;border:1px solid #ef4444;background:none;color:#ef4444;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Supprimer</button>';
+    } else {
+      html += '<button onclick="closeAllModals()" style="height:54px;border-radius:12px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>';
+      html += '<button onclick="saveStaffDetail(\''+cids+'\','+idx+')" style="height:54px;border-radius:12px;border:none;background:#0891b2;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>';
+    }
+    html += '</div>';
+  }
   html += '</div></div>';
   var existing = document.getElementById('staff-detail-overlay');
   if (existing) existing.remove();
