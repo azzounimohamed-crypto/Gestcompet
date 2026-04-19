@@ -9846,7 +9846,14 @@ function _renderDocHeader(variante, sig, orgBlock, destinataire, dateStr) {
       var pN = ((destinataire.prenom || '') + ' ' + (destinataire.nom || '').toUpperCase()).trim();
       s += '<div style="font-weight:700;font-size:14px">' + E(pN) + '</div>';
       if (destinataire.adresse) {
-        s += '<div style="margin-top:4px;font-size:12px;color:#333">' + E(destinataire.adresse) + '</div>';
+        var _adr = destinataire.adresse;
+        var _adrM = _adr.match(/^(.*?),?\s*(\d{5}\s+\S.*)$/);
+        if (_adrM) {
+          s += '<div style="margin-top:4px;font-size:12px;color:#333">' + E(_adrM[1].trim()) + '</div>';
+          s += '<div style="font-size:12px;color:#333">' + E(_adrM[2].trim()) + '</div>';
+        } else {
+          s += '<div style="margin-top:4px;font-size:12px;color:#333">' + E(_adr) + '</div>';
+        }
       } else {
         s += '<div style="margin-top:4px;font-size:11px;color:#aaa;font-style:italic">Adresse non renseignée</div>';
       }
@@ -9918,7 +9925,6 @@ function _renderDocSignature(tpl, sig, sigNom, sigImage) {
   var roleLabel = role === 'President' ? 'Le Président,' : role === 'DTN' ? 'Le Directeur Technique National,' : E(role) + ',';
   var s = '<div style="text-align:right;margin-top:40px">';
   s += '<div style="display:inline-block;text-align:center;min-width:220px">';
-  s += '<div style="font-style:italic;color:#555;margin-bottom:12px">' + roleLabel + '</div>';
   if (sigImage) {
     s += '<img src="' + E(sigImage) + '" style="max-height:70px;max-width:200px;display:block;margin:0 auto 8px">';
   } else {
@@ -9973,11 +9979,12 @@ function _renderDocumentFromTemplate(tpl, pilote, extraVars) {
   var E = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var s = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.75;color:#111">';
   s += _renderDocHeader(tpl.variante, sig, orgBlock, destinataire, dateStr);
-  s += '<div style="display:flex;align-items:center;gap:8px;margin:0 0 12px">';
+  s += '<div style="display:flex;align-items:center;gap:8px;margin:0 0 28px">';
   s += '<div style="width:14px;height:14px;background:#111;flex-shrink:0"></div>';
   s += '<div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">LA DIRECTION TECHNIQUE NATIONALE</div>';
   s += '</div>';
   s += _renderDocTitle(tpl, vars);
+  s += '<div style="height:20px"></div>';
   var paras = (tpl.corps || '').split('\n\n');
   s += '<div style="text-align:justify">';
   for (var pi = 0; pi < paras.length; pi++) {
