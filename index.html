@@ -2555,6 +2555,7 @@ async function b44Fetch(path) {
 function injectMaisoncelles2026() {
   var cid = 'comp-maisoncelles-2026';
   if ((S.comps||[]).find(function(c){return c.id===cid;})) return; // déjà présente
+  if ((S._deletedComps||[]).find(function(t){return t.id===cid;})) return; // supprimée
   S.comps = S.comps||[];
   S.comps.push({id:cid,nom:'Régionale Paramoteur Classic - Maisoncelles en Brie',lieu:'Maisoncelles en Brie',dateFrom:'2026-03-14',dateTo:'2026-03-15',saison:'2026',discipline:'classic',pratique:'paramotor',region:'Île-de-France'});
   S.compEnroll = S.compEnroll||{}; S.compEnroll[cid] = [];
@@ -11175,14 +11176,16 @@ async function pullFromCloud() {
     });
   }
 
-  // ── Nettoyage doublons staff (entrées sans .id ou avec même pilotId) ──
+  // ── Nettoyage doublons staff : clé composite nom+prénom+rôle (insensible à la casse) ──
   if (S.staff && typeof S.staff === 'object' && !Array.isArray(S.staff)) {
     Object.keys(S.staff).forEach(function(cid) {
-      var seen = {};
-      S.staff[cid] = (S.staff[cid]||[]).filter(function(s) {
-        var k = s.id || s.pilotId || ((s.prenom||'').toLowerCase()+'|'+(s.nom||'').toLowerCase());
-        if (seen[k]) return false; seen[k] = true; return true;
+      var best = {}; // clé → entrée la plus récente
+      (S.staff[cid]||[]).forEach(function(s) {
+        var k = s.pilotId
+          || ((s.prenom||'').trim().toLowerCase()+'|'+(s.nom||'').trim().toLowerCase()+'|'+(s.role||'').trim().toLowerCase());
+        if (!best[k] || (s._updatedAt||0) > (best[k]._updatedAt||0)) best[k] = s;
       });
+      S.staff[cid] = Object.keys(best).map(function(k){ return best[k]; });
     });
   }
 
@@ -17862,8 +17865,10 @@ function injectCalendrier2026() {
       region:'Occitanie', type:'entrainement', pratique:'paramoteur', discipline:'slalom',
       saison:'2026', desc:'Club : Terrain occasionnel · Référent : Pôle Sport · DC : Jean-Émile Oulha' }
   ];
+  var deleted = S._deletedComps || [];
   var added = 0;
   toAdd.forEach(function(cp) {
+    if (deleted.find(function(t){ return t.id === cp.id; })) return; // supprimée
     if (!S.comps.find(function(x){ return x.id === cp.id; })) {
       S.comps.push(cp);
       S.compEnroll = S.compEnroll || {};
@@ -17876,7 +17881,10 @@ function injectCalendrier2026() {
 
 function injectCalendrierFull() {
   S.comps = S.comps || []; S.compEnroll = S.compEnroll || {};
+  var _deletedIds = {};
+  (S._deletedComps||[]).forEach(function(t){ _deletedIds[t.id] = true; });
   function _add(cp) {
+    if (_deletedIds[cp.id]) return; // supprimée définitivement
     if (!S.comps.find(function(x){ return x.id === cp.id; })) {
       S.comps.push(cp);
       S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
