@@ -11209,6 +11209,25 @@ async function pullFromCloud() {
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
   // Merge profond pour budgets : {compId: {engagement:[...], ressources:[...]}}
   (function() {
+    function _mergeBgtLines(la, ra) {
+      // Union par id (si présent) ou par JSON (si pas d'id) — rien n'est perdu
+      la = Array.isArray(la) ? la : [];
+      ra = Array.isArray(ra) ? ra : [];
+      var byId = {}; var noId = [];
+      var seen = {};
+      ra.forEach(function(x) {
+        if (x && x.id) byId[x.id] = x;
+        else { var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); } }
+      });
+      la.forEach(function(x) {
+        if (x && x.id) {
+          if (!byId[x.id] || (x._updatedAt||0) > (byId[x.id]._updatedAt||0)) byId[x.id] = x;
+        } else {
+          var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); }
+        }
+      });
+      return Object.keys(byId).map(function(k){ return byId[k]; }).concat(noId);
+    }
     var lb = (S.budgets && typeof S.budgets==='object') ? S.budgets : {};
     var rb = (r.budgets && typeof r.budgets==='object') ? r.budgets : {};
     var res = {};
@@ -11220,8 +11239,8 @@ async function pullFromCloud() {
       if (!rv) { res[cid] = lv; return; }
       if (!lv) { res[cid] = rv; return; }
       res[cid] = {
-        engagement: _mergeById(Array.isArray(lv.engagement)?lv.engagement:[], Array.isArray(rv.engagement)?rv.engagement:[]),
-        ressources: _mergeById(Array.isArray(lv.ressources)?lv.ressources:[], Array.isArray(rv.ressources)?rv.ressources:[])
+        engagement: _mergeBgtLines(lv.engagement, rv.engagement),
+        ressources: _mergeBgtLines(lv.ressources, rv.ressources)
       };
     });
     S.budgets = res;
