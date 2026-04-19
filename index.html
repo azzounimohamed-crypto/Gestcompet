@@ -7668,12 +7668,12 @@ function savePartenaire() {
     var idx = S.partenaires[compId].findIndex(function(x){ return x.id===partId; });
     if (idx >= 0) {
       var existing = S.partenaires[compId][idx];
-      S.partenaires[compId][idx] = Object.assign({}, existing, {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition});
+      S.partenaires[compId][idx] = Object.assign({}, existing, {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()});
     }
   } else {
-    S.partenaires[compId].push({id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition});
+    S.partenaires[compId].push({id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,_updatedAt:Date.now()});
   }
-  saveState();
+  saveState(); silentPush();
   closePartenaireEdit();
   renderHomeDetailPanel(null);
   toast(partId ? 'Partenaire modifié ✓' : 'Partenaire ajouté ✓', 'ok');
@@ -7715,8 +7715,11 @@ function downloadPartenaireFile(compId, partId) {
 function deletePartenaire(compId, partId) {
   if (!confirm('Supprimer ce partenaire ?')) return;
   if (!S.partenaires || !S.partenaires[compId]) return;
+  if (!S._deletedPartenaires) S._deletedPartenaires = {};
+  if (!S._deletedPartenaires[compId]) S._deletedPartenaires[compId] = {};
+  S._deletedPartenaires[compId][partId] = Date.now();
   S.partenaires[compId] = S.partenaires[compId].filter(function(x){ return x.id!==partId; });
-  saveState();
+  saveState(); silentPush();
   if (window.innerWidth < 768) { renderMobileCompDetail(); } else { renderHomeDetailPanel(null); }
   toast('Partenaire supprimé', 'ok');
 }
@@ -11041,6 +11044,7 @@ async function pushToCloud() {
     _deletedStaff:        S._deletedStaff        || {},
     _deletedEnroll:       S._deletedEnroll       || {},
     _deletedBudgetLines:  S._deletedBudgetLines  || {},
+    _deletedPartenaires:  S._deletedPartenaires  || {},
     _pushAt:              Date.now()
   };
   var { error } = await sb.from('stol_shared').upsert(
@@ -11202,8 +11206,21 @@ function _cleanupAllDuplicates() {
     });
   }
 
-  // 6. Nettoyer staff/runs/materiel/partenaires des comps supprimées
-  ['runs','materiel','partenaires','evenements'].forEach(function(key) {
+  // 6. Partenaires : tombstones + dédup par id
+  if (S.partenaires && typeof S.partenaires === 'object') {
+    Object.keys(S.partenaires).forEach(function(cid) {
+      if (deletedCompIds[cid]) { delete S.partenaires[cid]; return; }
+      var tombs = (S._deletedPartenaires && S._deletedPartenaires[cid]) || {};
+      var seenPt = {};
+      S.partenaires[cid] = (S.partenaires[cid]||[]).filter(function(p) {
+        if (!p || !p.id || tombs[p.id] || seenPt[p.id]) return false;
+        seenPt[p.id] = true; return true;
+      });
+    });
+  }
+
+  // 7. Nettoyer runs/materiel/evenements des comps supprimées
+  ['runs','materiel','evenements'].forEach(function(key) {
     if (S[key] && typeof S[key] === 'object') {
       Object.keys(S[key]).forEach(function(cid) {
         if (deletedCompIds[cid]) delete S[key][cid];
@@ -11282,6 +11299,20 @@ async function pullFromCloud() {
     });
   });
 
+  // ── Tombstones partenaires (partenaires supprimés) ──
+  var rDP = (r._deletedPartenaires && typeof r._deletedPartenaires==='object') ? r._deletedPartenaires : {};
+  var lDP = (S._deletedPartenaires && typeof S._deletedPartenaires==='object') ? S._deletedPartenaires : {};
+  S._deletedPartenaires = {};
+  var allPartCids = Object.assign({}, lDP, rDP);
+  Object.keys(allPartCids).forEach(function(cid) {
+    S._deletedPartenaires[cid] = {};
+    var lK = lDP[cid]||{}; var rK = rDP[cid]||{};
+    Object.keys(lK).forEach(function(k){ S._deletedPartenaires[cid][k] = lK[k]; });
+    Object.keys(rK).forEach(function(k){
+      if (!S._deletedPartenaires[cid][k] || rK[k] > S._deletedPartenaires[cid][k]) S._deletedPartenaires[cid][k] = rK[k];
+    });
+  });
+
   // Sauvegarder les médias locaux (base64 — non stockés dans le JSON principal)
   var localUser     = S.user;
   var localAffiches = {};
@@ -11356,6 +11387,14 @@ async function pullFromCloud() {
     S.budgets = res;
   })();
   S.partenaires        = _mergeObjOfArrays(S.partenaires,        r.partenaires);
+  // Appliquer les tombstones partenaires
+  if (S._deletedPartenaires && S.partenaires) {
+    Object.keys(S.partenaires).forEach(function(cid) {
+      var tombs = (S._deletedPartenaires[cid]) || {};
+      if (Object.keys(tombs).length > 0)
+        S.partenaires[cid] = (S.partenaires[cid]||[]).filter(function(p){ return !tombs[p.id]; });
+    });
+  }
   S.officialDocs       = _mergeObjOfArrays(S.officialDocs,       r.officialDocs);
   S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
   // Objets scalaires simples
