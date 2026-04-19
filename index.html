@@ -6284,7 +6284,7 @@ function _staffResizeEnd() {
 }
 
 // ── Redimensionnement colonnes Équipage ───────────────────────────────────
-var _equipColWidths = [175, 68, 74, 100, 100, 60, 80, 110, 30]; // nom|lic|immat|marque|modele|cat|equip|region|btn
+var _equipColWidths = [40, 175, 68, 74, 100, 100, 60, 80, 110, 30]; // avatar|nom|lic|immat|marque|modele|cat|equip|region|btn
 var _equipResizing  = null;
 function _equipGetTpl() { return _equipColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _equipApplyTpl() {
@@ -6670,13 +6670,14 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _eqHdrs = ['Nom','Licence','Immat.','Marque','Modèle','Catégorie','Équipages','Région'];
     var _eqSort  = ['nom','','','','','categorie','',''];
     html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
+    html5 += '<div></div>'; // avatar col
     _eqHdrs.forEach(function(h, i) {
       var sortCol = _eqSort[i];
       var clickable = sortCol ? 'cursor:pointer;user-select:none;' : '';
       var click = sortCol ? ' onclick="_equipToggleSort(\''+sortCol+'\')"' : '';
       html5 += '<div style="'+_hSt+';position:relative;'+clickable+'"'+click+'>'
         + h + (sortCol ? '<span style="color:var(--stol)">'+_eqIco(sortCol)+'</span>' : '')
-        + '<div onmousedown="_equipResizeStart(event,'+i+')" style="'+_erh+'"><div style="'+_erl+'"></div></div>'
+        + '<div onmousedown="_equipResizeStart(event,'+(i+1)+')" style="'+_erh+'"><div style="'+_erl+'"></div></div>'
         + '</div>';
     });
     html5 += '<div></div>';
@@ -6687,6 +6688,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Ligne de saisie (desktop uniquement)
     if (!_isMobEquip) {
     html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;align-items:center;'+_rowInpSt+'">';
+    html5 += '<div></div>'; // avatar placeholder
     html5 += '<div style="position:relative">';
     html5 += '<input id="hdg-c-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
     html5 += '<div id="hdg-sug-c" style="display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
@@ -6753,7 +6755,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html5 += '</div>';
       } else {
         // Desktop grid layout
-        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:6px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        var _avCol2 = catColMap[catVal]||'#6b7280';
+        var _ini2   = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase()||'?';
+        var _photo2 = p.photo||'';
+        html5 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:'+_avCol2+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid '+_avCol2+'">';
+        html5 += _photo2 ? '<img src="'+_photo2+'" style="width:100%;height:100%;object-fit:cover">' : _ini2;
+        html5 += '</div>';
         html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
         html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
         html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
