@@ -2514,7 +2514,7 @@ var S = {
   docSettings: {
     signataire: { prenom: 'Mohamed', nom: 'AZZOUNI', titre: 'Directeur Technique National', organisation: 'Fédération Française ULM', ville: 'Maisons-Alfort' },
     signatureImage: null,
-    police: 'Times New Roman,Times,serif',
+    police: 'Arial,Helvetica,sans-serif',
     orgBlock: { nom: "Fédération Française d'ULM", adresse: '96 bis rue Marc Sangnier', cp: '94700', ville: 'Maisons-Alfort', tel: '01 49 81 74 43', email: 'ffplum@ffplum.org', www: 'www.ffplum.fr', accent: '#c0392b' },
     templates: []
   }
@@ -9617,7 +9617,8 @@ function _openA4Doc(contentHtml, title, opts) {
 
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+(title||'Document')+'</title><style>');
   win.document.write('*{box-sizing:border-box;margin:0;padding:0}');
-  win.document.write('body{background:#606060;font-family:\'Times New Roman\',Times,serif;color:#111}');
+  var _docPolice = ((S.docSettings||{}).police)||'Arial,Helvetica,sans-serif';
+  win.document.write('body{background:#606060;font-family:'+_docPolice+';color:#111}');
   win.document.write('.toolbar{background:#1e293b;color:#f1f5f9;padding:10px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.5)}');
   win.document.write('.tb-hint{font-size:11px;color:#94a3b8;flex:1;line-height:1.4}');
   win.document.write('.tb-hint strong{color:#cbd5e1}');
@@ -10383,7 +10384,8 @@ function _updatePrintDocPreview() {
   var pilot = _printDocPilot;
   if (!tpl || !pilot) { prev.innerHTML = ''; return; }
   var ev = _getPrintDocExtraVars();
-  prev.innerHTML = '<div style="font-family:\'Times New Roman\',Times,serif;color:#111;background:#fff;border-radius:4px;padding:12px 16px;font-size:11px;line-height:1.6;transform:scale(0.82);transform-origin:top left;width:122%">'
+  var _prevPolice = ((S.docSettings||{}).police)||'Arial,Helvetica,sans-serif';
+  prev.innerHTML = '<div style="font-family:'+_prevPolice+';color:#111;background:#fff;border-radius:4px;padding:12px 16px;font-size:11px;line-height:1.6;transform:scale(0.82);transform-origin:top left;width:122%">'
     + _renderDocumentFromTemplate(tpl, pilot, ev) + '</div>';
 }
 
@@ -10732,87 +10734,64 @@ function renderStaffList() {
       return [(p.prenom||''),(p.nom||''),(p.role||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(sq2) !== -1;
     });
   }
-  if (!groups.length && !_globalStaffPilots.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+ (_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' : 'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong> pour créer un membre') +'</div>';
+  // ── Liste plate : tous les encadrants + membres globaux, triés par nom ──
+  var allRows = [];
+  // Encadrants par compétition
+  groups.forEach(function(g) {
+    g.entries.forEach(function(s, origIdx) {
+      var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
+      allRows.push({ s:s, compId:g.compId, origIdx:origIdx, pilot:pilot, isGlobal:false });
+    });
+  });
+  // Membres staff globaux
+  _globalStaffPilots.forEach(function(p) {
+    allRows.push({ s:p, compId:null, origIdx:-1, pilot:p, isGlobal:true });
+  });
+  // Filtre recherche déjà appliqué sur groups et _globalStaffPilots
+  if (!allRows.length) {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+(_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' : 'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong> pour créer un membre')+'</div>';
     return;
   }
+  // Tri global par nom
+  allRows.sort(function(a, b) {
+    var na = ((a.pilot.nom||a.s.nom||'')+(a.pilot.prenom||a.s.prenom||'')).toLowerCase();
+    var nb = ((b.pilot.nom||b.s.nom||'')+(b.pilot.prenom||b.s.prenom||'')).toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  });
   var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
   var html = '';
-  // Bloc "Membres" (staff global non assigné)
-  if (_globalStaffPilots.length) {
-    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">Membres staff</div>';
-    html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">Non assignés à une compétition spécifique</div>';
+  allRows.forEach(function(row) {
+    var s      = row.s;
+    var pilot  = row.pilot;
+    var prenom = pilot.prenom || s.prenom || '';
+    var nom    = pilot.nom    || s.nom    || '';
+    var photo  = pilot.photo  || s.photo  || '';
+    var tel    = pilot.tel    || s.tel    || '';
+    var email  = pilot.email  || s.email  || '';
+    var lic    = pilot.licence || s.licence || '';
+    var role   = s.role || pilot.role || '';
+    var ini    = ((prenom[0]||'').toUpperCase()+(nom[0]||'').toUpperCase()) || '?';
+    var clickH = row.isGlobal ? '' : 'onclick="showStaffDetailModal(\''+row.compId+'\','+row.origIdx+')"';
+    html += '<div '+clickH+' style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);'+(row.isGlobal?'':'cursor:pointer')+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
+    if (photo) {
+      html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+ini+'</div>\'">';
+    } else {
+      html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+ini+'</div>';
+    }
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:13px;font-weight:700">'+(prenom+' '+nom).trim()+'</div>';
+    if (role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+role+'</div>';
+    var dets=[];
+    if (lic)   dets.push('Lic. '+lic);
+    if (tel)   dets.push('📞 '+tel);
+    if (email) dets.push('✉️ '+email);
+    if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
     html += '</div>';
-    _globalStaffPilots.slice().sort(function(a,b){
-      var na=((a.nom||'')+(a.prenom||'')).toLowerCase();
-      var nb=((b.nom||'')+(b.prenom||'')).toLowerCase();
-      return na<nb?-1:na>nb?1:0;
-    }).forEach(function(p) {
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr)">';
-      if (p.photo) {
-        html += '<img src="'+p.photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">';
-      } else {
-        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((p.prenom||'?')[0]).toUpperCase()+'</div>';
-      }
-      html += '<div style="flex:1;min-width:0">';
-      html += '<div style="font-size:13px;font-weight:700">'+((p.prenom||'')+' '+(p.nom||'')).trim()+'</div>';
-      if (p.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+p.role+'</div>';
-      var dets=[]; if(p.licence) dets.push('Lic. '+p.licence); if(p.tel) dets.push('📞 '+p.tel); if(p.email) dets.push('✉️ '+p.email);
-      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
-      html += '</div>';
-      html += '</div>';
-    });
-  }
-  groups.forEach(function(g) {
-    var comp = g.comp;
-    var compName = comp ? comp.name : 'Compétition inconnue';
-    var compDate = comp ? formatDate(comp.dateFrom) + (comp.dateTo && comp.dateTo !== comp.dateFrom ? ' — ' + formatDate(comp.dateTo) : '') : '';
-    // Tri des encadrants par nom dans chaque groupe
-    var sortedEntries = g.entries.slice().sort(function(a, b) {
-      var pa = (S.pilots||[]).find(function(p){ return p.id===(a.pilotId||a.id); })||{};
-      var pb = (S.pilots||[]).find(function(p){ return p.id===(b.pilotId||b.id); })||{};
-      var na = ((pa.nom||a.nom||'')+(pa.prenom||a.prenom||'')).toLowerCase();
-      var nb = ((pb.nom||b.nom||'')+(pb.prenom||b.prenom||'')).toLowerCase();
-      return na < nb ? -1 : na > nb ? 1 : 0;
-    });
-    // En-tête compétition
-    html += '<div style="padding:10px 0 5px;margin-top:8px;border-bottom:2px solid var(--stol)">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--stol)">' + compName + '</div>';
-    if (compDate) html += '<div style="font-size:11px;color:var(--txt3);margin-top:1px">' + compDate + '</div>';
+    if (canEdit && !row.isGlobal) {
+      html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+row.compId+'\','+row.origIdx+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Supprimer">×</button>';
+    }
+    if (!row.isGlobal) html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
     html += '</div>';
-    sortedEntries.forEach(function(s, si) {
-      var origIdx = g.entries.indexOf(s);
-      var pilot  = (S.pilots||[]).find(function(p){ return p.id === (s.pilotId||s.id); }) || {};
-      var prenom = pilot.prenom || s.prenom || '';
-      var nom    = pilot.nom    || s.nom    || '';
-      var photo  = pilot.photo  || s.photo  || '';
-      var tel    = pilot.tel    || s.tel    || '';
-      var email  = pilot.email  || s.email  || '';
-      var lic    = pilot.licence || s.licence || '';
-      html += '<div onclick="showStaffDetailModal(\''+g.compId+'\','+origIdx+')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);cursor:pointer" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
-      // Avatar
-      if (photo) {
-        html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+((prenom[0]||'?').toUpperCase())+'</div>\'">';
-      } else {
-        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+((prenom[0]||'?').toUpperCase())+'</div>';
-      }
-      // Infos
-      html += '<div style="flex:1;min-width:0">';
-      html += '<div style="font-size:13px;font-weight:700">'+(prenom+' '+nom).trim()+'</div>';
-      if (s.role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+s.role+'</div>';
-      var dets=[];
-      if (lic)   dets.push('Lic. '+lic);
-      if (tel)   dets.push('📞 '+tel);
-      if (email) dets.push('✉️ '+email);
-      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
-      html += '</div>';
-      if (canEdit) {
-        html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+g.compId+'\','+origIdx+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Supprimer">×</button>';
-      }
-      html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
-      html += '</div>';
-    });
   });
   cont.innerHTML = html;
 }
