@@ -11209,18 +11209,20 @@ async function pullFromCloud() {
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
   // Merge profond pour budgets : {compId: {engagement:[...], ressources:[...]}}
   (function() {
-    function _mergeBgtLines(la, ra) {
-      // Union par id (si présent) ou par JSON (si pas d'id) — rien n'est perdu
+    function _mergeBgtLines(la, ra, tombs) {
+      // Union par id — les tombstones filtrent les lignes supprimées
+      tombs = tombs || {};
       la = Array.isArray(la) ? la : [];
       ra = Array.isArray(ra) ? ra : [];
       var byId = {}; var noId = [];
       var seen = {};
       ra.forEach(function(x) {
-        if (x && x.id) byId[x.id] = x;
+        if (x && x.id) { if (!tombs[x.id]) byId[x.id] = x; }
         else { var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); } }
       });
       la.forEach(function(x) {
         if (x && x.id) {
+          if (tombs[x.id]) return;
           if (!byId[x.id] || (x._updatedAt||0) >= (byId[x.id]._updatedAt||0)) byId[x.id] = x;
         } else {
           var k = JSON.stringify(x); if (!seen[k]) { seen[k]=1; noId.push(x); }
@@ -11236,11 +11238,12 @@ async function pullFromCloud() {
     Object.keys(rb).forEach(function(k){ cids[k]=1; });
     Object.keys(cids).forEach(function(cid) {
       var lv = lb[cid]; var rv = rb[cid];
+      var dbl = (S._deletedBudgetLines && S._deletedBudgetLines[cid]) ? S._deletedBudgetLines[cid] : {};
       if (!rv) { res[cid] = lv; return; }
       if (!lv) { res[cid] = rv; return; }
       res[cid] = {
-        engagement: _mergeBgtLines(lv.engagement, rv.engagement),
-        ressources: _mergeBgtLines(lv.ressources, rv.ressources)
+        engagement: _mergeBgtLines(lv.engagement, rv.engagement, dbl.engagement||{}),
+        ressources: _mergeBgtLines(lv.ressources, rv.ressources, dbl.ressources||{})
       };
     });
     S.budgets = res;
@@ -16736,7 +16739,7 @@ function removeBudgetLine(compId, section, lineId) {
   if (!S._deletedBudgetLines[compId][section]) S._deletedBudgetLines[compId][section] = {};
   S._deletedBudgetLines[compId][section][lineId] = Date.now();
   S.budgets[compId][section] = S.budgets[compId][section].filter(function(l){ return l.id !== lineId; });
-  saveState();
+  saveState(); silentPush();
   _budgetSubTab = section;
   _refreshBudgetView();
 }
