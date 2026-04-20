@@ -6314,6 +6314,39 @@ function _equipResizeEnd() {
   document.body.style.cursor = document.body.style.userSelect = '';
 }
 
+// ── Redimensionnement colonnes Budget ────────────────────────────────────
+var _BGT_LS_KEY = 'gestappli_bgtColWidths';
+var _bgtColWidths = (function(){
+  try { var s = localStorage.getItem(_BGT_LS_KEY); if (s) { var p = JSON.parse(s); if (Array.isArray(p) && p.length === 8) return p; } } catch(e) {}
+  return [130, 170, 64, 52, 52, 80, 30, 28]; // domaine|libelle|valeur|jours|qt|cout|detail|del
+})();
+var _bgtResizing = null;
+function _bgtGetTpl() { return _bgtColWidths.map(function(w){ return w+'px'; }).join(' '); }
+function _bgtApplyTpl() {
+  var tpl = _bgtGetTpl();
+  document.querySelectorAll('[data-bgt-row]').forEach(function(el){ el.style.gridTemplateColumns = tpl; });
+}
+function _bgtResizeStart(e, idx) {
+  e.preventDefault(); e.stopPropagation();
+  _bgtResizing = {idx:idx, x0:e.clientX, w0:_bgtColWidths[idx]};
+  document.addEventListener('mousemove', _bgtResizeMove);
+  document.addEventListener('mouseup',   _bgtResizeEnd);
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+function _bgtResizeMove(e) {
+  if (!_bgtResizing) return;
+  _bgtColWidths[_bgtResizing.idx] = Math.max(36, _bgtResizing.w0 + e.clientX - _bgtResizing.x0);
+  _bgtApplyTpl();
+}
+function _bgtResizeEnd() {
+  _bgtResizing = null;
+  document.removeEventListener('mousemove', _bgtResizeMove);
+  document.removeEventListener('mouseup',   _bgtResizeEnd);
+  document.body.style.cursor = document.body.style.userSelect = '';
+  try { localStorage.setItem(_BGT_LS_KEY, JSON.stringify(_bgtColWidths)); } catch(e) {}
+}
+
 // ── Tri Équipage ──────────────────────────────────────────────────────────
 var _equipSortCol = ''; var _equipSortDir = 1;
 function _equipToggleSort(col) {
@@ -7355,7 +7388,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Coût = Valeur × Nb jours × Qt
     var computeCout = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var calcTotal = function(lines){ return lines.reduce(function(s,l){ return s+computeCout(l); }, 0); };
-    var BGRID = 'grid-template-columns:minmax(80px,1fr) minmax(100px,1.4fr) 64px 52px 52px 72px 30px 28px';
+    var BGRID = 'grid-template-columns:'+_bgtGetTpl();
     var cpIdS2 = cp.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     var isMobBgt = window.innerWidth < 768;
 
@@ -7469,17 +7502,19 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var nInpInt  = 'type="number" min="1" step="1"';
       var calcEvt  = function(lid){ return 'recalcBudgetCout(\''+cp.id+'\',\''+section+'\',\''+lid+'\')'; };
       // ── En-tête colonnes ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:min(540px,100%);flex-shrink:0">';
-      htmlB += '<div style="'+hStyle+'">Domaine</div>';
-      htmlB += '<div style="'+hStyle+'">Libellé</div>';
-      htmlB += '<div style="'+hStyle+';text-align:right">Valeur</div>';
-      htmlB += '<div style="'+hStyle+';text-align:center">Jours</div>';
-      htmlB += '<div style="'+hStyle+';text-align:center">Qt</div>';
-      htmlB += '<div style="'+hStyle+';text-align:right;color:'+secColor+'">Coût €</div>';
+      var _bRH = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
+      var _bRL = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
+      htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:min(540px,100%);flex-shrink:0">';
+      htmlB += '<div style="'+hStyle+';position:relative">Domaine<div onmousedown="_bgtResizeStart(event,0)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';position:relative">Libellé<div onmousedown="_bgtResizeStart(event,1)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:right;position:relative">Valeur<div onmousedown="_bgtResizeStart(event,2)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Jours<div onmousedown="_bgtResizeStart(event,3)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Qt<div onmousedown="_bgtResizeStart(event,4)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:right;color:'+secColor+';position:relative">Coût €<div onmousedown="_bgtResizeStart(event,5)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
       htmlB += '<div></div><div></div>';
       htmlB += '</div>';
       // ── Ligne de saisie (même système que Staff/Equipage) ──
-      htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:min(540px,100%);position:relative">';
+      htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:5px 6px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center;min-width:min(540px,100%);position:relative">';
       htmlB += '<div style="position:relative">';
       htmlB += '<input id="bgt-inp-dom-'+section+'" placeholder="Domaine…" autocomplete="off" style="'+iStyle+';border-color:var(--stol)" oninput="bgtShowDomSug(\''+cp.id+'\',\''+section+'\')" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'bgt-dom-drop-'+section+'\');if(d)d.style.display=\'none\'},150)">';
       htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
@@ -7506,7 +7541,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           var isOpen   = !!_bgtOpenDomains[domKey];
           var chevron  = isOpen ? '▾' : '▸';
           // Ligne récapitulative du groupe
-          htmlB += '<div onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:min(540px,100%);background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
+          htmlB += '<div data-bgt-row onclick="toggleBgtDomain(\''+domKey+'\')" style="display:grid;'+BGRID+';gap:4px;padding:6px 8px;align-items:center;min-width:min(540px,100%);background:var(--navy3);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none" onmouseover="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseout="this.style.background=\'var(--navy3)\'">';
           htmlB += '<div style="font-size:12px;font-weight:800;color:var(--stol);display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-size:11px">'+chevron+'</span>'+bEsc(dom)+'</div>';
           htmlB += '<div style="font-size:11px;color:var(--txt3);font-style:italic">'+grpLines.length+' ligne'+(grpLines.length>1?'s':'')+'</div>';
           htmlB += '<div></div><div></div><div></div>';
@@ -7518,7 +7553,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
             grpLines.forEach(function(l, i){
               var bg = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
               var coutCalc = computeCout(l);
-              htmlB += '<div style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:min(540px,100%);border-bottom:1px solid rgba(255,255,255,0.04)">';
+              htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:min(540px,100%);border-bottom:1px solid rgba(255,255,255,0.04)">';
               htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
               htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
