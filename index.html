@@ -1065,6 +1065,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <button class="btn btn-secondary btn-full btn-sm" style="margin-bottom:8px" onclick="openLink('https://ffplum.fr/images/Sport/2025/REGLEMENT_STOL_FFPLUM_30-3-2025.pdf')">📄 Règlement STOL FFPLUM 2025</button>
           <button class="btn btn-secondary btn-full btn-sm" onclick="openLink('https://ffplum-sport-hub.base44.app/Calendrier')">📅 Calendrier FFPLUM Sport Hub</button>
         </div>
+        <div class="section-title">Ordre de Mission</div>
+        <div class="card" style="margin-bottom:4px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">Modèle d'ordre de mission de référence (PDF). Disponible dans l'onglet <strong>Encadrants</strong> pour envoi par email.</div>
+          <div id="regl-odm-container"></div>
+          <input type="file" id="regl-odm-inp" accept="application/pdf,.pdf" style="display:none" onchange="loadOdmPdf(this)">
+        </div>
         <div class="section-title">Données locales</div>
         <div class="card">
           <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
@@ -5989,35 +5995,46 @@ async function hdgRemoveStaff(compId, idx) {
 }
 
 // ── Ordre de Mission PDF ──────────────────────────────────────────────────
-function loadOdmPdf(compId, input) {
+function renderReglagesOdmSection() {
+  var c = document.getElementById('regl-odm-container');
+  if (!c) return;
+  var odm = S.odmPdfRef;
+  if (odm && odm.data) {
+    c.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;border:1px solid var(--stol)">'
+      + '<span style="font-size:20px">📄</span>'
+      + '<span style="flex:1;font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escH(odm.name||'ODM.pdf') + '</span>'
+      + '<button onclick="removeOdmPdf()" class="btn btn-secondary btn-sm" style="flex-shrink:0;color:#ef4444;font-size:11px">Supprimer</button>'
+      + '</div>';
+  } else {
+    c.innerHTML = '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="document.getElementById(\'regl-odm-inp\').click()">📂 Charger l\'ODM PDF</button>';
+  }
+}
+function loadOdmPdf(input) {
   var file = input.files && input.files[0];
   if (!file) return;
   if (file.type && file.type !== 'application/pdf') { toast('Fichier PDF requis',''); return; }
   var reader = new FileReader();
   reader.onload = function(e) {
-    if (!S.odmPdf) S.odmPdf = {};
-    S.odmPdf[compId] = { data: e.target.result, name: file.name };
+    S.odmPdfRef = { data: e.target.result, name: file.name };
     saveState(); silentPush();
-    renderHomeDetailPanel(null);
+    renderReglagesOdmSection();
     toast('ODM chargé ✓','ok');
   };
   reader.readAsDataURL(file);
 }
-function removeOdmPdf(compId) {
-  if (!S.odmPdf) return;
-  delete S.odmPdf[compId];
+function removeOdmPdf() {
+  delete S.odmPdfRef;
   saveState(); silentPush();
-  renderHomeDetailPanel(null);
+  renderReglagesOdmSection();
   toast('ODM supprimé','');
 }
 function sendOdmToStaff(compId, staffOrigIdx) {
-  var odm = S.odmPdf && S.odmPdf[compId];
-  if (!odm || !odm.data) { toast('Aucun ODM déposé pour cette compétition',''); return; }
+  var odm = S.odmPdfRef;
+  if (!odm || !odm.data) { toast('Aucun ODM — déposez-le dans Gestion → Réglages',''); return; }
   var staffArr = S.staff && S.staff[compId];
   var s = staffArr && staffArr[staffOrigIdx];
   var pilot = s ? (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{} : {};
   var emailAddr = (pilot.email || (s && s.email) || '').trim();
-  // Convertir base64 → Blob
   var b64 = odm.data.split(',')[1] || '';
   var bStr = atob(b64);
   var ab = new ArrayBuffer(bStr.length);
@@ -6026,12 +6043,10 @@ function sendOdmToStaff(compId, staffOrigIdx) {
   var blob = new Blob([ab], {type:'application/pdf'});
   var fname = odm.name || 'ordre-de-mission.pdf';
   var file = new File([blob], fname, {type:'application/pdf'});
-  // Web Share API (mobile / navigateurs compatibles)
   if (navigator.canShare && navigator.canShare({files:[file]})) {
     navigator.share({ files:[file], title:'Ordre de Mission' }).catch(function(){});
     return;
   }
-  // Fallback : téléchargement + ouverture mailto
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = fname; a.click();
@@ -6752,17 +6767,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<button onclick="hdgExportEquipageExcel(\''+cid+'\')" title="Exporter l\'équipage en Excel" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📗 Export Excel</button>';
     html5 += '<label title="Importer un équipage depuis Excel" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">📂 Import Excel<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="hdgImportEquipageExcel(this,\''+cid+'\')"></label>';
     html5 += '<button onclick="hdgPrintEquipage(\''+cid+'\')" title="Imprimer la liste de l\'équipage" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">🖨 Imprimer</button>';
-    // ── ODM ──
-    html5 += '<div style="width:1px;height:18px;background:var(--bdr);flex-shrink:0"></div>';
-    var _odmEntry = S.odmPdf && S.odmPdf[cp.id];
-    if (_odmEntry) {
-      html5 += '<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;border:1px solid var(--stol);background:rgba(0,87,255,.08)">';
-      html5 += '<span style="font-size:11px;color:var(--stol);font-weight:700;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="'+escG(_odmEntry.name||'')+'">📄 '+escG(_odmEntry.name||'ODM.pdf')+'</span>';
-      html5 += '<button onclick="removeOdmPdf(\''+cid+'\')" title="Supprimer l\'ODM" style="width:18px;height:18px;border-radius:50%;border:none;background:rgba(239,68,68,.15);color:#ef4444;font-size:12px;font-weight:900;cursor:pointer;font-family:inherit;line-height:1;padding:0;flex-shrink:0">×</button>';
-      html5 += '</div>';
-    } else {
-      html5 += '<label title="Déposer l\'ordre de mission PDF" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--stol);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📄 ODM PDF<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="loadOdmPdf(\''+cid+'\',this)"></label>';
-    }
     html5 += '</div>';
     }
     // ── En-tête fixe (desktop uniquement) ──
@@ -7246,7 +7250,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(tel2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(email2||'—')+'</div>';
         html3 += '<div style="display:flex;align-items:center;justify-content:center;gap:4px">';
-        if (S.odmPdf && S.odmPdf[cp.id]) {
+        if (S.odmPdfRef && S.odmPdfRef.data) {
           html3 += '<button onclick="event.stopPropagation();sendOdmToStaff(\''+cidS+'\','+si+')" style="width:30px;height:28px;border-radius:6px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:10px;font-weight:800;cursor:pointer;font-family:inherit" title="Envoyer l\'ODM par email">ODM</button>';
         }
         html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Supprimer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
@@ -9093,7 +9097,7 @@ function switchSettingsTab(tab, btn) {
       }).catch(function(){});
     }
   }
-  if (tab === 'reglages') { applyTheme(localStorage.getItem('geststol_theme') || 'auto'); renderReglagesLogoSection(); updateNotifButtons(); }
+  if (tab === 'reglages') { applyTheme(localStorage.getItem('geststol_theme') || 'auto'); renderReglagesLogoSection(); renderReglagesOdmSection(); updateNotifButtons(); }
 }
 
 function renderSettingsCompte() {
