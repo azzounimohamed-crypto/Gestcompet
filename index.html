@@ -340,11 +340,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     border-right:1px solid var(--bdr);
     overflow:visible;
     flex-shrink:0;
-    position:relative;
-    transition:padding-left .2s ease;
-    box-sizing:border-box;
   }
-  body.panel-open #app{padding-left:300px}
 
   /* ── Header ── */
   #header{grid-column:1;grid-row:1;height:70px;padding:0 24px;justify-content:space-between}
@@ -384,11 +380,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
   /* ═══ PAGE ACCUEIL : détail pleine largeur + tiroir compétitions ═══ */
   #page-home.active{display:block!important;position:relative;height:calc(100vh - 108px);overflow:visible}
-  /* ── Panneau ancré gauche pleine hauteur (Documents & À faire) ── */
+  /* ── Panneau gauche pleine hauteur (Documents & À faire) ── */
   #home-col-left,#home-todo-panel{
-    position:absolute;left:0;top:0;
+    position:fixed;
+    left:var(--panel-app-left,0px);
+    top:108px;
     z-index:260;width:300px;
-    height:100%;
+    height:calc(100vh - 108px);
     border:none;border-right:1px solid var(--bdr);
     background:var(--navy2);
     box-shadow:4px 0 28px rgba(0,0,0,.38);
@@ -406,6 +404,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-col-left > *,#home-todo-panel > *{flex-shrink:0}
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
+  /* Décalage uniquement de la zone contenu (#main, row 3) */
+  #main{transition:padding-left .2s ease}
+  body.panel-open #main{padding-left:300px}
   #home-side-rail{
     position:absolute;left:-44px;top:120px;z-index:26;
     width:36px;display:flex;flex-direction:column;gap:8px;
@@ -2908,6 +2909,8 @@ function warmupSecondaryPages() {
 
 function showPage(id) {
   if (_curPage === id && _pageRendered[id]) return;
+  /* Retirer le décalage panel si on quitte la page home */
+  if (id !== 'page-home') document.body.classList.remove('panel-open');
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var el = document.getElementById(id);
   if (el) el.classList.add('active');
@@ -5371,6 +5374,15 @@ function _syncPanelOpen() {
   var backdrop = document.getElementById('home-comp-drawer-backdrop');
   if (backdrop) backdrop.classList.toggle('open', anyOpen);
 }
+
+/* ── Panneau gauche : alignement sur #app ── */
+function _updatePanelAppLeft() {
+  var appEl = document.getElementById('app');
+  var left = appEl ? Math.round(appEl.getBoundingClientRect().left) : 0;
+  document.documentElement.style.setProperty('--panel-app-left', left + 'px');
+}
+_updatePanelAppLeft();
+window.addEventListener('resize', _updatePanelAppLeft);
 
 /* ── Panneau flottant : drag & drop + mémorisation position ── */
 var _pdrag = { active:false, el:null, key:null, ox:0, oy:0 };
