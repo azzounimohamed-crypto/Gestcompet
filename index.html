@@ -340,7 +340,11 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     border-right:1px solid var(--bdr);
     overflow:visible;
     flex-shrink:0;
+    position:relative;
+    transition:padding-left .2s ease;
+    box-sizing:border-box;
   }
+  body.panel-open #app{padding-left:300px}
 
   /* ── Header ── */
   #header{grid-column:1;grid-row:1;height:70px;padding:0 24px;justify-content:space-between}
@@ -382,37 +386,31 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #page-home.active{display:block!important;position:relative;height:calc(100vh - 108px);overflow:visible}
   /* ── Panneau ancré gauche pleine hauteur (Documents & À faire) ── */
   #home-col-left,#home-todo-panel{
-    position:fixed;left:0;top:0;
-    z-index:260;width:300px;max-width:min(300px,90vw);
-    height:100vh;
+    position:absolute;left:0;top:0;
+    z-index:260;width:300px;
+    height:100%;
     border:none;border-right:1px solid var(--bdr);
     background:var(--navy2);
     box-shadow:4px 0 28px rgba(0,0,0,.38);
     border-radius:0;
     display:flex;flex-direction:column;
     opacity:0;visibility:hidden;pointer-events:none;
-    transition:opacity .2s ease,visibility 0s linear .2s,transform .2s ease;
-    transform:translateX(-100%);
+    transition:opacity .2s ease,visibility 0s linear .2s;
     overflow:hidden;
   }
   #home-col-left.open,#home-todo-panel.open{
     opacity:1;visibility:visible;pointer-events:auto;
-    transform:translateX(0);
-    transition:opacity .2s ease,visibility 0s,transform .2s ease;
+    transition:opacity .2s ease,visibility 0s;
   }
   /* Scrollable body inside */
   #home-col-left > *,#home-todo-panel > *{flex-shrink:0}
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
-  /* Décalage du bloc central quand panneau ouvert */
-  #page-home{transition:padding-left .2s ease}
-  body.panel-open #page-home{padding-left:300px}
   #home-side-rail{
     position:absolute;left:-44px;top:120px;z-index:26;
     width:36px;display:flex;flex-direction:column;gap:8px;
-    transition:left .2s ease;
   }
-  body.panel-open #home-side-rail{left:260px}
+  body.panel-open #home-side-rail{display:none}
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
     display:flex;align-items:center;justify-content:center;
@@ -5394,16 +5392,18 @@ function _panelDragStart(e, elId, key) {
 
 document.addEventListener('mousemove', function(e){
   if (!_pdrag.active || !_pdrag.el) return;
-  var x = e.clientX - _pdrag.ox;
-  var w = _pdrag.el.offsetWidth  || 300;
-  x = Math.max(0, Math.min(window.innerWidth  - w, x));
-  /* Le panneau reste pleine hauteur — seule la position X change */
+  var appEl = document.getElementById('app');
+  var appLeft = appEl ? appEl.getBoundingClientRect().left : 0;
+  var appW   = appEl ? appEl.offsetWidth : window.innerWidth;
+  var w = _pdrag.el.offsetWidth || 300;
+  /* Calcul en coordonnées #app */
+  var x = (e.clientX - _pdrag.ox) - appLeft;
+  x = Math.max(0, Math.min(appW - w, x));
   _pdrag.el.style.left = x + 'px';
   _pdrag.el.style.top  = '0';
   _pdrag.el.style.right  = 'auto';
   _pdrag.el.style.bottom = 'auto';
-  /* Décalage contenu selon position du panneau */
-  document.body.classList.toggle('panel-open', x < window.innerWidth / 2);
+  document.body.classList.toggle('panel-open', x < appW / 2);
   _panelPos[_pdrag.key] = {x:x, y:0};
 });
 
