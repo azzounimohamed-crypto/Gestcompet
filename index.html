@@ -6688,11 +6688,37 @@ function _equipResizeEnd() {
 // ── Redimensionnement colonnes Budget ────────────────────────────────────
 var _BGT_LS_KEY = 'gestappli_bgtColWidths';
 var _bgtColWidths = (function(){
-  try { var s = localStorage.getItem(_BGT_LS_KEY); if (s) { var p = JSON.parse(s); if (Array.isArray(p) && p.length === 8) return p; } } catch(e) {}
-  return [130, 170, 64, 52, 52, 80, 30, 28]; // domaine|libelle|valeur|jours|qt|cout|detail|del
+  try { var s = localStorage.getItem(_BGT_LS_KEY); if (s) { var p = JSON.parse(s); if (Array.isArray(p) && p.length === 9) return p; } } catch(e) {}
+  return [120, 160, 130, 60, 48, 48, 78, 28, 26]; // domaine|libelle|nomlié|valeur|jours|qt|cout|detail|del
 })();
 var _bgtResizing = null;
 function _bgtGetTpl() { return _bgtColWidths.map(function(w){ return w+'px'; }).join(' '); }
+
+function _bgtNomLieDatalist(compId) {
+  /* Collecte les noms des compétiteurs, encadrants et représentants partenaires */
+  var names = [];
+  // Compétiteurs inscrits
+  var enrolled = (S.compEnroll||{})[compId] || [];
+  enrolled.forEach(function(pid){
+    var p = (S.pilots||[]).find(function(x){ return x.id===pid; });
+    if (p) { var n = ((p.prenom||'')+' '+(p.nom||'')).trim(); if (n) names.push(n); }
+  });
+  // Encadrants
+  var staffArr = Array.isArray(S.staff) ? S.staff.filter(function(x){ return x&&x.compId===compId; }) : ((S.staff||{})[compId]||[]);
+  staffArr.forEach(function(s){
+    var n = ((s.prenom||'')+' '+(s.nom||'')).trim(); if (n) names.push(n);
+  });
+  // Partenaires (représentant)
+  var parts = (S.partenaires||{})[compId] || [];
+  parts.forEach(function(p){ var n = (p.representant||'').trim(); if (n) names.push(n); });
+  // Dédoublonner
+  var seen = {}; names = names.filter(function(n){ if (seen[n]) return false; seen[n]=1; return true; });
+  var dlId = 'bgt-nomlie-dl-'+compId.replace(/[^a-z0-9]/gi,'_');
+  var html = '<datalist id="'+dlId+'">';
+  names.forEach(function(n){ html += '<option value="'+n.replace(/"/g,'&quot;')+'">'; });
+  html += '</datalist>';
+  return {id: dlId, html: html};
+}
 function _bgtApplyTpl() {
   var tpl = _bgtGetTpl();
   document.querySelectorAll('[data-bgt-row]').forEach(function(el){ el.style.gridTemplateColumns = tpl; });
@@ -7815,6 +7841,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
                 htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
                 htmlB += '<div style="flex:1;min-width:0">';
                 htmlB += '<div style="font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+bEsc(l.libelle||'—')+'</div>';
+                if (l.nomLie) htmlB += '<div style="font-size:12px;color:#818cf8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👤 '+bEsc(l.nomLie)+'</div>';
                 htmlB += '<div style="font-size:12px;color:var(--txt3);margin-top:3px">';
                 if ((l.valeur||0)>0) htmlB += bEsc(String(l.valeur))+'€';
                 if ((l.nbjours||1)>1) htmlB += ' × '+bEsc(String(l.nbjours))+'j';
@@ -7880,13 +7907,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       // ── En-tête colonnes ──
       var _bRH = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
       var _bRL = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
+      var _dl = _bgtNomLieDatalist(cp.id);
+      htmlB += _dl.html;
       htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:min(540px,100%);flex-shrink:0">';
       htmlB += '<div style="'+hStyle+';position:relative">Domaine<div onmousedown="_bgtResizeStart(event,0)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
       htmlB += '<div style="'+hStyle+';position:relative">Libellé<div onmousedown="_bgtResizeStart(event,1)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
-      htmlB += '<div style="'+hStyle+';text-align:right;position:relative">Valeur<div onmousedown="_bgtResizeStart(event,2)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
-      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Jours<div onmousedown="_bgtResizeStart(event,3)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
-      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Qt<div onmousedown="_bgtResizeStart(event,4)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
-      htmlB += '<div style="'+hStyle+';text-align:right;color:'+secColor+';position:relative">Coût €<div onmousedown="_bgtResizeStart(event,5)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';position:relative;color:var(--stol)">Nom lié<div onmousedown="_bgtResizeStart(event,2)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:right;position:relative">Valeur<div onmousedown="_bgtResizeStart(event,3)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Jours<div onmousedown="_bgtResizeStart(event,4)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:center;position:relative">Qt<div onmousedown="_bgtResizeStart(event,5)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
+      htmlB += '<div style="'+hStyle+';text-align:right;color:'+secColor+';position:relative">Coût €<div onmousedown="_bgtResizeStart(event,6)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
       htmlB += '<div></div><div></div>';
       htmlB += '</div>';
       // ── Ligne de saisie (même système que Staff/Equipage) ──
@@ -7896,6 +7926,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<div id="bgt-dom-drop-'+section+'" style="display:none;position:absolute;top:100%;left:0;min-width:180px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:180px;overflow-y:auto"></div>';
       htmlB += '</div>';
       htmlB += '<input id="bgt-inp-lib-'+section+'" placeholder="Libellé…" style="'+iStyle+'" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')">';
+      htmlB += '<input id="bgt-inp-nom-'+section+'" list="'+_dl.id+'" placeholder="Nom lié…" autocomplete="off" style="'+iStyle+';border-color:rgba(99,102,241,.5)" onkeydown="if(event.key===\'Enter\')bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')">';
       htmlB += '<div></div><div></div><div></div><div></div><div></div>';
       htmlB += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" style="'+addBtnSt+'" title="Ajouter">+</button></div>';
       htmlB += '</div>';
@@ -7932,6 +7963,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
               htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:min(540px,100%);border-bottom:1px solid rgba(255,255,255,0.04)">';
               htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
               htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
+              htmlB += '<input id="bl-nom-'+l.id+'" list="'+_dl.id+'" autocomplete="off" style="'+iStyle+';font-size:11px;border-color:rgba(99,102,241,.4)" value="'+((l.nomLie||'').replace(/"/g,'&quot;'))+'" placeholder="Nom lié…" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nomLie\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
               htmlB += '<input id="bl-nbj-'+l.id+'" '+nInpInt+' style="'+iStyle+';text-align:center;font-size:11px" value="'+(l.nbjours||1)+'" placeholder="1" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nbjours\',this.value);'+calcEvt(l.id)+'">';
               htmlB += '<input id="bl-qt-'+l.id+'" '+nInpInt+' style="'+iStyle+';text-align:center;font-size:11px" value="'+(l.qt||1)+'" placeholder="1" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'qt\',this.value);'+calcEvt(l.id)+'">';
@@ -17682,14 +17714,17 @@ function bgtAddLineFromRow(compId, section) {
   if (!S.budgets || !S.budgets[compId]) return;
   var domEl = document.getElementById('bgt-inp-dom-'+section);
   var libEl = document.getElementById('bgt-inp-lib-'+section);
+  var nomEl = document.getElementById('bgt-inp-nom-'+section);
   var dom   = domEl ? domEl.value.trim() : '';
   var lib   = libEl ? libEl.value.trim() : '';
+  var nom   = nomEl ? nomEl.value.trim() : '';
   if (!dom && !lib) { toast('Saisissez un domaine ou un libellé', ''); return; }
-  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() };
+  var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, nomLie:nom, valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() };
   S.budgets[compId][section].push(newLine);
   saveState(); silentPush();
   if (domEl) { domEl.value=''; }
   if (libEl) { libEl.value=''; }
+  if (nomEl) { nomEl.value=''; }
   var isNDF = dom.toUpperCase() === 'NDF';
   _budgetSubTab = section;
   _refreshBudgetView();
