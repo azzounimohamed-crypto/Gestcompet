@@ -11,6 +11,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900&display=swap" rel="stylesheet">
@@ -379,32 +380,39 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
   /* ═══ PAGE ACCUEIL : détail pleine largeur + tiroir compétitions ═══ */
   #page-home.active{display:block!important;position:relative;height:calc(100vh - 108px);overflow:visible}
-  /* ── Panneau flottant déplaçable (Documents & À faire) ── */
+  /* ── Panneau ancré gauche pleine hauteur (Documents & À faire) ── */
   #home-col-left,#home-todo-panel{
-    position:fixed;left:20px;top:120px;
+    position:fixed;left:0;top:0;
     z-index:260;width:300px;max-width:min(300px,90vw);
-    max-height:calc(100vh - 140px);
-    border:1px solid var(--bdr);
+    height:100vh;
+    border:none;border-right:1px solid var(--bdr);
     background:var(--navy2);
-    box-shadow:0 8px 40px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.3);
-    border-radius:14px;
+    box-shadow:4px 0 28px rgba(0,0,0,.38);
+    border-radius:0;
     display:flex;flex-direction:column;
     opacity:0;visibility:hidden;pointer-events:none;
-    transition:opacity .18s ease,visibility 0s linear .18s;
+    transition:opacity .2s ease,visibility 0s linear .2s,transform .2s ease;
+    transform:translateX(-100%);
     overflow:hidden;
   }
   #home-col-left.open,#home-todo-panel.open{
     opacity:1;visibility:visible;pointer-events:auto;
-    transition:opacity .18s ease,visibility 0s;
+    transform:translateX(0);
+    transition:opacity .2s ease,visibility 0s,transform .2s ease;
   }
   /* Scrollable body inside */
   #home-col-left > *,#home-todo-panel > *{flex-shrink:0}
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
+  /* Décalage du contenu principal quand panneau ouvert */
+  #home-detail-panel{transition:margin-left .2s ease}
+  #page-home.panel-open #home-detail-panel{margin-left:300px}
   #home-side-rail{
     position:absolute;left:-44px;top:120px;z-index:26;
-    width:36px;display:flex;flex-direction:column;gap:8px
+    width:36px;display:flex;flex-direction:column;gap:8px;
+    transition:left .2s ease,top .2s ease;
   }
+  #page-home.panel-open #home-side-rail{left:260px;top:50%}
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
     display:flex;align-items:center;justify-content:center;
@@ -5387,16 +5395,17 @@ function _panelDragStart(e, elId, key) {
 document.addEventListener('mousemove', function(e){
   if (!_pdrag.active || !_pdrag.el) return;
   var x = e.clientX - _pdrag.ox;
-  var y = e.clientY - _pdrag.oy;
   var w = _pdrag.el.offsetWidth  || 300;
-  var h = _pdrag.el.offsetHeight || 400;
   x = Math.max(0, Math.min(window.innerWidth  - w, x));
-  y = Math.max(0, Math.min(window.innerHeight - 60, y));
+  /* Le panneau reste pleine hauteur — seule la position X change */
   _pdrag.el.style.left = x + 'px';
-  _pdrag.el.style.top  = y + 'px';
+  _pdrag.el.style.top  = '0';
   _pdrag.el.style.right  = 'auto';
   _pdrag.el.style.bottom = 'auto';
-  _panelPos[_pdrag.key] = {x:x, y:y};
+  /* Décalage contenu selon position du panneau */
+  var ph = document.getElementById('page-home');
+  if (ph) ph.classList.toggle('panel-open', x < window.innerWidth / 2);
+  _panelPos[_pdrag.key] = {x:x, y:0};
 });
 
 document.addEventListener('mouseup', function(){
@@ -5428,12 +5437,13 @@ function toggleHomeCompDrawer(forceOpen) {
   var drawer = document.getElementById('home-col-left');
   var todoPanel = document.getElementById('home-todo-panel');
   var btn = document.getElementById('home-open-comps-btn');
+  var ph = document.getElementById('page-home');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeCompDrawerOpen;
   _homeTodoPanelOpen = false;
   if (todoPanel) todoPanel.classList.remove('open');
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
-  if (next) _applyPanelPos('home-col-left', 'docPanel', 20, 120);
+  if (ph) ph.classList.toggle('panel-open', next);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
@@ -5448,12 +5458,13 @@ function toggleHomeTodoPanel(forceOpen) {
   var todoPanel = document.getElementById('home-todo-panel');
   var drawer = document.getElementById('home-col-left');
   var btn = document.getElementById('home-open-todo-btn');
+  var ph = document.getElementById('page-home');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeTodoPanelOpen;
   _homeCompDrawerOpen = false;
   if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
-  if (next) _applyPanelPos('home-todo-panel', 'todoPanel', 20, 120);
+  if (ph) ph.classList.toggle('panel-open', next);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
@@ -11811,8 +11822,13 @@ async function sbSync() {
     var errMsg = e.message || 'erreur réseau';
     if (syncBtn) syncBtn.textContent = '⚠️';
     var isTimeout  = errMsg.indexOf('timeout') !== -1 || errMsg.indexOf('canceling') !== -1 || errMsg.indexOf('statement') !== -1;
-    var isOffline  = errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1;
-    if (isOffline) {
+    var isCORS     = errMsg.indexOf('NetworkError') !== -1 || errMsg.indexOf('Failed to fetch') !== -1 || errMsg.indexOf('CORS') !== -1;
+    var isOffline  = !isCORS && (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1);
+    if (isCORS) {
+      // 522 Cloudflare / projet Supabase en pause → erreur CORS trompeuse
+      toast('⚠️ Serveur cloud indisponible (projet Supabase peut-être en pause). Données locales conservées. Vérifiez supabase.com.', 'warn');
+      setTimeout(function(){ silentPush(); }, 60000);
+    } else if (isOffline) {
       toast('Hors ligne — données locales conservées', 'warn');
     } else if (isTimeout) {
       toast('⚠️ Sync lente (timeout) — données locales ok, réessai auto…', 'warn');
@@ -12070,8 +12086,11 @@ function _cleanupAllDuplicates() {
 // ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
 async function pullFromCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
-  var { data, error } = await sb.from('stol_shared')
-    .select('data,updated_at').eq('id','global').single();
+  var result = await _withTimeout(
+    sb.from('stol_shared').select('data,updated_at').eq('id','global').single(),
+    12000
+  );
+  var data = result.data, error = result.error;
 
   if (error) {
     if (error.code === 'PGRST116') { await pushToCloud(); return; } // cloud vide → initialiser
