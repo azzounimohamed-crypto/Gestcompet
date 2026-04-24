@@ -2804,11 +2804,11 @@ var _toastT = null;
 function toast(msg, type) {
   var el = document.getElementById('toast');
   el.textContent = msg;
-  el.style.background = type === 'ok' ? 'rgba(34,197,94,.9)' : type === 'err' ? 'rgba(239,68,68,.9)' : 'var(--navy3)';
-  el.style.color = type === 'ok' || type === 'err' ? '#fff' : 'var(--txt)';
+  el.style.background = type === 'ok' ? 'rgba(34,197,94,.9)' : type === 'err' ? 'rgba(239,68,68,.9)' : type === 'warn' ? 'rgba(234,179,8,.92)' : 'var(--navy3)';
+  el.style.color = (type === 'ok' || type === 'err' || type === 'warn') ? '#fff' : 'var(--txt)';
   el.style.opacity = '1';
   clearTimeout(_toastT);
-  _toastT = setTimeout(function(){ el.style.opacity = '0'; }, type === 'err' ? 6000 : 2800);
+  _toastT = setTimeout(function(){ el.style.opacity = '0'; }, type === 'err' ? 6000 : type === 'warn' ? 5000 : 2800);
 }
 
 // ═══════════════════════════════════
@@ -11809,16 +11809,30 @@ async function sbSync() {
   } catch(e) {
     console.error('[GestSTOL] sbSync échouée:', e);
     var errMsg = e.message || 'erreur réseau';
-    if (syncBtn) syncBtn.textContent = '✗';
-    // Détecter si c'est une erreur réseau (Supabase injoignable)
-    if (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1) {
-      toast('Hors ligne ou Supabase injoignable — données locales conservées', 'err');
+    if (syncBtn) syncBtn.textContent = '⚠️';
+    var isTimeout  = errMsg.indexOf('timeout') !== -1 || errMsg.indexOf('canceling') !== -1 || errMsg.indexOf('statement') !== -1;
+    var isOffline  = errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('réseau') !== -1;
+    if (isOffline) {
+      toast('Hors ligne — données locales conservées', 'warn');
+    } else if (isTimeout) {
+      toast('⚠️ Sync lente (timeout) — données locales ok, réessai auto…', 'warn');
+      // Réessai silencieux après 30s
+      setTimeout(function(){ silentPush(); }, 30000);
     } else {
       toast('Sync échouée : ' + errMsg, 'err');
     }
   } finally {
     _syncInProgress = false;
   }
+}
+
+// ── Helper timeout ────────────────────────────────────
+function _withTimeout(promise, ms) {
+  var timer;
+  var tout = new Promise(function(_, reject){
+    timer = setTimeout(function(){ reject(new Error('timeout_'+ms)); }, ms);
+  });
+  return Promise.race([promise, tout]).finally(function(){ clearTimeout(timer); });
 }
 
 // ── PUSH : envoyer TOUT vers le cloud ─────────────────
@@ -11851,11 +11865,22 @@ async function pushToCloud() {
     partenaireTypes:      S.partenaireTypes       || null,
     _pushAt:              Date.now()
   };
-  var { error } = await sb.from('stol_shared').upsert(
-    { id: 'global', data: payload, updated_at: new Date().toISOString() },
-    { onConflict: 'id' }
-  );
-  if (error) throw new Error(error.message);
+  // Essai avec timeout 14s — retry automatique x2 si timeout Supabase
+  var lastErr;
+  for (var _try = 0; _try < 3; _try++) {
+    if (_try > 0) await new Promise(function(r){ setTimeout(r, 2500 * _try); });
+    try {
+      var res = await _withTimeout(
+        sb.from('stol_shared').upsert(
+          { id: 'global', data: payload, updated_at: new Date().toISOString() },
+          { onConflict: 'id' }
+        ), 14000
+      );
+      if (res.error) { lastErr = new Error(res.error.message); continue; }
+      lastErr = null; break;
+    } catch(e) { lastErr = e; }
+  }
+  if (lastErr) throw lastErr;
   S._lastPushAt = payload._pushAt;
   // Médias séparément (base64 volumineux)
   await _pushMedias(sb);
