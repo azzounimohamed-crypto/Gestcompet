@@ -598,6 +598,14 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- BANNIÈRE STATUT SAUVEGARDE ENCADREMENT/ÉQUIPAGE -->
+<div id="hdp-save-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:800;padding:10px 16px;background:linear-gradient(135deg,#1e3a5f,#0f2d4a);border-top:2px solid #f59e0b;box-shadow:0 -4px 24px rgba(0,0,0,.45);align-items:center;gap:10px;flex-wrap:wrap">
+  <span id="hdp-save-msg" style="flex:1;font-size:13px;font-weight:600;color:#fcd34d;min-width:200px">⏳ Enregistrement dans le cloud…</span>
+  <button id="hdp-save-btn" onclick="hdpForceSave()" style="display:none;padding:8px 20px;border-radius:9px;border:none;background:#ef4444;color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap">
+    🔄 Réessayer
+  </button>
+</div>
+
 <!-- BOUTON PLEIN ÉCRAN FLOTTANT -->
 <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein écran"
   style="position:fixed;bottom:90px;right:14px;z-index:490;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(20,24,40,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:rgba(255,255,255,.65);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.3);transition:opacity .2s,background .2s;padding:0"
@@ -5884,7 +5892,7 @@ function saveMoyen(moyenId) {
     obj.id = 'moy_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     S.moyens.push(obj);
   }
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   document.getElementById('_moyen-edit-overlay').remove();
   renderMoyens();
   if (_curPage === 'page-moyens') renderMoyensPage();
@@ -5896,7 +5904,7 @@ function deleteMoyen(moyenId) {
   if (!confirm('Supprimer cette fiche moyen ?')) return;
   // Supprimer depuis S.moyens (global)
   if (S.moyens) S.moyens = S.moyens.filter(function(x){ return x.id!==moyenId; });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   document.getElementById('_moyen-edit-overlay').remove();
   renderMoyens();
   if (_curPage === 'page-moyens') renderMoyensPage();
@@ -6998,6 +7006,69 @@ function deleteHDPMsgNotif(msgId) {
 var _gestionSubTab = 'competiteurs';
 function switchGestionTab(subTab) { _gestionSubTab = subTab; renderHomeDetailPanel(null); }
 
+// ─── Dirty flag — modifications Encadrement / Équipage en attente de sauvegarde cloud ───
+// ─── Sauvegarde cloud Encadrement / Équipage ─────────────────────────────────
+// _hdpDirty = true : un push a échoué → auto-sync bloqué jusqu'à réussite
+var _hdpDirty = false;
+
+function _renderHdpSaveBanner(state) {
+  var banner = document.getElementById('hdp-save-banner');
+  if (!banner) return;
+  var msgEl = document.getElementById('hdp-save-msg');
+  var btnEl = document.getElementById('hdp-save-btn');
+  if (state === 'saving') {
+    if (msgEl) msgEl.innerHTML = '⏳ Enregistrement dans le cloud…';
+    if (btnEl) { btnEl.style.display = 'none'; }
+    banner.style.background = 'linear-gradient(135deg,#1e3a5f,#0f2d4a)';
+    banner.style.borderTopColor = '#f59e0b';
+    banner.style.display = 'flex';
+  } else if (state === 'ok') {
+    _hdpDirty = false;
+    if (msgEl) msgEl.innerHTML = '✅ Enregistré dans le cloud';
+    if (btnEl) { btnEl.style.display = 'none'; }
+    banner.style.background = 'linear-gradient(135deg,#052e16,#14532d)';
+    banner.style.borderTopColor = '#22c55e';
+    banner.style.display = 'flex';
+    setTimeout(function(){ banner.style.display = 'none'; banner.style.background=''; banner.style.borderTopColor=''; }, 2500);
+  } else if (state === 'err') {
+    _hdpDirty = true;   // bloque l'auto-sync pull
+    if (msgEl) msgEl.innerHTML = '❌ Échec réseau — données conservées localement';
+    if (btnEl) { btnEl.style.display = 'flex'; btnEl.disabled = false; btnEl.innerHTML = '🔄 Réessayer'; }
+    banner.style.background = 'linear-gradient(135deg,#450a0a,#7f1d1d)';
+    banner.style.borderTopColor = '#ef4444';
+    banner.style.display = 'flex';
+  }
+}
+
+// Appelé après chaque saveState() dans Encadrement/Équipage
+async function _hdpSaveNow() {
+  _renderHdpSaveBanner('saving');
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now();
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+    _renderHdpSaveBanner('ok');
+  } catch(e) {
+    console.error('[HDP] push cloud échoué', e);
+    _renderHdpSaveBanner('err');
+  }
+}
+
+// Bouton "Réessayer" dans la bannière d'erreur
+async function hdpForceSave() {
+  _renderHdpSaveBanner('saving');
+  try {
+    await pushToCloud();
+    _lastSyncAt = Date.now();
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+    _hdpDirty = false;
+    _renderHdpSaveBanner('ok');
+  } catch(e) {
+    console.error('[HDP] réessai échoué', e);
+    _renderHdpSaveBanner('err');
+  }
+}
+
 function _hdgFilter(val) {
   var v = val.toLowerCase();
   return (S.pilots||[]).filter(function(p){
@@ -7059,7 +7130,8 @@ function hdgAddComp(compId) {
   if (!S.compEnroll[compId]) S.compEnroll[compId]=[];
   if (S.compEnroll[compId].indexOf(pilot.id)>=0) { toast('Déjà inscrit', ''); return; }
   S.compEnroll[compId].push(pilot.id);
-  saveState(); silentPush();
+  saveState();                  // ← localStorage + IDB immédiatement
+  _hdpSaveNow();                // ← push cloud immédiat + bannière statut
   ['hdg-c-nom','hdg-c-lic','hdg-c-immat','hdg-c-marque','hdg-c-modele','hdg-c-aile','hdg-c-places'].forEach(function(id){
     var el=document.getElementById(id); if(el){el.value='';if(el.dataset)el.dataset.pid='';}
   });
@@ -7072,7 +7144,8 @@ function hdgRemoveComp(compId, pilotId) {
   if (!S._deletedEnroll[compId]) S._deletedEnroll[compId] = {};
   S._deletedEnroll[compId][pilotId] = Date.now();
   S.compEnroll[compId]=S.compEnroll[compId].filter(function(id){return id!==pilotId;});
-  saveState(); silentPush();
+  saveState();                  // ← localStorage + IDB immédiatement
+  _hdpSaveNow();                // ← push cloud immédiat + bannière statut
   if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
     renderMobileCompDetail();
   } else {
@@ -7519,11 +7592,25 @@ function hdgAddStaff(compId) {
     role:g('hdg-s-role'), licence:g('hdg-s-lic')||(pilot?pilot.licence||'':''),
     tel:g('hdg-s-tel')||(pilot?pilot.tel||'':''), email:g('hdg-s-email')||(pilot?pilot.email||'':'')
   };
+  // ── Auto-enregistrement dans S.pilots si personne inconnue ──
+  if (!pilot) {
+    if (!S.pilots) S.pilots = [];
+    var newPilot = {
+      id: 'stf_' + Date.now().toString(36) + Math.random().toString(36).substr(2,5),
+      prenom: entry.prenom, nom: entry.nom,
+      role: entry.role, licence: entry.licence,
+      tel: entry.tel, email: entry.email,
+      statut: 'invite', _createdAt: Date.now()
+    };
+    S.pilots.push(newPilot);
+    entry.pilotId = newPilot.id;
+  }
   // Forcer S.staff en objet (peut être un tableau dans les anciennes données)
   if (!S.staff || Array.isArray(S.staff)) S.staff={};
   if (!S.staff[compId]) S.staff[compId]=[];
   S.staff[compId].push(entry);
-  saveState(); silentPush();
+  saveState();                  // ← localStorage + IDB immédiatement
+  _hdpSaveNow();                // ← push cloud immédiat + bannière statut
   ['hdg-s-nom','hdg-s-role','hdg-s-lic','hdg-s-tel','hdg-s-email'].forEach(function(id){
     var el=document.getElementById(id); if(el){el.value='';if(el.dataset)el.dataset.pid='';}
   });
@@ -7546,7 +7633,8 @@ async function hdgRemoveStaff(compId, idx) {
     S._deletedStaff[compId][_k] = Date.now();
   }
   S.staff[compId].splice(idx,1);
-  saveState();
+  saveState();                  // ← localStorage + IDB immédiatement
+  _hdpSaveNow();                // ← push cloud immédiat + bannière statut
   // Rendu immédiat — l'utilisateur voit la suppression sans attendre le réseau
   var ov = document.getElementById('overlay-comp-mobile');
   if (window.innerWidth < 768 && ov && ov.style.display !== 'none') {
@@ -7556,12 +7644,6 @@ async function hdgRemoveStaff(compId, idx) {
   }
   toast('Encadrant retiré','');
   if (document.getElementById('staff-list')) renderStaffList();
-  // Push en arrière-plan
-  try {
-    await pushToCloud();
-    _lastSyncAt = Date.now();
-    if (typeof updateSyncTime === 'function') updateSyncTime();
-  } catch(e) {}
 }
 
 // ── Ordre de Mission PDF ──────────────────────────────────────────────────
@@ -9745,7 +9827,7 @@ function savePartenaire() {
     S.partenaires[compId].push(newPart);
   }
   _syncPartDoc(compId, savedId);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   closePartenaireEdit();
   renderHomeDetailPanel(null);
   if (_homeCompDrawerOpen) renderHomeResultsDrawer();
@@ -9821,7 +9903,7 @@ function deletePartenaire(compId, partId) {
   if (!S._deletedDocuments) S._deletedDocuments = {};
   S._deletedDocuments[_docId] = Date.now();
   S.documents = (S.documents||[]).filter(function(d){ return d.id !== _docId; });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   if (window.innerWidth < 768) { renderMobileCompDetail(); } else { renderHomeDetailPanel(null); }
   toast('Partenaire supprimé', 'ok');
 }
@@ -12559,13 +12641,15 @@ function saveNewStaffMember() {
     prenom: prenom, nom: nom,
     licence: g('nsm-licence'), tel: g('nsm-tel'),
     email: g('nsm-email'), club: g('nsm-club'),
-    statut: 'staff', role: g('nsm-role')
+    statut: 'invite', role: g('nsm-role'),
+    _createdAt: Date.now()
   };
   S.pilots.push(newPilot);
-  saveState(); silentPush();
+  saveState();
+  _hdpSaveNow();                // ← push cloud immédiat + bannière statut
   document.getElementById('new-staff-modal').remove();
   renderStaffList();
-  toast(prenom+' '+nom+' ajouté ✓', 'ok');
+  toast(prenom+' '+nom+' ajouté — pensez à enregistrer dans le cloud ✓', 'ok');
 }
 
 function renderSitesSportifs() {
@@ -14098,6 +14182,11 @@ function startAutoSync() {
         var remoteTs = new Date(file.updated_at).getTime();
         // Si le fichier Storage est plus récent que notre dernière synchro, on tire les données
         if (remoteTs > _lastSyncAt + 5000) { // 5s de marge pour éviter les boucles push/pull
+          // ⛔ Si des modifications locales n'ont pas encore été sauvegardées, ne pas écraser
+          if (_hdpDirty) {
+            console.warn('[AutoSync] pull ignoré — modifications locales en attente (_hdpDirty)');
+            return;
+          }
           _autoSyncFails = 0;
           pullFromCloud().then(function(){
             _lastSyncAt = Date.now();
@@ -14120,7 +14209,7 @@ function startAutoSync() {
             .then(function(res2){
               if (!res2.data) return;
               var remoteTs2 = new Date(res2.data.updated_at).getTime();
-              if (remoteTs2 > _lastSyncAt + 5000) {
+              if (remoteTs2 > _lastSyncAt + 5000 && !_hdpDirty) {
                 pullFromCloud().then(function(){
                   _lastSyncAt = Date.now();
                   renderHome(); renderCompetitions(); renderPilots(); updateHeader(); updateSyncTime();
@@ -18264,7 +18353,7 @@ function addMateriel(compId) {
   if (!nom && !cat) return;
   S.materiel[compId].push({ id:'mat-'+Date.now(), categorie:cat, materiel:nom, quantite:parseFloat(qte)||1, lieuAcces:lieu, marque:'', modele:'', photo:'' });
   ['mat-inp-cat','mat-inp-nom','mat-inp-qte','mat-inp-lieu'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  saveState(); silentPush(); renderHomeDetailPanel(null);
+  saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
 }
 
 function deleteMateriel(compId, matId) {
@@ -18272,7 +18361,7 @@ function deleteMateriel(compId, matId) {
   if (S.materiel && S.materiel[compId]) {
     S.materiel[compId] = S.materiel[compId].filter(function(m){ return m.id !== matId; });
   }
-  saveState(); silentPush(); renderHomeDetailPanel(null);
+  saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
 }
 
 function openMaterielModal(compId, matId) {
@@ -18331,7 +18420,7 @@ function saveMaterielSheet() {
   m.marque    = g('mat-modal-marque');
   m.modele    = g('mat-modal-modele');
   // photo handled by mat-modal-file-input
-  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeMaterielModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Matériel enregistré ✓','ok');
 }
 
@@ -18342,7 +18431,7 @@ function deleteMaterielFromModal() {
   if (S.materiel && S.materiel[compId]) {
     S.materiel[compId] = S.materiel[compId].filter(function(m){ return m.id !== matId; });
   }
-  closeMaterielModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeMaterielModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Matériel supprimé','');
 }
 
@@ -18376,7 +18465,7 @@ function hdgAddEvenement(compId) {
   if (!nom && !circ && !imm) return;
   S.evenements[compId].push({ id:'evt-'+Date.now(), typeIncident:type, nom:nom, date:date, horaire:'', immatriculation:imm, circonstance:circ, commentaires:'' });
   ['evt-inp-nom','evt-inp-date','evt-inp-immat','evt-inp-circ'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  saveState(); silentPush(); renderHomeDetailPanel(null);
+  saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
 }
 
 function openEvenementModal(compId, evtId) {
@@ -18437,7 +18526,7 @@ function saveEvenementSheet() {
   ev.immatriculation = g('evt-modal-immat');
   ev.circonstance  = g('evt-modal-circ');
   ev.commentaires  = g('evt-modal-comm');
-  closeEvenementModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeEvenementModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Événement enregistré ✓','ok');
 }
 
@@ -18448,7 +18537,7 @@ function deleteEvenementFromModal() {
   if (S.evenements && S.evenements[compId]) {
     S.evenements[compId] = S.evenements[compId].filter(function(x){ return x.id !== evtId; });
   }
-  closeEvenementModal(); saveState(); silentPush(); renderHomeDetailPanel(null);
+  closeEvenementModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Événement supprimé','');
 }
 
@@ -20022,7 +20111,7 @@ function addBudgetLine(compId, section) {
   if (!S.budgets) S.budgets = {};
   if (!S.budgets[compId]) S.budgets[compId] = {engagement:[], ressources:[]};
   S.budgets[compId][section].push({id:'bl-'+Date.now(), domaine:'', libelle:'', valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now()});
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _budgetSubTab = section;
   _refreshBudgetView();
 }
@@ -20033,7 +20122,7 @@ function removeBudgetLine(compId, section, lineId) {
   if (!S._deletedBudgetLines[compId][section]) S._deletedBudgetLines[compId][section] = {};
   S._deletedBudgetLines[compId][section][lineId] = Date.now();
   S.budgets[compId][section] = S.budgets[compId][section].filter(function(l){ return l.id !== lineId; });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _budgetSubTab = section;
   _refreshBudgetView();
 }
@@ -20144,7 +20233,7 @@ function bgtAddSheetSave(compId, section) {
   var domKey = (compId+'_'+section+'_'+(dom||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
   _bgtOpenDomains[domKey] = true;
   S.budgets[compId][section].push(newLine);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   closeBgtAddSheet();
   _budgetSubTab = section;
   _refreshBudgetView();
@@ -20364,7 +20453,7 @@ function saveCrewFromSheet(compId) {
   var pid = _crewSheetSelectedId;
   if (pid) {
     if (S.compEnroll[compId].indexOf(pid)===-1) S.compEnroll[compId].push(pid);
-    saveState(); silentPush();
+    saveState(); _hdpSaveNow();
     _crewSheetSelectedId = null;
     _closeSheet('crew-add'); renderMobileCompDetail(); toast('Compétiteur inscrit ✓','ok');
     return;
@@ -20384,7 +20473,7 @@ function saveCrewFromSheet(compId) {
   if (!S.ulms) S.ulms = {};
   S.ulms[newPilot.id] = [{ id:'u-'+Date.now(), places: equi==='Biplace'?2:1, equi: equi }];
   S.compEnroll[compId].push(newPilot.id);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _closeSheet('crew-add'); renderMobileCompDetail(); toast('Compétiteur créé et inscrit ✓','ok');
 }
 
@@ -20424,7 +20513,7 @@ function saveEvtFromSheet(compId) {
     commentaires: (document.getElementById('eas-comm')||{}).value||'',
     _updatedAt: Date.now()
   });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _closeSheet('evt-add'); renderMobileCompDetail(); toast('Événement enregistré ✓','ok');
 }
 
@@ -21083,7 +21172,7 @@ function saveBudgetDetailModal() {
     if (qtEl)  line.qt      = parseInt(qtEl.value)    || 1;
     delete line.ndf;
   }
-  saveState();
+  saveState(); _hdpSaveNow();
   closeBudgetDetailModal();
   _budgetSubTab = _bdmSection;
   _refreshBudgetView();
