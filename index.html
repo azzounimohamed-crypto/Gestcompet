@@ -958,7 +958,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <!-- Recherche -->
         <div style="flex:1;display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;min-width:0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="pilots-search" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" onkeydown="if(event.key==='Enter'){_pilotsSearch=this.value.trim();renderPilots();this.blur()}" oninput="if(!this.value){_pilotsSearch='';renderPilots();document.getElementById('pilots-search-clear').style.display='none';}else{document.getElementById('pilots-search-clear').style.display='flex';}">
+          <input id="pilots-search" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" onkeydown="if(event.key==='Enter'){_pilotsSearch=this.value.trim();renderPilots();this.blur()}" oninput="if(!this.value){_pilotsSearch='';document.getElementById('pilots-search-clear').style.display='none';clearTimeout(_debPilotsT);_debPilotsT=setTimeout(renderPilots,180);}else{document.getElementById('pilots-search-clear').style.display='flex';}">
           <button id="pilots-search-clear" onclick="document.getElementById('pilots-search').value='';_pilotsSearch='';renderPilots();this.style.display='none'" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--txt3);flex-shrink:0;line-height:1;font-size:16px">✕</button>
         </div>
         <!-- Bouton Export compétiteurs -->
@@ -2811,8 +2811,16 @@ function _stripBigData(obj) {
   delete o.licenceDB; // licenceDB est sauvegardé uniquement dans IndexedDB (trop volumineux pour localStorage)
   return o;
 }
+// saveState avec debounce 80ms pour ne pas bloquer l'UI sur chaque action
+var _saveStateTimer = null;
 function saveState() {
-  // 1. Toujours sauvegarder COMPLET dans IndexedDB (pas de limite de taille)
+  // Annule l'écriture précédente si elle n'a pas encore eu lieu
+  if (_saveStateTimer) clearTimeout(_saveStateTimer);
+  _saveStateTimer = setTimeout(_flushSaveState, 80);
+}
+function _flushSaveState() {
+  _saveStateTimer = null;
+  // 1. IndexedDB (async, non-bloquant)
   var fullJson = JSON.stringify(S);
   saveToIDB(fullJson);
   // 2. localStorage : version allégée sans base64
@@ -2826,6 +2834,8 @@ function saveState() {
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
+// Flush immédiat avant fermeture de page pour éviter toute perte de données
+window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
 
 // ── IndexedDB — sauvegarde redondante ──
 var _idb = null;
@@ -3473,6 +3483,7 @@ function updateSeasonFilter() {
 }
 
 var _debRenderT = null;
+var _debPilotsT = null;
 function _debRender() { clearTimeout(_debRenderT); _debRenderT = setTimeout(renderCompetitions, 180); }
 
 function renderCompetitions() {
@@ -5676,8 +5687,13 @@ function openMoyenEdit(moyenId, compId) {
   ov = document.createElement('div');
   ov.id = '_moyen-edit-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
-  var cats = ['Communication','Informatique','Chronométrage','Sécurité','Signalisation','Sonorisation','Transport','Hébergement','Logistique','Outillage','Autre'];
-  var catOpts = cats.map(function(c){ return '<option value="'+c+'"'+(m.categorie===c?' selected':'')+'>'+c+'</option>'; }).join('');
+  // Catégories prédéfinies + catégories personnalisées déjà utilisées
+  var catsDefault = ['Communication','Informatique','Chronométrage','Sécurité','Signalisation','Sonorisation','Transport','Hébergement','Logistique','Outillage','Autre'];
+  var catsCustom = [];
+  (S.moyens||[]).forEach(function(x){ if(x.categorie && catsDefault.indexOf(x.categorie)===-1 && catsCustom.indexOf(x.categorie)===-1) catsCustom.push(x.categorie); });
+  Object.values(S.materiel||{}).forEach(function(arr){ (arr||[]).forEach(function(x){ if(x.categorie && catsDefault.indexOf(x.categorie)===-1 && catsCustom.indexOf(x.categorie)===-1) catsCustom.push(x.categorie); }); });
+  var cats = catsDefault.concat(catsCustom.sort());
+  var catDlOpts = cats.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
   var etats = ['','Neuf','Bon','Usé','HS'];
   var etatOpts = etats.map(function(e){ return '<option value="'+e+'"'+(m.etat===e?' selected':'')+'>'+e+'</option>'; }).join('');
   var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
@@ -5687,7 +5703,7 @@ function openMoyenEdit(moyenId, compId) {
     + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">' + (moyenId?'Modifier':'Créer') + ' une fiche moyen</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
     + '<div style="grid-column:1/-1"><label style="'+lSt+'">Nom *</label><input id="moy-nom" value="'+(m.nom||m.materiel||'')+'" placeholder="Ex: Balise GPS" style="'+iSt+'"></div>'
-    + '<div><label style="'+lSt+'">Catégorie</label><select id="moy-cat" style="'+iSt+'"><option value="">—</option>'+catOpts+'</select></div>'
+    + '<div><label style="'+lSt+'">Catégorie <span style="font-weight:400;opacity:.6">(ou tapez la vôtre)</span></label><input id="moy-cat" list="moy-cat-dl" value="'+(m.categorie||'')+'" placeholder="Choisir ou créer…" style="'+iSt+'"><datalist id="moy-cat-dl">'+catDlOpts+'</datalist></div>'
     + '<div><label style="'+lSt+'">Quantité</label><input id="moy-qte" type="number" min="1" value="'+(m.quantite||1)+'" style="'+iSt+'"></div>'
     + '<div><label style="'+lSt+'">Marque</label><input id="moy-marque" value="'+(m.marque||'')+'" placeholder="—" style="'+iSt+'"></div>'
     + '<div><label style="'+lSt+'">Fournisseur</label><input id="moy-fourn" value="'+(m.fournisseur||'')+'" placeholder="—" style="'+iSt+'"></div>'
@@ -5915,11 +5931,15 @@ function renderActeursPage() {
     groups[type].forEach(function(p) {
       var nom = p.organisme||p.representant||'—';
       var contact = (p.representant && p.organisme) ? p.representant : '';
-      html += '<div style="padding:10px 12px;border-radius:12px;background:var(--navy3);margin-bottom:7px;border:1.5px solid transparent;transition:border .15s;cursor:default" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
-        +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:3px">'+nom+'</div>'
+      var cid = p._compId||''; var pid = p.id||'';
+      html += '<div onclick="openPartenaireEdit(\''+cid+'\',\''+pid+'\')" style="padding:10px 12px;border-radius:12px;background:var(--navy3);margin-bottom:7px;border:1.5px solid transparent;transition:border .15s;cursor:pointer" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--txt)">'+nom+'</div>'
+        +'<span style="font-size:10px;color:var(--txt3);opacity:.6">✏️</span>'
+        +'</div>'
         +(contact?'<div style="font-size:12px;color:var(--txt3)">👤 '+contact+'</div>':'')
-        +(p.email?'<div style="font-size:12px;color:var(--txt3)"><a href="mailto:'+p.email+'" style="color:var(--stol);text-decoration:none">✉️ '+p.email+'</a></div>':'')
-        +(p.telephone?'<div style="font-size:12px;color:var(--txt3)"><a href="tel:'+p.telephone+'" style="color:var(--txt3);text-decoration:none">📞 '+p.telephone+'</a></div>':'')
+        +(p.email?'<div style="font-size:12px;color:var(--txt3)"><a href="mailto:'+p.email+'" onclick="event.stopPropagation()" style="color:var(--stol);text-decoration:none">✉️ '+p.email+'</a></div>':'')
+        +(p.telephone?'<div style="font-size:12px;color:var(--txt3)"><a href="tel:'+p.telephone+'" onclick="event.stopPropagation()" style="color:var(--txt3);text-decoration:none">📞 '+p.telephone+'</a></div>':'')
         +(p.proposition?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;opacity:.75">'+p.proposition.substring(0,80)+(p.proposition.length>80?'…':'')+'</div>':'')
         +'<div style="font-size:10px;color:var(--txt3);opacity:.5;margin-top:4px">📋 '+p._compName+'</div>'
         +'</div>';
@@ -9316,6 +9336,7 @@ function savePartenaire() {
   closePartenaireEdit();
   renderHomeDetailPanel(null);
   if (_homeCompDrawerOpen) renderHomeResultsDrawer();
+  if (_curPage === 'page-acteurs') renderActeursPage();
   toast(partId ? 'Partenaire modifié ✓' : 'Partenaire ajouté ✓', 'ok');
 }
 
