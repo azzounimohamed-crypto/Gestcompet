@@ -380,38 +380,32 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
   /* ═══ PAGE ACCUEIL : détail pleine largeur + tiroir compétitions ═══ */
   #page-home.active{display:block!important;position:relative;height:calc(100vh - 108px);overflow:visible}
-  /* ── Panneau gauche pleine hauteur (Documents & À faire) ── */
+  /* ── Panneau flottant déplaçable (Documents & À faire) ── */
   #home-col-left,#home-todo-panel{
-    position:fixed;
-    left:var(--panel-app-left,0px);
-    top:108px;
-    z-index:260;width:300px;
-    height:calc(100vh - 108px);
-    border:none;border-right:1px solid var(--bdr);
+    position:fixed;left:20px;top:120px;
+    z-index:260;width:300px;max-width:min(300px,90vw);
+    max-height:calc(100vh - 140px);
+    border:1px solid var(--bdr);
     background:var(--navy2);
-    box-shadow:4px 0 28px rgba(0,0,0,.38);
-    border-radius:0;
+    box-shadow:0 8px 40px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.3);
+    border-radius:14px;
     display:flex;flex-direction:column;
     opacity:0;visibility:hidden;pointer-events:none;
-    transition:opacity .2s ease,visibility 0s linear .2s;
+    transition:opacity .18s ease,visibility 0s linear .18s;
     overflow:hidden;
   }
   #home-col-left.open,#home-todo-panel.open{
     opacity:1;visibility:visible;pointer-events:auto;
-    transition:opacity .2s ease,visibility 0s;
+    transition:opacity .18s ease,visibility 0s;
   }
   /* Scrollable body inside */
   #home-col-left > *,#home-todo-panel > *{flex-shrink:0}
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
-  /* Décalage uniquement de la zone contenu (#main, row 3) */
-  #main{transition:padding-left .2s ease}
-  body.panel-open #main{padding-left:300px}
   #home-side-rail{
     position:absolute;left:-44px;top:120px;z-index:26;
-    width:36px;display:flex;flex-direction:column;gap:8px;
+    width:36px;display:flex;flex-direction:column;gap:8px
   }
-  body.panel-open #home-side-rail{display:none}
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
     display:flex;align-items:center;justify-content:center;
@@ -2909,8 +2903,6 @@ function warmupSecondaryPages() {
 
 function showPage(id) {
   if (_curPage === id && _pageRendered[id]) return;
-  /* Retirer le décalage panel si on quitte la page home */
-  if (id !== 'page-home') document.body.classList.remove('panel-open');
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var el = document.getElementById(id);
   if (el) el.classList.add('active');
@@ -5375,15 +5367,6 @@ function _syncPanelOpen() {
   if (backdrop) backdrop.classList.toggle('open', anyOpen);
 }
 
-/* ── Panneau gauche : alignement sur #app ── */
-function _updatePanelAppLeft() {
-  var appEl = document.getElementById('app');
-  var left = appEl ? Math.round(appEl.getBoundingClientRect().left) : 0;
-  document.documentElement.style.setProperty('--panel-app-left', left + 'px');
-}
-_updatePanelAppLeft();
-window.addEventListener('resize', _updatePanelAppLeft);
-
 /* ── Panneau flottant : drag & drop + mémorisation position ── */
 var _pdrag = { active:false, el:null, key:null, ox:0, oy:0 };
 var _panelPos = (function(){
@@ -5404,19 +5387,17 @@ function _panelDragStart(e, elId, key) {
 
 document.addEventListener('mousemove', function(e){
   if (!_pdrag.active || !_pdrag.el) return;
-  var appEl = document.getElementById('app');
-  var appLeft = appEl ? appEl.getBoundingClientRect().left : 0;
-  var appW   = appEl ? appEl.offsetWidth : window.innerWidth;
-  var w = _pdrag.el.offsetWidth || 300;
-  /* Calcul en coordonnées #app */
-  var x = (e.clientX - _pdrag.ox) - appLeft;
-  x = Math.max(0, Math.min(appW - w, x));
+  var x = e.clientX - _pdrag.ox;
+  var y = e.clientY - _pdrag.oy;
+  var w = _pdrag.el.offsetWidth  || 300;
+  var h = _pdrag.el.offsetHeight || 400;
+  x = Math.max(0, Math.min(window.innerWidth  - w, x));
+  y = Math.max(0, Math.min(window.innerHeight - 60, y));
   _pdrag.el.style.left = x + 'px';
-  _pdrag.el.style.top  = '0';
+  _pdrag.el.style.top  = y + 'px';
   _pdrag.el.style.right  = 'auto';
   _pdrag.el.style.bottom = 'auto';
-  document.body.classList.toggle('panel-open', x < appW / 2);
-  _panelPos[_pdrag.key] = {x:x, y:0};
+  _panelPos[_pdrag.key] = {x:x, y:y};
 });
 
 document.addEventListener('mouseup', function(){
@@ -5453,7 +5434,7 @@ function toggleHomeCompDrawer(forceOpen) {
   if (todoPanel) todoPanel.classList.remove('open');
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
-  document.body.classList.toggle('panel-open', next);
+  if (next) _applyPanelPos('home-col-left', 'docPanel', 20, 120);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
@@ -5473,7 +5454,7 @@ function toggleHomeTodoPanel(forceOpen) {
   if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
-  document.body.classList.toggle('panel-open', next);
+  if (next) _applyPanelPos('home-todo-panel', 'todoPanel', 20, 120);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
