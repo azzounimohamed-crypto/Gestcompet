@@ -11841,7 +11841,7 @@ function _withTimeout(promise, ms) {
   return Promise.race([promise, tout]).finally(function(){ clearTimeout(timer); });
 }
 
-// ── PUSH : envoyer TOUT vers le cloud ─────────────────
+// ── PUSH : envoyer vers Supabase Storage (Option 2 — sans timeout PostgreSQL) ──
 async function pushToCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
   var payload = {
@@ -11871,16 +11871,16 @@ async function pushToCloud() {
     partenaireTypes:      S.partenaireTypes       || null,
     _pushAt:              Date.now()
   };
-  // Essai avec timeout 14s — retry automatique x2 si timeout Supabase
+  var jsonStr = JSON.stringify(payload);
+  var blob = new Blob([jsonStr], { type: 'application/json' });
   var lastErr;
   for (var _try = 0; _try < 3; _try++) {
-    if (_try > 0) await new Promise(function(r){ setTimeout(r, 2500 * _try); });
+    if (_try > 0) await new Promise(function(r){ setTimeout(r, 2000 * _try); });
     try {
       var res = await _withTimeout(
-        sb.from('stol_shared').upsert(
-          { id: 'global', data: payload, updated_at: new Date().toISOString() },
-          { onConflict: 'id' }
-        ), 14000
+        sb.storage.from('gestappli-sync').upload('data.json', blob, {
+          upsert: true, contentType: 'application/json'
+        }), 30000
       );
       if (res.error) { lastErr = new Error(res.error.message); continue; }
       lastErr = null; break;
@@ -11888,7 +11888,6 @@ async function pushToCloud() {
   }
   if (lastErr) throw lastErr;
   S._lastPushAt = payload._pushAt;
-  // Médias séparément (base64 volumineux)
   await _pushMedias(sb);
 }
 
@@ -11911,8 +11910,8 @@ function _mergeById(local, remote) {
   la.forEach(function(x){
     if (!x || !x.id) return;
     if (!map[x.id]) { map[x.id] = x; return; }
-    // Si local a un _updatedAt plus récent → local gagne, sinon cloud garde
-    if ((x._updatedAt||0) > (map[x.id]._updatedAt||0)) map[x.id] = x;
+    // Local gagne si plus récent OU à égalité (local = plus récent par définition en cas d'outage)
+    if ((x._updatedAt||0) >= (map[x.id]._updatedAt||0)) map[x.id] = x;
   });
   return Object.keys(map).map(function(k){ return map[k]; });
 }
@@ -11954,8 +11953,8 @@ function _mergeObjOfArrays(local, remote) {
     } else if (typeof lv === 'object' && !Array.isArray(lv) && typeof rv === 'object' && !Array.isArray(rv)) {
       result[key] = Object.assign({}, lv, rv);
     } else {
-      // Scalaire : garder la valeur non nulle la plus récente (remote en priorité si définie)
-      result[key] = (rv !== null && rv !== undefined) ? rv : lv;
+      // Scalaire : local prioritaire (plus récent en cas d'outage sync)
+      result[key] = (lv !== null && lv !== undefined) ? lv : rv;
     }
   });
   return result;
@@ -12077,18 +12076,24 @@ function _cleanupAllDuplicates() {
 async function pullFromCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
   var result = await _withTimeout(
-    sb.from('stol_shared').select('data,updated_at').eq('id','global').single(),
-    12000
+    sb.storage.from('gestappli-sync').download('data.json'),
+    20000
   );
-  var data = result.data, error = result.error;
+  var error = result.error;
 
   if (error) {
-    if (error.code === 'PGRST116') { await pushToCloud(); return; } // cloud vide → initialiser
+    // Fichier inexistant → première utilisation, on initialise le cloud
+    var msg = (error.message || '').toLowerCase();
+    if (msg.indexOf('not found') !== -1 || msg.indexOf('object not found') !== -1 || msg.indexOf('404') !== -1) {
+      await pushToCloud(); return;
+    }
     throw new Error(error.message);
   }
-  if (!data || !data.data) { await pushToCloud(); return; }
+  if (!result.data) { await pushToCloud(); return; }
 
-  var r = data.data; // données distantes
+  var text = await result.data.text();
+  var r = JSON.parse(text); // données distantes
+  if (!r) { await pushToCloud(); return; }
 
   // ── Tombstones compétitions ──
   var remoteDeleted = r._deletedComps || [];
