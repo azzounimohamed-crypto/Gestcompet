@@ -1055,12 +1055,20 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <div style="font-size:18px;font-weight:700">🤝 Acteurs</div>
           <div style="font-size:12px;color:var(--txt3);margin-top:2px">Partenaires & contacts</div>
         </div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <button onclick="printActeursPage()" title="Imprimer" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️</button>
+          <button onclick="openNewActeurFromPage()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;margin:0 12px 8px;padding:0 12px;gap:6px;flex-shrink:0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="acteurs-page-search" type="search" placeholder="Rechercher un acteur…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" oninput="_debActeurs()">
+      <div style="display:flex;align-items:center;gap:6px;margin:0 12px 10px;flex-shrink:0">
+        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 12px;gap:6px;flex:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="acteurs-page-search" type="search" placeholder="Rechercher un acteur…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" oninput="_debActeurs()">
+        </div>
+        <select id="acteurs-type-select" onchange="_acteursPageTypeFilter=this.value;renderActeursPage()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;color:var(--txt);font-family:inherit;font-size:12px;font-weight:700;padding:7px 12px;outline:none;cursor:pointer;flex-shrink:0;max-width:140px">
+          <option value="">Tous les types</option>
+        </select>
       </div>
-      <div style="display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0" id="acteurs-type-filters"></div>
       <div id="acteurs-page-list" style="padding:0 12px 16px;overflow-y:auto;flex:1"></div>
     </div>
 
@@ -5679,61 +5687,123 @@ function renderMoyens() {
 }
 
 /* Modal fiche moyen */
-function openMoyenEdit(moyenId, compId) {
-  var m = {};
-  if (moyenId) {
-    // Chercher dans S.moyens
-    m = (S.moyens||[]).find(function(x){ return x.id===moyenId; }) || {};
-    if (!m.id && compId) {
-      // Chercher dans S.materiel[compId]
-      m = ((S.materiel||{})[compId]||[]).find(function(x){ return x.id===moyenId; }) || {};
-    }
-  }
+function openMoyenEdit(moyenId) {
+  if (!S.moyens) S.moyens = [];
+  var m = moyenId ? (S.moyens.find(function(x){ return x.id===moyenId; })||{}) : {};
+  var usages = moyenId ? _getMoyenUsages(m) : [];
+
   var ov = document.getElementById('_moyen-edit-overlay');
   if (ov) ov.remove();
   ov = document.createElement('div');
   ov.id = '_moyen-edit-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
-  // Catégories prédéfinies + catégories personnalisées déjà utilisées
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
   var catsDefault = ['Communication','Informatique','Chronométrage','Sécurité','Signalisation','Sonorisation','Transport','Hébergement','Logistique','Outillage','Autre'];
   var catsCustom = [];
-  (S.moyens||[]).forEach(function(x){ if(x.categorie && catsDefault.indexOf(x.categorie)===-1 && catsCustom.indexOf(x.categorie)===-1) catsCustom.push(x.categorie); });
-  Object.values(S.materiel||{}).forEach(function(arr){ (arr||[]).forEach(function(x){ if(x.categorie && catsDefault.indexOf(x.categorie)===-1 && catsCustom.indexOf(x.categorie)===-1) catsCustom.push(x.categorie); }); });
+  S.moyens.forEach(function(x){ if(x.categorie && catsDefault.indexOf(x.categorie)===-1 && catsCustom.indexOf(x.categorie)===-1) catsCustom.push(x.categorie); });
   var cats = catsDefault.concat(catsCustom.sort());
   var catDlOpts = cats.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
-  var etats = ['','Neuf','Bon','Usé','HS'];
-  var etatOpts = etats.map(function(e){ return '<option value="'+e+'"'+(m.etat===e?' selected':'')+'>'+e+'</option>'; }).join('');
+  var etats    = ['','Neuf','Bon','Usé','HS'];
+  var discs    = [{v:'',l:'—'},{v:'classic',l:'Classic'},{v:'slalom',l:'Slalom'},{v:'stol',l:'STOL'},{v:'cross',l:'Cross'},{v:'precision',l:'Précision'}];
+  var etatOpts = etats.map(function(e){ return '<option value="'+e+'"'+(m.etat===e?' selected':'')+'>'+e||'—'+'</option>'; }).join('');
+  var discOpts = discs.map(function(d){ return '<option value="'+d.v+'"'+(m.discipline===d.v?' selected':'')+'>'+d.l+'</option>'; }).join('');
+
   var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
-  var lSt = 'font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px;display:block';
-  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">'
-    + '<div style="padding:20px 22px 0">'
-    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">' + (moyenId?'Modifier':'Créer') + ' une fiche moyen</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Nom *</label><input id="moy-nom" value="'+(m.nom||m.materiel||'')+'" placeholder="Ex: Balise GPS" style="'+iSt+'"></div>'
-    + '<div><label style="'+lSt+'">Catégorie <span style="font-weight:400;opacity:.6">(ou tapez la vôtre)</span></label><input id="moy-cat" list="moy-cat-dl" value="'+(m.categorie||'')+'" placeholder="Choisir ou créer…" style="'+iSt+'"><datalist id="moy-cat-dl">'+catDlOpts+'</datalist></div>'
-    + '<div><label style="'+lSt+'">Quantité</label><input id="moy-qte" type="number" min="1" value="'+(m.quantite||1)+'" style="'+iSt+'"></div>'
-    + '<div><label style="'+lSt+'">Marque</label><input id="moy-marque" value="'+(m.marque||'')+'" placeholder="—" style="'+iSt+'"></div>'
-    + '<div><label style="'+lSt+'">Fournisseur</label><input id="moy-fourn" value="'+(m.fournisseur||'')+'" placeholder="—" style="'+iSt+'"></div>'
-    + '<div><label style="'+lSt+'">État</label><select id="moy-etat" style="'+iSt+'">'+etatOpts+'</select></div>'
-    + '<div><label style="'+lSt+'">Lieu de rangement</label><input id="moy-lieu" value="'+(m.lieuRangement||m.lieuAcces||'')+'" placeholder="—" style="'+iSt+'"></div>'
-    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Lien achat / fiche produit</label><input id="moy-lien" value="'+(m.lienAchat||'')+'" placeholder="https://…" style="'+iSt+'"></div>'
-    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Remarques</label><textarea id="moy-rem" rows="2" style="'+iSt+';resize:vertical">'+(m.remarques||'')+'</textarea></div>'
-    + '</div></div>'
-    + '<div style="padding:14px 22px 20px;display:flex;gap:10px;justify-content:space-between;border-top:1px solid var(--bdr);margin-top:8px">'
-    + (moyenId?'<button onclick="deleteMoyen(\''+(moyenId||'')+'\',\''+(compId||'')+'\')" style="padding:9px 14px;border-radius:10px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'<span></span>')
-    + '<div style="display:flex;gap:8px">'
-    + '<button onclick="document.getElementById(\'_moyen-edit-overlay\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
-    + '<button onclick="saveMoyen(\''+(moyenId||'')+'\',\''+(compId||'')+'\''+')" style="padding:9px 20px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
-    + '</div></div></div>';
+  var lSt = 'font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block';
+
+  // Section historique
+  var histHtml = '';
+  if (usages.length) {
+    histHtml = '<div style="border-top:1px solid var(--bdr);margin-top:16px;padding-top:14px">'
+      +'<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 Historique d\'usage en compétition</div>'
+      +'<div style="display:flex;flex-direction:column;gap:5px">';
+    usages.forEach(function(u) {
+      var cp = u.comp;
+      histHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--navy3)">'
+        +'<div style="flex:1;font-size:12px;color:var(--txt)">'+(cp?cp.name:'Compétition inconnue')+'</div>'
+        +(cp&&cp.dateFrom?'<div style="font-size:10px;color:var(--txt3)">'+new Date(cp.dateFrom).toLocaleDateString('fr-FR',{month:'short',year:'numeric'})+'</div>':'')
+        +(u.mat.quantite?'<div style="font-size:11px;color:var(--txt3);background:var(--navy2);border-radius:5px;padding:1px 6px">×'+u.mat.quantite+'</div>':'')
+        +'</div>';
+    });
+    histHtml += '</div></div>';
+  }
+
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:20px;width:100%;max-width:620px;max-height:95vh;overflow-y:auto;box-shadow:0 12px 60px rgba(0,0,0,.6);display:flex;flex-direction:column">'
+
+    // Header
+    +'<div style="padding:20px 24px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--txt)">'+(moyenId?'✏️ Modifier la fiche':'➕ Nouveau moyen')+'</div>'
+    +'<button onclick="document.getElementById(\'_moyen-edit-overlay\').remove()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt2);font-size:16px;cursor:pointer;flex-shrink:0">×</button>'
+    +'</div>'
+
+    // Contenu
+    +'<div style="padding:20px 24px;flex:1;overflow-y:auto">'
+
+    // Ligne 1 : Photo + Nom + Catégorie
+    +'<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start">'
+
+    // Photo
+    +'<div style="flex-shrink:0">'
+    +'<label style="'+lSt+'">Photo</label>'
+    +'<div onclick="document.getElementById(\'moy-photo-inp\').click()" style="width:80px;height:80px;border-radius:10px;border:2px dashed var(--bdr);overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--navy3);flex-shrink:0" id="moy-photo-wrap">'
+    +(m.photo?'<img id="moy-photo-preview" src="'+m.photo+'" style="width:100%;height:100%;object-fit:cover">':'<span id="moy-photo-preview" style="font-size:24px;opacity:.4">📷</span>')
+    +'</div>'
+    +'<input type="file" id="moy-photo-inp" accept="image/*" style="display:none" onchange="var r=new FileReader();r.onload=function(e){var p=document.getElementById(\'moy-photo-preview\');p.src=e.target.result;p.style.cssText=\'width:100%;height:100%;object-fit:cover\';p.outerHTML=\'<img id=\\\'moy-photo-preview\\\' src=\\\'\'+e.target.result+\'\\\' style=\\\'width:100%;height:100%;object-fit:cover\\\'>\';document.getElementById(\'moy-photo-wrap\').innerHTML=\'<img id=\\\'moy-photo-preview\\\' src=\\\'\'+e.target.result+\'\\\' style=\\\'width:100%;height:100%;object-fit:cover\\\'>\';};r.readAsDataURL(this.files[0])">'
+    +'</div>'
+
+    // Nom + Catégorie
+    +'<div style="flex:1;display:flex;flex-direction:column;gap:10px">'
+    +'<div><label style="'+lSt+'">Nom *</label><input id="moy-nom" value="'+(m.nom||'')+'" placeholder="Ex: Balise GPS" style="'+iSt+'"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div><label style="'+lSt+'">Catégorie</label><input id="moy-cat" list="moy-cat-dl" value="'+(m.categorie||'')+'" placeholder="Choisir ou créer…" style="'+iSt+'"><datalist id="moy-cat-dl">'+catDlOpts+'</datalist></div>'
+    +'<div><label style="'+lSt+'">Discipline</label><select id="moy-disc" style="'+iSt+'">'+discOpts+'</select></div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+
+    // Ligne 2 : Marque, Fournisseur, État, Qté
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px">'
+    +'<div><label style="'+lSt+'">Marque</label><input id="moy-marque" value="'+(m.marque||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    +'<div><label style="'+lSt+'">Fournisseur</label><input id="moy-fourn" value="'+(m.fournisseur||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    +'<div><label style="'+lSt+'">État</label><select id="moy-etat" style="'+iSt+'">'+etatOpts+'</select></div>'
+    +'<div><label style="'+lSt+'">Quantité</label><input id="moy-qte" type="number" min="1" value="'+(m.quantite||1)+'" style="'+iSt+'"></div>'
+    +'</div>'
+
+    // Ligne 3 : Lieu + Lien
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    +'<div><label style="'+lSt+'">Lieu de rangement</label><input id="moy-lieu" value="'+(m.lieuRangement||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    +'<div><label style="'+lSt+'">Lien achat / fiche</label><input id="moy-lien" value="'+(m.lienAchat||'')+'" placeholder="https://…" style="'+iSt+'"></div>'
+    +'</div>'
+
+    // Remarques
+    +'<div style="margin-bottom:4px"><label style="'+lSt+'">Remarques</label><textarea id="moy-rem" rows="2" style="'+iSt+';resize:vertical">'+(m.remarques||'')+'</textarea></div>'
+
+    // Historique
+    + histHtml
+    +'</div>'
+
+    // Footer
+    +'<div style="padding:14px 24px 18px;display:flex;gap:10px;justify-content:space-between;border-top:1px solid var(--bdr);flex-shrink:0">'
+    +(moyenId?'<button onclick="deleteMoyen(\''+moyenId+'\')" style="padding:9px 14px;border-radius:10px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">🗑 Supprimer</button>':'<span></span>')
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="document.getElementById(\'_moyen-edit-overlay\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    +'<button onclick="saveMoyen(\''+moyenId+'\')" style="padding:9px 24px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    +'</div></div></div>';
+
   document.body.appendChild(ov);
 }
 
-function saveMoyen(moyenId, compId) {
+function saveMoyen(moyenId) {
   var nom = (document.getElementById('moy-nom').value||'').trim();
   if (!nom) { toast('Le nom est obligatoire','err'); return; }
+  // Récupérer la photo depuis la preview
+  var photoEl = document.getElementById('moy-photo-preview');
+  var photo = (photoEl && photoEl.tagName==='IMG') ? photoEl.src : ((document.getElementById('_moy-photo-b64')||{}).value||'');
   var obj = {
-    nom: nom,
-    categorie:     (document.getElementById('moy-cat').value||'Autre'),
+    nom:           nom,
+    categorie:     (document.getElementById('moy-cat').value||'Autre').trim(),
+    discipline:    (document.getElementById('moy-disc').value||''),
     quantite:      parseFloat(document.getElementById('moy-qte').value)||1,
     marque:        (document.getElementById('moy-marque').value||'').trim(),
     fournisseur:   (document.getElementById('moy-fourn').value||'').trim(),
@@ -5741,16 +5811,14 @@ function saveMoyen(moyenId, compId) {
     lieuRangement: (document.getElementById('moy-lieu').value||'').trim(),
     lienAchat:     (document.getElementById('moy-lien').value||'').trim(),
     remarques:     (document.getElementById('moy-rem').value||'').trim(),
-    _updatedAt: Date.now()
+    _updatedAt:    Date.now()
   };
+  if (photo && photo.startsWith('data:')) obj.photo = photo;
   if (!S.moyens) S.moyens = [];
   if (moyenId) {
     var idx = S.moyens.findIndex(function(x){ return x.id===moyenId; });
     if (idx>=0) { S.moyens[idx] = Object.assign({}, S.moyens[idx], obj); }
-    else {
-      obj.id = moyenId;
-      S.moyens.push(obj);
-    }
+    else { obj.id = moyenId; S.moyens.push(obj); }
   } else {
     obj.id = 'moy_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     S.moyens.push(obj);
@@ -5762,15 +5830,11 @@ function saveMoyen(moyenId, compId) {
   toast((moyenId?'Moyen mis à jour':'Moyen créé')+' ✓','ok');
 }
 
-function deleteMoyen(moyenId, compId) {
+function deleteMoyen(moyenId) {
   if (!moyenId) return;
   if (!confirm('Supprimer cette fiche moyen ?')) return;
   // Supprimer depuis S.moyens (global)
   if (S.moyens) S.moyens = S.moyens.filter(function(x){ return x.id!==moyenId; });
-  // Supprimer aussi depuis S.materiel[compId] si matériel de compétition
-  if (compId && S.materiel && S.materiel[compId]) {
-    S.materiel[compId] = S.materiel[compId].filter(function(x){ return x.id!==moyenId; });
-  }
   saveState(); silentPush();
   document.getElementById('_moyen-edit-overlay').remove();
   renderMoyens();
@@ -5780,40 +5844,97 @@ function deleteMoyen(moyenId, compId) {
 
 /* ══ PAGE MOYENS (pleine page) ══ */
 var _moyensPageCatFilter = '';
-var _moyensCatCollapsed = {}; // {cat: true} si repliée
+var _moyensCatCollapsed = {};
 var _debMoyensT = null;
 function _debMoyens() { clearTimeout(_debMoyensT); _debMoyensT = setTimeout(renderMoyensPage, 180); }
-function _toggleMoyenCat(cat) {
+
+// Toggler accessible globalement via data-cat attribute pour éviter les pb d'échappement
+function _toggleMoyenCat(el) {
+  var cat = el.getAttribute('data-cat');
   _moyensCatCollapsed[cat] = !_moyensCatCollapsed[cat];
-  renderMoyensPage();
+  // Toggle direct sans re-render complet
+  var bodyId = el.getAttribute('data-body');
+  var body = document.getElementById(bodyId);
+  var arrow = el.querySelector('.moy-arrow');
+  if (body) body.style.display = _moyensCatCollapsed[cat] ? 'none' : 'block';
+  if (arrow) arrow.style.transform = 'rotate(' + (_moyensCatCollapsed[cat] ? '0' : '90') + 'deg)';
+}
+
+// Sync S.materiel → S.moyens : crée/complète les fiches globales depuis le matériel des compétitions
+function _syncMaterielToMoyens() {
+  if (!S.moyens) S.moyens = [];
+  var changed = false;
+  Object.keys(S.materiel||{}).forEach(function(cid) {
+    (S.materiel[cid]||[]).forEach(function(mat) {
+      var nom = (mat.nom||mat.materiel||'').trim();
+      if (!nom) return;
+      var nomKey = nom.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      // Chercher une fiche globale correspondante (par id lié ou par nom)
+      var existing = S.moyens.find(function(g){
+        if (mat._moyenId && g.id === mat._moyenId) return true;
+        return (g.nom||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'') === nomKey;
+      });
+      if (!existing) {
+        // Créer la fiche globale
+        var newMoyen = {
+          id: 'moy_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          nom: nom,
+          categorie:     mat.categorie     || 'Autre',
+          quantite:      mat.quantite      || 1,
+          marque:        mat.marque        || '',
+          fournisseur:   mat.fournisseur   || '',
+          etat:          mat.etat          || '',
+          lieuRangement: mat.lieuAcces     || '',
+          _updatedAt: Date.now()
+        };
+        S.moyens.push(newMoyen);
+        // Relier la fiche compétition à la fiche globale
+        mat._moyenId = newMoyen.id;
+        changed = true;
+      } else {
+        // Lier si pas encore lié
+        if (!mat._moyenId) { mat._moyenId = existing.id; changed = true; }
+        // Compléter les champs vides de la fiche globale avec les données compétition
+        ['categorie','marque','fournisseur','etat'].forEach(function(f){
+          if (!existing[f] && mat[f]) { existing[f] = mat[f]; changed = true; }
+        });
+      }
+    });
+  });
+  if (changed) saveState();
+}
+
+// Retourne la liste des usages en compétition pour un moyen (par id lié ou par nom)
+function _getMoyenUsages(moyen) {
+  var usages = [];
+  var nomKey = (moyen.nom||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  Object.keys(S.materiel||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.materiel[cid]||[]).forEach(function(mat) {
+      var match = (mat._moyenId && mat._moyenId === moyen.id);
+      if (!match) {
+        var matKey = (mat.nom||mat.materiel||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+        match = (matKey && matKey === nomKey);
+      }
+      if (match) usages.push({ comp: cp, mat: mat, compId: cid });
+    });
+  });
+  usages.sort(function(a,b){ return ((b.comp&&b.comp.dateFrom)||'').localeCompare((a.comp&&a.comp.dateFrom)||''); });
+  return usages;
 }
 
 function renderMoyensPage() {
   var list = document.getElementById('moyens-page-list');
   if (!list) return;
   if (!S.moyens) S.moyens = [];
+
+  // Sync automatique : intègre le matériel compétition dans S.moyens
+  _syncMaterielToMoyens();
+
   var q = ((document.getElementById('moyens-page-search')||{}).value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
-  // Agréger matériel des compétitions + S.moyens global
-  var allItems = [];
-  Object.keys(S.materiel||{}).forEach(function(cid) {
-    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
-    (S.materiel[cid]||[]).forEach(function(m) {
-      allItems.push(Object.assign({}, m, { _source: cp ? cp.name : 'Compétition', _compId: cid, _global: false }));
-    });
-  });
-  S.moyens.forEach(function(m) {
-    allItems.push(Object.assign({}, m, { _source: 'Global', _global: true }));
-  });
-
-  // Dédupliquer (préférer global)
-  var seen = {};
-  allItems = allItems.filter(function(m) {
-    var key = (m.nom||m.materiel||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    if (!key) return true;
-    if (seen[key]) return m._global;
-    seen[key] = true; return true;
-  });
+  // Source = uniquement S.moyens (le matériel compétition est intégré via _syncMaterielToMoyens)
+  var allItems = S.moyens.slice();
 
   // Catégories distinctes → alimenter le select
   var cats = [];
@@ -5821,20 +5942,20 @@ function renderMoyensPage() {
   cats.sort();
   var sel = document.getElementById('moyens-cat-select');
   if (sel) {
-    var prev = sel.value;
     sel.innerHTML = '<option value="">Toutes catégories</option>'
       + cats.map(function(c){ return '<option value="'+c+'"'+(c===_moyensPageCatFilter?' selected':'')+'>'+c+'</option>'; }).join('');
-    if (prev && cats.indexOf(prev) !== -1) sel.value = prev;
   }
 
   // Appliquer filtres
   if (_moyensPageCatFilter) allItems = allItems.filter(function(m){ return (m.categorie||'Autre')===_moyensPageCatFilter; });
   if (q) allItems = allItems.filter(function(m) {
-    var hay = [(m.nom||m.materiel||''),(m.categorie||''),(m.marque||m.fournisseur||''),(m.lieuRangement||m.lieuAcces||''),(m.remarques||'')].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    var usages = _getMoyenUsages(m);
+    var compNames = usages.map(function(u){ return u.comp ? u.comp.name||'' : ''; }).join(' ');
+    var hay = [(m.nom||''),(m.categorie||''),(m.marque||''),(m.fournisseur||''),(m.lieuRangement||''),(m.discipline||''),(m.remarques||''),compNames].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
     return hay.indexOf(q)!==-1;
   });
 
-  allItems.sort(function(a,b){ return (a.categorie||'Autre').localeCompare(b.categorie||'Autre') || (a.nom||a.materiel||'').localeCompare(b.nom||b.materiel||''); });
+  allItems.sort(function(a,b){ return (a.categorie||'Autre').localeCompare(b.categorie||'Autre') || (a.nom||'').localeCompare(b.nom||''); });
 
   if (!allItems.length) {
     list.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 20px">'+(q||_moyensPageCatFilter?'Aucun résultat':'Aucun matériel enregistré.<br><span style="font-size:12px">Cliquez <b>+ Nouveau</b> pour commencer.</span>')+'</div>';
@@ -5843,43 +5964,51 @@ function renderMoyensPage() {
 
   // Grouper par catégorie
   var groups = {};
-  allItems.forEach(function(m) {
+  allItems.forEach(function(m){
     var cat = m.categorie||'Autre';
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(m);
   });
 
+  var discLabel = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
+  var etatColor = function(e){ return e==='Bon'?'#10b981':e==='Usé'?'#f59e0b':e==='HS'?'#ef4444':'var(--txt3)'; };
+
   var html = '';
   Object.keys(groups).sort().forEach(function(cat) {
     var collapsed = !!_moyensCatCollapsed[cat];
-    var catId = 'moy-cat-body-' + cat.replace(/[^a-z0-9]/gi,'_');
-    // En-tête repliable
-    html += '<button onclick="_toggleMoyenCat(\''+cat.replace(/'/g,"\\'")+'\')" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:1.5px solid var(--bdr);padding:10px 0 6px;cursor:pointer;font-family:inherit;margin-top:10px">'
-      + '<span style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px">'+cat+' <span style="font-weight:400;opacity:.6">('+groups[cat].length+')</span></span>'
-      + '<span style="font-size:12px;color:var(--txt3);display:inline-block;transition:transform .18s;transform:rotate('+(collapsed?'0':'90')+'deg)">▶</span>'
+    var bodyId = 'moy-body-' + cat.replace(/[^a-z0-9]/gi,'_');
+    html += '<button data-cat="'+cat.replace(/"/g,'&quot;')+'" data-body="'+bodyId+'" onclick="_toggleMoyenCat(this)" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:2px solid var(--bdr);padding:10px 0 7px;cursor:pointer;font-family:inherit;margin-top:12px">'
+      + '<span style="font-size:12px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px">'+cat
+      + ' <span style="font-weight:400;font-size:11px;opacity:.6">('+groups[cat].length+')</span></span>'
+      + '<span class="moy-arrow" style="font-size:13px;color:var(--stol);display:inline-block;transition:transform .18s;transform:rotate('+(collapsed?'0':'90')+'deg)">▶</span>'
       + '</button>';
-    // Corps repliable
-    html += '<div id="'+catId+'" style="display:'+(collapsed?'none':'block')+'">';
+
+    html += '<div id="'+bodyId+'" style="display:'+(collapsed?'none':'block')+'">';
     groups[cat].forEach(function(m) {
-      var nom   = m.nom||m.materiel||'—';
+      var usages = _getMoyenUsages(m);
+      var nom   = m.nom||'—';
       var marque = m.marque||m.fournisseur||'';
-      var lieu  = m.lieuRangement||m.lieuAcces||'';
+      var lieu  = m.lieuRangement||'';
       var qte   = m.quantite||'';
       var etat  = m.etat||'';
-      var etatColor = etat==='Bon'?'#10b981':etat==='Usé'?'#f59e0b':etat==='HS'?'#ef4444':'var(--txt3)';
       var lien  = m.lienAchat||'';
-      var mid   = (m.id||'').replace(/'/g,"\\'");
-      var mcid  = (m._compId||'').replace(/'/g,"\\'");
-      html += '<div onclick="openMoyenEdit(\''+mid+'\',\''+mcid+'\')" style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--navy3);margin:5px 0;cursor:pointer;border:1.5px solid transparent;transition:border .15s" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
-        +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<span style="flex:1;font-size:13px;font-weight:700;color:var(--txt)">'+nom+'</span>'
-        +(qte?'<span style="font-size:11px;color:var(--txt3);background:var(--navy2);border-radius:6px;padding:2px 7px">×'+qte+'</span>':'')
-        +(etat?'<span style="font-size:11px;color:'+etatColor+';font-weight:700">'+etat+'</span>':'')
+      var disc  = m.discipline ? discLabel[m.discipline]||m.discipline : '';
+      html += '<div onclick="openMoyenEdit(\''+m.id+'\')" style="display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:var(--navy3);margin:5px 0;cursor:pointer;border:1.5px solid transparent;transition:border .15s" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">';
+      // Photo miniature
+      if (m.photo) html += '<img src="'+m.photo+'" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0">';
+      html += '<div style="flex:1;display:flex;flex-direction:column;gap:3px;min-width:0">'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:700;color:var(--txt)">'+nom+'</span>'
+        +(qte?'<span style="font-size:11px;color:var(--txt3);background:var(--navy2);border-radius:6px;padding:1px 7px">×'+qte+'</span>':'')
+        +(etat?'<span style="font-size:10px;color:'+etatColor(etat)+';font-weight:700">'+etat+'</span>':'')
+        +(disc?'<span style="font-size:10px;color:var(--stol);font-weight:600">'+disc+'</span>':'')
         +'</div>'
-        +((marque||lieu)?'<div style="display:flex;gap:10px;font-size:12px;color:var(--txt3)">'+(marque?'<span>'+marque+'</span>':'')+(lieu?'<span>📍 '+lieu+'</span>':'')+'</div>':'')
-        +(lien?'<a href="'+lien+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--stol);text-decoration:none">🔗 Lien achat</a>':'')
-        +'<div style="font-size:10px;color:var(--txt3);opacity:.6">'+(m._global?'⭐ Global':'📋 '+m._source)+'</div>'
-        +'</div>';
+        +((marque||lieu)?'<div style="display:flex;gap:8px;font-size:11px;color:var(--txt3)">'+(marque?'<span>'+marque+'</span>':'')+(lieu?'<span>📍 '+lieu+'</span>':'')+'</div>':'')
+        +(lien?'<a href="'+lien+'" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--stol);text-decoration:none">🔗 Lien achat</a>':'')
+        +(usages.length?'<div style="font-size:10px;color:var(--txt3);opacity:.7;margin-top:2px">📋 Utilisé dans '
+          +usages.slice(0,2).map(function(u){ return u.comp?u.comp.name:'?'; }).join(', ')
+          +(usages.length>2?' +'+( usages.length-2)+'…':'')+'</div>':'')
+        +'</div></div>';
     });
     html += '</div>';
   });
@@ -5925,11 +6054,35 @@ function printMoyensPage() {
 /* ══ PAGE ACTEURS (pleine page) ══ */
 var _acteursPageTypeFilter = '';
 var _debActeursT = null;
+var _acteursCatCollapsed = {};
 function _debActeurs() { clearTimeout(_debActeursT); _debActeursT = setTimeout(renderActeursPage, 180); }
+
+function _toggleActeurType(el) {
+  var cat = el.getAttribute('data-cat');
+  _acteursCatCollapsed[cat] = !_acteursCatCollapsed[cat];
+  var bodyId = el.getAttribute('data-body');
+  var body = document.getElementById(bodyId);
+  var arrow = el.querySelector('.act-arrow');
+  if (body) body.style.display = _acteursCatCollapsed[cat] ? 'none' : 'block';
+  if (arrow) arrow.style.transform = 'rotate(' + (_acteursCatCollapsed[cat] ? '0' : '90') + 'deg)';
+}
+
+function _getActeurUsages(orgKey) {
+  var usages = [];
+  Object.keys(S.partenaires||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.partenaires[cid]||[]).forEach(function(p) {
+      var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      if (key === orgKey) usages.push({ comp: cp, part: p, compId: cid });
+    });
+  });
+  return usages.sort(function(a,b){
+    return ((b.comp&&b.comp.dateFrom)||'').localeCompare((a.comp&&a.comp.dateFrom)||'');
+  });
+}
 
 function renderActeursPage() {
   var list = document.getElementById('acteurs-page-list');
-  var typeBar = document.getElementById('acteurs-type-filters');
   if (!list) return;
   var q = ((document.getElementById('acteurs-page-search')||{}).value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
@@ -5938,48 +6091,55 @@ function renderActeursPage() {
   Object.keys(S.partenaires||{}).forEach(function(cid) {
     var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
     (S.partenaires[cid]||[]).forEach(function(p) {
-      allParts.push(Object.assign({}, p, { _compName: cp ? cp.name : '', _compId: cid }));
+      allParts.push(Object.assign({}, p, { _compName: cp ? cp.name : '', _compDate: cp ? (cp.dateFrom||'') : '', _compId: cid }));
     });
   });
 
-  // Dédupliquer par organisme
-  var seenOrg = {};
-  allParts = allParts.filter(function(p) {
-    var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    if (!key) return true;
-    if (seenOrg[key]) return false;
-    seenOrg[key] = true; return true;
-  });
-
-  // Types distincts pour filtres
+  // Types distincts pour le select
   var types = [];
   allParts.forEach(function(p){ if(p.type && types.indexOf(p.type)===-1) types.push(p.type); });
   types.sort();
-
-  // Barre filtres types
-  if (typeBar) {
-    var fHtml = '<button onclick="_acteursPageTypeFilter=\'\';renderActeursPage()" style="padding:4px 10px;border-radius:14px;font-size:11px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;white-space:nowrap;'+(!_acteursPageTypeFilter?'background:var(--stol);color:#fff':'background:var(--navy3);color:var(--txt2)')+'">Tous</button>';
-    types.forEach(function(t) {
-      fHtml += '<button onclick="_acteursPageTypeFilter=\''+t+'\';renderActeursPage()" style="padding:4px 10px;border-radius:14px;font-size:11px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;white-space:nowrap;'+(t===_acteursPageTypeFilter?'background:var(--stol);color:#fff':'background:var(--navy3);color:var(--txt2)')+'">'+t+'</button>';
+  var sel = document.getElementById('acteurs-type-select');
+  if (sel) {
+    var prevVal = _acteursPageTypeFilter;
+    sel.innerHTML = '<option value="">Tous les types</option>';
+    types.forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      if (t === prevVal) opt.selected = true;
+      sel.appendChild(opt);
     });
-    typeBar.innerHTML = fHtml;
   }
 
+  // Dédupliquer par organisme — conserver la version la plus récente (date de comp)
+  var orgMap = {};
+  allParts.forEach(function(p) {
+    var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (!key) return;
+    if (!orgMap[key] || (p._compDate > orgMap[key]._compDate)) orgMap[key] = p;
+  });
+  var deduped = Object.keys(orgMap).map(function(k){ return orgMap[k]; });
+  // Entrées sans clé org (non dédupliquées)
+  allParts.forEach(function(p){
+    var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (!key) deduped.push(p);
+  });
+
   // Appliquer filtres
-  if (_acteursPageTypeFilter) allParts = allParts.filter(function(p){ return p.type===_acteursPageTypeFilter; });
-  if (q) allParts = allParts.filter(function(p) {
+  if (_acteursPageTypeFilter) deduped = deduped.filter(function(p){ return p.type===_acteursPageTypeFilter; });
+  if (q) deduped = deduped.filter(function(p) {
     var hay = [(p.organisme||''),(p.representant||''),(p.email||''),(p.telephone||''),(p.type||''),(p.proposition||'')].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
     return hay.indexOf(q)!==-1;
   });
 
-  if (!allParts.length) {
-    list.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 20px">'+(q||_acteursPageTypeFilter?'Aucun résultat pour ce filtre':'Aucun partenaire enregistré.')+'</div>';
+  if (!deduped.length) {
+    list.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 20px">'+(q||_acteursPageTypeFilter?'Aucun résultat pour ce filtre':'Aucun acteur enregistré.')+'</div>';
     return;
   }
 
   // Grouper par type
   var groups = {};
-  allParts.forEach(function(p) {
+  deduped.forEach(function(p) {
     var t = p.type||'Autre';
     if (!groups[t]) groups[t] = [];
     groups[t].push(p);
@@ -5987,26 +6147,128 @@ function renderActeursPage() {
 
   var html = '';
   Object.keys(groups).sort().forEach(function(type) {
-    html += '<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--bdr)">'
-      + type + ' <span style="font-weight:400;opacity:.6">('+groups[type].length+')</span></div>';
+    var collapsed = !!_acteursCatCollapsed[type];
+    var safeId = 'act-body-' + type.replace(/[^a-zA-Z0-9]/g,'_');
+    html += '<div style="margin-bottom:4px">'
+      + '<button data-cat="'+escH(type)+'" data-body="'+safeId+'" onclick="_toggleActeurType(this)" style="width:100%;display:flex;align-items:center;gap:8px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;padding:9px 12px;cursor:pointer;font-family:inherit;text-align:left;margin-bottom:6px">'
+      + '<span class="act-arrow" style="font-size:11px;transition:transform .2s;transform:rotate('+(collapsed?'0':'90')+'deg);display:inline-block;color:var(--txt3)">▶</span>'
+      + '<span style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;flex:1">'+escH(type)+'</span>'
+      + '<span style="font-size:11px;color:var(--txt3);opacity:.6;font-weight:400">'+groups[type].length+'</span>'
+      + '</button>'
+      + '<div id="'+safeId+'" style="display:'+(collapsed?'none':'block')+'">';
+
     groups[type].forEach(function(p) {
       var nom = p.organisme||p.representant||'—';
       var contact = (p.representant && p.organisme) ? p.representant : '';
+      var orgKey = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      var usages = _getActeurUsages(orgKey);
       var cid = p._compId||''; var pid = p.id||'';
-      html += '<div onclick="openPartenaireEdit(\''+cid+'\',\''+pid+'\')" style="padding:10px 12px;border-radius:12px;background:var(--navy3);margin-bottom:7px;border:1.5px solid transparent;transition:border .15s;cursor:pointer" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
-        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
-        +'<div style="font-size:13px;font-weight:700;color:var(--txt)">'+nom+'</div>'
-        +'<span style="font-size:10px;color:var(--txt3);opacity:.6">✏️</span>'
-        +'</div>'
-        +(contact?'<div style="font-size:12px;color:var(--txt3)">👤 '+contact+'</div>':'')
-        +(p.email?'<div style="font-size:12px;color:var(--txt3)"><a href="mailto:'+p.email+'" onclick="event.stopPropagation()" style="color:var(--stol);text-decoration:none">✉️ '+p.email+'</a></div>':'')
-        +(p.telephone?'<div style="font-size:12px;color:var(--txt3)"><a href="tel:'+p.telephone+'" onclick="event.stopPropagation()" style="color:var(--txt3);text-decoration:none">📞 '+p.telephone+'</a></div>':'')
-        +(p.proposition?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;opacity:.75">'+p.proposition.substring(0,80)+(p.proposition.length>80?'…':'')+'</div>':'')
-        +'<div style="font-size:10px;color:var(--txt3);opacity:.5;margin-top:4px">📋 '+p._compName+'</div>'
-        +'</div>';
+      html += '<div data-cid="'+escH(cid)+'" data-pid="'+escH(pid)+'" onclick="openPartenaireEdit(this.dataset.cid,this.dataset.pid)" style="padding:11px 13px;border-radius:11px;background:var(--navy3);margin-bottom:7px;border:1.5px solid transparent;transition:border .15s;cursor:pointer" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--txt)">'+escH(nom)+'</div>'
+        + (usages.length > 1 ? '<span style="font-size:10px;background:var(--stol);color:#fff;padding:2px 7px;border-radius:10px;font-weight:700">'+usages.length+' comp.</span>' : '<span style="font-size:10px;color:var(--txt3);opacity:.5">✏️</span>')
+        + '</div>'
+        + (contact ? '<div style="font-size:12px;color:var(--txt3)">👤 '+escH(contact)+'</div>' : '')
+        + (p.email ? '<div style="font-size:12px;color:var(--txt3)"><a href="mailto:'+escH(p.email)+'" onclick="event.stopPropagation()" style="color:var(--stol);text-decoration:none">✉️ '+escH(p.email)+'</a></div>' : '')
+        + (p.telephone ? '<div style="font-size:12px;color:var(--txt3)"><a href="tel:'+escH(p.telephone)+'" onclick="event.stopPropagation()" style="color:var(--txt3);text-decoration:none">📞 '+escH(p.telephone)+'</a></div>' : '')
+        + (p.proposition ? '<div style="font-size:11px;color:var(--txt3);margin-top:4px;opacity:.75">'+escH(p.proposition.substring(0,80))+(p.proposition.length>80?'…':'')+'</div>' : '')
+        + (usages.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'
+            + usages.slice(0,4).map(function(u){ return '<span style="font-size:10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:8px;padding:2px 6px;color:var(--txt3)">📋 '+escH((u.comp&&u.comp.name)||u.compId)+'</span>'; }).join('')
+            + (usages.length > 4 ? '<span style="font-size:10px;color:var(--txt3);opacity:.6;padding:2px 4px">+' + (usages.length-4) + ' autres</span>' : '')
+            + '</div>' : '')
+        + '</div>';
     });
+    html += '</div></div>';
   });
   list.innerHTML = html;
+}
+
+function openNewActeurFromPage() {
+  var comps = (S.comps||[]).filter(function(c){ return !c._deleted; }).sort(function(a,b){
+    return ((b.dateFrom||'') > (a.dateFrom||'')) ? 1 : -1;
+  });
+  if (!comps.length) { toast('Aucune compétition — créez d\'abord une compétition.', 'err'); return; }
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:5100;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = function(e){ if(e.target===ov) document.body.removeChild(ov); };
+  var inner = document.createElement('div');
+  inner.style.cssText = 'background:var(--navy2);border-radius:14px;width:min(420px,96vw);max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.65)';
+  var listHtml = '';
+  comps.forEach(function(c) {
+    listHtml += '<button data-cid="'+escH(c.id)+'" style="display:block;width:100%;text-align:left;padding:11px 14px;margin-bottom:7px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;cursor:pointer;box-sizing:border-box">'
+      + '<div style="font-weight:700">'+escH(c.name||'—')+'</div>'
+      + (c.dateFrom ? '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+escH(c.dateFrom)+(c.dateTo&&c.dateTo!==c.dateFrom?' → '+escH(c.dateTo):'')+'</div>' : '')
+      + '</button>';
+  });
+  inner.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+    + '<div style="font-size:14px;font-weight:800;color:var(--txt)">➕ Choisir une compétition</div>'
+    + '<button id="_na_close" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;line-height:1;padding:0 4px">×</button>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--txt3);padding:10px 18px 4px;flex-shrink:0">Rattacher ce nouvel acteur à quelle compétition ?</div>'
+    + '<div id="_na_list" style="flex:1;overflow-y:auto;padding:10px 14px 14px">'+listHtml+'</div>';
+  inner.querySelector('#_na_close').onclick = function(){ document.body.removeChild(ov); };
+  inner.querySelector('#_na_list').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-cid]');
+    if (!btn) return;
+    var cid = btn.getAttribute('data-cid');
+    document.body.removeChild(ov);
+    openPartenaireEdit(cid, null);
+  });
+  ov.appendChild(inner);
+  document.body.appendChild(ov);
+}
+
+function printActeursPage() {
+  var allParts = [];
+  Object.keys(S.partenaires||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.partenaires[cid]||[]).forEach(function(p) {
+      allParts.push(Object.assign({}, p, { _compDate: cp ? (cp.dateFrom||'') : '', _compId: cid }));
+    });
+  });
+  var orgMap = {};
+  allParts.forEach(function(p) {
+    var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (!key) return;
+    if (!orgMap[key] || (p._compDate > orgMap[key]._compDate)) orgMap[key] = p;
+  });
+  var deduped = Object.keys(orgMap).map(function(k){ return orgMap[k]; });
+  var groups = {};
+  deduped.forEach(function(p){ var t=p.type||'Autre'; if(!groups[t])groups[t]=[]; groups[t].push(p); });
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acteurs</title><style>'
+    + 'body{font-family:system-ui,sans-serif;font-size:12px;color:#111;padding:20px;margin:0}'
+    + 'h1{font-size:18px;font-weight:800;margin:0 0 4px}'
+    + '.sub{font-size:11px;color:#777;margin-bottom:20px}'
+    + 'h2{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#555;border-bottom:1px solid #ddd;padding-bottom:4px;margin:16px 0 8px}'
+    + '.card{border:1px solid #e5e7eb;border-radius:8px;padding:10px 13px;margin-bottom:7px;break-inside:avoid}'
+    + '.name{font-size:13px;font-weight:700;margin-bottom:3px}'
+    + '.row{color:#555;margin-bottom:2px}'
+    + '.comps{margin-top:5px;font-size:10px;color:#888;border-top:1px solid #f0f0f0;padding-top:4px}'
+    + '@media print{@page{margin:12mm}}'
+    + '</style></head><body>'
+    + '<h1>🤝 Acteurs</h1>'
+    + '<div class="sub">Édité le '+new Date().toLocaleDateString('fr-FR')+' — '+deduped.length+' acteur(s)</div>';
+  Object.keys(groups).sort().forEach(function(type) {
+    var g = groups[type].sort(function(a,b){ return (a.organisme||a.representant||'').localeCompare(b.organisme||b.representant||''); });
+    html += '<h2>'+type+' ('+g.length+')</h2>';
+    g.forEach(function(p) {
+      var orgKey = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      var usages = _getActeurUsages(orgKey);
+      html += '<div class="card">'
+        + '<div class="name">'+(p.organisme||p.representant||'—')+'</div>'
+        + (p.representant && p.organisme ? '<div class="row">👤 '+p.representant+'</div>' : '')
+        + (p.email ? '<div class="row">✉️ '+p.email+'</div>' : '')
+        + (p.telephone ? '<div class="row">📞 '+p.telephone+'</div>' : '')
+        + (p.proposition ? '<div class="row" style="margin-top:4px;color:#333">'+p.proposition+'</div>' : '')
+        + (usages.length ? '<div class="comps">Compétitions : '+usages.map(function(u){ return (u.comp&&u.comp.name)||u.compId; }).join(', ')+'</div>' : '')
+        + '</div>';
+    });
+  });
+  html += '</body></html>';
+  var w = window.open('','_blank');
+  if (!w) { toast('Popup bloqué — autorisez les popups pour imprimer.','err'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(function(){ w.print(); }, 500);
 }
 
 /* ══ VOLET ACTEURS ══ */
@@ -9352,6 +9614,34 @@ function openPartenaireEdit(compId, partId) {
                     data:p.propositionFile, mimeType:p.propositionFileType||'', taille:p.propositionFileSize||0}];
   }
   setTimeout(function(){ _peFichiersRender(); }, 30);
+  // Historique compétitions
+  var histSec = document.getElementById('pe-history-section');
+  if (histSec) {
+    var orgKey = ((p.organisme||p.representant||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    var usages = orgKey ? _getActeurUsages(orgKey) : [];
+    if (usages.length) {
+      var hHtml = '<div style="margin-top:14px;border-top:1px solid var(--bdr);padding-top:12px">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 Historique compétitions ('+usages.length+')</div>';
+      usages.forEach(function(u) {
+        var cName = (u.comp&&u.comp.name)||u.compId;
+        var cDate = (u.comp&&u.comp.dateFrom) ? u.comp.dateFrom : '';
+        var role = u.part.type||'';
+        hHtml += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:8px;background:var(--navy3);margin-bottom:5px;border:1px solid var(--bdr)">'
+          + '<div>'
+          + '<div style="font-size:12px;font-weight:600;color:var(--txt)">'+escH(cName)+'</div>'
+          + (cDate ? '<div style="font-size:10px;color:var(--txt3)">'+escH(cDate)+'</div>' : '')
+          + '</div>'
+          + (role ? '<span style="font-size:10px;background:rgba(255,255,255,.08);border:1px solid var(--bdr);border-radius:6px;padding:2px 6px;color:var(--txt3)">'+escH(role)+'</span>' : '')
+          + '</div>';
+      });
+      hHtml += '</div>';
+      histSec.innerHTML = hHtml;
+      histSec.style.display = 'block';
+    } else {
+      histSec.innerHTML = '';
+      histSec.style.display = 'none';
+    }
+  }
   modal.style.display = 'flex';
   setTimeout(function(){ modal.style.opacity = '1'; }, 10);
 }
@@ -24078,7 +24368,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 <!-- ══ MODAL ÉDITEUR DE TEMPLATE ══ -->
 <!-- ══ MODAL ÉDITION PARTENAIRE ══ -->
 <div id="modal-partenaire-edit" onclick="if(event.target===this)closePartenaireEdit()" style="display:none;opacity:0;transition:opacity .18s;position:fixed;inset:0;z-index:4100;align-items:center;justify-content:center;background:rgba(0,0,0,.65);padding:16px">
-  <div style="background:var(--navy2);border-radius:14px;width:min(540px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+  <div style="background:var(--navy2);border-radius:14px;width:min(640px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr);flex-shrink:0">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:18px">🤝</span>
@@ -24142,6 +24432,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         <!-- Liste des fichiers ajoutés -->
         <div id="pe-fichiers-list"></div>
       </div>
+      <!-- Historique compétitions -->
+      <div id="pe-history-section" style="display:none"></div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--bdr);flex-shrink:0">
       <button onclick="closePartenaireEdit()" style="padding:9px 18px;border:1px solid var(--bdr);border-radius:9px;background:none;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
