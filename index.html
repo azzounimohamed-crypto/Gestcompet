@@ -6206,22 +6206,7 @@ function hdgImportEquipageExcel(inp, compId) {
 
       var get = function(r, field){ return colMap[field] !== undefined ? (r[colMap[field]]||'').toString().trim() : ''; };
 
-      var fmtDate = function(v) {
-        if (!v) return '';
-        var s = v.toString().trim();
-        var dm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (dm) return dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
-        var ym = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (ym) return ym[1]+'-'+ym[2]+'-'+ym[3];
-        return s;
-      };
-      var mapGenre = function(v) {
-        var s = (v||'').toString().trim().toUpperCase();
-        if (s==='F'||s==='MME'||s==='MME.'||s==='FEMME') return 'Mme.';
-        if (s==='M'||s==='H'||s==='M.'||s==='MR'||s==='HOMME') return 'M.';
-        return v||'';
-      };
-      var normName = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+      var normName = _normStr;
 
       // Récupérer la compétition pour déduire la classe par défaut
       var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
@@ -6273,29 +6258,48 @@ function hdgImportEquipageExcel(inp, compId) {
         if (licF) found = (S.pilots||[]).find(function(p){ return p.licence && normName(p.licence)===normName(licF); });
         if (!found && nomF) found = (S.pilots||[]).find(function(p){ return normName(p.nom)===normName(nomF) && normName(p.prenom)===normName(prenomF); });
 
+        // Smart mapping des champs contrôlés
+        var rawForMap = {
+          pratique:   get(r, 'pratique'),
+          classe:     get(r, 'classe'),
+          categorie:  get(r, 'categorie'),
+          equipage:   get(r, 'equipage'),
+          discipline: get(r, 'discipline'),
+          role:       get(r, 'role')
+        };
+        var smart = (typeof _applySmartMapping === 'function')
+          ? _applySmartMapping(rawForMap, ldb)
+          : { pratique:'', classe: defaultClasse, categorie:'', equipage:'', discipline:'', role:'' };
+
+        var classeFinale = smart.classe || defaultClasse;
+
         if (found) {
           if (S.compEnroll[compId].indexOf(found.id) !== -1) {
             alreadyIn.push(found);
           } else {
-            toEnroll.push({ pilot: found, row: r });
+            toEnroll.push({ pilot: found, row: r, smart: smart });
           }
         } else {
           // Préparer un nouveau pilote à créer
           toCreate.push({
             nom: nomF, prenom: prenomF, licence: licF,
-            genre:  mapGenre((ldb&&ldb.genre)  || get(r, 'genre')),
-            ddn:    fmtDate((ldb&&ldb.ddn)     || get(r, 'ddn')),
-            email:  (ldb&&ldb.email)  || get(r, 'email')  || '',
-            tel:    (ldb&&ldb.tel)    || get(r, 'tel')    || '',
-            club:   (ldb&&ldb.club)   || get(r, 'club')   || '',
-            region: (ldb&&ldb.region) || get(r, 'region') || '',
-            classe: defaultClasse,
-            niveau: get(r, 'niveau') || '',
+            genre:     (typeof _mapGenre === 'function') ? _mapGenre((ldb&&ldb.genre)||get(r,'genre')) : '',
+            ddn:       (typeof _mapDate  === 'function') ? _mapDate((ldb&&ldb.ddn)||get(r,'ddn'))     : '',
+            email:     (ldb&&ldb.email)  || get(r, 'email')  || '',
+            tel:       (ldb&&ldb.tel)    || get(r, 'tel')    || '',
+            club:      (ldb&&ldb.club)   || get(r, 'club')   || '',
+            region:    (ldb&&ldb.region) || get(r, 'region') || '',
+            classe:    classeFinale,
+            pratique:  smart.pratique,
+            categorie: smart.categorie,
+            equipage:  smart.equipage,
+            discipline:smart.discipline,
+            role:      smart.role,
+            niveau:    get(r, 'niveau')    || '',
             remarques: get(r, 'remarques') || '',
-            // ULM data from Excel
-            _immat:  get(r, 'immat')  || '',
-            _marque: get(r, 'marque') || '',
-            _modele: get(r, 'modele') || '',
+            _immat:    get(r, 'immat')     || '',
+            _marque:   get(r, 'marque')    || '',
+            _modele:   get(r, 'modele')    || '',
             statut: 'pilote'
           });
         }
@@ -6327,6 +6331,17 @@ function _hdgShowEquipImportPreview(toEnroll, toCreate, alreadyIn, compId, defau
 
   var listHtml = '';
 
+  // Badges champs contrôlés (même helper que Compétiteurs)
+  var _equipBadges = function(c) {
+    var tags = '';
+    if (c.pratique||c.smart&&c.smart.pratique)   tags += '<span style="background:rgba(59,130,246,.15);color:#60a5fa;border-radius:4px;padding:1px 5px;font-size:10px">'+(c.pratique||c.smart.pratique)+'</span> ';
+    if (c.classe||c.smart&&c.smart.classe)        tags += '<span style="background:rgba(139,92,246,.15);color:#a78bfa;border-radius:4px;padding:1px 5px;font-size:10px">'+(c.classe||c.smart.classe)+'</span> ';
+    if (c.categorie||c.smart&&c.smart.categorie)  tags += '<span style="background:rgba(234,179,8,.15);color:#fbbf24;border-radius:4px;padding:1px 5px;font-size:10px">'+(c.categorie||c.smart.categorie)+'</span> ';
+    if (c.equipage||c.smart&&c.smart.equipage)    tags += '<span style="background:rgba(16,185,129,.15);color:#34d399;border-radius:4px;padding:1px 5px;font-size:10px">'+(c.equipage||c.smart.equipage)+'</span> ';
+    if (c.discipline||c.smart&&c.smart.discipline)tags += '<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:4px;padding:1px 5px;font-size:10px">'+(c.discipline||c.smart.discipline)+'</span> ';
+    return tags;
+  };
+
   // Section pilotes existants à inscrire
   if (toEnroll.length) {
     listHtml += '<div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:6px">🔗 ' + toEnroll.length + ' compétiteur(s) existant(s) à inscrire</div>';
@@ -6334,11 +6349,15 @@ function _hdgShowEquipImportPreview(toEnroll, toCreate, alreadyIn, compId, defau
     toEnroll.forEach(function(item, i) {
       var p = item.pilot;
       var bg = i%2===0?'background:var(--navy3)':'';
-      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+      var tags = _equipBadges(item);
+      listHtml += '<div style="padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
         + '<span style="color:#3b82f6;font-size:10px">●</span>'
         + '<span style="flex:1;font-weight:600">' + (p.prenom||'') + ' ' + (p.nom||'') + '</span>'
         + (p.licence?'<span style="color:var(--txt3);font-size:11px">'+p.licence+'</span>':'')
         + (p.club?'<span style="color:var(--txt3);font-size:11px">'+p.club+'</span>':'')
+        + '</div>'
+        + (tags?'<div style="margin-top:3px;padding-left:16px;display:flex;gap:3px;flex-wrap:wrap">'+tags+'</div>':'')
         + '</div>';
     });
     listHtml += '</div>';
@@ -6350,11 +6369,15 @@ function _hdgShowEquipImportPreview(toEnroll, toCreate, alreadyIn, compId, defau
     listHtml += '<div style="max-height:130px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px">';
     toCreate.forEach(function(c, i) {
       var bg = i%2===0?'background:var(--navy3)':'';
-      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+      var tags = _equipBadges(c);
+      listHtml += '<div style="padding:7px 10px;font-size:12px;'+bg+'">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
         + '<span style="color:#10b981;font-size:10px">★</span>'
         + '<span style="flex:1;font-weight:600">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
         + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
         + (c.club?'<span style="color:var(--txt3);font-size:11px">'+c.club+'</span>':'')
+        + '</div>'
+        + (tags?'<div style="margin-top:3px;padding-left:16px;display:flex;gap:3px;flex-wrap:wrap">'+tags+'</div>':'')
         + '</div>';
     });
     listHtml += '</div>';
@@ -6430,20 +6453,27 @@ function _hdgConfirmEquipImport() {
           id: pid,
           nom: c.nom, prenom: c.prenom, licence: c.licence,
           genre: c.genre, ddn: c.ddn, email: c.email, tel: c.tel,
-          club: c.club, region: c.region, niveau: c.niveau,
-          remarques: c.remarques, statut: 'pilote',
+          club: c.club, region: c.region,
+          pratique:  c.pratique  || '',
+          categorie: c.categorie || '',
+          equipage:  c.equipage  || '',
+          discipline:c.discipline|| '',
+          role:      c.role      || '',
+          niveau:    c.niveau    || '',
+          remarques: c.remarques || '',
+          statut: 'pilote',
           _updatedAt: Date.now()
         };
         S.pilots.push(newPilot);
 
         // Créer un ULM si données disponibles
-        if (c._immat || c._marque || c._modele) {
+        if (c._immat || c._marque || c._modele || c.classe) {
           if (!S.ulms) S.ulms = {};
           if (!S.ulms[pid]) S.ulms[pid] = [];
           S.ulms[pid].push({
             id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-            classe: defClasse,
-            immat: c._immat || '', marque: c._marque || '', modele: c._modele || ''
+            classe: c.classe || defClasse,
+            immat: c._immat||'', marque: c._marque||'', modele: c._modele||''
           });
         }
 
@@ -14147,6 +14177,96 @@ function _normStr(s) {
   return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 }
 
+/* ══════════ NORMALISEURS DE VALEURS CONTRÔLÉES ══════════ */
+
+/* Pratique : microlight | paramoteur */
+function _mapPratique(v) {
+  var s = _normStr(v);
+  if (!s) return '';
+  if (s==='MICROLIGHT'||s==='MICRO'||s==='ULM'||s==='MLT'||s==='ML') return 'microlight';
+  if (s.indexOf('PARAM')!==-1||s==='PM'||s==='PARA') return 'paramoteur';
+  if (s.indexOf('MICRO')!==-1) return 'microlight';
+  return '';
+}
+
+/* Classe ULM : pendulaire | multiaxes | gyro | paramotor */
+function _mapClasse(v) {
+  var s = _normStr(v);
+  if (!s) return '';
+  if (s.indexOf('MULTI')!==-1||s==='MA'||s==='MX') return 'multiaxes';
+  if (s.indexOf('GYRO')!==-1||s.indexOf('AUTO')!==-1||s==='GY') return 'gyro';
+  if (s.indexOf('PARAM')!==-1||s==='PM'||s==='PARA') return 'paramotor';
+  if (s.indexOf('PENDU')!==-1||s==='PE'||s==='PEN'||s==='TRI') return 'pendulaire';
+  if (s==='ULM') return 'pendulaire'; // défaut ULM générique
+  return '';
+}
+
+/* Catégorie paramoteur : PF1 | PF2 | PL1 | PL2 */
+function _mapCategorie(v) {
+  var s = _normStr(v).replace(/[\s\-_]/g,'');
+  if (!s) return '';
+  if (s==='PF1') return 'PF1';
+  if (s==='PF2') return 'PF2';
+  if (s==='PL1') return 'PL1';
+  if (s==='PL2') return 'PL2';
+  // Tentative souple : "Pilote Féminin 1" etc.
+  if (s.indexOf('F1')!==-1||s.indexOf('FEM1')!==-1) return 'PF1';
+  if (s.indexOf('F2')!==-1||s.indexOf('FEM2')!==-1) return 'PF2';
+  if (s.indexOf('L1')!==-1||s.indexOf('LIB1')!==-1) return 'PL1';
+  if (s.indexOf('L2')!==-1||s.indexOf('LIB2')!==-1) return 'PL2';
+  return '';
+}
+
+/* Équipages : Monoplace | Biplace */
+function _mapEquipage(v) {
+  var s = _normStr(v).replace(/[\s\-_]/g,'');
+  if (!s) return '';
+  if (s==='MONOPLACE'||s==='MONO'||s==='1'||s==='M'||s==='SOLO'||s.indexOf('MONO')!==-1) return 'Monoplace';
+  if (s==='BIPLACE'||s==='BI'||s==='2'||s==='B'||s==='DUO'||s.indexOf('BIPLAC')!==-1||s.indexOf('BIPL')!==-1) return 'Biplace';
+  return '';
+}
+
+/* Discipline : classic | slalom | stol | cross | precision */
+function _mapDiscipline(v) {
+  var s = _normStr(v);
+  if (!s) return '';
+  if (s.indexOf('CLASS')!==-1||s==='CL') return 'classic';
+  if (s.indexOf('SLAL')!==-1||s==='SL') return 'slalom';
+  if (s.indexOf('STOL')!==-1||s==='ST') return 'stol';
+  if (s.indexOf('CROSS')!==-1||s==='CR'||s.indexOf('FOND')!==-1) return 'cross';
+  if (s.indexOf('PREC')!==-1||s==='PR'||s.indexOf('PRECI')!==-1) return 'precision';
+  return '';
+}
+
+/* Rôle : Pilote | Navigateur */
+function _mapRole(v) {
+  var s = _normStr(v);
+  if (!s) return '';
+  if (s.indexOf('PILOT')!==-1||s==='P'||s==='PL') return 'Pilote';
+  if (s.indexOf('NAV')!==-1||s==='N'||s.indexOf('COPIL')!==-1||s.indexOf('PASS')!==-1) return 'Navigateur';
+  return '';
+}
+
+/* Genre : Mme. | M. */
+function _mapGenre(v) {
+  var s = _normStr(v).replace(/[\s\.]/g,'');
+  if (!s) return '';
+  if (s==='F'||s==='MME'||s==='FEMME'||s==='FEMALE'||s==='W'||s==='WOMAN') return 'Mme.';
+  if (s==='M'||s==='MR'||s==='HOMME'||s==='MALE'||s==='H'||s==='MAN') return 'M.';
+  return v||'';
+}
+
+/* Date DD/MM/YYYY ou YYYY-MM-DD → YYYY-MM-DD */
+function _mapDate(v) {
+  if (!v) return '';
+  var s = v.toString().trim();
+  var dm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dm) return dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+  var ym = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ym) return ym[1]+'-'+ym[2]+'-'+ym[3];
+  return s;
+}
+
 /* ── Mapping colonnes Excel → champs internes compétiteur ── */
 var _PILOT_COL_MAP = {
   // Licence
@@ -14166,10 +14286,29 @@ var _PILOT_COL_MAP = {
   // Aéro
   'club':'club','aéroclub':'club','aeroclub':'club','club sportif':'club',
   'region':'region','région':'region','ligue':'region',
-  'classe':'classe','class':'classe','discipline':'classe','categorie':'classe','catégorie':'classe',
+  // Classe ULM (pendulaire / multiaxes / gyro / paramotor)
+  'classe':'classe','class':'classe','classe ulm':'classe','type ulm':'classe','type appareil':'classe',
+  // Pratique (microlight / paramoteur)
+  'pratique':'pratique','activite':'pratique','activité':'pratique','sport':'pratique','type pratique':'pratique',
+  // Catégorie paramoteur (PF1/PF2/PL1/PL2)
+  'categorie':'categorie','catégorie':'categorie','cat':'categorie','cat.':'categorie',
+  'categorie competiteur':'categorie','catégorie compétiteur':'categorie',
+  // Équipages (Monoplace / Biplace)
+  'equipage':'equipage','équipage':'equipage','equipages':'equipage','équipages':'equipage',
+  'nb places':'equipage','places':'equipage','monoplace biplace':'equipage',
+  // Discipline (classic/slalom/stol/cross/precision)
+  'discipline':'discipline','disc':'discipline','epreuve':'discipline','épreuve':'discipline',
+  'type epreuve':'discipline','type épreuve':'discipline',
+  // Rôle (Pilote / Navigateur)
+  'role':'role','rôle':'role','fonction':'role',
+  // ULM données
+  'immat':'immat','immatriculation':'immat','immat.':'immat','immatriculation ulm':'immat',
+  'marque':'marque','brand':'marque','constructeur':'marque',
+  'modele':'modele','modèle':'modele','model':'modele','type':'modele',
+  // Autres
   'niveau':'niveau','level':'niveau',
-  // Remarques
-  'remarques':'remarques','remarque':'remarques','notes':'remarques','note':'remarques','commentaire':'remarques','commentaires':'remarques',
+  'remarques':'remarques','remarque':'remarques','notes':'remarques','note':'remarques',
+  'commentaire':'remarques','commentaires':'remarques','observations':'remarques',
 };
 
 function _detectPilotColumns(headerRow) {
@@ -14182,6 +14321,47 @@ function _detectPilotColumns(headerRow) {
     }
   });
   return map;
+}
+
+/* Applique tous les normaliseurs sur un objet candidat brut */
+function _applySmartMapping(raw, ldb) {
+  // pratique
+  var pratique = _mapPratique((ldb&&ldb.pratique)||raw.pratique||'');
+
+  // classe ULM (colonne "classe" dans Excel peut contenir "Multiaxes", "MA", etc.)
+  var classe = _mapClasse((ldb&&ldb.classe)||raw.classe||raw.discipline||'');
+
+  // Si classe contient "paramotor" → pratique = paramoteur sauf si déjà défini
+  if (!pratique && classe === 'paramotor') pratique = 'paramoteur';
+  // Si pratique est paramoteur et classe vide → garde classe vide (sera lié à l'ULM)
+  if (!classe && pratique === 'microlight') classe = 'pendulaire';
+
+  // catégorie paramoteur
+  var categorie = _mapCategorie((ldb&&ldb.categorie)||raw.categorie||'');
+  // Si PL1/PF1 détecté → force pratique paramoteur
+  if (categorie && !pratique) pratique = 'paramoteur';
+
+  // équipages
+  var equipage = _mapEquipage((ldb&&ldb.equipage)||raw.equipage||'');
+  // PL1/PF1 → toujours Monoplace
+  if ((categorie==='PL1'||categorie==='PF1') && !equipage) equipage = 'Monoplace';
+
+  // discipline
+  var discipline = _mapDiscipline((ldb&&ldb.discipline)||raw.discipline||'');
+
+  // rôle
+  var role = _mapRole((ldb&&ldb.role)||raw.role||'');
+  // Monoplace → toujours Pilote
+  if (equipage==='Monoplace' && !role) role = 'Pilote';
+
+  return {
+    pratique:   pratique,
+    classe:     classe || '',
+    categorie:  categorie,
+    equipage:   equipage,
+    discipline: discipline,
+    role:       role
+  };
 }
 
 /* ── Import Excel compétiteurs ── */
@@ -14218,29 +14398,6 @@ function importPilotsExcel(input) {
 
       _updateImportProgress('Comparaison avec les données existantes…', dataRows.length + ' lignes trouvées');
 
-      var fmtDate = function(v) {
-        if (!v) return '';
-        var s = v.toString().trim();
-        var dm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (dm) return dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
-        var ym = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (ym) return ym[1]+'-'+ym[2]+'-'+ym[3];
-        return s;
-      };
-      var mapGenre = function(v) {
-        var s = (v||'').toString().trim().toUpperCase();
-        if (s==='F'||s==='MME'||s==='MME.'||s==='FEMME') return 'Mme.';
-        if (s==='M'||s==='H'||s==='M.'||s==='MR'||s==='MR.'||s==='HOMME') return 'M.';
-        return v||'';
-      };
-      var mapClasse = function(v) {
-        var s = _normStr(v);
-        if (s.indexOf('MULTI')!==-1||s==='MA') return 'multiaxes';
-        if (s.indexOf('GYRO')!==-1||s.indexOf('AUTO')!==-1||s==='GY') return 'gyro';
-        if (s.indexOf('PENDU')!==-1||s==='PE'||s==='ULM') return 'pendulaire';
-        return v||'';
-      };
-
       // Construire la liste des candidats depuis Excel
       var candidates = [];
       dataRows.forEach(function(r) {
@@ -14251,7 +14408,6 @@ function importPilotsExcel(input) {
           var full = get('_nomComplet').trim();
           var parts = full.split(/\s+/);
           if (parts.length >= 2) {
-            // Heuristique : le nom est souvent en majuscules
             var hasUpperNom = parts[0] === parts[0].toUpperCase();
             nom = hasUpperNom ? parts[0] : parts[parts.length-1];
             prenom = hasUpperNom ? parts.slice(1).join(' ') : parts.slice(0,-1).join(' ');
@@ -14263,30 +14419,52 @@ function importPilotsExcel(input) {
         // Chercher dans licenceDB si disponible
         var ldb = null;
         if (S.licenceDB) {
-          if (licence) {
-            ldb = Object.values(S.licenceDB).find(function(x){ return x.licence === licence; }) || null;
-          }
+          if (licence) ldb = Object.values(S.licenceDB).find(function(x){ return x.licence === licence; }) || null;
           if (!ldb && nom) {
-            var k1 = _normStr(nom)+'|'+_normStr(prenom);
-            var k2 = _normStr(prenom)+'|'+_normStr(nom);
-            ldb = S.licenceDB[k1] || S.licenceDB[k2] || null;
+            ldb = S.licenceDB[_normStr(nom)+'|'+_normStr(prenom)]
+               || S.licenceDB[_normStr(prenom)+'|'+_normStr(nom)] || null;
           }
         }
 
+        // Valeurs brutes depuis Excel pour le smart mapping
+        var rawForMap = {
+          pratique:   get('pratique'),
+          classe:     get('classe'),
+          categorie:  get('categorie'),
+          equipage:   get('equipage'),
+          discipline: get('discipline'),
+          role:       get('role')
+        };
+        var smart = _applySmartMapping(rawForMap, ldb);
+
+        // Classe finale : priorité smart, sinon classe courante de l'écran
+        var classeFinale = smart.classe || (typeof _pilotsClass !== 'undefined' ? _pilotsClass : 'pendulaire');
+
         var candidate = {
-          nom:      (ldb&&ldb.nom)    || nom    || '',
-          prenom:   (ldb&&ldb.prenom) || prenom || '',
-          licence:  (ldb&&ldb.licence)|| licence|| '',
-          genre:    mapGenre((ldb&&ldb.genre)   || get('genre')  || ''),
-          ddn:      fmtDate((ldb&&ldb.ddn)      || get('ddn')    || ''),
-          email:    (ldb&&ldb.email)  || get('email')  || '',
-          tel:      (ldb&&ldb.tel)    || get('tel')    || '',
-          club:     (ldb&&ldb.club)   || get('club')   || '',
-          region:   (ldb&&ldb.region) || get('region') || '',
-          classe:   mapClasse(get('classe')) || _pilotsClass || 'pendulaire',
-          niveau:   get('niveau') || '',
-          remarques:get('remarques') || '',
-          statut:   'pilote',
+          nom:       (ldb&&ldb.nom)     || nom     || '',
+          prenom:    (ldb&&ldb.prenom)  || prenom  || '',
+          licence:   (ldb&&ldb.licence) || licence || '',
+          genre:     _mapGenre((ldb&&ldb.genre)  || get('genre')),
+          ddn:       _mapDate((ldb&&ldb.ddn)     || get('ddn')),
+          email:     (ldb&&ldb.email)   || get('email')  || '',
+          tel:       (ldb&&ldb.tel)     || get('tel')    || '',
+          club:      (ldb&&ldb.club)    || get('club')   || '',
+          region:    (ldb&&ldb.region)  || get('region') || '',
+          // ── Champs contrôlés normalisés ──
+          classe:     classeFinale,
+          pratique:   smart.pratique,
+          categorie:  smart.categorie,
+          equipage:   smart.equipage,
+          discipline: smart.discipline,
+          role:       smart.role,
+          // ── ULM ──
+          _immat:    get('immat')  || '',
+          _marque:   get('marque') || '',
+          _modele:   get('modele') || '',
+          // ── Autres ──
+          niveau:    get('niveau')    || '',
+          remarques: get('remarques') || '',
+          statut:    'pilote',
           _fromExcel: true
         };
         candidates.push(candidate);
@@ -14338,16 +14516,30 @@ function _showPilotsImportPreview(toAdd, alreadyExist, colMap) {
   var colsDetected = Object.keys(colMap).filter(function(k){ return k!=='_nomComplet'; }).join(', ');
 
   var listHtml = '';
+  // Badges pour valeurs contrôlées d'un candidat
+  var _pilotBadges = function(c) {
+    var tags = '';
+    if (c.pratique)   tags += '<span style="background:rgba(59,130,246,.15);color:#60a5fa;border-radius:4px;padding:1px 5px;font-size:10px">'+c.pratique+'</span> ';
+    if (c.classe)     tags += '<span style="background:rgba(139,92,246,.15);color:#a78bfa;border-radius:4px;padding:1px 5px;font-size:10px">'+c.classe+'</span> ';
+    if (c.categorie)  tags += '<span style="background:rgba(234,179,8,.15);color:#fbbf24;border-radius:4px;padding:1px 5px;font-size:10px">'+c.categorie+'</span> ';
+    if (c.equipage)   tags += '<span style="background:rgba(16,185,129,.15);color:#34d399;border-radius:4px;padding:1px 5px;font-size:10px">'+c.equipage+'</span> ';
+    if (c.discipline) tags += '<span style="background:rgba(239,68,68,.15);color:#f87171;border-radius:4px;padding:1px 5px;font-size:10px">'+c.discipline+'</span> ';
+    return tags;
+  };
+
   if (toAdd.length) {
     listHtml += '<div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px">✅ ' + toAdd.length + ' nouveau(x) à importer</div>';
-    listHtml += '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:12px">';
+    listHtml += '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:12px">';
     toAdd.forEach(function(c, i) {
       var bg = i%2===0?'background:var(--navy3)':'';
-      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+      listHtml += '<div style="padding:7px 10px;font-size:12px;'+bg+'">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
         + '<span style="color:#10b981;font-size:10px">●</span>'
         + '<span style="flex:1;font-weight:600">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
         + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
         + (c.club?'<span style="color:var(--txt3);font-size:11px">'+c.club+'</span>':'')
+        + '</div>'
+        + (_pilotBadges(c) ? '<div style="margin-top:3px;padding-left:16px;display:flex;gap:3px;flex-wrap:wrap">'+_pilotBadges(c)+'</div>' : '')
         + '</div>';
     });
     listHtml += '</div>';
@@ -14358,10 +14550,13 @@ function _showPilotsImportPreview(toAdd, alreadyExist, colMap) {
     alreadyExist.forEach(function(item, i) {
       var c = item.candidate;
       var bg = i%2===0?'background:var(--navy3)':'';
-      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+      listHtml += '<div style="padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
         + '<span style="color:var(--txt3);font-size:10px">●</span>'
         + '<span style="flex:1;color:var(--txt2)">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
         + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
+        + '</div>'
+        + (_pilotBadges(c) ? '<div style="margin-top:2px;padding-left:16px;display:flex;gap:3px;flex-wrap:wrap">'+_pilotBadges(c)+'</div>' : '')
         + '</div>';
     });
     listHtml += '</div>';
@@ -14412,10 +14607,28 @@ function _confirmPilotsImport() {
       var added = 0, updated = 0;
 
       toAdd.forEach(function(c) {
-        delete c._fromExcel;
-        c.id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-        c._updatedAt = Date.now();
-        S.pilots.push(c);
+        var pid = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        var newPilot = {
+          id: pid,
+          nom: c.nom, prenom: c.prenom, licence: c.licence,
+          genre: c.genre, ddn: c.ddn, email: c.email, tel: c.tel,
+          club: c.club, region: c.region,
+          pratique: c.pratique, categorie: c.categorie,
+          equipage: c.equipage, discipline: c.discipline, role: c.role,
+          niveau: c.niveau, remarques: c.remarques,
+          statut: 'pilote', _updatedAt: Date.now()
+        };
+        S.pilots.push(newPilot);
+        // Créer ULM si données disponibles
+        if (c._immat || c._marque || c._modele || c.classe) {
+          if (!S.ulms) S.ulms = {};
+          if (!S.ulms[pid]) S.ulms[pid] = [];
+          S.ulms[pid].push({
+            id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+            classe: c.classe || 'pendulaire',
+            immat: c._immat||'', marque: c._marque||'', modele: c._modele||''
+          });
+        }
         added++;
       });
 
@@ -14423,10 +14636,23 @@ function _confirmPilotsImport() {
         alreadyExist.forEach(function(item) {
           var c = item.candidate;
           var p = item.existing;
-          delete c._fromExcel;
-          var FIELDS = ['licence','genre','ddn','email','tel','club','region','niveau','remarques'];
-          FIELDS.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
-          if (c.licence && !p.licence) { p.licence = c.licence; }
+          // Champs texte libres : compléter si vide
+          var FILL = ['licence','genre','ddn','email','tel','club','region','niveau','remarques'];
+          FILL.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
+          // Champs contrôlés : appliquer si non vide dans Excel ET vide dans la fiche
+          var CTRL = ['pratique','categorie','equipage','discipline','role'];
+          CTRL.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
+          // ULM : compléter le premier ULM si présent
+          if ((c._immat||c._marque||c._modele||c.classe) && S.ulms) {
+            var ulms = S.ulms[p.id];
+            if (ulms && ulms.length) {
+              var u = ulms[0];
+              if (c._immat && !u.immat) u.immat = c._immat;
+              if (c._marque && !u.marque) u.marque = c._marque;
+              if (c._modele && !u.modele) u.modele = c._modele;
+              if (c.classe && !u.classe) u.classe = c.classe;
+            }
+          }
           p._updatedAt = Date.now();
           updated++;
         });
