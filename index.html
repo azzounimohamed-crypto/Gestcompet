@@ -672,7 +672,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <div style="font-size:12px;color:var(--txt3);margin-top:2px">Vue globale de la saison</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <select id="base-saison-sel" onchange="renderBase()"
+          <select id="base-saison-sel" onchange="_globalSaison=this.value;_syncSaisonSelects();renderBase()"
             style="background:var(--navy3);border:1.5px solid var(--bdr);border-radius:10px;color:var(--txt);font-family:inherit;font-size:14px;font-weight:700;padding:8px 14px;outline:none;cursor:pointer;min-width:110px">
           </select>
           <button onclick="openAgenda()" title="Agenda saisonnier"
@@ -922,7 +922,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" oninput="_debRender()">
         </div>
         <!-- Saison -->
-        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
+        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="_globalSaison=this.value;_syncSaisonSelects();renderCompetitions()">
           <option value="all">Toutes saisons</option>
         </select>
         <!-- Pratique -->
@@ -1419,6 +1419,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <div class="section-title">Import licences FFPLUM</div>
         <div class="card">
           <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Sélectionnez le fichier <strong>Licence 2015 2025.xlsx</strong> pour mettre à jour automatiquement les compétiteurs et le staff avec les données manquantes (genre, DDN, téléphone, email, adresse, licence, club, région).</div>
+          <div id="licence-status-bar" style="margin-bottom:8px"></div>
           <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('import-licence-inp').click()">📋 Importer le fichier licences FFPLUM</button>
           <input type="file" id="import-licence-inp" accept=".xlsx,.xls" style="display:none" onchange="importLicenceFfplum(this)">
           <div id="import-licence-result" style="margin-top:10px;display:none"></div>
@@ -2682,6 +2683,7 @@ var S = {
   moyens: [],
   documents: [],
   officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 },
+  settings: { logo: null, licenceInfo: null },
   docSettings: {
     signataire: { prenom: 'Mohamed', nom: 'AZZOUNI', titre: 'Directeur Technique National', organisation: 'Fédération Française ULM', ville: 'Maisons-Alfort' },
     signatureImage: null,
@@ -2802,6 +2804,20 @@ async function loadState() {
           if (lp && ip.photo) lp.photo = ip.photo;
         });
         if (idbData.licenceDB) S.licenceDB = idbData.licenceDB;
+        // Restaurer images volumineuses strippées de localStorage
+        if (idbData.officialDocs) {
+          if (!S.officialDocs) S.officialDocs = {};
+          if (!S.officialDocs.header && idbData.officialDocs.header) S.officialDocs.header = idbData.officialDocs.header;
+          if (!S.officialDocs.footer && idbData.officialDocs.footer) S.officialDocs.footer = idbData.officialDocs.footer;
+        }
+        if (idbData.settings) {
+          if (!S.settings) S.settings = {};
+          if (!S.settings.logo && idbData.settings.logo) S.settings.logo = idbData.settings.logo;
+          if (!S.settings.licenceInfo && idbData.settings.licenceInfo) S.settings.licenceInfo = idbData.settings.licenceInfo;
+        }
+        if (idbData.docSettings && idbData.docSettings.signatureImage && S.docSettings && !S.docSettings.signatureImage) {
+          S.docSettings.signatureImage = idbData.docSettings.signatureImage;
+        }
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
         Object.assign(S, idbData);
@@ -2827,11 +2843,20 @@ function clearLocalStorageQuota() {
 }
 
 function _stripBigData(obj) {
-  // Retirer les données volumineuses pour alléger localStorage
+  // Retirer les données volumineuses pour alléger localStorage (IDB + cloud restent sources principales)
   var o = JSON.parse(JSON.stringify(obj));
   if (o.pilots) o.pilots = o.pilots.map(function(p){ if (p.photo && p.photo.startsWith('data:')) delete p.photo; return p; });
   if (o.comps)  o.comps  = o.comps.map(function(c){ if (c.affiche && c.affiche.startsWith('data:')) delete c.affiche; return c; });
-  delete o.licenceDB; // licenceDB est sauvegardé uniquement dans IndexedDB (trop volumineux pour localStorage)
+  // Images officialDocs (header/footer) → stockées IDB + cloud uniquement
+  if (o.officialDocs) {
+    if (o.officialDocs.header && typeof o.officialDocs.header === 'string' && o.officialDocs.header.startsWith('data:')) delete o.officialDocs.header;
+    if (o.officialDocs.footer && typeof o.officialDocs.footer === 'string' && o.officialDocs.footer.startsWith('data:')) delete o.officialDocs.footer;
+  }
+  // Logo app → IDB + cloud uniquement
+  if (o.settings && o.settings.logo) delete o.settings.logo;
+  // Signature image → IDB + cloud uniquement
+  if (o.docSettings && o.docSettings.signatureImage) delete o.docSettings.signatureImage;
+  delete o.licenceDB; // IDB uniquement (trop volumineux)
   return o;
 }
 // saveState avec debounce 80ms pour ne pas bloquer l'UI sur chaque action
@@ -3498,10 +3523,37 @@ function updateSeasonFilter() {
   var all = document.createElement('option'); all.value = 'all'; all.textContent = 'Toutes saisons';
   if (prev === 'all') all.selected = true;
   sel.appendChild(all);
-  // Default to current year if available, else latest (never override 'all' or valid season selection)
-  if (!prev || (prev !== 'all' && !seasons.includes(prev))) {
+  // Synchroniser avec _globalSaison
+  var targetSaison = _globalSaison || new Date().getFullYear().toString();
+  if (seasons.includes(targetSaison)) {
+    sel.value = targetSaison;
+  } else if (prev === 'all' || seasons.includes(prev)) {
+    sel.value = prev;
+  } else {
     var curYear = new Date().getFullYear().toString();
     sel.value = seasons.includes(curYear) ? curYear : (seasons[0] || 'all');
+    _globalSaison = sel.value;
+  }
+}
+
+// ── Logo centralisé (S.settings.logo > localStorage legacy) ──
+function _getAppLogo() {
+  return (S.settings && S.settings.logo) || localStorage.getItem('ffplum_logo') || '';
+}
+
+// ── Saison partagée entre page Base et page Compétitions ──
+var _globalSaison = new Date().getFullYear().toString();
+function _syncSaisonSelects() {
+  var s1 = document.getElementById('base-saison-sel');
+  var s2 = document.getElementById('comp-season-filter');
+  if (s1 && s1.value !== _globalSaison) {
+    // Vérifier que la valeur existe dans les options
+    var opt1 = Array.from(s1.options).find(function(o){ return o.value === _globalSaison; });
+    if (opt1) s1.value = _globalSaison;
+  }
+  if (s2 && s2.value !== _globalSaison) {
+    var opt2 = Array.from(s2.options).find(function(o){ return o.value === _globalSaison; });
+    if (opt2) s2.value = _globalSaison;
   }
 }
 
@@ -4963,14 +5015,15 @@ function renderBase() {
     if (!seasons.includes(curYear)) seasons.push(curYear);
     seasons.sort(function(a,b){ return b.localeCompare(a); });
     // Reconstruire seulement si nécessaire (éviter perte de sélection)
-    var prevVal = sel.value;
     if (sel.options.length !== seasons.length) {
       sel.innerHTML = seasons.map(function(y){
-        return '<option value="'+y+'"'+(y===curYear?' selected':'')+'>Saison '+y+'</option>';
+        return '<option value="'+y+'">Saison '+y+'</option>';
       }).join('');
     }
-    if (prevVal && seasons.includes(prevVal)) sel.value = prevVal;
-    else sel.value = curYear;
+    // Synchroniser avec la saison globale partagée
+    var targetS = _globalSaison || curYear;
+    if (seasons.includes(targetS)) sel.value = targetS;
+    else { sel.value = curYear; _globalSaison = curYear; }
   }
 
   var saison = sel ? sel.value : curYear;
@@ -8549,7 +8602,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var CLSPOD = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
     var podColors = ['#f59e0b','#94a3b8','#cd7c2f'];
     var podHeights = [80,56,44];
-    var appLogo = localStorage.getItem('ffplum_logo')||'';
+    var appLogo = _getAppLogo();
     var byClassR = {};
     Object.keys(byPilotR).forEach(function(pid){
       var info = byPilotR[pid];
@@ -9880,7 +9933,7 @@ function printCompResults(compId) {
   var cp        = S.comps.find(function(c){ return c.id===compId; }) || {};
   var runs      = (S.runs||{})[compId] || [];
   var staffList = (S.staff||{})[compId] || [];
-  var logo      = localStorage.getItem('ffplum_logo') || '';
+  var logo      = _getAppLogo();
   var typeLabel = {'comp-internationale':'Compétition internationale','cdf':'Compétition nationale','regional':'Compétition régionale','comp-regionale':'Compétition régionale','entrainement-national':'Entraînement national','entrainement':'Entraînement / Qualif','stage':'Stage'}[cp.type] || (cp.type||'');
   var today     = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
 
@@ -10915,7 +10968,7 @@ function switchSettingsTab(tab, btn) {
       }).catch(function(){});
     }
   }
-  if (tab === 'reglages') { applyTheme(localStorage.getItem('geststol_theme') || 'auto'); renderReglagesLogoSection(); renderReglagesOdmSection(); updateNotifButtons(); }
+  if (tab === 'reglages') { applyTheme(localStorage.getItem('geststol_theme') || 'auto'); renderReglagesLogoSection(); renderReglagesOdmSection(); updateNotifButtons(); _renderLicenceStatus(); }
 }
 
 function renderSettingsCompte() {
@@ -13387,6 +13440,7 @@ async function pushToCloud() {
     _deletedDocuments:    S._deletedDocuments    || {},
     partenaireTypes:      S.partenaireTypes       || null,
     moyens:               S.moyens               || [],
+    settings:             S.settings             || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -13780,6 +13834,12 @@ async function pullFromCloud() {
   }
   S.officialDocs       = _mergeObjOfArrays(S.officialDocs,       r.officialDocs);
   S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
+  // Settings (logo, licenceInfo) — remote prioritaire si local absent
+  if (r.settings && typeof r.settings === 'object') {
+    if (!S.settings) S.settings = {};
+    if (!S.settings.logo && r.settings.logo) S.settings.logo = r.settings.logo;
+    if (!S.settings.licenceInfo && r.settings.licenceInfo) S.settings.licenceInfo = r.settings.licenceInfo;
+  }
   // Objets scalaires simples
   S.docSettings        = _mergeObj(S.docSettings, r.docSettings);
   // Types de partenaire : union des deux listes (local + cloud), ordre local en premier
@@ -16520,7 +16580,7 @@ function showWelcomeScreen() {
   var ws = document.getElementById('welcome-screen');
   if (ws) { ws.style.display = 'flex'; }
   // Logo chargé depuis réglages (ou logo FFPLUM par défaut)
-  var savedLogo = localStorage.getItem('ffplum_logo');
+  var savedLogo = _getAppLogo();
   var logoSrc = savedLogo || window._FFPLUM_LOGO_SRC || '';
   var img = document.getElementById('welcome-logo-top-img');
   var fb  = document.getElementById('welcome-logo-top-fb');
@@ -18842,6 +18902,28 @@ function importDataFull(inp) {
 // ══════════════════════════════════════════════════════
 // IMPORT LICENCES FFPLUM (.xlsx)
 // ══════════════════════════════════════════════════════
+function _renderLicenceStatus() {
+  var bar = document.getElementById('licence-status-bar');
+  if (!bar) return;
+  var info = S.settings && S.settings.licenceInfo;
+  var dbCount = S.licenceDB ? Object.keys(S.licenceDB).length : 0;
+  if (info || dbCount > 0) {
+    var count = info ? info.count : dbCount;
+    var dateStr = info ? new Date(info.date).toLocaleDateString('fr-FR') : '—';
+    var fname = info ? info.filename : '—';
+    bar.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:12px">'
+      + '<span style="font-size:16px">✅</span>'
+      + '<div><div style="font-weight:700;color:#10b981">Licences chargées — '+count.toLocaleString()+' licenciés</div>'
+      + '<div style="color:var(--txt3);font-size:11px">'+fname+' · importé le '+dateStr+'</div></div>'
+      + '</div>';
+  } else {
+    bar.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;font-size:12px">'
+      + '<span style="font-size:16px">⚠️</span>'
+      + '<div style="color:var(--amber)">Aucun fichier licences chargé — les fonctions &laquo; Compléter depuis licence &raquo; ne seront pas disponibles.</div>'
+      + '</div>';
+  }
+}
+
 function importLicenceFfplum(inp) {
   if (!inp.files || !inp.files[0]) return;
   var resultEl = document.getElementById('import-licence-result');
@@ -18972,9 +19054,17 @@ function importLicenceFfplum(inp) {
         });
       }
 
+      // Mémoriser métadonnées d'import (persistées dans S.settings → cloud)
+      if (!S.settings) S.settings = {};
+      S.settings.licenceInfo = {
+        date: Date.now(),
+        count: Object.keys(S.licenceDB || {}).length,
+        filename: (inp.files[0] && inp.files[0].name) || 'licences.xlsx'
+      };
       saveState();
       if (typeof silentPush === 'function') silentPush();
       if (typeof renderPilots === 'function') renderPilots();
+      _renderLicenceStatus();
 
       // Rapport
       var html = '<div style="font-size:12px">';
@@ -19173,7 +19263,7 @@ function updateHeader() {
   var logoImg = document.getElementById('header-logo-img');
   var logoFallback = document.getElementById('header-logo-fallback');
   if (logoImg) {
-    var savedLogo = localStorage.getItem('ffplum_logo');
+    var savedLogo = _getAppLogo();
     if (savedLogo) {
       logoImg.src = savedLogo;
       logoImg.style.display = '';
@@ -19196,7 +19286,7 @@ function updateHeader() {
   var dtnLogoEl = document.getElementById('dtn-logo-img');
   var dtnFbEl   = document.getElementById('dtn-logo-fb');
   if (dtnLogoEl) {
-    var lgo = localStorage.getItem('ffplum_logo');
+    var lgo = _getAppLogo();
     if (lgo) { dtnLogoEl.src = lgo; dtnLogoEl.style.display = ''; if(dtnFbEl) dtnFbEl.style.display = 'none'; }
     else { dtnLogoEl.style.display = 'none'; if(dtnFbEl) dtnFbEl.style.display = 'flex'; }
   }
@@ -19209,15 +19299,21 @@ function handleLogoUpload(inp) {
   if (!inp.files || !inp.files[0]) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    localStorage.setItem('ffplum_logo', e.target.result);
-    renderReglagesLogoSection();
+    if (!S.settings) S.settings = {};
+    S.settings.logo = e.target.result;
+    localStorage.setItem('ffplum_logo', e.target.result); // compat legacy
+    saveState(); silentPush();
+    renderReglagesLogoSection(); updateHeader();
     toast('Logo mis à jour ✓', 'ok');
   };
   reader.readAsDataURL(inp.files[0]);
 }
 function removeSplashLogo() {
+  if (!S.settings) S.settings = {};
+  S.settings.logo = null;
   localStorage.removeItem('ffplum_logo');
-  renderReglagesLogoSection();
+  saveState(); silentPush();
+  renderReglagesLogoSection(); updateHeader();
   toast('Logo supprimé', 'ok');
 }
 function renderReglagesLogoSection() {
@@ -19229,7 +19325,7 @@ function renderReglagesLogoSection() {
   if (!isGest) return;
   var preview = document.getElementById('regl-logo-preview');
   if (!preview) return;
-  var saved = localStorage.getItem('ffplum_logo');
+  var saved = _getAppLogo();
   var logoSrc = saved || (typeof _FFPLUM_LOGO_DEFAULT !== 'undefined' ? _FFPLUM_LOGO_DEFAULT : '');
   preview.innerHTML = '<img src="' + logoSrc + '" style="width:56px;height:56px;object-fit:contain">';
 }
@@ -19394,7 +19490,7 @@ function printCompDossier(compId, opts) {
   var bdata     = (S.budgets||{})[compId] || {engagement:[], ressources:[]};
   var partList  = (S.partenaires||{})[compId] || [];
   var runs      = (S.runs||{})[compId] || [];
-  var logo      = localStorage.getItem('ffplum_logo') || 'https://ffplum.fr/templates/ffplum/images/logo.png';
+  var logo      = _getAppLogo() || 'https://ffplum.fr/templates/ffplum/images/logo.png';
   var now       = new Date();
   var nowStr    = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})
                 + ' à ' + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
@@ -21013,7 +21109,7 @@ function showDTNPortal() {
   var nmEl = document.getElementById('dtn-user-name');
   if (nmEl) nmEl.textContent = u.prenom ? (u.prenom + (u.nom ? ' ' + u.nom : '')) : (u.email || '');
   // Synchroniser le logo avec celui des réglages
-  var savedLogo = localStorage.getItem('ffplum_logo');
+  var savedLogo = _getAppLogo();
   var dtnLogo = document.getElementById('dtn-logo-img');
   var dtnFb   = document.getElementById('dtn-logo-fb');
   if (dtnLogo) {
@@ -21539,7 +21635,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     splash.style.background = isDark ? '#000' : '#fff';
     var logoInner = document.getElementById('splash-logo-inner');
     if (logoInner) {
-      var savedLogo = localStorage.getItem('ffplum_logo');
+      var savedLogo = _getAppLogo();
       var logoSrc = savedLogo || _FFPLUM_LOGO_DEFAULT;
       window._FFPLUM_LOGO_SRC = logoSrc; // accessible globalement
       logoInner.innerHTML = '<img src="' + logoSrc + '" style="width:88px;height:88px;object-fit:contain">';
