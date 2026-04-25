@@ -647,8 +647,6 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="home-open-base-btn" class="rail-btn" onclick="showDTNPortal()">Gest'DTN</button>
     <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Documents</button>
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">À faire</button>
-    <button id="btn-home-moyens" class="rail-btn" onclick="toggleHomeMoyens()">🔧 Moyens</button>
-    <button id="btn-home-acteurs" class="rail-btn" onclick="toggleHomeActeurs()">🤝 Acteurs</button>
   </div>
 
   <!-- MAIN -->
@@ -1475,6 +1473,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </button>
     <button class="nav-btn" id="nav-staff" aria-label="Staff" title="Staff" onclick="showPage('page-staff')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Staff</span>
+    </button>
+
+    <button class="nav-btn" id="btn-home-moyens" aria-label="Moyens" title="Moyens matériels" onclick="navToggleMoyens()">
+      <span class="nav-pip"></span>
+      <span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M2 20h20M4 20V10l8-7 8 7v10"/><rect x="9" y="14" width="6" height="6"/><path d="M9 9h6"/></svg></span>
+      <span class="nav-lbl">Moyens</span>
+    </button>
+
+    <button class="nav-btn" id="btn-home-acteurs" aria-label="Acteurs" title="Acteurs & partenaires" onclick="navToggleActeurs()">
+      <span class="nav-pip"></span>
+      <span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M17 11h.01M7 11h.01"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/></svg></span>
+      <span class="nav-lbl">Acteurs</span>
     </button>
 
     <button class="nav-btn" id="nav-sites" aria-label="Sites sportifs" title="Sites sportifs" onclick="showPage('page-sites')">
@@ -5387,8 +5397,7 @@ function syncHomeRailVisibility() {
   var btnActeurs   = document.getElementById('btn-home-acteurs');
   if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
   if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
-  if (btnMoyens)    btnMoyens.style.display    = '';
-  if (btnActeurs)   btnActeurs.style.display   = '';
+  // Moyens et Acteurs sont dans la nav — toujours visibles
 }
 function retourFromBase() {
   // S'assurer que l'app est visible (pas le portail DTN)
@@ -5509,15 +5518,20 @@ function toggleHomeTodoPanel(forceOpen) {
 
 /* ══ VOLET MOYENS ══ */
 var _homeMoyensOpen = false;
+function navToggleMoyens() { toggleHomeMoyens(); }
 function toggleHomeMoyens(force) {
   _homeMoyensOpen = (force !== undefined) ? force : !_homeMoyensOpen;
   var panel = document.getElementById('home-moyens-panel');
   if (!panel) return;
   panel.style.display = _homeMoyensOpen ? 'flex' : 'none';
   panel.style.flexDirection = 'column';
+  // Style bouton nav actif
   var btn = document.getElementById('btn-home-moyens');
-  if (btn) btn.style.background = _homeMoyensOpen ? 'var(--stol)' : 'var(--navy3)';
-  if (btn) btn.style.color = _homeMoyensOpen ? '#fff' : 'var(--txt2)';
+  if (btn) {
+    btn.classList.toggle('active', _homeMoyensOpen);
+    var pip = btn.querySelector('.nav-pip');
+    if (pip) pip.style.opacity = _homeMoyensOpen ? '1' : '';
+  }
   if (_homeMoyensOpen) { renderMoyens(); _applyPanelPos('home-moyens-panel','moyensPanel',20,120); }
 }
 
@@ -5690,15 +5704,20 @@ function deleteMoyen(moyenId, compId) {
 /* ══ VOLET ACTEURS ══ */
 var _homeActeursOpen = false;
 var _acteursTypeFilter = '';
+function navToggleActeurs() { toggleHomeActeurs(); }
 function toggleHomeActeurs(force) {
   _homeActeursOpen = (force !== undefined) ? force : !_homeActeursOpen;
   var panel = document.getElementById('home-acteurs-panel');
   if (!panel) return;
   panel.style.display = _homeActeursOpen ? 'flex' : 'none';
   panel.style.flexDirection = 'column';
+  // Style bouton nav actif
   var btn = document.getElementById('btn-home-acteurs');
-  if (btn) btn.style.background = _homeActeursOpen ? 'var(--stol)' : 'var(--navy3)';
-  if (btn) btn.style.color = _homeActeursOpen ? '#fff' : 'var(--txt2)';
+  if (btn) {
+    btn.classList.toggle('active', _homeActeursOpen);
+    var pip = btn.querySelector('.nav-pip');
+    if (pip) pip.style.opacity = _homeActeursOpen ? '1' : '';
+  }
   if (_homeActeursOpen) { renderActeurs(); _applyPanelPos('home-acteurs-panel','acteursPanel',360,120); }
 }
 
