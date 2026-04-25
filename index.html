@@ -1010,16 +1010,24 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
     <!-- PAGE STAFF -->
     <div class="page" id="page-staff">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
-        <div style="font-size:18px;font-weight:700">Staff</div>
-        <button onclick="openNewStaffMemberModal()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px;flex-shrink:0">
+        <div style="font-size:18px;font-weight:700">👥 Staff</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <button onclick="printStaffPage()" title="Imprimer" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️</button>
+          <button onclick="openNewStaffMemberModal()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;margin:0 12px 8px;padding:0 12px;gap:6px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="staff-search" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" onkeydown="if(event.key==='Enter'){_staffSearch=this.value.trim();renderStaffList();this.blur()}" oninput="if(!this.value){_staffSearch='';renderStaffList();document.getElementById('staff-search-clear').style.display='none';}else{document.getElementById('staff-search-clear').style.display='flex';}">
-        <button id="staff-search-clear" onclick="document.getElementById('staff-search').value='';_staffSearch='';renderStaffList();this.style.display='none'" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--txt3);flex-shrink:0;line-height:1;font-size:16px">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;margin:0 12px 8px;flex-shrink:0">
+        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 12px;gap:6px;flex:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="staff-search" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" oninput="_staffSearch=this.value;_debStaff()">
+          <button id="staff-search-clear" onclick="document.getElementById('staff-search').value='';_staffSearch='';renderStaffList();this.style.display='none'" style="display:none;background:none;border:none;cursor:pointer;padding:0;color:var(--txt3);flex-shrink:0;line-height:1;font-size:16px">✕</button>
+        </div>
+        <select id="staff-func-select" onchange="_staffFuncFilter=this.value;renderStaffList()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;color:var(--txt);font-family:inherit;font-size:12px;font-weight:700;padding:7px 12px;outline:none;cursor:pointer;flex-shrink:0;max-width:150px">
+          <option value="">Toutes fonctions</option>
+        </select>
       </div>
-      <div style="padding:0 12px 16px">
+      <div style="padding:0 12px 16px;overflow-y:auto;flex:1">
         <div id="staff-list"></div>
       </div>
     </div>
@@ -10007,6 +10015,39 @@ var _pilotsClass = 'paramotor';
 var _pilotsViewRanking = false;
 var _pilotsSearch = '';
 var _staffSearch = '';
+var _staffFuncFilter = '';
+var _staffCatCollapsed = {};
+var _debStaffT = null;
+function _debStaff() {
+  var v = (document.getElementById('staff-search')||{}).value||'';
+  var clr = document.getElementById('staff-search-clear');
+  if (clr) clr.style.display = v ? 'flex' : 'none';
+  clearTimeout(_debStaffT); _debStaffT = setTimeout(renderStaffList, 180);
+}
+function _toggleStaffFunc(el) {
+  var cat = el.getAttribute('data-cat');
+  _staffCatCollapsed[cat] = !_staffCatCollapsed[cat];
+  var bodyId = el.getAttribute('data-body');
+  var body = document.getElementById(bodyId);
+  var arrow = el.querySelector('.stf-arrow');
+  if (body) body.style.display = _staffCatCollapsed[cat] ? 'none' : 'block';
+  if (arrow) arrow.style.transform = 'rotate('+(_staffCatCollapsed[cat]?'0':'90')+'deg)';
+}
+function _getStaffMemberUsages(nameKey, pilotId) {
+  var staffObj = (!S.staff || Array.isArray(S.staff)) ? {} : S.staff;
+  var usages = [];
+  Object.keys(staffObj).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (staffObj[cid]||[]).forEach(function(s, idx) {
+      var sKey = ((s.prenom||'')+(s.nom||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      var match = (pilotId && (s.pilotId===pilotId)) || (!pilotId && nameKey && sKey === nameKey);
+      if (match) usages.push({ comp:cp, compId:cid, idx:idx, entry:s, role:s.role||'' });
+    });
+  });
+  return usages.sort(function(a,b){
+    return ((b.comp&&b.comp.dateFrom)||'').localeCompare((a.comp&&a.comp.dateFrom)||'');
+  });
+}
 
 function setPilotsClass(cls, btn) {
   _pilotsClass = cls;
@@ -12600,108 +12641,192 @@ function deleteSite() {
 function renderStaffList() {
   var cont = document.getElementById('staff-list'); if (!cont) return;
   var staffObj = (!S.staff || Array.isArray(S.staff)) ? {} : S.staff;
-  // Agréger toutes les compétitions ayant du staff
-  var groups = [];
-  Object.keys(staffObj).forEach(function(compId) {
-    var entries = staffObj[compId] || [];
-    if (!entries.length) return;
-    var comp = (S.comps||[]).find(function(c){ return c.id === compId; });
-    groups.push({ comp:comp, compId:compId, entries:entries });
-  });
-  // Filtrer par recherche
-  if (_staffSearch) {
-    var sq = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    groups.forEach(function(g){
-      g.entries = g.entries.filter(function(e){
-        var pilot = (S.pilots||[]).find(function(p){ return p.id === (e.pilotId||e.id); }) || {};
-        var hay = [
-          (pilot.prenom||e.prenom||''),
-          (pilot.nom||e.nom||''),
-          (e.role||''),
-          (pilot.club||e.club||''),
-          (pilot.email||e.email||'')
-        ].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        return hay.indexOf(sq) !== -1;
-      });
-    });
-    groups = groups.filter(function(g){ return g.entries.length > 0; });
-  }
-  // Trier par date décroissante
-  groups.sort(function(a, b) {
-    var da = a.comp ? (a.comp.dateFrom||'') : '';
-    var db = b.comp ? (b.comp.dateFrom||'') : '';
-    return db.localeCompare(da);
-  });
-  // ── Membres staff globaux (statut='staff' dans S.pilots, non assignés à une compét) ──
-  var _allAssignedIds = [];
-  Object.keys(staffObj).forEach(function(cid){ (staffObj[cid]||[]).forEach(function(e){ if(e.pilotId||e.id) _allAssignedIds.push(e.pilotId||e.id); }); });
-  var _globalStaffPilots = (S.pilots||[]).filter(function(p){ return p.statut === 'staff' && _allAssignedIds.indexOf(p.id) === -1; });
-  if (_staffSearch) {
-    var sq2 = _staffSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    _globalStaffPilots = _globalStaffPilots.filter(function(p){
-      return [(p.prenom||''),(p.nom||''),(p.role||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(sq2) !== -1;
-    });
-  }
-  // ── Liste plate : tous les encadrants + membres globaux, triés par nom ──
-  var allRows = [];
-  // Encadrants par compétition
-  groups.forEach(function(g) {
-    g.entries.forEach(function(s, origIdx) {
+  var q = _staffSearch.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+  // ── 1. Construire un annuaire dédupliqué ──
+  var memberMap = {};
+  Object.keys(staffObj).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (staffObj[cid]||[]).forEach(function(s, idx) {
       var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
-      allRows.push({ s:s, compId:g.compId, origIdx:origIdx, pilot:pilot, isGlobal:false });
+      var prenom = pilot.prenom||s.prenom||'';
+      var nom    = pilot.nom||s.nom||'';
+      var nKey   = (prenom+nom).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      var key    = s.pilotId || nKey || ('_anon_'+cid+'_'+idx);
+      var cd     = cp ? (cp.dateFrom||'') : '';
+      if (!memberMap[key]) {
+        memberMap[key] = { prenom:prenom, nom:nom, photo:pilot.photo||s.photo||'',
+          tel:pilot.tel||s.tel||'', email:pilot.email||s.email||'',
+          lic:pilot.licence||s.licence||'', club:pilot.club||s.club||'',
+          role:s.role||pilot.role||'', compId:cid, idx:idx, compDate:cd,
+          nameKey:nKey, isGlobal:false };
+      } else if (cd > (memberMap[key].compDate||'')) {
+        memberMap[key].compId = cid; memberMap[key].idx = idx; memberMap[key].compDate = cd;
+        if (!memberMap[key].role && (s.role||pilot.role)) memberMap[key].role = s.role||pilot.role||'';
+        if (!memberMap[key].photo && (pilot.photo||s.photo)) memberMap[key].photo = pilot.photo||s.photo||'';
+        if (!memberMap[key].tel && (pilot.tel||s.tel)) memberMap[key].tel = pilot.tel||s.tel||'';
+        if (!memberMap[key].email && (pilot.email||s.email)) memberMap[key].email = pilot.email||s.email||'';
+        if (!memberMap[key].lic && (pilot.licence||s.licence)) memberMap[key].lic = pilot.licence||s.licence||'';
+      }
     });
   });
-  // Membres staff globaux
-  _globalStaffPilots.forEach(function(p) {
-    allRows.push({ s:p, compId:null, origIdx:-1, pilot:p, isGlobal:true });
+  // Membres globaux (statut='staff' dans S.pilots non encore dans une compét)
+  var allAssigned = {};
+  Object.keys(staffObj).forEach(function(cid){ (staffObj[cid]||[]).forEach(function(s){ if(s.pilotId) allAssigned[s.pilotId]=true; }); });
+  (S.pilots||[]).forEach(function(p) {
+    if (p.statut !== 'staff' || allAssigned[p.id]) return;
+    var nKey = ((p.prenom||'')+(p.nom||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    memberMap[p.id] = { prenom:p.prenom||'', nom:p.nom||'', photo:p.photo||'',
+      tel:p.tel||'', email:p.email||'', lic:p.licence||'', club:p.club||'',
+      role:p.role||'', compId:null, idx:-1, compDate:'', nameKey:nKey, isGlobal:true };
   });
-  // Filtre recherche déjà appliqué sur groups et _globalStaffPilots
-  if (!allRows.length) {
-    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+(_staffSearch ? 'Aucun résultat pour &laquo;'+_staffSearch+'&raquo;' : 'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong> pour créer un membre')+'</div>';
+
+  var members = Object.keys(memberMap).map(function(k){ return memberMap[k]; });
+
+  // ── 2. Alimenter le select fonctions ──
+  var roles = [];
+  members.forEach(function(m){ if(m.role && roles.indexOf(m.role)===-1) roles.push(m.role); });
+  roles.sort();
+  var sel = document.getElementById('staff-func-select');
+  if (sel) {
+    sel.innerHTML = '<option value="">Toutes fonctions</option>';
+    roles.forEach(function(r){
+      var opt = document.createElement('option');
+      opt.value = r; opt.textContent = r;
+      if (r === _staffFuncFilter) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── 3. Appliquer filtres ──
+  if (_staffFuncFilter) members = members.filter(function(m){ return m.role===_staffFuncFilter; });
+  if (q) members = members.filter(function(m) {
+    var hay = [(m.prenom),(m.nom),(m.role),(m.club),(m.email),(m.tel)].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    return hay.indexOf(q) !== -1;
+  });
+
+  if (!members.length) {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px 0">'+(q||_staffFuncFilter?'Aucun résultat pour ce filtre.':'Aucun membre de staff enregistré — utilisez le bouton <strong>+ Nouveau</strong>.')+'</div>';
     return;
   }
-  // Tri global par nom
-  allRows.sort(function(a, b) {
-    var na = ((a.pilot.nom||a.s.nom||'')+(a.pilot.prenom||a.s.prenom||'')).toLowerCase();
-    var nb = ((b.pilot.nom||b.s.nom||'')+(b.pilot.prenom||b.s.prenom||'')).toLowerCase();
-    return na < nb ? -1 : na > nb ? 1 : 0;
+
+  // ── 4. Grouper par rôle / fonction ──
+  var groups = {};
+  members.forEach(function(m){ var r=m.role||'Sans fonction'; if(!groups[r])groups[r]=[]; groups[r].push(m); });
+  Object.keys(groups).forEach(function(r){
+    groups[r].sort(function(a,b){ return ((a.nom+a.prenom).toLowerCase() < (b.nom+b.prenom).toLowerCase()) ? -1 : 1; });
   });
-  var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+
   var html = '';
-  allRows.forEach(function(row) {
-    var s      = row.s;
-    var pilot  = row.pilot;
-    var prenom = pilot.prenom || s.prenom || '';
-    var nom    = pilot.nom    || s.nom    || '';
-    var photo  = pilot.photo  || s.photo  || '';
-    var tel    = pilot.tel    || s.tel    || '';
-    var email  = pilot.email  || s.email  || '';
-    var lic    = pilot.licence || s.licence || '';
-    var role   = s.role || pilot.role || '';
-    var ini    = ((prenom[0]||'').toUpperCase()+(nom[0]||'').toUpperCase()) || '?';
-    var clickH = row.isGlobal ? '' : 'onclick="showStaffDetailModal(\''+row.compId+'\','+row.origIdx+')"';
-    html += '<div '+clickH+' style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);'+(row.isGlobal?'':'cursor:pointer')+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">';
-    if (photo) {
-      html += '<img src="'+photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+ini+'</div>\'">';
-    } else {
-      html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+ini+'</div>';
-    }
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-size:13px;font-weight:700">'+(prenom+' '+nom).trim()+'</div>';
-    if (role) html += '<div style="font-size:11px;color:#0891b2;font-weight:600;margin-top:1px">'+role+'</div>';
-    var dets=[];
-    if (lic)   dets.push('Lic. '+lic);
-    if (tel)   dets.push('📞 '+tel);
-    if (email) dets.push('✉️ '+email);
-    if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
-    html += '</div>';
-    if (canEdit && !row.isGlobal) {
-      html += '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+row.compId+'\','+row.origIdx+')" style="background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);padding:5px 9px;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0" title="Supprimer">×</button>';
-    }
-    if (!row.isGlobal) html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
-    html += '</div>';
+  Object.keys(groups).sort().forEach(function(role) {
+    var collapsed = !!_staffCatCollapsed[role];
+    var safeId = 'stf-body-' + role.replace(/[^a-zA-Z0-9]/g,'_');
+    html += '<div style="margin-bottom:4px">'
+      + '<button data-cat="'+escH(role)+'" data-body="'+safeId+'" onclick="_toggleStaffFunc(this)" style="width:100%;display:flex;align-items:center;gap:8px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;padding:9px 12px;cursor:pointer;font-family:inherit;text-align:left;margin-bottom:6px">'
+      + '<span class="stf-arrow" style="font-size:11px;transition:transform .2s;transform:rotate('+(collapsed?'0':'90')+'deg);display:inline-block;color:var(--txt3)">▶</span>'
+      + '<span style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;flex:1">'+escH(role)+'</span>'
+      + '<span style="font-size:11px;color:var(--txt3);opacity:.6;font-weight:400">'+groups[role].length+'</span>'
+      + '</button>'
+      + '<div id="'+safeId+'" style="display:'+(collapsed?'none':'block')+'">';
+
+    groups[role].forEach(function(m) {
+      var ini = ((m.prenom[0]||'').toUpperCase()+(m.nom[0]||'').toUpperCase())||'?';
+      var usages = _getStaffMemberUsages(m.nameKey, null);
+      var clickAttr = (!m.isGlobal && m.compId) ? 'data-cid="'+escH(m.compId)+'" data-idx="'+m.idx+'" onclick="showStaffDetailModal(this.dataset.cid,parseInt(this.dataset.idx))"' : '';
+      html += '<div '+clickAttr+' style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:11px;background:var(--navy3);margin-bottom:7px;border:1.5px solid transparent;transition:border .15s;'+(!m.isGlobal&&m.compId?'cursor:pointer;':'')+'" '
+        + (!m.isGlobal&&m.compId ? 'onmouseover="this.style.borderColor=\'#0891b2\'" onmouseout="this.style.borderColor=\'transparent\'"' : '')+'>';
+      if (m.photo) {
+        html += '<img src="'+m.photo+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:var(--navy2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0&quot;>'+ini+'</div>\'">';
+      } else {
+        html += '<div style="width:40px;height:40px;border-radius:50%;background:var(--navy2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0891b2;flex-shrink:0">'+escH(ini)+'</div>';
+      }
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:13px;font-weight:700;color:var(--txt)">'+escH((m.prenom+' '+m.nom).trim())+'</div>';
+      var dets=[];
+      if (m.lic)   dets.push('Lic. '+escH(m.lic));
+      if (m.tel)   dets.push('\u{1F4DE} '+escH(m.tel));
+      if (m.email) dets.push('✉️ '+escH(m.email));
+      if (dets.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dets.join(' · ')+'</div>';
+      if (usages.length) {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'
+          + usages.slice(0,3).map(function(u){ return '<span style="font-size:10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:7px;padding:2px 6px;color:var(--txt3)">\U0001F4CB '+escH((u.comp&&u.comp.name)||u.compId)+'</span>'; }).join('')
+          + (usages.length > 3 ? '<span style="font-size:10px;color:var(--txt3);opacity:.6;padding:2px 4px">+'+(usages.length-3)+' autres</span>' : '')
+          + '</div>';
+      }
+      html += '</div>';
+      if (usages.length > 1) {
+        html += '<span style="font-size:10px;background:#0891b2;color:#fff;padding:2px 7px;border-radius:10px;font-weight:700;flex-shrink:0">'+usages.length+' comp.</span>';
+      } else if (!m.isGlobal && m.compId) {
+        html += '<span style="font-size:16px;color:var(--txt3);flex-shrink:0">›</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div></div>';
   });
   cont.innerHTML = html;
+}
+
+function printStaffPage() {
+  var staffObj = (!S.staff || Array.isArray(S.staff)) ? {} : S.staff;
+  var memberMap = {};
+  Object.keys(staffObj).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (staffObj[cid]||[]).forEach(function(s, idx) {
+      var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
+      var prenom = pilot.prenom||s.prenom||'';
+      var nom    = pilot.nom||s.nom||'';
+      var nKey   = (prenom+nom).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      var key    = s.pilotId || nKey || ('_anon_'+cid+'_'+idx);
+      var cd     = cp ? (cp.dateFrom||'') : '';
+      if (!memberMap[key]) {
+        memberMap[key] = { prenom:prenom, nom:nom, tel:pilot.tel||s.tel||'',
+          email:pilot.email||s.email||'', lic:pilot.licence||s.licence||'',
+          club:pilot.club||s.club||'', role:s.role||pilot.role||'',
+          compDate:cd, nameKey:nKey };
+      } else if (cd > (memberMap[key].compDate||'')) {
+        memberMap[key].compDate = cd;
+        if (!memberMap[key].role && (s.role||pilot.role)) memberMap[key].role = s.role||pilot.role||'';
+      }
+    });
+  });
+  var members = Object.keys(memberMap).map(function(k){ return memberMap[k]; });
+  var groups = {};
+  members.forEach(function(m){ var r=m.role||'Sans fonction'; if(!groups[r])groups[r]=[]; groups[r].push(m); });
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Staff</title><style>'
+    + 'body{font-family:system-ui,sans-serif;font-size:12px;color:#111;padding:20px;margin:0}'
+    + 'h1{font-size:18px;font-weight:800;margin:0 0 4px}'
+    + '.sub{font-size:11px;color:#777;margin-bottom:20px}'
+    + 'h2{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#555;border-bottom:1px solid #ddd;padding-bottom:4px;margin:16px 0 8px}'
+    + '.card{border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;margin-bottom:6px;break-inside:avoid;display:flex;align-items:flex-start;gap:10px}'
+    + '.ini{width:36px;height:36px;border-radius:50%;background:#e0f2fe;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#0891b2;flex-shrink:0}'
+    + '.name{font-size:13px;font-weight:700;margin-bottom:2px}'
+    + '.row{color:#555;font-size:11px;margin-bottom:1px}'
+    + '.comps{margin-top:4px;font-size:10px;color:#888;border-top:1px solid #f0f0f0;padding-top:3px}'
+    + '@media print{@page{margin:12mm}}'
+    + '</style></head><body>'
+    + '<h1>\U0001F465 Staff</h1>'
+    + '<div class="sub">Edite le '+new Date().toLocaleDateString('fr-FR')+' — '+members.length+' membre(s)</div>';
+  Object.keys(groups).sort().forEach(function(role) {
+    var g = groups[role].sort(function(a,b){ return (a.nom+a.prenom).localeCompare(b.nom+b.prenom); });
+    html += '<h2>'+role+' ('+g.length+')</h2>';
+    g.forEach(function(m) {
+      var usages = _getStaffMemberUsages(m.nameKey, null);
+      var ini = ((m.prenom[0]||'').toUpperCase()+(m.nom[0]||'').toUpperCase())||'?';
+      html += '<div class="card"><div class="ini">'+ini+'</div><div style="flex:1">'
+        + '<div class="name">'+(m.prenom+' '+m.nom).trim()+'</div>'
+        + (m.lic  ? '<div class="row">Lic. '+m.lic+'</div>' : '')
+        + (m.club ? '<div class="row">'+m.club+'</div>' : '')
+        + (m.tel  ? '<div class="row">☎ '+m.tel+'</div>' : '')
+        + (m.email? '<div class="row">✉ '+m.email+'</div>' : '')
+        + (usages.length ? '<div class="comps">Competitions : '+usages.map(function(u){ return (u.comp&&u.comp.name)||u.compId; }).join(', ')+'</div>' : '')
+        + '</div></div>';
+    });
+  });
+  html += '</body></html>';
+  var w = window.open('','_blank');
+  if (!w) { toast('Popup bloque — autorisez les popups pour imprimer.','err'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(function(){ w.print(); }, 500);
 }
 
 function editStaff(i) {
