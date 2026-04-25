@@ -781,10 +781,50 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         </div>
         <div id="home-todo-list" style="padding:0 10px 14px;overflow-y:auto;flex:1;min-height:0"></div>
       </div>
+      <!-- ══ VOLET MOYENS ══ -->
+      <div id="home-moyens-panel" style="display:none;position:fixed;left:20px;top:120px;width:320px;max-height:calc(100vh - 140px);background:var(--navy2);border:1.5px solid var(--bdr);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:800;flex-direction:column;overflow:hidden">
+        <div onmousedown="_panelDragStart(event,'home-moyens-panel','moyensPanel')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px;cursor:move;user-select:none;flex-shrink:0;border-bottom:1px solid var(--bdr)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="display:flex;flex-direction:column;gap:3px;opacity:.4"><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span></span>
+            <div style="font-size:14px;font-weight:800">🔧 Moyens</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button onclick="openMoyenEdit(null)" title="Ajouter un moyen" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:none;background:var(--stol);color:#fff;font-size:18px;line-height:1;cursor:pointer;font-family:inherit">+</button>
+            <button onclick="toggleHomeMoyens(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
+          </div>
+        </div>
+        <div style="padding:6px 10px;flex-shrink:0;border-bottom:1px solid var(--bdr)">
+          <input id="moyens-search" type="search" placeholder="Rechercher un moyen…" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 10px;outline:none" oninput="renderMoyens()">
+        </div>
+        <div id="moyens-panel-body" style="flex:1;overflow-y:auto;padding:8px 10px 12px"></div>
+      </div>
+
+      <!-- ══ VOLET ACTEURS ══ -->
+      <div id="home-acteurs-panel" style="display:none;position:fixed;left:20px;top:120px;width:320px;max-height:calc(100vh - 140px);background:var(--navy2);border:1.5px solid var(--bdr);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:800;flex-direction:column;overflow:hidden">
+        <div onmousedown="_panelDragStart(event,'home-acteurs-panel','acteursPanel')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px;cursor:move;user-select:none;flex-shrink:0;border-bottom:1px solid var(--bdr)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="display:flex;flex-direction:column;gap:3px;opacity:.4"><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span><span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span></span>
+            <div style="font-size:14px;font-weight:800">🤝 Acteurs</div>
+          </div>
+          <button onclick="toggleHomeActeurs(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
+        </div>
+        <div style="padding:6px 10px;flex-shrink:0;border-bottom:1px solid var(--bdr)">
+          <input id="acteurs-search" type="search" placeholder="Rechercher un acteur…" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 10px;outline:none" oninput="renderActeurs()">
+          <div id="acteurs-filter-bar" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap"></div>
+        </div>
+        <div id="acteurs-panel-body" style="flex:1;overflow-y:auto;padding:8px 10px 12px"></div>
+      </div>
+
       <div id="home-comp-drawer-backdrop" onclick="closeHomeSidePanels()"></div>
 
       <!-- ╔══ COLONNE DROITE (sidebar) ══╗ -->
       <div id="home-col-right">
+
+        <!-- BOUTONS VOLETS MOYENS / ACTEURS -->
+        <div style="display:flex;gap:8px;padding:8px 12px 4px;flex-wrap:wrap">
+          <button onclick="toggleHomeMoyens()" id="btn-home-moyens" title="Volet Moyens" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 10px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🔧 Moyens</button>
+          <button onclick="toggleHomeActeurs()" id="btn-home-acteurs" title="Volet Acteurs" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 10px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🤝 Acteurs</button>
+        </div>
 
         <!-- MÉTÉO LOCALE -->
         <div style="margin:8px 12px 4px">
@@ -875,7 +915,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <!-- Recherche -->
         <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;min-width:140px;flex:1">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" oninput="renderCompetitions()">
+          <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" oninput="_debRender()">
         </div>
         <!-- Saison -->
         <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
@@ -2567,6 +2607,7 @@ var S = {
   nationalRanking: {},
   messages: [],
   collectif: [],
+  moyens: [],
   documents: [],
   officialDocs: { header: null, headerHeight: 20, headerPos: 'left', footer: null, footerHeight: 15, marginTop: 25, marginBottom: 20, marginLeft: 20, marginRight: 20 },
   docSettings: {
@@ -2732,7 +2773,7 @@ function saveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,moyens:S.moyens||[]})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
 }
@@ -3378,6 +3419,9 @@ function updateSeasonFilter() {
     sel.value = seasons.includes(curYear) ? curYear : (seasons[0] || 'all');
   }
 }
+
+var _debRenderT = null;
+function _debRender() { clearTimeout(_debRenderT); _debRenderT = setTimeout(renderCompetitions, 180); }
 
 function renderCompetitions() {
   var c = document.getElementById('comp-list'); if (!c) return;
@@ -5463,6 +5507,278 @@ function toggleHomeTodoPanel(forceOpen) {
   }
 }
 
+/* ══ VOLET MOYENS ══ */
+var _homeMoyensOpen = false;
+function toggleHomeMoyens(force) {
+  _homeMoyensOpen = (force !== undefined) ? force : !_homeMoyensOpen;
+  var panel = document.getElementById('home-moyens-panel');
+  if (!panel) return;
+  panel.style.display = _homeMoyensOpen ? 'flex' : 'none';
+  panel.style.flexDirection = 'column';
+  var btn = document.getElementById('btn-home-moyens');
+  if (btn) btn.style.background = _homeMoyensOpen ? 'var(--stol)' : 'var(--navy3)';
+  if (btn) btn.style.color = _homeMoyensOpen ? '#fff' : 'var(--txt2)';
+  if (_homeMoyensOpen) { renderMoyens(); _applyPanelPos('home-moyens-panel','moyensPanel',20,120); }
+}
+
+function renderMoyens() {
+  var body = document.getElementById('moyens-panel-body');
+  if (!body) return;
+  if (!S.moyens) S.moyens = [];
+  var q = ((document.getElementById('moyens-search')||{}).value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+  // Agréger le matériel des compétitions + S.moyens global
+  var allItems = [];
+  // Matériel des compétitions
+  Object.keys(S.materiel||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.materiel[cid]||[]).forEach(function(m) {
+      allItems.push(Object.assign({}, m, { _source: cp ? cp.name : 'Compétition', _compId: cid, _global: false }));
+    });
+  });
+  // Fiches globales
+  S.moyens.forEach(function(m) {
+    allItems.push(Object.assign({}, m, { _source: 'Global', _global: true }));
+  });
+
+  // Déduplique les noms identiques (préférer global)
+  var seen = {};
+  allItems = allItems.filter(function(m) {
+    var key = (m.nom||m.materiel||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (!key) return true;
+    if (seen[key]) return m._global; // garder global si déjà vu
+    seen[key] = true; return true;
+  });
+
+  // Filtrer par recherche
+  if (q) {
+    allItems = allItems.filter(function(m) {
+      var hay = [(m.nom||m.materiel||''),(m.categorie||''),(m.marque||m.fournisseur||''),(m.lieuRangement||m.lieuAcces||''),(m.remarques||'')].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      return hay.indexOf(q) !== -1;
+    });
+  }
+
+  // Trier par catégorie
+  allItems.sort(function(a,b){ return (a.categorie||'').localeCompare(b.categorie||''); });
+
+  if (!allItems.length) {
+    body.innerHTML = '<div style="color:var(--txt3);font-size:12px;text-align:center;padding:20px">' + (q ? 'Aucun résultat' : 'Aucun matériel. Cliquez + pour créer.') + '</div>';
+    return;
+  }
+
+  // Grouper par catégorie
+  var groups = {};
+  allItems.forEach(function(m) {
+    var cat = m.categorie || 'Autre';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(m);
+  });
+
+  var html = '';
+  Object.keys(groups).sort().forEach(function(cat) {
+    html += '<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin:10px 0 4px;padding-bottom:2px;border-bottom:1px solid var(--bdr)">' + cat + ' <span style="font-weight:400;opacity:.6">(' + groups[cat].length + ')</span></div>';
+    groups[cat].forEach(function(m) {
+      var nom = m.nom || m.materiel || '—';
+      var marque = m.marque || m.fournisseur || '';
+      var lieu = m.lieuRangement || m.lieuAcces || '';
+      var qte = m.quantite || '';
+      var etat = m.etat || '';
+      var etatColor = etat==='Bon'?'#10b981':etat==='Usé'?'#f59e0b':etat==='HS'?'#ef4444':'var(--txt3)';
+      var lien = m.lienAchat || '';
+      html += '<div onclick="openMoyenEdit(\'' + (m.id||'') + '\',\'' + (m._compId||'') + '\')" style="display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:10px;background:var(--navy3);margin-bottom:5px;cursor:pointer;border:1px solid transparent;transition:border .15s" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
+        + '<div style="display:flex;align-items:center;gap:6px">'
+        + '<span style="flex:1;font-size:12px;font-weight:700;color:var(--txt)">' + nom + '</span>'
+        + (qte?'<span style="font-size:11px;color:var(--txt3);background:var(--navy2);border-radius:5px;padding:1px 6px">×'+qte+'</span>':'')
+        + (etat?'<span style="font-size:10px;color:'+etatColor+';font-weight:700">'+etat+'</span>':'')
+        + '</div>'
+        + (marque||lieu?'<div style="display:flex;gap:8px;font-size:11px;color:var(--txt3)">'+(marque?'<span>'+marque+'</span>':'')+(lieu?'<span>📍 '+lieu+'</span>':'')+'</div>':'')
+        + (lien?'<a href="'+lien+'" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--stol);text-decoration:none">🔗 Lien achat</a>':'')
+        + '<div style="font-size:10px;color:var(--txt3);opacity:.7">' + (m._global?'⭐ Global':'📋 '+m._source) + '</div>'
+        + '</div>';
+    });
+  });
+  body.innerHTML = html;
+}
+
+/* Modal fiche moyen */
+function openMoyenEdit(moyenId, compId) {
+  var m = {};
+  if (moyenId) {
+    // Chercher dans S.moyens
+    m = (S.moyens||[]).find(function(x){ return x.id===moyenId; }) || {};
+    if (!m.id && compId) {
+      // Chercher dans S.materiel[compId]
+      m = ((S.materiel||{})[compId]||[]).find(function(x){ return x.id===moyenId; }) || {};
+    }
+  }
+  var ov = document.getElementById('_moyen-edit-overlay');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = '_moyen-edit-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+  var cats = ['Communication','Informatique','Chronométrage','Sécurité','Signalisation','Sonorisation','Transport','Hébergement','Logistique','Outillage','Autre'];
+  var catOpts = cats.map(function(c){ return '<option value="'+c+'"'+(m.categorie===c?' selected':'')+'>'+c+'</option>'; }).join('');
+  var etats = ['','Neuf','Bon','Usé','HS'];
+  var etatOpts = etats.map(function(e){ return '<option value="'+e+'"'+(m.etat===e?' selected':'')+'>'+e+'</option>'; }).join('');
+  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
+  var lSt = 'font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px;display:block';
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">'
+    + '<div style="padding:20px 22px 0">'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">' + (moyenId?'Modifier':'Créer') + ' une fiche moyen</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Nom *</label><input id="moy-nom" value="'+(m.nom||m.materiel||'')+'" placeholder="Ex: Balise GPS" style="'+iSt+'"></div>'
+    + '<div><label style="'+lSt+'">Catégorie</label><select id="moy-cat" style="'+iSt+'"><option value="">—</option>'+catOpts+'</select></div>'
+    + '<div><label style="'+lSt+'">Quantité</label><input id="moy-qte" type="number" min="1" value="'+(m.quantite||1)+'" style="'+iSt+'"></div>'
+    + '<div><label style="'+lSt+'">Marque</label><input id="moy-marque" value="'+(m.marque||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    + '<div><label style="'+lSt+'">Fournisseur</label><input id="moy-fourn" value="'+(m.fournisseur||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    + '<div><label style="'+lSt+'">État</label><select id="moy-etat" style="'+iSt+'">'+etatOpts+'</select></div>'
+    + '<div><label style="'+lSt+'">Lieu de rangement</label><input id="moy-lieu" value="'+(m.lieuRangement||m.lieuAcces||'')+'" placeholder="—" style="'+iSt+'"></div>'
+    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Lien achat / fiche produit</label><input id="moy-lien" value="'+(m.lienAchat||'')+'" placeholder="https://…" style="'+iSt+'"></div>'
+    + '<div style="grid-column:1/-1"><label style="'+lSt+'">Remarques</label><textarea id="moy-rem" rows="2" style="'+iSt+';resize:vertical">'+(m.remarques||'')+'</textarea></div>'
+    + '</div></div>'
+    + '<div style="padding:14px 22px 20px;display:flex;gap:10px;justify-content:space-between;border-top:1px solid var(--bdr);margin-top:8px">'
+    + (moyenId?'<button onclick="deleteMoyen(\''+moyenId+'\',\''+compId+'\')" style="padding:9px 14px;border-radius:10px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'<span></span>')
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="document.getElementById(\'_moyen-edit-overlay\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    + '<button onclick="saveMoyen(\''+moyenId+'\',\''+compId+'\')" style="padding:9px 20px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    + '</div></div></div>';
+  document.body.appendChild(ov);
+}
+
+function saveMoyen(moyenId, compId) {
+  var nom = (document.getElementById('moy-nom').value||'').trim();
+  if (!nom) { toast('Le nom est obligatoire','err'); return; }
+  var obj = {
+    nom: nom,
+    categorie:     (document.getElementById('moy-cat').value||'Autre'),
+    quantite:      parseFloat(document.getElementById('moy-qte').value)||1,
+    marque:        (document.getElementById('moy-marque').value||'').trim(),
+    fournisseur:   (document.getElementById('moy-fourn').value||'').trim(),
+    etat:          (document.getElementById('moy-etat').value||''),
+    lieuRangement: (document.getElementById('moy-lieu').value||'').trim(),
+    lienAchat:     (document.getElementById('moy-lien').value||'').trim(),
+    remarques:     (document.getElementById('moy-rem').value||'').trim(),
+    _updatedAt: Date.now()
+  };
+  if (!S.moyens) S.moyens = [];
+  if (moyenId) {
+    var idx = S.moyens.findIndex(function(x){ return x.id===moyenId; });
+    if (idx>=0) { S.moyens[idx] = Object.assign({}, S.moyens[idx], obj); }
+    else {
+      obj.id = moyenId;
+      S.moyens.push(obj);
+    }
+  } else {
+    obj.id = 'moy_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    S.moyens.push(obj);
+  }
+  saveState(); silentPush();
+  document.getElementById('_moyen-edit-overlay').remove();
+  renderMoyens();
+  toast((moyenId?'Moyen mis à jour':'Moyen créé')+' ✓','ok');
+}
+
+function deleteMoyen(moyenId, compId) {
+  if (!confirm('Supprimer cette fiche moyen ?')) return;
+  if (S.moyens) S.moyens = S.moyens.filter(function(x){ return x.id!==moyenId; });
+  saveState(); silentPush();
+  document.getElementById('_moyen-edit-overlay').remove();
+  renderMoyens();
+  toast('Moyen supprimé','ok');
+}
+
+/* ══ VOLET ACTEURS ══ */
+var _homeActeursOpen = false;
+var _acteursTypeFilter = '';
+function toggleHomeActeurs(force) {
+  _homeActeursOpen = (force !== undefined) ? force : !_homeActeursOpen;
+  var panel = document.getElementById('home-acteurs-panel');
+  if (!panel) return;
+  panel.style.display = _homeActeursOpen ? 'flex' : 'none';
+  panel.style.flexDirection = 'column';
+  var btn = document.getElementById('btn-home-acteurs');
+  if (btn) btn.style.background = _homeActeursOpen ? 'var(--stol)' : 'var(--navy3)';
+  if (btn) btn.style.color = _homeActeursOpen ? '#fff' : 'var(--txt2)';
+  if (_homeActeursOpen) { renderActeurs(); _applyPanelPos('home-acteurs-panel','acteursPanel',360,120); }
+}
+
+function renderActeurs() {
+  var body = document.getElementById('acteurs-panel-body');
+  var filterBar = document.getElementById('acteurs-filter-bar');
+  if (!body) return;
+  var q = ((document.getElementById('acteurs-search')||{}).value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+  // Agréger tous les partenaires de toutes les compétitions
+  var allParts = [];
+  Object.keys(S.partenaires||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.partenaires[cid]||[]).forEach(function(p) {
+      allParts.push(Object.assign({}, p, { _compName: cp ? cp.name : '', _compId: cid }));
+    });
+  });
+
+  // Dédupliquer par organisme
+  var seenOrg = {};
+  allParts = allParts.filter(function(p) {
+    var key = (p.organisme||p.representant||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if (!key) return true;
+    if (seenOrg[key]) return false;
+    seenOrg[key] = true; return true;
+  });
+
+  // Types distincts pour filtres
+  var types = [];
+  allParts.forEach(function(p){ if (p.type && types.indexOf(p.type)===-1) types.push(p.type); });
+  types.sort();
+
+  // Barre de filtres types
+  if (filterBar) {
+    var fHtml = '<button onclick="_acteursTypeFilter=\'\';renderActeurs()" style="padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;'+(''===_acteursTypeFilter?'background:var(--stol);color:#fff;':'background:var(--navy3);color:var(--txt2)')+'">Tous</button>';
+    types.forEach(function(t){
+      fHtml += '<button onclick="_acteursTypeFilter=\''+t+'\';renderActeurs()" style="padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;'+(t===_acteursTypeFilter?'background:var(--stol);color:#fff;':'background:var(--navy3);color:var(--txt2)')+'">'+t+'</button>';
+    });
+    filterBar.innerHTML = fHtml;
+  }
+
+  // Filtrer
+  if (_acteursTypeFilter) allParts = allParts.filter(function(p){ return p.type===_acteursTypeFilter; });
+  if (q) allParts = allParts.filter(function(p) {
+    var hay = [(p.organisme||''),(p.representant||''),(p.email||''),(p.telephone||''),(p.type||''),(p.proposition||'')].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    return hay.indexOf(q)!==-1;
+  });
+
+  if (!allParts.length) {
+    body.innerHTML = '<div style="color:var(--txt3);font-size:12px;text-align:center;padding:20px">' + (q||_acteursTypeFilter ? 'Aucun résultat' : 'Aucun partenaire enregistré.') + '</div>';
+    return;
+  }
+
+  // Grouper par type
+  var groups = {};
+  allParts.forEach(function(p) {
+    var t = p.type || 'Autre';
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(p);
+  });
+
+  var html = '';
+  Object.keys(groups).sort().forEach(function(type) {
+    html += '<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin:10px 0 4px;padding-bottom:2px;border-bottom:1px solid var(--bdr)">' + type + ' <span style="font-weight:400;opacity:.6">('+groups[type].length+')</span></div>';
+    groups[type].forEach(function(p) {
+      var nom = p.organisme || p.representant || '—';
+      var contact = p.representant && p.organisme ? p.representant : '';
+      html += '<div style="padding:8px 10px;border-radius:10px;background:var(--navy3);margin-bottom:5px;border:1px solid transparent;transition:border .15s;cursor:pointer" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
+        + '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px">'+nom+'</div>'
+        + (contact?'<div style="font-size:11px;color:var(--txt3)">'+contact+'</div>':'')
+        + (p.email?'<div style="font-size:11px;color:var(--txt3)">✉️ '+p.email+'</div>':'')
+        + (p.telephone?'<div style="font-size:11px;color:var(--txt3)">📞 '+p.telephone+'</div>':'')
+        + (p.proposition?'<div style="font-size:10px;color:var(--txt3);margin-top:3px;opacity:.7">'+p.proposition.substring(0,60)+(p.proposition.length>60?'…':'')+'</div>':'')
+        + '<div style="font-size:10px;color:var(--txt3);opacity:.5;margin-top:2px">📋 '+p._compName+'</div>'
+        + '</div>';
+    });
+  });
+  body.innerHTML = html;
+}
+
 function renderHomeResultsDrawer() {
   var cont = document.getElementById('home-results-drawer-content');
   if (!cont) return;
@@ -6171,34 +6487,9 @@ function hdgImportEquipageExcel(inp, compId) {
         if (rawRows[hi] && rawRows[hi].some(function(c){ return c && c.toString().trim().length > 1; })) { headerIdx = hi; break; }
       }
 
-      // Détection colonnes — réutilise _PILOT_COL_MAP si disponible
-      var colMap = {};
+      // Détection colonnes — utilise _detectPilotColumns (réutilise _PILOT_COL_MAP)
       var hdrs = rawRows[headerIdx];
-      var COL_MAP_EQUIP = {
-        'nom':'nom','name':'nom','last name':'nom','lastname':'nom','nom de famille':'nom',
-        'prenom':'prenom','prénom':'prenom','firstname':'prenom','first name':'prenom',
-        'nom complet':'_nomComplet','pilote':'_nomComplet','competiteur':'_nomComplet','compétiteur':'_nomComplet',
-        'licence':'licence','n° licence':'licence','no licence':'licence','numero licence':'licence',
-        'numéro licence':'licence','num licence':'licence','n°licence':'licence',
-        'email':'email','mail':'email','courriel':'email',
-        'tel':'tel','téléphone':'tel','telephone':'tel','portable':'tel','mobile':'tel',
-        'genre':'genre','sexe':'genre','civilite':'genre','civilité':'genre',
-        'ddn':'ddn','date de naissance':'ddn','naissance':'ddn','dob':'ddn','date naissance':'ddn',
-        'club':'club','aéroclub':'club','aeroclub':'club',
-        'region':'region','région':'region','ligue':'region',
-        'classe':'classe','class':'classe','discipline':'classe','categorie':'classe','catégorie':'classe',
-        'immat':'immat','immatriculation':'immat','immat.':'immat','immatriculation ulm':'immat',
-        'marque':'marque','brand':'marque',
-        'modele':'modele','modèle':'modele','model':'modele',
-        'niveau':'niveau','level':'niveau',
-        'remarques':'remarques','remarque':'remarques','notes':'remarques','commentaire':'remarques'
-      };
-      var normHdr = function(h){ return (h||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); };
-      hdrs.forEach(function(h, i) {
-        var n = normHdr(h);
-        var field = (typeof _PILOT_COL_MAP !== 'undefined' ? _PILOT_COL_MAP[n] : null) || COL_MAP_EQUIP[n];
-        if (field && colMap[field] === undefined) colMap[field] = i;
-      });
+      var colMap = _detectPilotColumns(hdrs);
 
       var dataRows = rawRows.slice(headerIdx + 1).filter(function(r){ return r && r.some(function(c){ return c && c.toString().trim(); }); });
 
@@ -12196,6 +12487,7 @@ async function pushToCloud() {
     _deletedPartenaires:  S._deletedPartenaires  || {},
     _deletedDocuments:    S._deletedDocuments    || {},
     partenaireTypes:      S.partenaireTypes       || null,
+    moyens:               S.moyens               || [],
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -12596,6 +12888,14 @@ async function pullFromCloud() {
     var baseTypes = S.partenaireTypes || _DEFAULT_PART_TYPES.slice();
     r.partenaireTypes.forEach(function(t) { if (baseTypes.indexOf(t) < 0) baseTypes.push(t); });
     S.partenaireTypes = baseTypes;
+  }
+  // Moyens globaux : fusion par id
+  if (r.moyens && Array.isArray(r.moyens)) {
+    var localM = S.moyens || [];
+    r.moyens.forEach(function(m) {
+      if (!localM.find(function(x){ return x.id===m.id; })) localM.push(m);
+    });
+    S.moyens = localM;
   }
 
   S._lastPushAt = r._pushAt || 0;
@@ -14320,6 +14620,16 @@ function _detectPilotColumns(headerRow) {
       if (map[field] === undefined) map[field] = i; // first match wins
     }
   });
+  // Fallback fuzzy : si nom/prénom toujours non détectés, essayer les colonnes non mappées
+  if (map['nom'] === undefined && map['_nomComplet'] === undefined) {
+    headerRow.forEach(function(h, i) {
+      if (Object.values(map).indexOf(i) === -1) { // colonne non encore mappée
+        var n = (h||'').toString().toLowerCase();
+        if (n.indexOf('nom') !== -1 && map['nom'] === undefined) map['nom'] = i;
+        if ((n.indexOf('prenom') !== -1 || n.indexOf('prénom') !== -1) && map['prenom'] === undefined) map['prenom'] = i;
+      }
+    });
+  }
   return map;
 }
 
@@ -14567,7 +14877,7 @@ function _showPilotsImportPreview(toAdd, alreadyExist, colMap) {
 
   // Option mise à jour des existants
   var hasLicence = colMap['licence'] !== undefined;
-  var updateOpt = alreadyExist.length ? '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-bottom:14px"><input type="checkbox" id="_imp-update-exist" style="width:14px;height:14px"> Mettre à jour les données des compétiteurs déjà présents</label>' : '';
+  var updateOpt = alreadyExist.length ? '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-bottom:14px"><input type="checkbox" id="_imp-update-exist" checked style="width:14px;height:14px"> Mettre à jour les données des compétiteurs déjà présents</label>' : '';
 
   ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">'
     + '<div style="padding:22px 24px 0">'
@@ -14639,9 +14949,9 @@ function _confirmPilotsImport() {
           // Champs texte libres : compléter si vide
           var FILL = ['licence','genre','ddn','email','tel','club','region','niveau','remarques'];
           FILL.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
-          // Champs contrôlés : appliquer si non vide dans Excel ET vide dans la fiche
+          // Champs contrôlés : toujours écraser si la nouvelle valeur est non-vide
           var CTRL = ['pratique','categorie','equipage','discipline','role'];
-          CTRL.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
+          CTRL.forEach(function(f){ if (c[f]) p[f] = c[f]; });
           // ULM : compléter le premier ULM si présent
           if ((c._immat||c._marque||c._modele||c.classe) && S.ulms) {
             var ulms = S.ulms[p.id];
