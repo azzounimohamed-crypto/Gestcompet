@@ -924,13 +924,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           Export
         </button>
         <!-- Bouton Import compétiteurs -->
-        <button onclick="document.getElementById('pilots-import-file').click()" title="Importer des compétiteurs (JSON)" class="mob-hidden"
+        <button onclick="document.getElementById('pilots-import-file').click()" title="Importer des compétiteurs (JSON ou Excel)" class="mob-hidden"
           style="display:flex;align-items:center;gap:5px;padding:8px 13px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><polyline points="17 8 12 3 7 8" style="transform:rotate(180deg);transform-origin:12px 9px"/></svg>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Import
         </button>
-        <input type="file" id="pilots-import-file" accept=".json" style="display:none" onchange="importPilots(this)">
+        <input type="file" id="pilots-import-file" accept=".json,.xlsx,.xls" style="display:none" onchange="importPilotsFile(this)">
         <!-- Bouton Collectif France -->
         <button id="btn-collectif-france" onclick="openCollectifFrance()"
           style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;border:1.5px solid #1e6fbe;background:linear-gradient(135deg,#0f4c81,#1565c0);color:#93c5fd;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">
@@ -6144,34 +6143,332 @@ function hdgExportEquipageExcel(compId) {
 function hdgImportEquipageExcel(inp, compId) {
   var file = inp.files && inp.files[0];
   if (!file) return;
+  inp.value = '';
+
+  if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée','err'); return; }
+
+  // Utiliser la fenêtre animée partagée (définie dans importPilotsExcel)
+  if (typeof _showImportProgress === 'function') _showImportProgress('Lecture du fichier Excel…');
+
   var reader = new FileReader();
   reader.onload = function(e) {
-    if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée','err'); return; }
-    var wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-    var ws = wb.Sheets[wb.SheetNames[0]];
-    var rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
-    var added = 0;
-    if (!S.compEnroll) S.compEnroll = {};
-    if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
-    rows.forEach(function(row) {
-      var nom    = (row['Nom']||row['nom']||'').trim();
-      var prenom = (row['Prénom']||row['prenom']||row['Prenom']||'').trim();
-      var lic    = (row['Licence']||row['licence']||'').trim();
-      if (!nom && !prenom && !lic) return;
-      var pilot = (S.pilots||[]).find(function(p) {
-        return (lic && p.licence===lic) ||
-               (nom && prenom && p.nom&&p.prenom && p.nom.toLowerCase()===nom.toLowerCase() && p.prenom.toLowerCase()===prenom.toLowerCase());
-      });
-      if (pilot && S.compEnroll[compId].indexOf(pilot.id)===-1) {
-        S.compEnroll[compId].push(pilot.id);
-        added++;
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+
+      if (typeof _updateImportProgress === 'function') _updateImportProgress('Analyse des colonnes…');
+
+      // Lecture brute avec en-têtes
+      var rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+      if (!rawRows || rawRows.length < 2) {
+        if (typeof _hideImportProgress === 'function') _hideImportProgress();
+        toast('Fichier vide ou sans données', 'err'); return;
       }
-    });
-    saveState(); silentPush(); renderHomeDetailPanel(null);
-    toast(added ? added+' pilote(s) importé(s) ✓' : 'Aucun pilote reconnu — vérifiez Nom/Licence', added?'ok':'');
+
+      // Détecter ligne d'en-tête (première ligne non vide)
+      var headerIdx = 0;
+      for (var hi = 0; hi < Math.min(5, rawRows.length); hi++) {
+        if (rawRows[hi] && rawRows[hi].some(function(c){ return c && c.toString().trim().length > 1; })) { headerIdx = hi; break; }
+      }
+
+      // Détection colonnes — réutilise _PILOT_COL_MAP si disponible
+      var colMap = {};
+      var hdrs = rawRows[headerIdx];
+      var COL_MAP_EQUIP = {
+        'nom':'nom','name':'nom','last name':'nom','lastname':'nom','nom de famille':'nom',
+        'prenom':'prenom','prénom':'prenom','firstname':'prenom','first name':'prenom',
+        'nom complet':'_nomComplet','pilote':'_nomComplet','competiteur':'_nomComplet','compétiteur':'_nomComplet',
+        'licence':'licence','n° licence':'licence','no licence':'licence','numero licence':'licence',
+        'numéro licence':'licence','num licence':'licence','n°licence':'licence',
+        'email':'email','mail':'email','courriel':'email',
+        'tel':'tel','téléphone':'tel','telephone':'tel','portable':'tel','mobile':'tel',
+        'genre':'genre','sexe':'genre','civilite':'genre','civilité':'genre',
+        'ddn':'ddn','date de naissance':'ddn','naissance':'ddn','dob':'ddn','date naissance':'ddn',
+        'club':'club','aéroclub':'club','aeroclub':'club',
+        'region':'region','région':'region','ligue':'region',
+        'classe':'classe','class':'classe','discipline':'classe','categorie':'classe','catégorie':'classe',
+        'immat':'immat','immatriculation':'immat','immat.':'immat','immatriculation ulm':'immat',
+        'marque':'marque','brand':'marque',
+        'modele':'modele','modèle':'modele','model':'modele',
+        'niveau':'niveau','level':'niveau',
+        'remarques':'remarques','remarque':'remarques','notes':'remarques','commentaire':'remarques'
+      };
+      var normHdr = function(h){ return (h||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); };
+      hdrs.forEach(function(h, i) {
+        var n = normHdr(h);
+        var field = (typeof _PILOT_COL_MAP !== 'undefined' ? _PILOT_COL_MAP[n] : null) || COL_MAP_EQUIP[n];
+        if (field && colMap[field] === undefined) colMap[field] = i;
+      });
+
+      var dataRows = rawRows.slice(headerIdx + 1).filter(function(r){ return r && r.some(function(c){ return c && c.toString().trim(); }); });
+
+      if (typeof _updateImportProgress === 'function') _updateImportProgress('Comparaison avec les compétiteurs…', dataRows.length + ' lignes trouvées');
+
+      var get = function(r, field){ return colMap[field] !== undefined ? (r[colMap[field]]||'').toString().trim() : ''; };
+
+      var fmtDate = function(v) {
+        if (!v) return '';
+        var s = v.toString().trim();
+        var dm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dm) return dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+        var ym = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (ym) return ym[1]+'-'+ym[2]+'-'+ym[3];
+        return s;
+      };
+      var mapGenre = function(v) {
+        var s = (v||'').toString().trim().toUpperCase();
+        if (s==='F'||s==='MME'||s==='MME.'||s==='FEMME') return 'Mme.';
+        if (s==='M'||s==='H'||s==='M.'||s==='MR'||s==='HOMME') return 'M.';
+        return v||'';
+      };
+      var normName = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+
+      // Récupérer la compétition pour déduire la classe par défaut
+      var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+      var defaultClasse = (cp && cp.classe) ? cp.classe : (typeof _pilotsClass !== 'undefined' ? _pilotsClass : 'pendulaire');
+
+      if (!S.compEnroll) S.compEnroll = {};
+      if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+
+      // Catégoriser les lignes
+      var toEnroll   = []; // pilotes existants à inscrire
+      var toCreate   = []; // pilotes nouveaux à créer + inscrire
+      var alreadyIn  = []; // déjà dans l'équipage
+
+      dataRows.forEach(function(r) {
+        var nom    = get(r, 'nom');
+        var prenom = get(r, 'prenom');
+
+        // Essai nom complet
+        if (!nom && !prenom && colMap['_nomComplet'] !== undefined) {
+          var full = get(r, '_nomComplet').trim();
+          var parts = full.split(/\s+/);
+          if (parts.length >= 2) {
+            var upperFirst = parts[0] === parts[0].toUpperCase();
+            nom    = upperFirst ? parts[0] : parts[parts.length-1];
+            prenom = upperFirst ? parts.slice(1).join(' ') : parts.slice(0,-1).join(' ');
+          } else { nom = full; prenom = ''; }
+        }
+
+        var lic = get(r, 'licence');
+        if (!nom && !prenom && !lic) return; // ligne vide
+
+        // Enrichissement via licenceDB si disponible
+        var ldb = null;
+        if (S.licenceDB) {
+          if (lic) ldb = Object.values(S.licenceDB).find(function(x){ return x.licence === lic; }) || null;
+          if (!ldb && nom) {
+            var k1 = normName(nom)+'|'+normName(prenom);
+            var k2 = normName(prenom)+'|'+normName(nom);
+            ldb = S.licenceDB[k1] || S.licenceDB[k2] || null;
+          }
+        }
+
+        var nomF    = (ldb&&ldb.nom)    || nom    || '';
+        var prenomF = (ldb&&ldb.prenom) || prenom || '';
+        var licF    = (ldb&&ldb.licence)|| lic    || '';
+
+        // Chercher pilote existant (par licence prioritaire, puis nom+prénom)
+        var found = null;
+        if (licF) found = (S.pilots||[]).find(function(p){ return p.licence && normName(p.licence)===normName(licF); });
+        if (!found && nomF) found = (S.pilots||[]).find(function(p){ return normName(p.nom)===normName(nomF) && normName(p.prenom)===normName(prenomF); });
+
+        if (found) {
+          if (S.compEnroll[compId].indexOf(found.id) !== -1) {
+            alreadyIn.push(found);
+          } else {
+            toEnroll.push({ pilot: found, row: r });
+          }
+        } else {
+          // Préparer un nouveau pilote à créer
+          toCreate.push({
+            nom: nomF, prenom: prenomF, licence: licF,
+            genre:  mapGenre((ldb&&ldb.genre)  || get(r, 'genre')),
+            ddn:    fmtDate((ldb&&ldb.ddn)     || get(r, 'ddn')),
+            email:  (ldb&&ldb.email)  || get(r, 'email')  || '',
+            tel:    (ldb&&ldb.tel)    || get(r, 'tel')    || '',
+            club:   (ldb&&ldb.club)   || get(r, 'club')   || '',
+            region: (ldb&&ldb.region) || get(r, 'region') || '',
+            classe: defaultClasse,
+            niveau: get(r, 'niveau') || '',
+            remarques: get(r, 'remarques') || '',
+            // ULM data from Excel
+            _immat:  get(r, 'immat')  || '',
+            _marque: get(r, 'marque') || '',
+            _modele: get(r, 'modele') || '',
+            statut: 'pilote'
+          });
+        }
+      });
+
+      if (typeof _hideImportProgress === 'function') _hideImportProgress();
+
+      // Afficher la fenêtre de prévisualisation
+      _hdgShowEquipImportPreview(toEnroll, toCreate, alreadyIn, compId, defaultClasse);
+
+    } catch(err) {
+      if (typeof _hideImportProgress === 'function') _hideImportProgress();
+      toast('Erreur lors de la lecture Excel : ' + (err.message||err), 'err');
+      console.error('[ImportEquipage]', err);
+    }
   };
   reader.readAsArrayBuffer(file);
-  inp.value = '';
+}
+
+function _hdgShowEquipImportPreview(toEnroll, toCreate, alreadyIn, compId, defaultClasse) {
+  var existing = document.getElementById('_equip-import-preview');
+  if (existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = '_equip-import-preview';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+  var total = toEnroll.length + toCreate.length;
+
+  var listHtml = '';
+
+  // Section pilotes existants à inscrire
+  if (toEnroll.length) {
+    listHtml += '<div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:6px">🔗 ' + toEnroll.length + ' compétiteur(s) existant(s) à inscrire</div>';
+    listHtml += '<div style="max-height:130px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px">';
+    toEnroll.forEach(function(item, i) {
+      var p = item.pilot;
+      var bg = i%2===0?'background:var(--navy3)':'';
+      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<span style="color:#3b82f6;font-size:10px">●</span>'
+        + '<span style="flex:1;font-weight:600">' + (p.prenom||'') + ' ' + (p.nom||'') + '</span>'
+        + (p.licence?'<span style="color:var(--txt3);font-size:11px">'+p.licence+'</span>':'')
+        + (p.club?'<span style="color:var(--txt3);font-size:11px">'+p.club+'</span>':'')
+        + '</div>';
+    });
+    listHtml += '</div>';
+  }
+
+  // Section nouveaux pilotes à créer
+  if (toCreate.length) {
+    listHtml += '<div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px">✨ ' + toCreate.length + ' nouveau(x) compétiteur(s) à créer</div>';
+    listHtml += '<div style="max-height:130px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:10px">';
+    toCreate.forEach(function(c, i) {
+      var bg = i%2===0?'background:var(--navy3)':'';
+      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<span style="color:#10b981;font-size:10px">★</span>'
+        + '<span style="flex:1;font-weight:600">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
+        + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
+        + (c.club?'<span style="color:var(--txt3);font-size:11px">'+c.club+'</span>':'')
+        + '</div>';
+    });
+    listHtml += '</div>';
+  }
+
+  // Section déjà inscrits
+  if (alreadyIn.length) {
+    listHtml += '<div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">✅ ' + alreadyIn.length + ' déjà inscrit(s) — ignoré(s)</div>';
+  }
+
+  if (!total && !alreadyIn.length) {
+    listHtml = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:20px">Aucun compétiteur détecté dans ce fichier</div>';
+  }
+
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  var cpName = cp ? cp.name : '';
+
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">'
+    + '<div style="padding:22px 24px 0">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:4px">✈️ Import Excel — Équipage</div>'
+    + (cpName?'<div style="font-size:12px;color:var(--txt3);margin-bottom:12px">Compétition : <strong>'+cpName+'</strong></div>':'')
+    + (S.licenceDB
+        ? '<div style="font-size:11px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10b981;border-radius:7px;padding:6px 10px;margin-bottom:12px">✅ Base licences FFPLUM chargée — données enrichies automatiquement</div>'
+        : '<div style="font-size:11px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);color:#f59e0b;border-radius:7px;padding:6px 10px;margin-bottom:12px">💡 Conseil : importez d\'abord le fichier licences FFPLUM pour enrichir les données automatiquement</div>')
+    + listHtml
+    + (toCreate.length ? '<div style="font-size:11px;color:var(--txt3);background:var(--navy3);border-radius:8px;padding:8px 10px;margin-bottom:10px">Les nouveaux compétiteurs seront créés dans la liste des Compétiteurs (classe : <strong>'+defaultClasse+'</strong>) ET inscrits à cette compétition.</div>' : '')
+    + '</div>'
+    + '<div style="padding:16px 24px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--bdr);margin-top:8px">'
+    + '<button onclick="document.getElementById(\'_equip-import-preview\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    + (total ? '<button onclick="_hdgConfirmEquipImport()" style="padding:9px 20px;border-radius:10px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Inscrire ' + total + ' compétiteur(s)</button>' : '')
+    + '</div>'
+    + '</div>';
+
+  ov._toEnroll  = toEnroll;
+  ov._toCreate  = toCreate;
+  ov._compId    = compId;
+  ov._defaultClasse = defaultClasse;
+  document.body.appendChild(ov);
+}
+
+function _hdgConfirmEquipImport() {
+  var ov = document.getElementById('_equip-import-preview');
+  if (!ov) return;
+  var toEnroll  = ov._toEnroll  || [];
+  var toCreate  = ov._toCreate  || [];
+  var compId    = ov._compId;
+  var defClasse = ov._defaultClasse || 'pendulaire';
+  ov.remove();
+
+  if (typeof _showImportProgress === 'function') _showImportProgress('Import en cours…');
+
+  setTimeout(function() {
+    try {
+      if (!S.pilots)    S.pilots    = [];
+      if (!S.compEnroll) S.compEnroll = {};
+      if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+
+      var enrolled = 0, created = 0;
+
+      // Inscrire les pilotes existants trouvés
+      toEnroll.forEach(function(item) {
+        var pid = item.pilot.id;
+        if (S.compEnroll[compId].indexOf(pid) === -1) {
+          S.compEnroll[compId].push(pid);
+          enrolled++;
+        }
+      });
+
+      // Créer les nouveaux pilotes puis les inscrire
+      toCreate.forEach(function(c) {
+        var pid = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        var newPilot = {
+          id: pid,
+          nom: c.nom, prenom: c.prenom, licence: c.licence,
+          genre: c.genre, ddn: c.ddn, email: c.email, tel: c.tel,
+          club: c.club, region: c.region, niveau: c.niveau,
+          remarques: c.remarques, statut: 'pilote',
+          _updatedAt: Date.now()
+        };
+        S.pilots.push(newPilot);
+
+        // Créer un ULM si données disponibles
+        if (c._immat || c._marque || c._modele) {
+          if (!S.ulms) S.ulms = {};
+          if (!S.ulms[pid]) S.ulms[pid] = [];
+          S.ulms[pid].push({
+            id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+            classe: defClasse,
+            immat: c._immat || '', marque: c._marque || '', modele: c._modele || ''
+          });
+        }
+
+        if (S.compEnroll[compId].indexOf(pid) === -1) {
+          S.compEnroll[compId].push(pid);
+          created++;
+        }
+      });
+
+      saveState();
+      silentPush();
+      if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+      if (typeof renderPilots === 'function') renderPilots();
+      if (typeof _hideImportProgress === 'function') _hideImportProgress();
+
+      var msg = [];
+      if (enrolled) msg.push(enrolled + ' inscrit(s)');
+      if (created)  msg.push(created  + ' créé(s) et inscrit(s)');
+      toast(msg.length ? msg.join(' · ') + ' ✓' : 'Aucun changement', msg.length ? 'ok' : '');
+
+    } catch(err) {
+      if (typeof _hideImportProgress === 'function') _hideImportProgress();
+      toast('Erreur : ' + (err.message||err), 'err');
+    }
+  }, 80);
 }
 
 function hdgPrintEquipage(compId) {
@@ -13774,6 +14071,22 @@ function exportPilots() {
   toast('Export téléchargé (' + data.length + ' pilotes)', 'ok');
 }
 
+/* ══════════ IMPORT COMPÉTITEURS (JSON + EXCEL) ══════════ */
+
+/* Routeur principal selon extension */
+function importPilotsFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'json') {
+    importPilots(input);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    importPilotsExcel(input);
+  } else {
+    toast('Format non supporté (.json, .xlsx, .xls uniquement)', 'err');
+  }
+}
+
 function importPilots(input) {
   var file = input.files[0];
   if (!file) return;
@@ -13796,6 +14109,339 @@ function importPilots(input) {
   };
   reader.readAsText(file);
   input.value = '';
+}
+
+/* ── Fenêtre de traitement animée ── */
+function _showImportProgress(msg) {
+  var existing = document.getElementById('_import-progress-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = '_import-progress-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;padding:36px 44px;display:flex;flex-direction:column;align-items:center;gap:18px;min-width:280px;box-shadow:0 8px 40px rgba(0,0,0,.5)">'
+    + '<div style="width:44px;height:44px;border:4px solid var(--bdr);border-top-color:#3b82f6;border-radius:50%;animation:_spin .8s linear infinite"></div>'
+    + '<div id="_import-progress-msg" style="color:var(--txt);font-size:14px;font-weight:600;text-align:center">' + (msg||'Traitement en cours…') + '</div>'
+    + '<div id="_import-progress-sub" style="color:var(--txt3);font-size:12px;text-align:center"></div>'
+    + '</div>';
+  if (!document.getElementById('_import-spin-style')) {
+    var st = document.createElement('style');
+    st.id = '_import-spin-style';
+    st.textContent = '@keyframes _spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+  document.body.appendChild(ov);
+}
+function _updateImportProgress(msg, sub) {
+  var el = document.getElementById('_import-progress-msg');
+  var sl = document.getElementById('_import-progress-sub');
+  if (el && msg) el.textContent = msg;
+  if (sl && sub !== undefined) sl.textContent = sub;
+}
+function _hideImportProgress() {
+  var el = document.getElementById('_import-progress-overlay');
+  if (el) el.remove();
+}
+
+/* ── Normalisation de chaîne ── */
+function _normStr(s) {
+  return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+
+/* ── Mapping colonnes Excel → champs internes compétiteur ── */
+var _PILOT_COL_MAP = {
+  // Licence
+  'licence':'licence','n° licence':'licence','no licence':'licence','numero licence':'licence',
+  'numéro licence':'licence','num licence':'licence','n°licence':'licence','nolicence':'licence',
+  // Nom / Prénom
+  'nom':'nom','name':'nom','last name':'nom','lastname':'nom','nom de famille':'nom',
+  'prenom':'prenom','prénom':'prenom','firstname':'prenom','first name':'prenom',
+  // Nom complet (sera splitté)
+  'nom complet':'_nomComplet','pilote':'_nomComplet','competiteur':'_nomComplet','compétiteur':'_nomComplet',
+  // Contact
+  'email':'email','mail':'email','courriel':'email','e-mail':'email',
+  'tel':'tel','téléphone':'tel','telephone':'tel','portable':'tel','mobile':'tel','phone':'tel',
+  // Identité
+  'genre':'genre','sexe':'genre','civilite':'genre','civilité':'genre','sex':'genre','gender':'genre',
+  'ddn':'ddn','date de naissance':'ddn','naissance':'ddn','datedenaissance':'ddn','date naissance':'ddn','dob':'ddn',
+  // Aéro
+  'club':'club','aéroclub':'club','aeroclub':'club','club sportif':'club',
+  'region':'region','région':'region','ligue':'region',
+  'classe':'classe','class':'classe','discipline':'classe','categorie':'classe','catégorie':'classe',
+  'niveau':'niveau','level':'niveau',
+  // Remarques
+  'remarques':'remarques','remarque':'remarques','notes':'remarques','note':'remarques','commentaire':'remarques','commentaires':'remarques',
+};
+
+function _detectPilotColumns(headerRow) {
+  var map = {}; // fieldName → colIndex
+  headerRow.forEach(function(h, i) {
+    var norm = (h||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+    if (_PILOT_COL_MAP[norm]) {
+      var field = _PILOT_COL_MAP[norm];
+      if (map[field] === undefined) map[field] = i; // first match wins
+    }
+  });
+  return map;
+}
+
+/* ── Import Excel compétiteurs ── */
+function importPilotsExcel(input) {
+  var file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  _showImportProgress('Lecture du fichier Excel…');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      _updateImportProgress('Analyse des colonnes…');
+      var wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+
+      if (!rows || rows.length < 2) {
+        _hideImportProgress();
+        toast('Fichier vide ou sans données', 'err');
+        return;
+      }
+
+      // Chercher la ligne d'en-tête (première ligne non vide avec du texte)
+      var headerIdx = 0;
+      for (var hi = 0; hi < Math.min(5, rows.length); hi++) {
+        if (rows[hi] && rows[hi].some(function(c){ return c && c.toString().trim().length > 1; })) {
+          headerIdx = hi; break;
+        }
+      }
+      var colMap = _detectPilotColumns(rows[headerIdx]);
+      var dataRows = rows.slice(headerIdx + 1).filter(function(r){ return r && r.some(function(c){ return c && c.toString().trim(); }); });
+
+      _updateImportProgress('Comparaison avec les données existantes…', dataRows.length + ' lignes trouvées');
+
+      var fmtDate = function(v) {
+        if (!v) return '';
+        var s = v.toString().trim();
+        var dm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dm) return dm[3]+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');
+        var ym = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (ym) return ym[1]+'-'+ym[2]+'-'+ym[3];
+        return s;
+      };
+      var mapGenre = function(v) {
+        var s = (v||'').toString().trim().toUpperCase();
+        if (s==='F'||s==='MME'||s==='MME.'||s==='FEMME') return 'Mme.';
+        if (s==='M'||s==='H'||s==='M.'||s==='MR'||s==='MR.'||s==='HOMME') return 'M.';
+        return v||'';
+      };
+      var mapClasse = function(v) {
+        var s = _normStr(v);
+        if (s.indexOf('MULTI')!==-1||s==='MA') return 'multiaxes';
+        if (s.indexOf('GYRO')!==-1||s.indexOf('AUTO')!==-1||s==='GY') return 'gyro';
+        if (s.indexOf('PENDU')!==-1||s==='PE'||s==='ULM') return 'pendulaire';
+        return v||'';
+      };
+
+      // Construire la liste des candidats depuis Excel
+      var candidates = [];
+      dataRows.forEach(function(r) {
+        var get = function(field){ return colMap[field]!==undefined ? (r[colMap[field]]||'').toString().trim() : ''; };
+        var nom = get('nom'), prenom = get('prenom');
+        // Si nom complet → split
+        if ((!nom || !prenom) && colMap['_nomComplet'] !== undefined) {
+          var full = get('_nomComplet').trim();
+          var parts = full.split(/\s+/);
+          if (parts.length >= 2) {
+            // Heuristique : le nom est souvent en majuscules
+            var hasUpperNom = parts[0] === parts[0].toUpperCase();
+            nom = hasUpperNom ? parts[0] : parts[parts.length-1];
+            prenom = hasUpperNom ? parts.slice(1).join(' ') : parts.slice(0,-1).join(' ');
+          } else { nom = full; prenom = ''; }
+        }
+        if (!nom && !prenom && !get('licence')) return; // ligne vide
+        var licence = get('licence');
+
+        // Chercher dans licenceDB si disponible
+        var ldb = null;
+        if (S.licenceDB) {
+          if (licence) {
+            ldb = Object.values(S.licenceDB).find(function(x){ return x.licence === licence; }) || null;
+          }
+          if (!ldb && nom) {
+            var k1 = _normStr(nom)+'|'+_normStr(prenom);
+            var k2 = _normStr(prenom)+'|'+_normStr(nom);
+            ldb = S.licenceDB[k1] || S.licenceDB[k2] || null;
+          }
+        }
+
+        var candidate = {
+          nom:      (ldb&&ldb.nom)    || nom    || '',
+          prenom:   (ldb&&ldb.prenom) || prenom || '',
+          licence:  (ldb&&ldb.licence)|| licence|| '',
+          genre:    mapGenre((ldb&&ldb.genre)   || get('genre')  || ''),
+          ddn:      fmtDate((ldb&&ldb.ddn)      || get('ddn')    || ''),
+          email:    (ldb&&ldb.email)  || get('email')  || '',
+          tel:      (ldb&&ldb.tel)    || get('tel')    || '',
+          club:     (ldb&&ldb.club)   || get('club')   || '',
+          region:   (ldb&&ldb.region) || get('region') || '',
+          classe:   mapClasse(get('classe')) || _pilotsClass || 'pendulaire',
+          niveau:   get('niveau') || '',
+          remarques:get('remarques') || '',
+          statut:   'pilote',
+          _fromExcel: true
+        };
+        candidates.push(candidate);
+      });
+
+      if (!candidates.length) {
+        _hideImportProgress();
+        toast('Aucun compétiteur détecté dans ce fichier', 'err');
+        return;
+      }
+
+      // Catégoriser : nouveau / déjà existant (par licence puis nom+prénom)
+      var toAdd = [], alreadyExist = [];
+      candidates.forEach(function(c) {
+        var found = null;
+        if (c.licence) {
+          found = (S.pilots||[]).find(function(p){ return p.licence && _normStr(p.licence)===_normStr(c.licence); });
+        }
+        if (!found && c.nom) {
+          found = (S.pilots||[]).find(function(p){
+            return _normStr(p.nom)===_normStr(c.nom) && _normStr(p.prenom)===_normStr(c.prenom);
+          });
+        }
+        if (found) alreadyExist.push({ candidate: c, existing: found });
+        else toAdd.push(c);
+      });
+
+      _hideImportProgress();
+      _showPilotsImportPreview(toAdd, alreadyExist, colMap);
+
+    } catch(err) {
+      _hideImportProgress();
+      toast('Erreur lors de la lecture Excel : ' + (err.message||err), 'err');
+      console.error('[ImportExcel]', err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ── Modal de prévisualisation avant import ── */
+function _showPilotsImportPreview(toAdd, alreadyExist, colMap) {
+  var existing = document.getElementById('_pilots-import-preview');
+  if (existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = '_pilots-import-preview';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+  var colsDetected = Object.keys(colMap).filter(function(k){ return k!=='_nomComplet'; }).join(', ');
+
+  var listHtml = '';
+  if (toAdd.length) {
+    listHtml += '<div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px">✅ ' + toAdd.length + ' nouveau(x) à importer</div>';
+    listHtml += '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:12px">';
+    toAdd.forEach(function(c, i) {
+      var bg = i%2===0?'background:var(--navy3)':'';
+      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<span style="color:#10b981;font-size:10px">●</span>'
+        + '<span style="flex:1;font-weight:600">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
+        + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
+        + (c.club?'<span style="color:var(--txt3);font-size:11px">'+c.club+'</span>':'')
+        + '</div>';
+    });
+    listHtml += '</div>';
+  }
+  if (alreadyExist.length) {
+    listHtml += '<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:6px">⚠️ ' + alreadyExist.length + ' déjà présent(s) (ignorés)</div>';
+    listHtml += '<div style="max-height:120px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px;margin-bottom:12px">';
+    alreadyExist.forEach(function(item, i) {
+      var c = item.candidate;
+      var bg = i%2===0?'background:var(--navy3)':'';
+      listHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;'+bg+'">'
+        + '<span style="color:var(--txt3);font-size:10px">●</span>'
+        + '<span style="flex:1;color:var(--txt2)">' + (c.prenom||'') + ' ' + (c.nom||'') + '</span>'
+        + (c.licence?'<span style="color:var(--txt3);font-size:11px">'+c.licence+'</span>':'')
+        + '</div>';
+    });
+    listHtml += '</div>';
+  }
+  if (!toAdd.length && !alreadyExist.length) {
+    listHtml = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:20px">Aucun compétiteur détecté</div>';
+  }
+
+  // Option mise à jour des existants
+  var hasLicence = colMap['licence'] !== undefined;
+  var updateOpt = alreadyExist.length ? '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-bottom:14px"><input type="checkbox" id="_imp-update-exist" style="width:14px;height:14px"> Mettre à jour les données des compétiteurs déjà présents</label>' : '';
+
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">'
+    + '<div style="padding:22px 24px 0">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:4px">📋 Import Excel — Compétiteurs</div>'
+    + (colsDetected?'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">Colonnes détectées : '+colsDetected+'</div>':'')
+    + (S.licenceDB?'<div style="font-size:11px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10b981;border-radius:7px;padding:6px 10px;margin-bottom:12px">✅ Base licences FFPLUM chargée — données enrichies automatiquement</div>':'<div style="font-size:11px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);color:#f59e0b;border-radius:7px;padding:6px 10px;margin-bottom:12px">💡 Conseil : importez d\'abord le fichier licences FFPLUM (onglet Paramètres) pour enrichir les données</div>')
+    + listHtml
+    + updateOpt
+    + '</div>'
+    + '<div style="padding:16px 24px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--bdr);margin-top:8px">'
+    + '<button onclick="document.getElementById(\'_pilots-import-preview\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    + (toAdd.length?'<button onclick="_confirmPilotsImport()" style="padding:9px 20px;border-radius:10px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Importer ' + toAdd.length + ' compétiteur(s)</button>':'')
+    + '</div>'
+    + '</div>';
+
+  // Stocker les données pour la confirmation
+  ov._toAdd = toAdd;
+  ov._alreadyExist = alreadyExist;
+
+  document.body.appendChild(ov);
+}
+
+function _confirmPilotsImport() {
+  var ov = document.getElementById('_pilots-import-preview');
+  if (!ov) return;
+  var toAdd = ov._toAdd || [];
+  var alreadyExist = ov._alreadyExist || [];
+  var updateExist = document.getElementById('_imp-update-exist');
+  var doUpdate = updateExist && updateExist.checked;
+  ov.remove();
+
+  _showImportProgress('Import en cours…', toAdd.length + ' compétiteur(s) à ajouter');
+
+  setTimeout(function() {
+    try {
+      if (!S.pilots) S.pilots = [];
+      var added = 0, updated = 0;
+
+      toAdd.forEach(function(c) {
+        delete c._fromExcel;
+        c.id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        c._updatedAt = Date.now();
+        S.pilots.push(c);
+        added++;
+      });
+
+      if (doUpdate) {
+        alreadyExist.forEach(function(item) {
+          var c = item.candidate;
+          var p = item.existing;
+          delete c._fromExcel;
+          var FIELDS = ['licence','genre','ddn','email','tel','club','region','niveau','remarques'];
+          FIELDS.forEach(function(f){ if (c[f] && !p[f]) p[f] = c[f]; });
+          if (c.licence && !p.licence) { p.licence = c.licence; }
+          p._updatedAt = Date.now();
+          updated++;
+        });
+      }
+
+      saveState();
+      silentPush();
+      renderPilots();
+      _hideImportProgress();
+      toast(added + ' ajouté(s)' + (updated?' · '+updated+' mis à jour':''), 'ok');
+    } catch(err) {
+      _hideImportProgress();
+      toast('Erreur lors de l\'import : ' + (err.message||err), 'err');
+    }
+  }, 80);
 }
 
 /* ══════════ EXPORT / IMPORT COLLECTIF FRANCE ══════════ */
