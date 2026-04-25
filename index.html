@@ -799,7 +799,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <div style="font-size:14px;font-weight:800">🔧 Moyens</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
-            <button onclick="openMoyenEdit(null)" title="Ajouter un moyen" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:none;background:var(--stol);color:#fff;font-size:18px;line-height:1;cursor:pointer;font-family:inherit">+</button>
+            <button onclick="openMoyenEdit('')" title="Ajouter un moyen" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:none;background:var(--stol);color:#fff;font-size:18px;line-height:1;cursor:pointer;font-family:inherit">+</button>
             <button onclick="toggleHomeMoyens(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
           </div>
         </div>
@@ -1031,13 +1031,20 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <div style="font-size:18px;font-weight:700">🔧 Moyens</div>
           <div style="font-size:12px;color:var(--txt3);margin-top:2px">Gestion du matériel</div>
         </div>
-        <button onclick="openMoyenEdit(null)" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+        <div style="display:flex;gap:7px;align-items:center">
+          <button onclick="printMoyensPage()" title="Imprimer" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️</button>
+          <button onclick="openMoyenEdit('')" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;margin:0 12px 8px;padding:0 12px;gap:6px;flex-shrink:0">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="moyens-page-search" type="search" placeholder="Rechercher un moyen…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" oninput="_debMoyens()">
+      <div style="display:flex;align-items:center;gap:6px;margin:0 12px 10px;flex-shrink:0">
+        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 12px;gap:6px;flex:1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="moyens-page-search" type="search" placeholder="Rechercher un moyen…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none" oninput="_debMoyens()">
+        </div>
+        <select id="moyens-cat-select" onchange="_moyensPageCatFilter=this.value;renderMoyensPage()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;color:var(--txt);font-family:inherit;font-size:12px;font-weight:700;padding:7px 12px;outline:none;cursor:pointer;flex-shrink:0;max-width:130px">
+          <option value="">Toutes catégories</option>
+        </select>
       </div>
-      <div style="display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0" id="moyens-cat-filters"></div>
       <div id="moyens-page-list" style="padding:0 12px 16px;overflow-y:auto;flex:1"></div>
     </div>
 
@@ -5713,10 +5720,10 @@ function openMoyenEdit(moyenId, compId) {
     + '<div style="grid-column:1/-1"><label style="'+lSt+'">Remarques</label><textarea id="moy-rem" rows="2" style="'+iSt+';resize:vertical">'+(m.remarques||'')+'</textarea></div>'
     + '</div></div>'
     + '<div style="padding:14px 22px 20px;display:flex;gap:10px;justify-content:space-between;border-top:1px solid var(--bdr);margin-top:8px">'
-    + (moyenId?'<button onclick="deleteMoyen(\''+moyenId+'\',\''+compId+'\')" style="padding:9px 14px;border-radius:10px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'<span></span>')
+    + (moyenId?'<button onclick="deleteMoyen(\''+(moyenId||'')+'\',\''+(compId||'')+'\')" style="padding:9px 14px;border-radius:10px;border:1.5px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'<span></span>')
     + '<div style="display:flex;gap:8px">'
     + '<button onclick="document.getElementById(\'_moyen-edit-overlay\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
-    + '<button onclick="saveMoyen(\''+moyenId+'\',\''+compId+'\')" style="padding:9px 20px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    + '<button onclick="saveMoyen(\''+(moyenId||'')+'\',\''+(compId||'')+'\''+')" style="padding:9px 20px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
     + '</div></div></div>';
   document.body.appendChild(ov);
 }
@@ -5756,8 +5763,14 @@ function saveMoyen(moyenId, compId) {
 }
 
 function deleteMoyen(moyenId, compId) {
+  if (!moyenId) return;
   if (!confirm('Supprimer cette fiche moyen ?')) return;
+  // Supprimer depuis S.moyens (global)
   if (S.moyens) S.moyens = S.moyens.filter(function(x){ return x.id!==moyenId; });
+  // Supprimer aussi depuis S.materiel[compId] si matériel de compétition
+  if (compId && S.materiel && S.materiel[compId]) {
+    S.materiel[compId] = S.materiel[compId].filter(function(x){ return x.id!==moyenId; });
+  }
   saveState(); silentPush();
   document.getElementById('_moyen-edit-overlay').remove();
   renderMoyens();
@@ -5767,12 +5780,16 @@ function deleteMoyen(moyenId, compId) {
 
 /* ══ PAGE MOYENS (pleine page) ══ */
 var _moyensPageCatFilter = '';
+var _moyensCatCollapsed = {}; // {cat: true} si repliée
 var _debMoyensT = null;
 function _debMoyens() { clearTimeout(_debMoyensT); _debMoyensT = setTimeout(renderMoyensPage, 180); }
+function _toggleMoyenCat(cat) {
+  _moyensCatCollapsed[cat] = !_moyensCatCollapsed[cat];
+  renderMoyensPage();
+}
 
 function renderMoyensPage() {
   var list = document.getElementById('moyens-page-list');
-  var catBar = document.getElementById('moyens-cat-filters');
   if (!list) return;
   if (!S.moyens) S.moyens = [];
   var q = ((document.getElementById('moyens-page-search')||{}).value||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -5798,18 +5815,16 @@ function renderMoyensPage() {
     seen[key] = true; return true;
   });
 
-  // Catégories distinctes pour filtres
+  // Catégories distinctes → alimenter le select
   var cats = [];
   allItems.forEach(function(m){ var c=m.categorie||'Autre'; if(cats.indexOf(c)===-1) cats.push(c); });
   cats.sort();
-
-  // Barre filtres catégories
-  if (catBar) {
-    var fHtml = '<button onclick="_moyensPageCatFilter=\'\';renderMoyensPage()" style="padding:4px 10px;border-radius:14px;font-size:11px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;white-space:nowrap;'+(!_moyensPageCatFilter?'background:var(--stol);color:#fff':'background:var(--navy3);color:var(--txt2)')+'">Tous</button>';
-    cats.forEach(function(c) {
-      fHtml += '<button onclick="_moyensPageCatFilter=\''+c+'\';renderMoyensPage()" style="padding:4px 10px;border-radius:14px;font-size:11px;font-weight:700;font-family:inherit;border:1px solid var(--bdr);cursor:pointer;white-space:nowrap;'+(c===_moyensPageCatFilter?'background:var(--stol);color:#fff':'background:var(--navy3);color:var(--txt2)')+'">'+c+'</button>';
-    });
-    catBar.innerHTML = fHtml;
+  var sel = document.getElementById('moyens-cat-select');
+  if (sel) {
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">Toutes catégories</option>'
+      + cats.map(function(c){ return '<option value="'+c+'"'+(c===_moyensPageCatFilter?' selected':'')+'>'+c+'</option>'; }).join('');
+    if (prev && cats.indexOf(prev) !== -1) sel.value = prev;
   }
 
   // Appliquer filtres
@@ -5819,10 +5834,10 @@ function renderMoyensPage() {
     return hay.indexOf(q)!==-1;
   });
 
-  allItems.sort(function(a,b){ return (a.categorie||'').localeCompare(b.categorie||''); });
+  allItems.sort(function(a,b){ return (a.categorie||'Autre').localeCompare(b.categorie||'Autre') || (a.nom||a.materiel||'').localeCompare(b.nom||b.materiel||''); });
 
   if (!allItems.length) {
-    list.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 20px">'+(q||_moyensPageCatFilter?'Aucun résultat pour ce filtre':'Aucun matériel enregistré.<br><span style="font-size:12px">Cliquez <b>+ Nouveau</b> pour commencer.</span>')+'</div>';
+    list.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 20px">'+(q||_moyensPageCatFilter?'Aucun résultat':'Aucun matériel enregistré.<br><span style="font-size:12px">Cliquez <b>+ Nouveau</b> pour commencer.</span>')+'</div>';
     return;
   }
 
@@ -5836,17 +5851,26 @@ function renderMoyensPage() {
 
   var html = '';
   Object.keys(groups).sort().forEach(function(cat) {
-    html += '<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--bdr)">'
-      + cat + ' <span style="font-weight:400;opacity:.6">('+groups[cat].length+')</span></div>';
+    var collapsed = !!_moyensCatCollapsed[cat];
+    var catId = 'moy-cat-body-' + cat.replace(/[^a-z0-9]/gi,'_');
+    // En-tête repliable
+    html += '<button onclick="_toggleMoyenCat(\''+cat.replace(/'/g,"\\'")+'\')" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-bottom:1.5px solid var(--bdr);padding:10px 0 6px;cursor:pointer;font-family:inherit;margin-top:10px">'
+      + '<span style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px">'+cat+' <span style="font-weight:400;opacity:.6">('+groups[cat].length+')</span></span>'
+      + '<span style="font-size:12px;color:var(--txt3);display:inline-block;transition:transform .18s;transform:rotate('+(collapsed?'0':'90')+'deg)">▶</span>'
+      + '</button>';
+    // Corps repliable
+    html += '<div id="'+catId+'" style="display:'+(collapsed?'none':'block')+'">';
     groups[cat].forEach(function(m) {
-      var nom = m.nom||m.materiel||'—';
+      var nom   = m.nom||m.materiel||'—';
       var marque = m.marque||m.fournisseur||'';
-      var lieu = m.lieuRangement||m.lieuAcces||'';
-      var qte = m.quantite||'';
-      var etat = m.etat||'';
+      var lieu  = m.lieuRangement||m.lieuAcces||'';
+      var qte   = m.quantite||'';
+      var etat  = m.etat||'';
       var etatColor = etat==='Bon'?'#10b981':etat==='Usé'?'#f59e0b':etat==='HS'?'#ef4444':'var(--txt3)';
-      var lien = m.lienAchat||'';
-      html += '<div onclick="openMoyenEdit(\''+(m.id||'')+'\',\''+(m._compId||'')+'\''+')" style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--navy3);margin-bottom:7px;cursor:pointer;border:1.5px solid transparent;transition:border .15s" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
+      var lien  = m.lienAchat||'';
+      var mid   = (m.id||'').replace(/'/g,"\\'");
+      var mcid  = (m._compId||'').replace(/'/g,"\\'");
+      html += '<div onclick="openMoyenEdit(\''+mid+'\',\''+mcid+'\')" style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--navy3);margin:5px 0;cursor:pointer;border:1.5px solid transparent;transition:border .15s" onmouseover="this.style.borderColor=\'var(--stol)\'" onmouseout="this.style.borderColor=\'transparent\'">'
         +'<div style="display:flex;align-items:center;gap:8px">'
         +'<span style="flex:1;font-size:13px;font-weight:700;color:var(--txt)">'+nom+'</span>'
         +(qte?'<span style="font-size:11px;color:var(--txt3);background:var(--navy2);border-radius:6px;padding:2px 7px">×'+qte+'</span>':'')
@@ -5857,8 +5881,45 @@ function renderMoyensPage() {
         +'<div style="font-size:10px;color:var(--txt3);opacity:.6">'+(m._global?'⭐ Global':'📋 '+m._source)+'</div>'
         +'</div>';
     });
+    html += '</div>';
   });
   list.innerHTML = html;
+}
+
+function printMoyensPage() {
+  if (!S.moyens) S.moyens = [];
+  var allItems = [];
+  Object.keys(S.materiel||{}).forEach(function(cid) {
+    var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
+    (S.materiel[cid]||[]).forEach(function(m) {
+      allItems.push(Object.assign({}, m, { _source: cp ? cp.name : 'Compétition' }));
+    });
+  });
+  S.moyens.forEach(function(m) { allItems.push(Object.assign({}, m, { _source: 'Global' })); });
+  var seen = {};
+  allItems = allItems.filter(function(m) {
+    var key = (m.nom||m.materiel||'').toLowerCase();
+    if (!key) return true;
+    if (seen[key]) return m._global;
+    seen[key] = true; return true;
+  });
+  allItems.sort(function(a,b){ return (a.categorie||'Autre').localeCompare(b.categorie||'Autre'); });
+  var groups = {};
+  allItems.forEach(function(m){ var c=m.categorie||'Autre'; if(!groups[c]) groups[c]=[]; groups[c].push(m); });
+  var w = window.open('','_blank');
+  var body = '<html><head><meta charset="utf-8"><title>Moyens</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#111}h1{font-size:18px;margin-bottom:4px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:#555;border-bottom:1px solid #ccc;margin:16px 0 6px;padding-bottom:3px}table{width:100%;border-collapse:collapse;margin-bottom:8px}th{text-align:left;font-size:10px;color:#666;font-weight:700;padding:4px 6px;border-bottom:1px solid #ddd}td{padding:4px 6px;border-bottom:1px solid #eee;font-size:11px}@media print{button{display:none}}</style></head><body>';
+  body += '<h1>🔧 Inventaire des Moyens</h1><p style="color:#666;font-size:11px">Édité le '+new Date().toLocaleDateString('fr-FR')+'</p>';
+  body += '<button onclick="window.print()" style="margin:8px 0;padding:6px 14px;background:#0057ff;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button>';
+  Object.keys(groups).sort().forEach(function(cat) {
+    body += '<h2>'+cat+' ('+groups[cat].length+')</h2><table><tr><th>Nom</th><th>Qté</th><th>Marque</th><th>État</th><th>Lieu</th><th>Source</th></tr>';
+    groups[cat].forEach(function(m) {
+      body += '<tr><td>'+( m.nom||m.materiel||'—')+'</td><td>'+(m.quantite||'')+'</td><td>'+(m.marque||m.fournisseur||'')+'</td><td>'+(m.etat||'')+'</td><td>'+(m.lieuRangement||m.lieuAcces||'')+'</td><td>'+(m._source||'')+'</td></tr>';
+    });
+    body += '</table>';
+  });
+  body += '</body></html>';
+  w.document.write(body);
+  w.document.close();
 }
 
 /* ══ PAGE ACTEURS (pleine page) ══ */
