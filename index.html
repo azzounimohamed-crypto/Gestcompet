@@ -12082,12 +12082,13 @@ async function pullFromCloud() {
   var error = result.error;
 
   if (error) {
-    // Fichier inexistant → première utilisation, on initialise le cloud
-    var msg = (error.message || '').toLowerCase();
-    if (msg.indexOf('not found') !== -1 || msg.indexOf('object not found') !== -1 || msg.indexOf('404') !== -1) {
-      await pushToCloud(); return;
-    }
-    throw new Error(error.message);
+    // Toute erreur au téléchargement (fichier inexistant, 404, etc.) → initialiser avec données locales
+    var msg = (error.message || error.error || JSON.stringify(error) || '').toLowerCase();
+    var isAuthErr = msg.indexOf('401') !== -1 || msg.indexOf('403') !== -1 || msg.indexOf('unauthorized') !== -1 || msg.indexOf('forbidden') !== -1;
+    if (isAuthErr) throw new Error('Accès refusé au Storage — vérifiez les permissions du bucket');
+    // Sinon : fichier introuvable ou première utilisation → on pousse les données locales
+    console.warn('[GestSTOL] Storage download:', msg || '{}', '→ initialisation cloud');
+    await pushToCloud(); return;
   }
   if (!result.data) { await pushToCloud(); return; }
 
