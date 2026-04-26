@@ -13956,14 +13956,16 @@ async function pullFromCloud() {
         }
       });
       var merged = Object.keys(byId).map(function(k){ return byId[k]; }).concat(noId);
-      // Dédup secondaire par contenu : si deux lignes ont même domaine+libelle+valeur+nbjours+qt
-      // (IDs différents = doublons issus de bugs de sync passés), garder la plus récente
+      // Dédup secondaire : UNIQUEMENT pour les lignes sans id (ne jamais éliminer une ligne avec id)
+      // Les lignes sans id sont des anciens doublons issus de bugs de sync
+      var withId = merged.filter(function(x){ return x && x.id; });
+      var withoutId = merged.filter(function(x){ return !x || !x.id; });
       var byContent = {};
-      merged.forEach(function(x) {
+      withoutId.forEach(function(x) {
         var ck = (x.domaine||'').trim().toLowerCase()+'|'+(x.libelle||'').trim().toLowerCase()+'|'+String(x.valeur||0)+'|'+String(x.nbjours||1)+'|'+String(x.qt||1);
         if (!byContent[ck] || (x._updatedAt||0) > (byContent[ck]._updatedAt||0)) byContent[ck] = x;
       });
-      return Object.keys(byContent).map(function(k){ return byContent[k]; });
+      return withId.concat(Object.keys(byContent).map(function(k){ return byContent[k]; }));
     }
     var lb = (S.budgets && typeof S.budgets==='object') ? S.budgets : {};
     var rb = (r.budgets && typeof r.budgets==='object') ? r.budgets : {};
@@ -20825,6 +20827,7 @@ function budgetLineInput(compId, section, lineId, field, value) {
   if (!line) return;
   var numFields = ['valeur','nbjours','qt','cout'];
   line[field] = numFields.indexOf(field) >= 0 ? (parseFloat(value)||0) : value;
+  line._updatedAt = Date.now(); // ← horodatage = garantit que la version locale gagne au merge
   saveState();
   _debouncedBudgetPush(); // push cloud 2s après la dernière frappe
 }
