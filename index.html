@@ -4617,7 +4617,7 @@ async function saveUserProfilePopup() {
     S.pilots[idx].statut  = S.user.statut;
   }
   // Email est en lecture seule — pas de modification d'email
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   renderHome();
   toast('Profil mis à jour ✓', 'ok');
   openUserAccountPopup(); // retour mode vue
@@ -7008,7 +7008,7 @@ function switchGestionTab(subTab) { _gestionSubTab = subTab; renderHomeDetailPan
 
 // ─── Dirty flag — modifications Encadrement / Équipage en attente de sauvegarde cloud ───
 // ─── Sauvegarde cloud Encadrement / Équipage ─────────────────────────────────
-// _hdpDirty = true : un push a échoué → auto-sync bloqué jusqu'à réussite
+// _hdpDirty = true : un push a échoué → bannière ❌ affichée (n'empêche plus le pull — pullFromCloud merge)
 var _hdpDirty = false;
 
 function _renderHdpSaveBanner(state) {
@@ -7031,7 +7031,7 @@ function _renderHdpSaveBanner(state) {
     banner.style.display = 'flex';
     setTimeout(function(){ banner.style.display = 'none'; banner.style.background=''; banner.style.borderTopColor=''; }, 2500);
   } else if (state === 'err') {
-    _hdpDirty = true;   // bloque l'auto-sync pull
+    _hdpDirty = true;   // bannière ❌ affichée (auto-sync pull non bloqué)
     if (msgEl) msgEl.innerHTML = '❌ Échec réseau — données conservées localement';
     if (btnEl) { btnEl.style.display = 'flex'; btnEl.disabled = false; btnEl.innerHTML = '🔄 Réessayer'; }
     banner.style.background = 'linear-gradient(135deg,#450a0a,#7f1d1d)';
@@ -7668,16 +7668,18 @@ function loadOdmPdf(input) {
   var reader = new FileReader();
   reader.onload = function(e) {
     S.odmPdfRef = { data: e.target.result, name: file.name };
-    saveState(); silentPush();
+    saveState();
     renderReglagesOdmSection();
+    _hdpSaveNow(); // push cloud immédiat
     toast('ODM chargé ✓','ok');
   };
   reader.readAsDataURL(file);
 }
 function removeOdmPdf() {
   delete S.odmPdfRef;
-  saveState(); silentPush();
+  saveState();
   renderReglagesOdmSection();
+  _hdpSaveNow(); // push cloud immédiat
   toast('ODM supprimé','');
 }
 function sendOdmToStaff(compId, staffOrigIdx) {
@@ -10647,7 +10649,7 @@ function savePilotDetailEdits(pilotId) {
   S.pilots[idx].email   = get('email');
   S.pilots[idx].tel     = get('tel');
   S.pilots[idx].maillot = (document.getElementById('pde-maillot')||{value:''}).value;
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   toast('Compétiteur mis à jour \u2713', 'ok');
   renderPilotDetailContent(pilotId, false);
   renderPilots();
@@ -10964,7 +10966,7 @@ function saveProfile() {
     S.pilots.push({id:S.user.id, prenom:S.user.prenom, nom:S.user.nom, statut:S.user.statut, photo:S.user.photo, tel:S.user.tel, club:S.user.club, licence:S.user.licence});
   }
   updateHeader();
-  saveState(); silentPush(); toast('Profil enregistré ✓', 'ok');
+  saveState(); _hdpSaveNow(); toast('Profil enregistré ✓', 'ok');
 }
 
 function handleProfilePhoto(inp) {
@@ -11351,8 +11353,9 @@ async function saveSettingsProfile() {
     toast('✉️ Lien de confirmation envoyé à ' + newEmail, 'ok');
   }
   _scEditMode = false;
-  saveState(); silentPush(); updateHeader(); renderHome();
+  saveState(); updateHeader(); renderHome();
   renderSettingsCompte();
+  _hdpSaveNow(); // push cloud immédiat avec bannière statut
   if (!newEmail || newEmail === S.user.email) toast('Profil enregistré ✓', 'ok');
 }
 
@@ -11580,6 +11583,7 @@ function officialDocUpload(zone, input) {
     S.officialDocs[zone] = e.target.result;
     saveState();
     _officialDocRefreshPreview();
+    _hdpSaveNow(); // push cloud immédiat
     toast(zone === 'header' ? 'En‑tête enregistré ✓' : 'Bas de page enregistré ✓', 'ok');
   };
   reader.readAsDataURL(file);
@@ -11591,15 +11595,20 @@ function officialDocRemove(zone) {
   S.officialDocs[zone] = null;
   saveState();
   _officialDocRefreshPreview();
+  _hdpSaveNow(); // push cloud immédiat
   toast('Image supprimée', 'ok');
 }
 
+var _officialDocPushTimer = null;
 function officialDocSetConfig(field, value) {
   if (!S.officialDocs) S.officialDocs = {};
   var numFields = ['headerHeight','footerHeight','marginTop','marginBottom','marginLeft','marginRight'];
   S.officialDocs[field] = numFields.indexOf(field) >= 0 ? (parseFloat(value) || 0) : value;
   saveState();
   _officialDocRefreshPreview();
+  // Push différé 2s pour éviter un push par touche sur les champs numériques
+  clearTimeout(_officialDocPushTimer);
+  _officialDocPushTimer = setTimeout(function() { _hdpSaveNow(); }, 2000);
 }
 
 function _officialDocRefreshPreview() {
@@ -13111,7 +13120,7 @@ function saveStaff() {
     S.staff.push(s);
     toast('Ajouté ✓', 'ok');
   }
-  saveState(); closeSheet('sheet-staff'); renderStaffTab(); silentPush();
+  saveState(); closeSheet('sheet-staff'); renderStaffTab(); _hdpSaveNow();
 }
 
 function deleteStaff(i) {
@@ -14249,11 +14258,7 @@ function startAutoSync() {
         var remoteTs = new Date(file.updated_at).getTime();
         // Si le fichier Storage est plus récent que notre dernière synchro, on tire les données
         if (remoteTs > _lastSyncAt + 5000) { // 5s de marge pour éviter les boucles push/pull
-          // ⛔ Si des modifications locales n'ont pas encore été sauvegardées, ne pas écraser
-          if (_hdpDirty) {
-            console.warn('[AutoSync] pull ignoré — modifications locales en attente (_hdpDirty)');
-            return;
-          }
+          // pullFromCloud() fait un MERGE → sûr même si des modifs locales sont en attente
           _autoSyncFails = 0;
           pullFromCloud().then(function(){
             _lastSyncAt = Date.now();
@@ -14276,7 +14281,7 @@ function startAutoSync() {
             .then(function(res2){
               if (!res2.data) return;
               var remoteTs2 = new Date(res2.data.updated_at).getTime();
-              if (remoteTs2 > _lastSyncAt + 5000 && !_hdpDirty) {
+              if (remoteTs2 > _lastSyncAt + 5000) {
                 pullFromCloud().then(function(){
                   _lastSyncAt = Date.now();
                   renderHome(); renderCompetitions(); renderPilots(); updateHeader(); updateSyncTime();
@@ -20272,7 +20277,7 @@ function importBudgetExcel(evt, compId) {
     });
     if (eng.length) S.budgets[compId].engagement = S.budgets[compId].engagement.concat(eng);
     if (res.length) S.budgets[compId].ressources  = S.budgets[compId].ressources.concat(res);
-    saveState(); silentPush();
+    saveState(); _hdpSaveNow();
     _refreshBudgetView();
     toast((eng.length+res.length)+' lignes importées ✓','ok');
   };
@@ -20324,7 +20329,7 @@ function bgtAddLineFromRow(compId, section) {
   if (!dom && !lib) { toast('Saisissez un domaine ou un libellé', ''); return; }
   var newLine = { id:'bl-'+Date.now(), domaine:dom, libelle:lib, nomLie:nom, valeur:0, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() };
   S.budgets[compId][section].push(newLine);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   if (domEl) { domEl.value=''; }
   if (libEl) { libEl.value=''; }
   if (nomEl) { nomEl.value=''; }
@@ -20356,7 +20361,7 @@ function bgtMobAdd(compId, section) {
   var domKey = (compId+'_'+section+'_'+(dom||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
   _bgtOpenDomains[domKey] = true;
   S.budgets[compId][section].push(newLine);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   if (domEl) domEl.value = '';
   if (libEl) libEl.value = '';
   if (valEl) valEl.value = '';
@@ -20577,7 +20582,7 @@ function saveBgtLineFromSheet(compId, section, lineId) {
   // Mettre à jour le domKey ouvert si le domaine a changé
   var domKey = (compId+'_'+section+'_'+(l.domaine||'—')).replace(/[^a-zA-Z0-9_]/g,'_');
   _bgtOpenDomains[domKey] = true;
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   closeBgtLineSheet();
   _budgetSubTab = section;
   _refreshBudgetView();
@@ -20649,7 +20654,7 @@ function saveStaffFromSheet(compId) {
     email: (document.getElementById('sas-email')||{}).value||'',
     compId: compId, _updatedAt: Date.now()
   });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _closeSheet('staff-add');
   renderMobileCompDetail();
   toast('Encadrant ajouté ✓','ok');
@@ -20806,8 +20811,13 @@ function savePartFromSheet(compId) {
     proposition: (document.getElementById('pas-note')||{}).value||'',
     _updatedAt: Date.now()
   });
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _closeSheet('part-add'); renderMobileCompDetail(); toast('Partenaire ajouté ✓','ok');
+}
+var _budgetPushTimer = null;
+function _debouncedBudgetPush() {
+  clearTimeout(_budgetPushTimer);
+  _budgetPushTimer = setTimeout(function() { _hdpSaveNow(); }, 2000);
 }
 function budgetLineInput(compId, section, lineId, field, value) {
   if (!S.budgets || !S.budgets[compId]) return;
@@ -20816,6 +20826,7 @@ function budgetLineInput(compId, section, lineId, field, value) {
   var numFields = ['valeur','nbjours','qt','cout'];
   line[field] = numFields.indexOf(field) >= 0 ? (parseFloat(value)||0) : value;
   saveState();
+  _debouncedBudgetPush(); // push cloud 2s après la dernière frappe
 }
 function recalcBudgetCout(compId, section, lineId) {
   if (!S.budgets || !S.budgets[compId]) return;
