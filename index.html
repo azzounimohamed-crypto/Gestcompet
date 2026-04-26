@@ -8812,6 +8812,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
     }
 
+    // Exclure les entrées créées automatiquement par les lignes NDF du budget
+    compStaffG2 = compStaffG2.filter(function(s){ return !s._fromNDF; });
     var canEditS    = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
     var cidS        = escS(cp.id);
     // ── Styles communs (identiques à Équipage) ──
@@ -8823,6 +8825,12 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _isMobStaff = window.innerWidth < 768;
     var _stfTpl = _staffGetTpl();
     var html3  = '';
+    // ── Barre d'actions encadrement ──
+    var _stfActBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+    html3 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+    html3 += '<button onclick="exportEncadrementCSV(''+cidS+'')" style="'+_stfActBtnSt+'">📤 Export CSV</button>';
+    if (canEditS) html3 += '<label style="'+_stfActBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importEncadrementCSV(event,''+cidS+'')"></label>';
+    html3 += '</div>';
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobStaff) {
     var _rh = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
@@ -9073,6 +9081,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var typeColors = {'Sécurité':'#ef4444','Matériel':'#f59e0b','Médical':'#3b82f6','Météo':'#8b5cf6','Autre':'#6b7280'};
     var _isMobEvt = window.innerWidth < 768;
     var htmlEvt = '';
+    // Barre d'actions
+    var _evtBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+    htmlEvt += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+    htmlEvt += '<button onclick="printAllEvenements(''+cp.id+'')" style="'+_evtBtnSt+'">🖨 Imprimer tous</button>';
+    if (canEditEvt) htmlEvt += '<button onclick="importEvenementsCSV(''+cp.id+'')" style="'+_evtBtnSt+'">📂 Import CSV</button>';
+    htmlEvt += '<button onclick="exportEvenementsCSV(''+cp.id+'')" style="'+_evtBtnSt+'">📤 Export CSV</button>';
+    htmlEvt += '</div>';
     // Fixed header (desktop uniquement)
     if (!_isMobEvt) {
     htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
@@ -9449,6 +9464,13 @@ function renderPartenairesTab(cp) {
   var isGest = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
   var isMob = window.innerWidth < 768;
 
+  // ── Barre d'actions Partenaires ─────────────────────────────────────────
+  var _ptBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+  var htmlPtBar = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+  htmlPtBar += '<button onclick="exportPartenairesCSV(''+cp.id+'')" style="'+_ptBtnSt+'">📤 Export CSV</button>';
+  if (isGest) htmlPtBar += '<label style="'+_ptBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importPartenairesCSV(event,''+cp.id+'')"></label>';
+  htmlPtBar += '</div>';
+
   // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
   if (isMob) {
     var typeColors = {'Institutionnel':'#3b82f6','Sponsor':'#f59e0b','Médias':'#8b5cf6','Aéroclub':'#10b981','Collectivité':'#ef4444','Autre':'#6b7280'};
@@ -9458,7 +9480,7 @@ function renderPartenairesTab(cp) {
       if (!mGroups[t]) { mGroups[t] = []; mGroupOrder.push(t); }
       mGroups[t].push(p);
     });
-    var html = '<div style="flex:1;overflow-y:auto;padding:12px 12px '+(isGest?'76':'20')+'px">';
+    var html = htmlPtBar + '<div style="flex:1;overflow-y:auto;padding:12px 12px '+(isGest?'76':'20')+'px">';
     if (list.length === 0) {
       html += '<div style="text-align:center;padding:40px 20px;color:var(--txt3);font-size:13px">Aucun partenaire enregistré.</div>';
     } else {
@@ -9504,7 +9526,7 @@ function renderPartenairesTab(cp) {
   }
 
   // ── DESKTOP LAYOUT ─────────────────────────────────────────────────────────
-  var html = '<div style="flex:1;overflow-y:auto;padding:14px 16px">';
+  var html = htmlPtBar + '<div style="flex:1;overflow-y:auto;padding:14px 16px">';
 
   // Header
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">';
@@ -9712,7 +9734,7 @@ function _addPartType() {
   if (types.indexOf(val) >= 0) { toast('Ce type existe déjà',''); return; }
   S.partenaireTypes = types;
   S.partenaireTypes.push(val);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _renderPartTypeMgr();
   _peRefreshTypes(document.getElementById('pe-type') ? document.getElementById('pe-type').value : '');
 }
@@ -9722,7 +9744,7 @@ function _removePartType(idx) {
   S.partenaireTypes = types.slice();
   S.partenaireTypes.splice(idx, 1);
   if (S.partenaireTypes.length === 0) S.partenaireTypes = _DEFAULT_PART_TYPES.slice();
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   _renderPartTypeMgr();
   _peRefreshTypes(document.getElementById('pe-type') ? document.getElementById('pe-type').value : '');
 }
@@ -9906,6 +9928,42 @@ function deletePartenaire(compId, partId) {
   saveState(); _hdpSaveNow();
   if (window.innerWidth < 768) { renderMobileCompDetail(); } else { renderHomeDetailPanel(null); }
   toast('Partenaire supprimé', 'ok');
+}
+
+// ── Export CSV Partenaires ─────────────────────────────────────────────────
+function exportPartenairesCSV(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var list = ((S.partenaires||{})[compId]||[]);
+  var rows = [['Type','Organisme','Représentant','Téléphone','Email','Proposition/Notes']];
+  list.forEach(function(p){ rows.push([p.type||'',p.organisme||'',p.representant||'',p.telephone||'',p.email||'',p.proposition||'']); });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c||'').replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
+  var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'Partenaires_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.csv'; a.click();
+  toast('Export CSV téléchargé ✓','ok');
+}
+
+// ── Import CSV Partenaires ─────────────────────────────────────────────────
+function importPartenairesCSV(evt, compId) {
+  var file = evt.target.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var lines = e.target.result.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+    if (lines.length < 2) { toast('Fichier vide','err'); return; }
+    if (!S.partenaires) S.partenaires = {};
+    if (!S.partenaires[compId]) S.partenaires[compId] = [];
+    var added = 0;
+    lines.slice(1).forEach(function(line){
+      var c = line.split(';').map(function(x){ return x.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+      if (!c[1] && !c[2]) return;
+      S.partenaires[compId].push({id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        type:c[0]||'Autre',organisme:c[1]||'',representant:c[2]||'',telephone:c[3]||'',email:c[4]||'',proposition:c[5]||'',
+        fichiers:[],_updatedAt:Date.now()}); added++;
+    });
+    saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
+    toast(added+' partenaire'+(added>1?'s':'')+' importé'+(added>1?'s':'')+' ✓','ok');
+  };
+  reader.readAsText(file,'UTF-8');
 }
 
 var _hdpMap = null;
@@ -10175,6 +10233,7 @@ function _getStaffMemberUsages(nameKey, pilotId) {
   Object.keys(staffObj).forEach(function(cid) {
     var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
     (staffObj[cid]||[]).forEach(function(s, idx) {
+      if (s._fromNDF) return; // ignorer les entrées NDF du budget
       var sKey = ((s.prenom||'')+(s.nom||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
       var match = (pilotId && (s.pilotId===pilotId)) || (!pilotId && nameKey && sKey === nameKey);
       if (match) usages.push({ comp:cp, compId:cid, idx:idx, entry:s, role:s.role||'' });
@@ -12615,7 +12674,14 @@ function openNewStaffMemberModal() {
   html += '<div><div style="'+lSt+'">Prénom</div><input id="nsm-prenom" style="'+fSt+'" placeholder="Prénom"></div>';
   html += '<div><div style="'+lSt+'">Nom</div><input id="nsm-nom" style="'+fSt+'" placeholder="Nom"></div>';
   html += '</div>';
+  var _nsmStatutOpts = ['invite','pilote','commissaire','staff','gestionnaire'];
+  var _nsmStatutLabels = {invite:'👁 Invité',pilote:'✈️ Pilote',commissaire:'🚩 Commissaire',staff:'🔧 Staff',gestionnaire:'👑 Gestionnaire'};
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div><div style="'+lSt+'">Statut</div><select id="nsm-statut" style="'+fSt+'">';
+  _nsmStatutOpts.forEach(function(st){ html += '<option value="'+st+'"'+(st==='invite'?' selected':'')+'>'+_nsmStatutLabels[st]+'</option>'; });
+  html += '</select></div>';
   html += '<div><div style="'+lSt+'">Rôle / Fonction</div><input id="nsm-role" style="'+fSt+'" placeholder="DC, Juge, Starter…"></div>';
+  html += '</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   html += '<div><div style="'+lSt+'">N° Licence</div><input id="nsm-licence" style="'+fSt+'"></div>';
   html += '<div><div style="'+lSt+'">Téléphone</div><input id="nsm-tel" type="tel" style="'+fSt+'"></div>';
@@ -12641,7 +12707,7 @@ function saveNewStaffMember() {
     prenom: prenom, nom: nom,
     licence: g('nsm-licence'), tel: g('nsm-tel'),
     email: g('nsm-email'), club: g('nsm-club'),
-    statut: 'invite', role: g('nsm-role'),
+    statut: g('nsm-statut')||'invite', role: g('nsm-role'),
     _createdAt: Date.now()
   };
   S.pilots.push(newPilot);
@@ -14104,7 +14170,7 @@ function saveMatAddSheet() {
     modele:    document.getElementById('mas-modele').value.trim(),
     checked:   false
   });
-  saveState(); silentPush(); closeMatAddSheet();
+  saveState(); _hdpSaveNow(); closeMatAddSheet();
   // Refresh matériel tab
   var cp = S.comps.find(function(c){ return c.id === compId; });
   var runs = (S.runs||{})[compId]||[];
@@ -14218,7 +14284,7 @@ function startAutoSync() {
             }).catch(function(){});
         }
       });
-  }, 30000); // toutes les 30s
+  }, 15000); // toutes les 15s
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -17617,7 +17683,15 @@ function showStaffDetailModal(compId, idx, editMode) {
       html += '<input id="sdm-prenom" value="'+_esc(prenom)+'" placeholder="Prénom" style="'+iSt+'">';
       html += '</div>';
       html += '<input id="sdm-nom" value="'+_esc(nom)+'" placeholder="NOM" style="'+iSt+';font-weight:700;text-transform:uppercase">';
+      var _sdmStatutOptsMob = ['invite','pilote','commissaire','staff','gestionnaire'];
+      var _sdmStatutLabelsMob = {invite:'👁 Invité',pilote:'✈️ Pilote',commissaire:'🚩 Commissaire',staff:'🔧 Staff',gestionnaire:'👑 Gestionnaire'};
+      var _sdmCurStatutMob = (pilot.statut||entry.statut||'invite');
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+      html += '<select id="sdm-statut" style="'+iSt+'">'; 
+      _sdmStatutOptsMob.forEach(function(st){ html += '<option value="'+st+'"'+(_sdmCurStatutMob===st?' selected':'')+'>'+_sdmStatutLabelsMob[st]+'</option>'; });
+      html += '</select>';
       html += '<input id="sdm-role" value="'+_esc(entry.role||'')+'" placeholder="Fonction / Rôle" style="'+iSt+';color:#0891b2;font-weight:600">';
+      html += '</div>';
       html += '</div>';
       html += '</div>';
     } else {
@@ -17653,8 +17727,18 @@ function showStaffDetailModal(compId, idx, editMode) {
     html += '<div><div style="'+lSt+'">Prénom</div><input id="sdm-prenom" value="'+_esc(prenom)+'" style="'+iSt+'"></div>';
     html += '<div><div style="'+lSt+'">Nom</div><input id="sdm-nom" value="'+_esc(nom)+'" style="'+iSt+'"></div>';
     html += '</div>';
-    // Fonction
+    // Statut + Fonction (côte à côte)
+
+      var _sdmStatutOpts = ['invite','pilote','commissaire','staff','gestionnaire'];
+      var _sdmStatutLabels = {invite:'👁 Invité',pilote:'✈️ Pilote',commissaire:'🚩 Commissaire',staff:'🔧 Staff',gestionnaire:'👑 Gestionnaire'};
+      var _sdmCurStatut = (pilot.statut||entry.statut||'invite');
+      var _sdmStatutHtml = '<select id="sdm-statut" style="'+iSt+'">';
+      _sdmStatutOpts.forEach(function(st){ _sdmStatutHtml += '<option value="'+st+'"'+(_sdmCurStatut===st?' selected':'')+'>'+_sdmStatutLabels[st]+'</option>'; });
+      _sdmStatutHtml += '</select>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    html += '<div><div style="'+lSt+'">Statut</div>'+_sdmStatutHtml+'</div>';
     html += '<div><div style="'+lSt+'">Fonction / Rôle</div><input id="sdm-role" value="'+_esc(entry.role||'')+'" placeholder="DC, Starter, Juge…" style="'+iSt+'"></div>';
+    html += '</div>';
     } // fin !mobile
     // Licence + DDN + âge
     html += '<div style="display:grid;grid-template-columns:'+(_isMobStaffModal?'1fr 1fr':'1fr auto 1fr')+';gap:8px;align-items:end">';
@@ -17691,6 +17775,12 @@ function showStaffDetailModal(compId, idx, editMode) {
     }
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:20px;font-weight:800;line-height:1.2">'+((genre?genre+' ':'')+prenom+' '+nom).trim()+'</div>';
+    var _sdmViewStatut = pilot.statut || entry.statut || '';
+    var _sdmStatutCfg = {gestionnaire:{bg:'rgba(255,195,0,.2)',c:'#c89600',lbl:'👑 Gestionnaire'},staff:{bg:'rgba(0,87,255,.15)',c:'var(--stol)',lbl:'🔧 Staff'},commissaire:{bg:'rgba(255,140,0,.2)',c:'#d47800',lbl:'🚩 Commissaire'},pilote:{bg:'rgba(0,180,80,.15)',c:'#00a050',lbl:'✈️ Pilote'},invite:{bg:'rgba(140,140,140,.18)',c:'var(--txt2)',lbl:'👁 Invité'}};
+    if (_sdmViewStatut && _sdmStatutCfg[_sdmViewStatut]) {
+      var _sdmSC = _sdmStatutCfg[_sdmViewStatut];
+      html += '<div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:'+_sdmSC.bg+';color:'+_sdmSC.c+'">'+_sdmSC.lbl+'</div>';
+    }
     if (entry.role) html += '<div style="font-size:13px;color:#0891b2;font-weight:700;margin-top:4px">'+entry.role+'</div>';
     if (age)    html += '<div style="font-size:12px;color:var(--txt2);margin-top:3px">'+age+'</div>';
     if (club)   html += '<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+club+'</div>';
@@ -17782,6 +17872,7 @@ function saveStaffDetail(compId, idx) {
   entry.prenom  = g('sdm-prenom') || entry.prenom;
   entry.nom     = g('sdm-nom')    || entry.nom;
   entry.role    = g('sdm-role');
+  var newStatut  = g('sdm-statut'); if (newStatut) entry.statut = newStatut;
   entry.licence = g('sdm-lic');
   entry.tel     = g('sdm-tel');
   entry.email   = g('sdm-email');
@@ -17804,15 +17895,77 @@ function saveStaffDetail(compId, idx) {
       if (entry.region)  pilot.region  = entry.region;
       if (entry.adresse) pilot.adresse = entry.adresse;
       if (entry.ddn)     pilot.ddn     = entry.ddn;
+      if (entry.statut)  pilot.statut  = entry.statut;
       if (_sdmPhotoData) pilot.photo   = _sdmPhotoData;
     }
   }
   _sdmPhotoData = null;
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   renderStaffList();
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
   toast('Profil mis à jour ✓','ok');
   closeAllModals();
+}
+
+// ── Export CSV Encadrement ────────────────────────────────────────────────
+function exportEncadrementCSV(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var staffArr = ((!S.staff||Array.isArray(S.staff))?{}:S.staff)[compId]||[];
+  staffArr = staffArr.filter(function(s){ return !s._fromNDF; });
+  var rows = [['Statut','Fonction/Rôle','Prénom','Nom','N° Licence','Téléphone','Email','Club','Région']];
+  staffArr.forEach(function(s){
+    var p = (S.pilots||[]).find(function(x){ return x.id===s.pilotId; })||{};
+    rows.push([
+      p.statut||'',s.role||'',
+      p.prenom||s.prenom||'',p.nom||s.nom||'',
+      p.licence||s.licence||'',p.tel||s.tel||'',p.email||s.email||'',
+      p.club||s.club||'',p.region||s.region||''
+    ]);
+  });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c||'').replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
+  var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'Encadrement_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.csv'; a.click();
+  toast('Export CSV téléchargé ✓','ok');
+}
+
+// ── Import CSV Encadrement ────────────────────────────────────────────────
+function importEncadrementCSV(evt, compId) {
+  var file = evt.target.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var lines = e.target.result.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+    if (lines.length < 2) { toast('Fichier vide','err'); return; }
+    if (!S.staff || Array.isArray(S.staff)) S.staff = {};
+    if (!S.staff[compId]) S.staff[compId] = [];
+    if (!S.pilots) S.pilots = [];
+    var added = 0;
+    lines.slice(1).forEach(function(line){
+      var c = line.split(';').map(function(x){ return x.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+      var prenom = c[2]||'', nom = c[3]||'', role = c[1]||'', statut = c[0]||'invite';
+      if (!prenom && !nom && !role) return;
+      // Chercher un pilote existant
+      var pilot = (S.pilots||[]).find(function(p){
+        return (p.prenom||'').toLowerCase()===(prenom).toLowerCase() && (p.nom||'').toLowerCase()===(nom).toLowerCase();
+      });
+      if (!pilot) {
+        pilot = {id:'stf_'+Date.now()+Math.random().toString(36).slice(2,5),
+          prenom:prenom,nom:nom,licence:c[4]||'',tel:c[5]||'',email:c[6]||'',
+          club:c[7]||'',region:c[8]||'',statut:statut,_createdAt:Date.now()};
+        S.pilots.push(pilot);
+      }
+      var alreadyIn = S.staff[compId].some(function(s){ return s.pilotId===pilot.id; });
+      if (!alreadyIn) {
+        S.staff[compId].push({id:'stf_'+Date.now()+Math.random().toString(36).slice(2,5),
+          pilotId:pilot.id,prenom:pilot.prenom,nom:pilot.nom,role:role,
+          licence:pilot.licence,tel:pilot.tel,email:pilot.email,_updatedAt:Date.now()});
+        added++;
+      }
+    });
+    saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
+    toast(added+' encadrant'+(added>1?'s':'')+' importé'+(added>1?'s':'')+' ✓','ok');
+  };
+  reader.readAsText(file,'UTF-8');
 }
 
 // ── Déduit la région française depuis un code postal extrait d'une adresse ──
@@ -17997,7 +18150,7 @@ function sendCDMessage(dest) {
     urgent: false
   };
   S.messages.push(msg);
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   if (textEl) textEl.value = '';
   var row = document.getElementById('cd-msg-dest-row');
   if (row) row.style.display = 'none';
@@ -18060,7 +18213,7 @@ function urgentCDMessage(id) {
   var m = (S.messages||[]).find(function(x){ return x.id === id; });
   if (!m) return;
   m.urgent = !m.urgent;
-  saveState(); silentPush();
+  saveState(); _hdpSaveNow();
   renderCDMessages();
   toast(m.urgent ? 'Message urgent ⚡' : 'Urgent retiré', 'ok');
 }
@@ -18541,6 +18694,110 @@ function deleteEvenementFromModal() {
   toast('Événement supprimé','');
 }
 
+// ── Imprimer tous les événements d'une compétition ──────────────────────────
+function printAllEvenements(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var evtList = ((S.evenements||{})[compId]||[]);
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var typeColors = {'Sécurité':'#ef4444','Matériel':'#f59e0b','Médical':'#3b82f6','Météo':'#8b5cf6','Administratif':'#10b981','Mécanique':'#f97316','Autre':'#6b7280'};
+  var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var logo = _getAppLogo ? _getAppLogo() : '';
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Événements — '+esc(cp.name||compId)+'</title>';
+  html += '<style>@page{size:A4;margin:18mm 14mm}body{font-family:Arial,sans-serif;font-size:11px;color:#111;line-height:1.4;margin:0}';
+  html += '.header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:10px;border-bottom:2px solid #1e3a5f;margin-bottom:14px}';
+  html += '.header-left h1{font-size:18px;margin:0 0 3px;color:#1e3a5f}.header-left p{margin:0;font-size:11px;color:#555}';
+  html += '.logo{max-height:52px;max-width:110px;object-fit:contain}';
+  html += 'table{width:100%;border-collapse:collapse;margin-bottom:16px}';
+  html += 'thead th{background:#1e3a5f;color:#fff;padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px}';
+  html += 'tbody tr:nth-child(even){background:#f3f7fb}td{padding:6px 8px;border-bottom:1px solid #e0e7ef;vertical-align:top}';
+  html += '.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;color:#fff}';
+  html += '.footer{margin-top:20px;font-size:9px;color:#888;text-align:right;border-top:1px solid #ddd;padding-top:6px}';
+  html += '@media print{button{display:none}}</style></head><body>';
+  html += '<div class="header"><div class="header-left"><h1>📋 Registre des Événements</h1>';
+  html += '<p><strong>'+esc(cp.name||'Compétition')+'</strong>';
+  if (cp.dateFrom) html += ' &nbsp;·&nbsp; '+esc(cp.dateFrom+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+cp.dateTo:''));
+  if (cp.lieu)     html += ' &nbsp;·&nbsp; '+esc(cp.lieu);
+  html += '</p><p style="color:#888;margin-top:3px">Édité le '+now+'</p></div>';
+  if (logo) html += '<img src="'+logo+'" class="logo">';
+  else       html += '<div style="font-size:22px">🛩</div>';
+  html += '</div>';
+  if (!evtList.length) {
+    html += '<p style="color:#888;text-align:center;padding:30px">Aucun événement enregistré.</p>';
+  } else {
+    html += '<table><thead><tr>';
+    ['N°','Type','Nom / Aéronef','Date','Heure','Immatriculation','Circonstances','Commentaires'].forEach(function(h){ html += '<th>'+h+'</th>'; });
+    html += '</tr></thead><tbody>';
+    evtList.forEach(function(ev, i) {
+      var tc = typeColors[ev.typeIncident]||'#6b7280';
+      html += '<tr>';
+      html += '<td style="color:#888;font-size:9px">'+(i+1)+'</td>';
+      html += '<td><span class="badge" style="background:'+tc+'">'+esc(ev.typeIncident||'—')+'</span></td>';
+      html += '<td><strong>'+esc(ev.nom||'—')+'</strong></td>';
+      html += '<td style="white-space:nowrap">'+esc(ev.date||'—')+'</td>';
+      html += '<td style="white-space:nowrap">'+esc(ev.horaire||'—')+'</td>';
+      html += '<td style="font-weight:700;color:#b45309">'+esc(ev.immatriculation||'—')+'</td>';
+      html += '<td>'+esc(ev.circonstance||'—')+'</td>';
+      html += '<td style="color:#555">'+esc(ev.commentaires||'—')+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<p style="font-size:10px;font-weight:700">Total : '+evtList.length+' événement'+(evtList.length>1?'s':'')+'</p>';
+  }
+  html += '<div class="footer">Document généré par Gest\'Appli FFPLUM · '+now+'</div>';
+  html += '<div style="margin-top:12px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">🖨 Imprimer</button></div>';
+  html += '</body></html>';
+  var win = window.open('','_blank'); if(!win) return;
+  win.document.write(html); win.document.close();
+  setTimeout(function(){ win.print(); }, 400);
+}
+
+// ── Export CSV événements ──────────────────────────────────────────────────
+function exportEvenementsCSV(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var evtList = ((S.evenements||{})[compId]||[]);
+  var rows = [['Type','Nom / Aéronef','Date','Heure','Immatriculation','Circonstance','Commentaires']];
+  evtList.forEach(function(ev){
+    rows.push([ev.typeIncident||'',ev.nom||'',ev.date||'',ev.horaire||'',ev.immatriculation||'',ev.circonstance||'',ev.commentaires||'']);
+  });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c||'').replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
+  var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'Evenements_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.csv';
+  a.click(); toast('Export CSV téléchargé ✓','ok');
+}
+
+// ── Import CSV événements ──────────────────────────────────────────────────
+function importEvenementsCSV(compId) {
+  var inp = document.createElement('input'); inp.type='file'; inp.accept='.csv,.xlsx,.xls';
+  inp.onchange = function(){
+    var file = inp.files[0]; if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var text = e.target.result;
+      var lines = text.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+      if (lines.length < 2) { toast('Fichier vide','err'); return; }
+      if (!S.evenements) S.evenements = {};
+      if (!S.evenements[compId]) S.evenements[compId] = [];
+      var added = 0;
+      lines.slice(1).forEach(function(line){
+        var cols = line.split(';').map(function(c){ return c.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+        if (!cols[0] && !cols[1]) return;
+        S.evenements[compId].push({
+          id:'evt-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+          typeIncident:cols[0]||'Autre', nom:cols[1]||'', date:cols[2]||'',
+          horaire:cols[3]||'', immatriculation:cols[4]||'',
+          circonstance:cols[5]||'', commentaires:cols[6]||'',
+          _updatedAt: Date.now()
+        }); added++;
+      });
+      saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
+      toast(added+' événement'+(added>1?'s':'')+' importé'+(added>1?'s':'')+'✓','ok');
+    };
+    reader.readAsText(file,'UTF-8');
+  };
+  inp.click();
+}
+
 function exportEvenement(compId, evtId) {
   var cp = (S.comps||[]).find(function(c){ return c.id === compId; }) || {};
   var ev = ((S.evenements||{})[compId]||[]).find(function(x){ return x.id === evtId; }) || {};
@@ -18605,7 +18862,7 @@ function renderCDStaff() {
   var compId = _currentCompId;
   var compAssigned = [];
   if (S.staff && !Array.isArray(S.staff)) {
-    compAssigned = (S.staff[compId] || S.staff[String(compId)] || []);
+    compAssigned = (S.staff[compId] || S.staff[String(compId)] || []).filter(function(s){ return !s._fromNDF; });
   } else if (Array.isArray(S.staff)) {
     compAssigned = S.staff.filter(function(x){ return x && (x.compId === compId || x.competitionId === compId || x.comp_id === compId); });
   }
@@ -21158,7 +21415,8 @@ function saveBudgetDetailModal() {
           prenom: matchPilot.prenom,
           nom: matchPilot.nom,
           role: 'NDF',
-          adresse: matchPilot.adresse || ''
+          adresse: matchPilot.adresse || '',
+          _fromNDF: true          // ← NE PAS afficher dans l'onglet Encadrants
         });
       }
     }
