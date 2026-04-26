@@ -1535,6 +1535,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <div id="licence-status-bar" style="margin-bottom:8px"></div>
           <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('import-licence-inp').click()">📋 Importer le fichier licences FFPLUM</button>
           <input type="file" id="import-licence-inp" accept=".xlsx,.xls" style="display:none" onchange="importLicenceFfplum(this)">
+          <div id="btn-refresh-all-licences-wrap" style="display:none;margin-top:8px">
+            <button class="btn btn-sm" style="width:100%;background:rgba(0,87,255,.12);border:1px solid rgba(0,87,255,.35);color:var(--stol);font-weight:700" onclick="refreshAllFromLicenceDB()">🔄 Mettre à jour pilotes &amp; encadrants depuis la base</button>
+          </div>
           <div id="import-licence-result" style="margin-top:10px;display:none"></div>
         </div>
       </div>
@@ -20111,7 +20114,11 @@ function _renderLicenceStatus() {
   if (!bar) return;
   var info = S.settings && S.settings.licenceInfo;
   var dbCount = S.licenceDB ? Object.keys(S.licenceDB).length : 0;
-  if (info || dbCount > 0) {
+  var hasDB = dbCount > 0;
+  // Afficher/masquer le bouton de mise à jour globale
+  var refreshWrap = document.getElementById('btn-refresh-all-licences-wrap');
+  if (refreshWrap) refreshWrap.style.display = hasDB ? '' : 'none';
+  if (info || hasDB) {
     var count = info ? info.count : dbCount;
     var dateStr = info ? new Date(info.date).toLocaleDateString('fr-FR') : '—';
     var fname = info ? info.filename : '—';
@@ -20287,6 +20294,84 @@ function importLicenceFfplum(inp) {
   };
   reader.readAsArrayBuffer(inp.files[0]);
   inp.value = '';
+}
+
+/* ── Mise à jour globale depuis licenceDB déjà chargée ── */
+function refreshAllFromLicenceDB() {
+  if (!S.licenceDB || Object.keys(S.licenceDB).length === 0) {
+    toast('Aucune base licences — importez d\'abord le fichier FFPLUM', 'err');
+    return;
+  }
+
+  var norm = function(s) {
+    return (s || '').toString().trim().toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  };
+
+  var updated = 0, notFound = 0;
+  var missingList = [];
+
+  var updatePerson = function(p) {
+    var key  = norm(p.nom) + '|' + norm(p.prenom);
+    var ldb  = S.licenceDB[key];
+    if (!ldb) ldb = S.licenceDB[norm(p.prenom) + '|' + norm(p.nom)];
+    // Recherche partielle par numéro de licence si disponible
+    if (!ldb && p.licence) {
+      ldb = Object.values(S.licenceDB).find(function(x){ return x.licence && x.licence === p.licence; }) || null;
+    }
+    if (!ldb) { notFound++; missingList.push((p.prenom || '') + ' ' + (p.nom || '')); return; }
+    var changed = false;
+    var fill = function(field, val) { if (!p[field] && val) { p[field] = val; changed = true; } };
+    fill('genre',   ldb.genre);
+    fill('ddn',     ldb.ddn);
+    fill('licence', ldb.licence);
+    fill('email',   ldb.email);
+    fill('tel',     ldb.tel);
+    fill('club',    ldb.club);
+    fill('region',  ldb.region);
+    fill('adresse', ldb.adresse);
+    if (changed) updated++;
+  };
+
+  // Pilotes
+  (S.pilots || []).forEach(function(p) { updatePerson(p); });
+
+  // Encadrants / staff  (structure : { compId : [{…}] })
+  if (S.staff && !Array.isArray(S.staff)) {
+    Object.keys(S.staff).forEach(function(cid) {
+      (S.staff[cid] || []).forEach(function(m) {
+        updatePerson(m);
+        // Propager vers la fiche pilote liée
+        if (m.pilotId) {
+          var lp = (S.pilots || []).find(function(p){ return p.id === m.pilotId; });
+          if (lp) {
+            ['genre','ddn','licence','email','tel','club','region','adresse'].forEach(function(f){
+              if (m[f] && !lp[f]) lp[f] = m[f];
+            });
+          }
+        }
+      });
+    });
+  }
+
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof renderPilots === 'function') renderPilots();
+
+  // Rapport dans le div résultat existant
+  var resultEl = document.getElementById('import-licence-result');
+  var html = '<div style="font-size:12px">';
+  html += '<div style="font-weight:700;color:#10b981;margin-bottom:4px">✅ ' + updated + ' fiche(s) mise(s) à jour</div>';
+  if (notFound > 0) {
+    html += '<div style="font-weight:700;color:var(--txt2);margin-bottom:4px">⚠️ ' + notFound + ' non trouvé(s) dans la base :</div>';
+    html += '<div style="color:var(--txt3);font-size:11px;line-height:1.6">'
+          + missingList.slice(0, 30).join(', ')
+          + (missingList.length > 30 ? ' … et ' + (missingList.length - 30) + ' autres' : '')
+          + '</div>';
+  }
+  html += '</div>';
+  if (resultEl) { resultEl.style.display = ''; resultEl.innerHTML = html; }
+  toast(updated > 0 ? updated + ' fiche(s) mise(s) à jour' : 'Aucune donnée manquante à compléter', updated > 0 ? 'ok' : 'info');
 }
 
 /* ── Import JSON global avec gestion des doublons ── */
