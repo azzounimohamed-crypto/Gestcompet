@@ -8813,7 +8813,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
 
     // Exclure les entrées créées automatiquement par les lignes NDF du budget
-    compStaffG2 = compStaffG2.filter(function(s){ return !s._fromNDF; });
+    // Exclure entrées NDF du budget (nouvelles via _fromNDF, anciennes via id/role)
+    compStaffG2 = compStaffG2.filter(function(s){ return !s._fromNDF && !(s.id && s.id.startsWith('staff-ndf-')); });
     var canEditS    = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
     var cidS        = escS(cp.id);
     // ── Styles communs (identiques à Équipage) ──
@@ -8828,8 +8829,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Barre d'actions encadrement ──
     var _stfActBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
     html3 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
-    html3 += '<button onclick="exportEncadrementCSV(''+cidS+'')" style="'+_stfActBtnSt+'">📤 Export CSV</button>';
-    if (canEditS) html3 += '<label style="'+_stfActBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importEncadrementCSV(event,''+cidS+'')"></label>';
+    html3 += '<button onclick="exportEncadrementCSV(\''+cidS+'\')" style="'+_stfActBtnSt+'">📤 Export CSV</button>';
+    if (canEditS) html3 += '<label style="'+_stfActBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importEncadrementCSV(event,\''+cidS+'\')"></label>';
     html3 += '</div>';
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobStaff) {
@@ -9084,9 +9085,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Barre d'actions
     var _evtBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
     htmlEvt += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
-    htmlEvt += '<button onclick="printAllEvenements(''+cp.id+'')" style="'+_evtBtnSt+'">🖨 Imprimer tous</button>';
-    if (canEditEvt) htmlEvt += '<button onclick="importEvenementsCSV(''+cp.id+'')" style="'+_evtBtnSt+'">📂 Import CSV</button>';
-    htmlEvt += '<button onclick="exportEvenementsCSV(''+cp.id+'')" style="'+_evtBtnSt+'">📤 Export CSV</button>';
+    htmlEvt += '<button onclick="printAllEvenements(\''+cp.id+'\')" style="'+_evtBtnSt+'">🖨 Imprimer tous</button>';
+    if (canEditEvt) htmlEvt += '<button onclick="importEvenementsCSV(\''+cp.id+'\')" style="'+_evtBtnSt+'">📂 Import CSV</button>';
+    htmlEvt += '<button onclick="exportEvenementsCSV(\''+cp.id+'\')" style="'+_evtBtnSt+'">📤 Export CSV</button>';
     htmlEvt += '</div>';
     // Fixed header (desktop uniquement)
     if (!_isMobEvt) {
@@ -9467,8 +9468,8 @@ function renderPartenairesTab(cp) {
   // ── Barre d'actions Partenaires ─────────────────────────────────────────
   var _ptBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
   var htmlPtBar = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
-  htmlPtBar += '<button onclick="exportPartenairesCSV(''+cp.id+'')" style="'+_ptBtnSt+'">📤 Export CSV</button>';
-  if (isGest) htmlPtBar += '<label style="'+_ptBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importPartenairesCSV(event,''+cp.id+'')"></label>';
+  htmlPtBar += '<button onclick="exportPartenairesCSV(\''+cp.id+'\')" style="'+_ptBtnSt+'">📤 Export CSV</button>';
+  if (isGest) htmlPtBar += '<label style="'+_ptBtnSt+'">📂 Import CSV<input type="file" accept=".csv" style="display:none" onchange="importPartenairesCSV(event,\''+cp.id+'\')"></label>';
   htmlPtBar += '</div>';
 
   // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
@@ -10233,7 +10234,7 @@ function _getStaffMemberUsages(nameKey, pilotId) {
   Object.keys(staffObj).forEach(function(cid) {
     var cp = (S.comps||[]).find(function(c){ return c.id===cid; });
     (staffObj[cid]||[]).forEach(function(s, idx) {
-      if (s._fromNDF) return; // ignorer les entrées NDF du budget
+      if (s._fromNDF || (s.id && s.id.startsWith('staff-ndf-'))) return; // ignorer NDF
       var sKey = ((s.prenom||'')+(s.nom||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
       var match = (pilotId && (s.pilotId===pilotId)) || (!pilotId && nameKey && sKey === nameKey);
       if (match) usages.push({ comp:cp, compId:cid, idx:idx, entry:s, role:s.role||'' });
@@ -17911,7 +17912,7 @@ function saveStaffDetail(compId, idx) {
 function exportEncadrementCSV(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
   var staffArr = ((!S.staff||Array.isArray(S.staff))?{}:S.staff)[compId]||[];
-  staffArr = staffArr.filter(function(s){ return !s._fromNDF; });
+  staffArr = staffArr.filter(function(s){ return !s._fromNDF && !(s.id && s.id.startsWith('staff-ndf-')); });
   var rows = [['Statut','Fonction/Rôle','Prénom','Nom','N° Licence','Téléphone','Email','Club','Région']];
   staffArr.forEach(function(s){
     var p = (S.pilots||[]).find(function(x){ return x.id===s.pilotId; })||{};
@@ -18862,7 +18863,7 @@ function renderCDStaff() {
   var compId = _currentCompId;
   var compAssigned = [];
   if (S.staff && !Array.isArray(S.staff)) {
-    compAssigned = (S.staff[compId] || S.staff[String(compId)] || []).filter(function(s){ return !s._fromNDF; });
+    compAssigned = (S.staff[compId] || S.staff[String(compId)] || []).filter(function(s){ return !s._fromNDF && !(s.id && s.id.startsWith('staff-ndf-')); });
   } else if (Array.isArray(S.staff)) {
     compAssigned = S.staff.filter(function(x){ return x && (x.compId === compId || x.competitionId === compId || x.comp_id === compId); });
   }
