@@ -1307,6 +1307,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
               <input id="psp-inp-resultats" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('resultats',this.value)">
             </div>
           </div>
+          <div id="psp-save-status" style="display:none;margin-top:10px;padding:7px 12px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:12px;font-weight:700;color:#10b981;text-align:center">✓ Liens sauvegardés</div>
         </div>
         <div class="section-title">Ressources</div>
         <div class="card">
@@ -2825,6 +2826,57 @@ function getSB() {
 // Les données persistent entre toutes les versions
 // ═══════════════════════════════════════════════════════
 const LS = 'geststol';  // Clé unique et définitive
+const LS_CRITICAL = 'geststol_critical'; // Réglages critiques — jamais strippés, jamais écrasés
+
+// ── Sauvegarde des réglages critiques dans une clé dédiée ──
+function _saveCritical() {
+  try {
+    var od = S.officialDocs || {};
+    var backup = {
+      officialDocs: {
+        header:       od.header       || null,
+        footer:       od.footer       || null,
+        headerHeight: od.headerHeight !== undefined ? od.headerHeight : 20,
+        headerPos:    od.headerPos    || 'left',
+        footerHeight: od.footerHeight !== undefined ? od.footerHeight : 15,
+        marginTop:    od.marginTop    !== undefined ? od.marginTop    : 25,
+        marginBottom: od.marginBottom !== undefined ? od.marginBottom : 20,
+        marginLeft:   od.marginLeft   !== undefined ? od.marginLeft   : 20,
+        marginRight:  od.marginRight  !== undefined ? od.marginRight  : 20
+      },
+      poleSport: (S.settings && S.settings.poleSport) || {}
+    };
+    localStorage.setItem(LS_CRITICAL, JSON.stringify(backup));
+  } catch(e) {}
+}
+
+// ── Restauration depuis la clé critique (comble les trous après chargement) ──
+function _restoreCritical() {
+  try {
+    var raw = localStorage.getItem(LS_CRITICAL);
+    if (!raw) return;
+    var bk = JSON.parse(raw);
+    // officialDocs : local prioritaire, backup comble les null/undefined
+    if (bk.officialDocs) {
+      if (!S.officialDocs) S.officialDocs = {};
+      var od = bk.officialDocs;
+      Object.keys(od).forEach(function(k) {
+        if ((S.officialDocs[k] === null || S.officialDocs[k] === undefined) && od[k] !== null && od[k] !== undefined) {
+          S.officialDocs[k] = od[k];
+        }
+      });
+    }
+    // poleSport : même logique
+    if (bk.poleSport && Object.keys(bk.poleSport).length) {
+      if (!S.settings) S.settings = {};
+      if (!S.settings.poleSport) S.settings.poleSport = {};
+      var ps = bk.poleSport;
+      Object.keys(ps).forEach(function(k) {
+        if (!S.settings.poleSport[k] && ps[k]) S.settings.poleSport[k] = ps[k];
+      });
+    }
+  } catch(e) {}
+}
 
 // ══════════════════════════════════════════════
 // PHOTO SPLASH — coller ici l'URL ou base64
@@ -2994,6 +3046,13 @@ async function loadState() {
           if (!S.settings) S.settings = {};
           if (!S.settings.logo && idbData.settings.logo) S.settings.logo = idbData.settings.logo;
           if (!S.settings.licenceInfo && idbData.settings.licenceInfo) S.settings.licenceInfo = idbData.settings.licenceInfo;
+          // Restaurer poleSport depuis IDB si absent en localStorage
+          if (idbData.settings.poleSport && typeof idbData.settings.poleSport === 'object') {
+            if (!S.settings.poleSport) S.settings.poleSport = {};
+            Object.keys(idbData.settings.poleSport).forEach(function(k) {
+              if (!S.settings.poleSport[k] && idbData.settings.poleSport[k]) S.settings.poleSport[k] = idbData.settings.poleSport[k];
+            });
+          }
         }
         if (idbData.docSettings && idbData.docSettings.signatureImage && S.docSettings && !S.docSettings.signatureImage) {
           S.docSettings.signatureImage = idbData.docSettings.signatureImage;
@@ -3003,6 +3062,8 @@ async function loadState() {
         Object.assign(S, idbData);
       }
     }
+    // ── Restauration depuis la clé critique (3e niveau de sauvegarde) ──
+    _restoreCritical();
   } catch(e) {
     console.warn('loadState error', e);
   }
@@ -3011,10 +3072,11 @@ async function loadState() {
 
 function clearLocalStorageQuota() {
   // Libère de la place en supprimant les photos base64 et clés externes
+  // IMPORTANT : LS_CRITICAL est préservé — il contient les réglages essentiels
   try {
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS) { localStorage.removeItem(k); return; }
+      if (k !== LS && k !== LS_CRITICAL) { localStorage.removeItem(k); return; }
     });
     // Retirer les photos des pilotes dans S
     if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
@@ -3027,8 +3089,11 @@ function _stripBigData(obj) {
   var o = JSON.parse(JSON.stringify(obj));
   if (o.pilots) o.pilots = o.pilots.map(function(p){ if (p.photo && p.photo.startsWith('data:')) delete p.photo; return p; });
   if (o.comps)  o.comps  = o.comps.map(function(c){ if (c.affiche && c.affiche.startsWith('data:')) delete c.affiche; return c; });
-  // officialDocs (en-tête/pied de page) : conservés dans localStorage pour maximiser la résilience
-  // Ces images de gestion sont petites (~50-200 Ko) contrairement aux affiches de compétition
+  // Images officialDocs : stockées UNIQUEMENT dans geststol_critical (clé dédiée) — pas dans geststol
+  if (o.officialDocs) {
+    if (o.officialDocs.header && typeof o.officialDocs.header === 'string' && o.officialDocs.header.startsWith('data:')) delete o.officialDocs.header;
+    if (o.officialDocs.footer && typeof o.officialDocs.footer === 'string' && o.officialDocs.footer.startsWith('data:')) delete o.officialDocs.footer;
+  }
   // Logo app → IDB + cloud uniquement
   if (o.settings && o.settings.logo) delete o.settings.logo;
   // Signature image → IDB + cloud uniquement
@@ -3058,6 +3123,8 @@ function _flushSaveState() {
       localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,moyens:S.moyens||[]})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
+  // 3. Clé critique : toujours synchronisée (réglages docs + liens Pôle Sport)
+  _saveCritical();
 }
 // Flush immédiat avant fermeture de page pour éviter toute perte de données
 window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
@@ -5862,11 +5929,20 @@ function renderHome() {
 
 // ── Pôle Sport : boutons scrollables depuis les liens Réglages ──
 var _poleSportPushTimer = null;
+var _poleSportStatusTimer = null;
 function poleSportLinkChange(key, value) {
   if (!S.settings) S.settings = {};
   if (!S.settings.poleSport) S.settings.poleSport = {};
   S.settings.poleSport[key] = value.trim();
   saveState();
+  _saveCritical(); // sauvegarde dans la clé dédiée
+  // Indicateur visuel de sauvegarde
+  var st = document.getElementById('psp-save-status');
+  if (st) {
+    st.style.display = 'block';
+    clearTimeout(_poleSportStatusTimer);
+    _poleSportStatusTimer = setTimeout(function() { if (st) st.style.display = 'none'; }, 3000);
+  }
   clearTimeout(_poleSportPushTimer);
   _poleSportPushTimer = setTimeout(function() { _hdpSaveNow(); renderHomeComps(); }, 1500);
 }
@@ -12334,6 +12410,7 @@ function officialDocUpload(zone, input) {
     if (!S.officialDocs) S.officialDocs = {};
     S.officialDocs[zone] = e.target.result;
     saveState();
+    _saveCritical(); // sauvegarde dans la clé dédiée
     _officialDocRefreshPreview();
     _hdpSaveNow(); // push cloud immédiat
     toast(zone === 'header' ? 'En‑tête enregistré ✓' : 'Bas de page enregistré ✓', 'ok');
@@ -12346,6 +12423,7 @@ function officialDocRemove(zone) {
   if (!S.officialDocs) S.officialDocs = {};
   S.officialDocs[zone] = null;
   saveState();
+  _saveCritical(); // sauvegarde dans la clé dédiée
   _officialDocRefreshPreview();
   _hdpSaveNow(); // push cloud immédiat
   toast('Image supprimée', 'ok');
@@ -12357,6 +12435,7 @@ function officialDocSetConfig(field, value) {
   var numFields = ['headerHeight','footerHeight','marginTop','marginBottom','marginLeft','marginRight'];
   S.officialDocs[field] = numFields.indexOf(field) >= 0 ? (parseFloat(value) || 0) : value;
   saveState();
+  _saveCritical(); // sauvegarde dans la clé dédiée
   _officialDocRefreshPreview();
   // Push différé 2s pour éviter un push par touche sur les champs numériques
   clearTimeout(_officialDocPushTimer);
