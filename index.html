@@ -285,6 +285,33 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
 .home-comp-card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:border-color .15s}
 .home-comp-card:active{border-color:var(--stol)}
 
+/* ══ PULL TO REFRESH ══ */
+#ptr-bar{
+  position:fixed;top:66px;left:0;right:0;z-index:200;
+  height:0;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(to bottom,var(--navy2),transparent);
+  transition:height .2s ease;
+  pointer-events:none;
+}
+#ptr-bar.ptr-pulling{height:52px}
+#ptr-bar.ptr-loading{height:44px}
+#ptr-inner{
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:700;color:var(--txt3);
+  opacity:0;transition:opacity .2s;
+}
+#ptr-bar.ptr-pulling #ptr-inner,
+#ptr-bar.ptr-loading #ptr-inner{opacity:1}
+#ptr-spinner{
+  width:18px;height:18px;border-radius:50%;
+  border:2.5px solid rgba(0,87,255,.2);
+  border-top-color:var(--stol);
+  flex-shrink:0;
+}
+#ptr-bar.ptr-loading #ptr-spinner{animation:spin .7s linear infinite}
+@keyframes ptrBounce{0%{transform:translateY(-6px)}50%{transform:translateY(2px)}100%{transform:translateY(0)}}
+
 /* ══ MOBILE DESIGN SYSTEM ══ */
 /* Titres de sections */
 .mob-sec-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
@@ -701,6 +728,14 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="home-open-base-btn" class="rail-btn" onclick="showDTNPortal()">Gest'DTN</button>
     <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Documents</button>
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">À faire</button>
+  </div>
+
+  <!-- PULL-TO-REFRESH indicator (mobile uniquement) -->
+  <div id="ptr-bar">
+    <div id="ptr-inner">
+      <div id="ptr-spinner"></div>
+      <span id="ptr-lbl">Tirer pour actualiser</span>
+    </div>
   </div>
 
   <!-- MAIN -->
@@ -25333,6 +25368,74 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // Fermer profile sur click avatar
 // avatar non cliquable — accès via nav Compte
+
+// ══ PULL-TO-REFRESH (mobile uniquement) ══
+(function() {
+  if (window.innerWidth >= 768) return; // desktop : non
+  var ptr = document.getElementById('ptr-bar');
+  var ptrLbl = document.getElementById('ptr-lbl');
+  if (!ptr) return;
+
+  var startY = 0, curY = 0, pulling = false, loading = false;
+  var THRESHOLD = 64; // px à tirer pour déclencher
+
+  document.addEventListener('touchstart', function(e) {
+    if (loading) return;
+    var main = document.getElementById('main');
+    // Actif seulement si le conteneur est déjà en haut
+    if (main && main.scrollTop > 0) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!pulling || loading) return;
+    curY = e.touches[0].clientY;
+    var dy = curY - startY;
+    if (dy <= 0) { ptr.classList.remove('ptr-pulling'); return; }
+    ptr.classList.add('ptr-pulling');
+    var ratio = Math.min(dy / THRESHOLD, 1);
+    ptr.style.height = Math.min(dy * 0.5, 52) + 'px';
+    ptrLbl.textContent = dy >= THRESHOLD ? '↑ Relâcher pour actualiser' : '↓ Tirer pour actualiser';
+    document.getElementById('ptr-spinner').style.transform = 'rotate(' + (ratio * 360) + 'deg)';
+  }, { passive: true });
+
+  document.addEventListener('touchend', function() {
+    if (!pulling || loading) return;
+    pulling = false;
+    var dy = curY - startY;
+    if (dy < THRESHOLD) {
+      ptr.classList.remove('ptr-pulling');
+      ptr.style.height = '';
+      return;
+    }
+    // Déclencher la synchro
+    loading = true;
+    ptr.classList.remove('ptr-pulling');
+    ptr.classList.add('ptr-loading');
+    ptr.style.height = '';
+    ptrLbl.textContent = 'Actualisation…';
+    var sb = getSB();
+    var p = (sb && navigator.onLine) ? pullFromCloud() : Promise.resolve();
+    p.then(function() {
+      ptrLbl.textContent = '✓ À jour';
+      saveState();
+      renderBase(); renderHome(); renderCompetitions(); updateHeader();
+      setTimeout(function() {
+        ptr.classList.remove('ptr-loading');
+        loading = false;
+        curY = 0; startY = 0;
+      }, 900);
+    }).catch(function() {
+      ptrLbl.textContent = '⚠ Hors ligne';
+      setTimeout(function() {
+        ptr.classList.remove('ptr-loading');
+        loading = false;
+        curY = 0; startY = 0;
+      }, 1200);
+    });
+  }, { passive: true });
+})();
 </script>
 
 <!-- ═══ BOTTOM SHEET : AJOUT MATÉRIEL ═══ -->
