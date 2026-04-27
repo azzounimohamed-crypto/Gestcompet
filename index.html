@@ -1615,14 +1615,20 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
               style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px 7px 32px;width:100%;outline:none;box-sizing:border-box"
               oninput="renderUtilisateursTab()">
           </div>
-          <!-- Filtre profil -->
-          <select id="util-statut-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px;width:100%;outline:none" onchange="renderUtilisateursTab()">
-            <option value="all">👥 Tous les profils</option>
-            <option value="developpeur">⚙️ Développeurs</option>
-            <option value="gestionnaire">👑 Gestionnaires</option>
-            <option value="utilisateur_modif">✏️ Utilisateurs (modif)</option>
-            <option value="utilisateur">👁 Utilisateurs</option>
-          </select>
+          <!-- Filtre profil + tri -->
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="util-statut-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px;flex:1;outline:none" onchange="renderUtilisateursTab()">
+              <option value="all">👥 Tous les profils</option>
+              <option value="developpeur">⚙️ Développeurs</option>
+              <option value="gestionnaire">👑 Gestionnaires</option>
+              <option value="utilisateur_modif">✏️ Utilisateurs (modif)</option>
+              <option value="utilisateur">👁 Utilisateurs</option>
+            </select>
+            <button id="util-sort-btn" onclick="_toggleUtilSort()" title="Trier par nom"
+              style="flex-shrink:0;padding:7px 11px;background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt2);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation">
+              A→Z
+            </button>
+          </div>
         </div>
         <div id="stab-utilisateurs-list" style="padding:0 12px 24px"></div>
       </div>
@@ -14164,6 +14170,15 @@ async function createAndInviteUser() {
   renderUtilisateursTab();
 }
 
+var _utilSortDir = 'profil'; // 'profil' | 'az' | 'za'
+function _toggleUtilSort() {
+  _utilSortDir = (_utilSortDir === 'az') ? 'za' : 'az';
+  var btn = document.getElementById('util-sort-btn');
+  if (btn) btn.textContent = _utilSortDir === 'az' ? 'A→Z' : 'Z→A';
+  if (btn) btn.style.color = _utilSortDir !== 'profil' ? 'var(--stol)' : 'var(--txt2)';
+  renderUtilisateursTab();
+}
+
 function renderUtilisateursTab() {
   var cont = document.getElementById('stab-utilisateurs-list');
   if (!cont) return;
@@ -14204,13 +14219,26 @@ function renderUtilisateursTab() {
   var statIcons  = {utilisateur:'👁',utilisateur_modif:'✏️',gestionnaire:'👑',developpeur:'⚙️'};
   var statLabels = {utilisateur:'Utilisateur',utilisateur_modif:'Util. modif',gestionnaire:'Gestionnaire',developpeur:'Développeur'};
   cont.innerHTML = '';
-  // Trier : gestionnaire en premier, puis par nom
+  // Tri selon le mode choisi
   realPilots.sort(function(a,b){
+    if (_utilSortDir === 'az' || _utilSortDir === 'za') {
+      var na = ((a.nom||'') + ' ' + (a.prenom||'')).trim().toLowerCase();
+      var nb = ((b.nom||'') + ' ' + (b.prenom||'')).trim().toLowerCase();
+      return _utilSortDir === 'az' ? na.localeCompare(nb) : nb.localeCompare(na);
+    }
+    // Par défaut : par profil puis par nom
     var order = {developpeur:0,gestionnaire:1,utilisateur_modif:2,utilisateur:3,staff:4,commissaire:5,pilote:6,invite:7};
     var oa = order[a.statut]||5, ob = order[b.statut]||5;
     if (oa !== ob) return oa - ob;
     return (a.nom||'').localeCompare(b.nom||'');
   });
+  // Mettre à jour l'apparence du bouton tri
+  var sortBtn = document.getElementById('util-sort-btn');
+  if (sortBtn) {
+    sortBtn.textContent = _utilSortDir === 'za' ? 'Z→A' : 'A→Z';
+    sortBtn.style.color = _utilSortDir !== 'profil' ? 'var(--stol)' : 'var(--txt2)';
+    sortBtn.style.borderColor = _utilSortDir !== 'profil' ? 'var(--stol)' : 'var(--bdr)';
+  }
   realPilots.forEach(function(p) {
     var globalIdx = S.pilots.findIndex(function(pl){ return pl.id === p.id; });
     var isMe = S.user && p.id === S.user.id;
