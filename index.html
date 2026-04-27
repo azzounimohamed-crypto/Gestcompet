@@ -1543,11 +1543,32 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       </div>
 
       <!-- TAB DROITS -->
-      <div id="stab-droits-panel" style="display:none;overflow-y:auto;padding:20px 16px">
-        <div style="text-align:center;padding:40px 20px;color:var(--txt3)">
-          <div style="font-size:48px;margin-bottom:16px">🔐</div>
-          <div style="font-size:17px;font-weight:800;color:var(--txt);margin-bottom:10px">Gestion des droits d'accès</div>
-          <div style="font-size:13px;line-height:1.7">Ce module sera développé prochainement.<br>Il permettra de définir les droits d'accès<br>aux différentes pages et modules de <b style="color:var(--stol)">Gest'DTN</b>.</div>
+      <div id="stab-droits-panel" style="display:none;overflow-y:auto;padding:16px">
+        <!-- Profil courant -->
+        <div id="droits-mon-profil" style="margin-bottom:14px"></div>
+        <!-- Titre -->
+        <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:10px;letter-spacing:-.2px">Tableau des droits par profil</div>
+        <!-- Tableau responsive -->
+        <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--bdr)">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+            <thead>
+              <tr style="background:var(--navy3)">
+                <th style="padding:9px 10px;text-align:left;font-weight:700;color:var(--txt2);border-bottom:1px solid var(--bdr);min-width:110px">Action</th>
+                <th style="padding:9px 8px;text-align:center;font-weight:700;color:var(--txt2);border-bottom:1px solid var(--bdr)">👁<br><span style="font-size:10px;font-weight:500">Utilisateur</span></th>
+                <th style="padding:9px 8px;text-align:center;font-weight:700;color:var(--stol);border-bottom:1px solid var(--bdr)">✏️<br><span style="font-size:10px;font-weight:500">Util. modif</span></th>
+                <th style="padding:9px 8px;text-align:center;font-weight:700;color:#c89600;border-bottom:1px solid var(--bdr)">👑<br><span style="font-size:10px;font-weight:500">Gestionnaire</span></th>
+                <th style="padding:9px 8px;text-align:center;font-weight:700;color:#ef4444;border-bottom:1px solid var(--bdr)">⚙️<br><span style="font-size:10px;font-weight:500">Développeur</span></th>
+              </tr>
+            </thead>
+            <tbody id="droits-tbody"><!-- Rempli par renderDroitsTab() --></tbody>
+          </table>
+        </div>
+        <!-- Note bas de page -->
+        <div style="margin-top:12px;font-size:11px;color:var(--txt3);line-height:1.6;background:var(--navy3);border-radius:8px;padding:10px 12px">
+          <b>Règles d'accès :</b><br>
+          • Seuls le <b>Gestionnaire</b> et le <b>Développeur</b> peuvent inviter des utilisateurs.<br>
+          • Un pilote ou encadrant saisi dans l'application n'a <b>aucun accès automatique</b> — il doit être explicitement invité.<br>
+          • Le premier compte créé obtient automatiquement le profil Gestionnaire.
         </div>
       </div>
 
@@ -1567,11 +1588,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Email</div><input id="util-new-email" type="email" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box" placeholder="adresse@email.fr"></div>
             <div style="margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Statut</div>
               <select id="util-new-statut" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box">
-                <option value="pilote">✈️ Pilote</option>
-                <option value="staff">🔧 Staff</option>
-                <option value="commissaire">🚩 Commissaire</option>
+                <option value="utilisateur" selected>👁 Utilisateur (lecture seule)</option>
+                <option value="utilisateur_modif">✏️ Utilisateur (modif + export)</option>
                 <option value="gestionnaire">👑 Gestionnaire</option>
-                <option value="invite">👁 Invité</option>
+                <option value="developpeur">⚙️ Développeur</option>
               </select>
             </div>
             <button onclick="createAndInviteUser()" style="width:100%;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📧 Créer et envoyer l'invitation</button>
@@ -1589,12 +1609,11 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         </div>
         <div style="padding:0 12px 8px">
           <select id="util-statut-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px;width:100%;outline:none" onchange="renderUtilisateursTab()">
-            <option value="all">👥 Tous les statuts</option>
+            <option value="all">👥 Tous les profils</option>
+            <option value="developpeur">⚙️ Développeurs</option>
             <option value="gestionnaire">👑 Gestionnaires</option>
-            <option value="staff">🔧 Staff</option>
-            <option value="commissaire">🚩 Commissaires</option>
-            <option value="pilote">✈️ Pilotes</option>
-            <option value="invite">👁 Invités</option>
+            <option value="utilisateur_modif">✏️ Utilisateurs (modif)</option>
+            <option value="utilisateur">👁 Utilisateurs</option>
           </select>
         </div>
         <div id="stab-utilisateurs-list" style="padding:0 12px 24px"></div>
@@ -3890,7 +3909,7 @@ function renderCompetitions() {
     info.appendChild(runs);
     card.appendChild(info);
     // Bouton Modifier (à droite)
-    var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
+    var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
     if (canEdit) {
       var editBtn = document.createElement('button');
       editBtn.title = 'Modifier la compétition';
@@ -3902,7 +3921,7 @@ function renderCompetitions() {
     c.appendChild(card);
   });
   // Bouton ajouter
-  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
+  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
 }
@@ -4055,7 +4074,7 @@ function openCompDetail(compId) {
       editBtn.onclick = function(){ editComp(compId); };
       actionsCont.appendChild(editBtn);
     }
-    if (S.user && S.user.statut === 'gestionnaire') {
+    if (canDelete()) {
       var delBtn = document.createElement('button');
       delBtn.className = 'btn btn-sm';
       delBtn.style.cssText = 'background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red)';
@@ -4231,7 +4250,7 @@ function renderMobileCompDetail() {
   var footerEl = document.getElementById('mcd-footer');
   if (footerEl) {
     if (sec.id === 'materiel') {
-      var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEdit = canModify();
       var fHtml = '<div style="display:flex;align-items:stretch;border-top:1px solid var(--bdr)">';
       // Bouton collapse/expand
       fHtml += '<button onclick="matToggleAllCats(\''+cp.id+'\')" style="width:52px;flex-shrink:0;background:var(--navy3);border:none;border-right:1px solid var(--bdr);color:var(--txt2);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation" title="Tout déplier / replier">⊞</button>';
@@ -4246,7 +4265,7 @@ function renderMobileCompDetail() {
       footerEl.style.display = '';
     } else if (sec.id === 'budget') {
       var bSubCur = _budgetSubTab || 'engagement';
-      var canEditBgt = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEditBgt = canModify();
       if (canEditBgt && (bSubCur === 'engagement' || bSubCur === 'ressources')) {
         var secLbl = bSubCur === 'engagement' ? '💸 Dépense' : '💰 Recette';
         var secCol = bSubCur === 'engagement' ? '#ef4444' : '#10b981';
@@ -4260,28 +4279,28 @@ function renderMobileCompDetail() {
         footerEl.style.display = 'none';
       }
     } else if (sec.id === 'staff') {
-      var canEditStf = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEditStf = canModify();
       if (canEditStf) {
         var fStf = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openStaffAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#3b82f6,#2563eb);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouvel encadrant</button></div>';
         footerEl.innerHTML = fStf; footerEl.style.display = '';
       } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
 
     } else if (sec.id === 'gestion') {
-      var canEditCrew = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEditCrew = canModify();
       if (canEditCrew) {
         var fCrew = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openCrewAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter un compétiteur</button></div>';
         footerEl.innerHTML = fCrew; footerEl.style.display = '';
       } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
 
     } else if (sec.id === 'evenements') {
-      var canEditEvtMob = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEditEvtMob = canModify();
       if (canEditEvtMob) {
         var fEvt = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openEvtAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouvel événement</button></div>';
         footerEl.innerHTML = fEvt; footerEl.style.display = '';
       } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
 
     } else if (sec.id === 'partenaires') {
-      var canEditPart = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+      var canEditPart = canModify();
       if (canEditPart) {
         var fPart = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openPartAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Nouveau partenaire</button></div>';
         footerEl.innerHTML = fPart; footerEl.style.display = '';
@@ -4355,9 +4374,50 @@ function _getBestComp() {
 }
 var _currentCDClass = 'multiaxes';
 
-function canEditComp() {
-  return S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+// ══════════════════════════════════════════════════════════
+// GESTION DES DROITS — source unique de vérité
+// Profils (ordre croissant) :
+//   utilisateur        → lecture seule
+//   utilisateur_modif  → modification + export
+//   gestionnaire       → gestion complète + utilisateurs
+//   developpeur        → accès total (technique inclus)
+// Compat. ascendante : 'staff' ≡ utilisateur_modif
+// ══════════════════════════════════════════════════════════
+var PROFILS_ORDER = ['utilisateur','utilisateur_modif','gestionnaire','developpeur'];
+var PROFILS_LABELS = {
+  utilisateur:       '👁 Utilisateur',
+  utilisateur_modif: '✏️ Utilisateur (modif + export)',
+  gestionnaire:      '👑 Gestionnaire',
+  developpeur:       '⚙️ Développeur'
+};
+var PROFILS_COLORS = {
+  utilisateur:       {bg:'rgba(140,140,140,.18)', color:'var(--txt2)'},
+  utilisateur_modif: {bg:'rgba(0,87,255,.15)',    color:'var(--stol)'},
+  gestionnaire:      {bg:'rgba(255,195,0,.18)',    color:'#c89600'},
+  developpeur:       {bg:'rgba(239,68,68,.15)',    color:'#ef4444'}
+};
+// Anciens statuts (données / rétro-compat)
+var LEGACY_LABELS = {
+  staff:'🔧 Staff', commissaire:'🚩 Commissaire', pilote:'✈️ Pilote', invite:'👁 Invité'
+};
+
+function _userStatut() { return (S.user && S.user.statut) || ''; }
+// Retourne true si le statut courant est dans la liste (inclut compat. 'staff')
+function _hasDroit(list) {
+  var st = _userStatut();
+  if (list.indexOf(st) !== -1) return true;
+  // Compat : 'staff' hérite des droits utilisateur_modif
+  if (st === 'staff' && list.indexOf('utilisateur_modif') !== -1) return true;
+  return false;
 }
+function canModify()      { return _hasDroit(['utilisateur_modif','gestionnaire','developpeur']); }
+function canDelete()      { return _hasDroit(['gestionnaire','developpeur']); }
+function canExport()      { return _hasDroit(['utilisateur_modif','gestionnaire','developpeur']); }
+function canManageUsers() { return _hasDroit(['gestionnaire','developpeur']); }
+function canTechnical()   { return _hasDroit(['developpeur']); }
+function canInvite()      { return canManageUsers(); }
+
+function canEditComp() { return canModify(); }
 
 // ── deleteCompById : suppression avec 2-step depuis n'importe quel bouton ────
 var _dcbPending = false;
@@ -6296,7 +6356,7 @@ function renderHomeDesktopComps() {
     card.appendChild(info);
     cont.appendChild(card);
   });
-  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
+  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('home-btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
   updateHomeDashboardStats();
@@ -8549,7 +8609,7 @@ function renderHomeDetailPanel(cp) {
     if (_staffSeen[k]) return false; _staffSeen[k] = true; return true;
   });
 
-  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff'));
+  var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var html = '';
 
   // ── En-tête : affiche + infos + bouton Modifier ──
@@ -9190,7 +9250,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     return html;
 
   } else if (tab === 'modifier') {
-    if (!(S.user && (S.user.statut==='gestionnaire'||S.user.statut==='staff'))) {
+    if (!(canModify())) {
       return '<div style="text-align:center;padding:32px;color:var(--txt3);font-size:13px">Accès réservé aux gestionnaires</div>';
     }
     var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
@@ -9642,7 +9702,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Exclure les entrées créées automatiquement par les lignes NDF du budget
     // Exclure entrées NDF du budget (nouvelles via _fromNDF, anciennes via id/role)
     compStaffG2 = compStaffG2.filter(function(s){ return !s._fromNDF && !(s.id && s.id.startsWith('staff-ndf-')); });
-    var canEditS    = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+    var canEditS    = canModify();
     var cidS        = escS(cp.id);
     // ── Styles communs (identiques à Équipage) ──
     var _iStS  = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:5px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;box-sizing:border-box;width:100%';
@@ -9779,7 +9839,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!S.materiel) S.materiel = {};
     if (!S.materiel[cp.id]) S.materiel[cp.id] = [];
     var matList = S.materiel[cp.id];
-    var canEditMat = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+    var canEditMat = canModify();
     var isMob = window.innerWidth < 768;
     var htmlMat = '';
 
@@ -9901,7 +9961,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!S.evenements) S.evenements = {};
     if (!S.evenements[cp.id]) S.evenements[cp.id] = [];
     var evtList = S.evenements[cp.id];
-    var canEditEvt = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+    var canEditEvt = canModify();
     var EVCOL = 'grid-template-columns:100px minmax(0,1fr) 90px 80px minmax(0,1.2fr) 28px 28px';
     var hStE = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap';
     var iStE = 'background:var(--navy3);border:1.5px solid var(--stol);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box';
@@ -10256,7 +10316,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     return renderPartenairesTab(cp);
 
   } else if (tab === 'messagerie') {
-    var canMsg = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+    var canMsg = canModify();
     var html4 = '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">';
     html4 += '<div id="cd-msg-list" style="flex:1;overflow-y:auto;background:#e8f4fd;padding:14px 16px;display:flex;flex-direction:column;gap:10px"></div>';
     if (canMsg) {
@@ -10289,7 +10349,7 @@ function renderPartenairesTab(cp) {
   if (!S.partenaires) S.partenaires = {};
   if (!S.partenaires[cp.id]) S.partenaires[cp.id] = [];
   var list = S.partenaires[cp.id];
-  var isGest = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+  var isGest = canModify();
   var isMob = window.innerWidth < 768;
 
   // ── Barre d'actions Partenaires ─────────────────────────────────────────
@@ -11103,7 +11163,7 @@ function updatePilotsToggleBtn() {
 }
 
 function renderPilots() {
-  var isGest = S.user && S.user.statut === 'gestionnaire';
+  var isGest = canManageUsers();
   var addBtn   = document.getElementById('btn-add-pilot');
   var shareBtn = document.getElementById('btn-share-ranking');
   var title    = document.getElementById('pilots-page-title');
@@ -11250,7 +11310,7 @@ var _pilotDetailEditMode  = false;
 function renderPilotDetailContent(pilotId, editMode) {
   var p = S.pilots.find(function(pl){ return pl.id === pilotId; });
   if (!p) return;
-  var isGest  = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+  var isGest  = canModify();
   var ulms    = S.ulms[pilotId] || [];
   var history = [];
   S.comps.forEach(function(cp) {
@@ -11513,18 +11573,18 @@ function renderProfileCompte() {
 
   // Statut
   var statutDisp = document.getElementById('pf-statut-display');
-  var lbl = {gestionnaire:'👑 Gestionnaire',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
+  var lbl = {developpeur:'⚙️ Développeur',gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏️ Util. modif',utilisateur:'👁 Utilisateur',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
   if (statutDisp) statutDisp.textContent = lbl[S.user.statut] || S.user.statut || '—';
 
   // Droits selon statut
   var droits = document.getElementById('pf-droits-list');
   if (droits) {
     var droitsMap = {
-      gestionnaire: ['✅ Créer / modifier / supprimer des compétitions','✅ Saisir tous les résultats','✅ Gérer les utilisateurs et statuts','✅ Ajouter du staff et commissaires','✅ Synchroniser les données cloud'],
-      staff:        ['✅ Créer / modifier des compétitions','✅ Saisir les résultats','✅ Ajouter staff et commissaires','❌ Gestion des utilisateurs','✅ Synchroniser les données cloud'],
-      commissaire:  ['❌ Modifier les compétitions','❌ Saisir les résultats','👁 Consulter tous les résultats','👁 Consulter les classements','✅ Synchroniser'],
-      pilote:       ['✅ Gérer ses machines ULM','✅ Consulter ses résultats et historique','👁 Consulter les classements','❌ Modifier les compétitions'],
-      invite:       ['👁 Consulter les compétitions','👁 Consulter les classements','❌ Aucune saisie autorisée']
+      developpeur:       ['✅ Accès total — toutes fonctions y compris techniques','✅ Gérer les utilisateurs','✅ Modifier / supprimer tout','✅ Exporter toutes données','✅ Synchroniser le cloud'],
+      gestionnaire:      ['✅ Créer / modifier / supprimer des compétitions','✅ Gérer les utilisateurs et profils','✅ Inviter de nouveaux utilisateurs','✅ Exporter toutes données','✅ Synchroniser le cloud'],
+      utilisateur_modif: ['✅ Modifier les compétitions et résultats','✅ Exporter les données','👁 Consulter toutes les informations','❌ Gérer les utilisateurs','❌ Accès technique'],
+      utilisateur:       ['👁 Consulter les compétitions','👁 Consulter les classements et résultats','❌ Aucune modification autorisée','❌ Export non disponible'],
+      staff:             ['✅ Modifier les compétitions et résultats','✅ Exporter','👁 Consulter','❌ Gérer les utilisateurs']
     };
     var list = droitsMap[S.user.statut] || droitsMap.invite;
     droits.innerHTML = list.map(function(d){ return '<div>' + d + '</div>'; }).join('');
@@ -11743,7 +11803,7 @@ function syncProfileFields() {
   if (emailEl)  emailEl.value = S.user.email  || '';
   if (nameDisp) nameDisp.textContent = ((S.user.prenom||'') + ' ' + (S.user.nom||'')).trim() || '—';
   if (emailDisp) emailDisp.textContent = S.user.email || '';
-  var lbl = {gestionnaire:'👑 Gestionnaire',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
+  var lbl = {developpeur:'⚙️ Développeur',gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏️ Util. modif',utilisateur:'👁 Utilisateur',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
   if (statutDisp) statutDisp.textContent = lbl[S.user.statut] || S.user.statut || '—';
   renderStatusBadge('profile-status-display', S.user.statut || 'invite');
 }
@@ -11938,6 +11998,7 @@ function switchSettingsTab(tab, btn) {
     }
   }
   if (tab === 'reglages') { applyTheme(localStorage.getItem('geststol_theme') || 'auto'); renderReglagesLogoSection(); renderReglagesOdmSection(); updateNotifButtons(); _renderLicenceStatus(); }
+  if (tab === 'droits')  { renderDroitsTab(); }
 }
 
 function renderSettingsCompte() {
@@ -11971,14 +12032,14 @@ function renderSettingsCompte() {
   var hasData = !!(S.user.prenom || S.user.nom || S.user.tel || S.user.club || S.user.licence);
   if (!hasData) _scEditMode = true;
 
-  var statutOptions = ['gestionnaire','staff','commissaire','pilote','invite'];
-  var statutLabels  = {gestionnaire:'👑 Gestionnaire',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
+  var statutOptions = ['utilisateur','utilisateur_modif','gestionnaire','developpeur'];
+  var statutLabels  = {utilisateur:'👁 Utilisateur',utilisateur_modif:'✏️ Util. modif',gestionnaire:'👑 Gestionnaire',developpeur:'⚙️ Développeur'};
   var statCfg = {
-    gestionnaire:{bg:'rgba(255,195,0,.18)',color:'#c89600'},
-    staff:       {bg:'rgba(0,87,255,.15)', color:'var(--stol)'},
-    commissaire: {bg:'rgba(255,140,0,.18)',color:'#d47800'},
-    pilote:      {bg:'rgba(0,180,80,.15)', color:'#00a050'},
-    invite:      {bg:'rgba(140,140,140,.18)',color:'var(--txt2)'}
+    developpeur:      {bg:'rgba(239,68,68,.15)',    color:'#ef4444'},
+    gestionnaire:     {bg:'rgba(255,195,0,.18)',    color:'#c89600'},
+    utilisateur_modif:{bg:'rgba(0,87,255,.15)',     color:'var(--stol)'},
+    utilisateur:      {bg:'rgba(140,140,140,.18)',  color:'var(--txt2)'},
+    staff:            {bg:'rgba(0,87,255,.12)',     color:'var(--stol)'}
   }[S.user.statut] || {bg:'rgba(140,140,140,.18)',color:'var(--txt2)'};
 
   // ── EN-TÊTE : avatar + nom + boutons ──
@@ -12382,12 +12443,14 @@ function renderSettingsHistory() {
 
 function renderSettings() {
   var isLogged = !!S.user;
-  var isGest   = isLogged && S.user.statut === 'gestionnaire';
-  var canStaff = isLogged && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
   var staffBtn = document.getElementById('btn-add-staff');
-  if (staffBtn) staffBtn.style.display = canStaff ? '' : 'none';
+  if (staffBtn) staffBtn.style.display = canModify() ? '' : 'none';
+  // Onglet Utilisateurs visible pour gestionnaire + développeur
   var utilTab = document.getElementById('stab-utilisateurs');
-  if (utilTab) utilTab.style.display = isGest ? '' : 'none';
+  if (utilTab) utilTab.style.display = canManageUsers() ? '' : 'none';
+  // Masquer le formulaire de création si non-autorisé
+  var utilCreate = document.getElementById('util-create-form');
+  if (utilCreate) utilCreate.style.display = canInvite() ? '' : 'none';
   applyTheme(localStorage.getItem('geststol_theme') || 'auto');
   switchSettingsTab('apropos', document.getElementById('stab-apropos'));
   // Restaurer l'aperçu Documents officiels
@@ -13494,7 +13557,7 @@ function officialDocPreview() {
 
 function renderStatusBadge(containerId, statut) {
   var cont = document.getElementById(containerId); if (!cont) return;
-  var labels = {gestionnaire:'Gestionnaire',staff:'Staff',commissaire:'Commissaire',pilote:'Pilote',invite:'Invité'};
+  var labels = {developpeur:'Développeur',gestionnaire:'Gestionnaire',utilisateur_modif:'Util. modif',utilisateur:'Utilisateur',staff:'Staff',commissaire:'Commissaire',pilote:'Pilote',invite:'Invité'};
   cont.innerHTML = '<span class="status-pill status-' + statut + '">' + (labels[statut]||statut) + '</span>';
 }
 
@@ -13567,7 +13630,7 @@ function renderSitesSportifs() {
   if (!S.sitesSportifs) S.sitesSportifs = [];
   var filtre = (document.getElementById('sites-pratique-filter') || {}).value || 'all';
   var list = S.sitesSportifs.filter(function(s){ return filtre === 'all' || s.pratique === filtre; });
-  var canEdit = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+  var canEdit = canModify();
   var btn = document.getElementById('btn-add-site');
   if (btn) btn.style.display = canEdit ? '' : 'none';
 
@@ -13979,11 +14042,59 @@ function toggleUtilCreateForm() {
   if (ico) ico.textContent = open ? '▸' : '▾';
 }
 
+/* ── Tableau des droits ── */
+function renderDroitsTab() {
+  // Profil courant
+  var monProfil = document.getElementById('droits-mon-profil');
+  if (monProfil) {
+    if (S.user) {
+      var st = S.user.statut || '';
+      var cfg = PROFILS_COLORS[st] || {bg:'rgba(140,140,140,.18)',color:'var(--txt2)'};
+      var lbl = PROFILS_LABELS[st] || st;
+      monProfil.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'+cfg.bg+';border:1px solid '+cfg.color.replace('var(','').replace(')','')+(cfg.color.startsWith('var')?'':'')+';border-color:'+cfg.color+';border-radius:10px">'
+        + '<span style="font-size:22px">🏷️</span>'
+        + '<div><div style="font-size:11px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Votre profil actuel</div>'
+        + '<div style="font-size:14px;font-weight:800;color:'+cfg.color+'">'+lbl+'</div></div>'
+        + '</div>';
+    } else {
+      monProfil.innerHTML = '<div style="padding:10px 12px;background:var(--navy3);border-radius:10px;font-size:12px;color:var(--txt3)">Non connecté</div>';
+    }
+  }
+
+  // Tableau des droits
+  var tbody = document.getElementById('droits-tbody');
+  if (!tbody) return;
+  var ROWS = [
+    { label:'👁 Voir',                     rights:[true, true,  true,  true]  },
+    { label:'✏️ Modifier',                 rights:[false,true,  true,  true]  },
+    { label:'🗑 Supprimer',                rights:[false,false, true,  true]  },
+    { label:'📤 Exporter',                 rights:[false,true,  true,  true]  },
+    { label:'👥 Gérer les utilisateurs',   rights:[false,false, true,  true]  },
+    { label:'⚙️ Accès technique / système',rights:[false,false, false, true]  }
+  ];
+  var mySt = _userStatut();
+  var myCol = {utilisateur:1,utilisateur_modif:2,gestionnaire:3,developpeur:4,staff:2}[mySt] || 0;
+  tbody.innerHTML = ROWS.map(function(row, ri) {
+    var bg = ri%2===0 ? '' : 'background:rgba(255,255,255,.025)';
+    var cells = row.rights.map(function(ok, ci) {
+      var isMine = (ci+1) === myCol;
+      var icon = ok
+        ? '<span style="font-size:15px;color:#22c55e">✅</span>'
+        : '<span style="font-size:15px;color:#ef4444">✕</span>';
+      var mine = isMine ? 'outline:2px solid var(--stol);outline-offset:2px;border-radius:4px;' : '';
+      return '<td style="padding:9px 8px;text-align:center;border-bottom:1px solid var(--bdr);'+mine+'">'+icon+'</td>';
+    }).join('');
+    return '<tr style="'+bg+'"><td style="padding:9px 10px;font-weight:600;color:var(--txt2);border-bottom:1px solid var(--bdr)">'+row.label+'</td>'+cells+'</tr>';
+  }).join('');
+}
+
 async function createAndInviteUser() {
+  // Seuls Gestionnaire et Développeur peuvent inviter
+  if (!canInvite()) { toast('Droits insuffisants — Gestionnaire ou Développeur requis', 'err'); return; }
   var prenom = (document.getElementById('util-new-prenom')||{value:''}).value.trim();
   var nom    = (document.getElementById('util-new-nom')   ||{value:''}).value.trim();
   var email  = ((document.getElementById('util-new-email')||{value:''}).value.trim()).toLowerCase();
-  var statut = (document.getElementById('util-new-statut')||{value:'pilote'}).value;
+  var statut = (document.getElementById('util-new-statut')||{value:'utilisateur'}).value;
   if (!email) { toast('Email requis', 'err'); return; }
   if (!prenom && !nom) { toast('Prénom ou nom requis', 'err'); return; }
   // Vérifier si déjà existant
@@ -14050,14 +14161,14 @@ function renderUtilisateursTab() {
       + '<span style="font-size:11px">Actualisez pour récupérer les utilisateurs du cloud</span></div>';
     return;
   }
-  var statuts    = ['gestionnaire','staff','commissaire','pilote','invite'];
-  var statColors = {gestionnaire:'var(--stol)',staff:'var(--amber)',commissaire:'var(--green)',pilote:'var(--blue-l)',invite:'var(--txt3)'};
-  var statIcons  = {gestionnaire:'👑',staff:'🔧',commissaire:'🚩',pilote:'✈️',invite:'👁'};
-  var statLabels = {gestionnaire:'Gestionnaire',staff:'Staff',commissaire:'Commissaire',pilote:'Pilote',invite:'Invité'};
+  var statuts    = ['utilisateur','utilisateur_modif','gestionnaire','developpeur'];
+  var statColors = {utilisateur:'var(--txt2)',utilisateur_modif:'var(--stol)',gestionnaire:'#c89600',developpeur:'#ef4444'};
+  var statIcons  = {utilisateur:'👁',utilisateur_modif:'✏️',gestionnaire:'👑',developpeur:'⚙️'};
+  var statLabels = {utilisateur:'Utilisateur',utilisateur_modif:'Util. modif',gestionnaire:'Gestionnaire',developpeur:'Développeur'};
   cont.innerHTML = '';
   // Trier : gestionnaire en premier, puis par nom
   realPilots.sort(function(a,b){
-    var order = {gestionnaire:0,staff:1,commissaire:2,pilote:3,invite:4};
+    var order = {developpeur:0,gestionnaire:1,utilisateur_modif:2,utilisateur:3,staff:4,commissaire:5,pilote:6,invite:7};
     var oa = order[a.statut]||5, ob = order[b.statut]||5;
     if (oa !== ob) return oa - ob;
     return (a.nom||'').localeCompare(b.nom||'');
@@ -14270,7 +14381,7 @@ async function sbSignup() {
   // Afficher le statut dans le profil immédiatement
   var statutDisp = document.getElementById('pf-statut-display');
   if (statutDisp) {
-    var lbl = {gestionnaire:'👑 Gestionnaire',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
+    var lbl = {developpeur:'⚙️ Développeur',gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏️ Util. modif',utilisateur:'👁 Utilisateur',staff:'🔧 Staff',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',invite:'👁 Invité'};
     statutDisp.textContent = lbl[statut] || statut;
   }
 }
@@ -19023,7 +19134,7 @@ function renderCDMessages() {
   var cont = document.getElementById('cd-msg-list'); if (!cont) return;
   var msgs = (S.messages||[]).filter(function(m){ return m.compId === _currentCompId; });
   msgs.sort(function(a,b){ return a.ts - b.ts; });
-  var canMod = S.user && (S.user.statut === 'gestionnaire' || S.user.statut === 'staff');
+  var canMod = canModify();
   var destLabels = {all:'Tout le monde', staff:'Staff', both:'Staff & Pilotes'};
   cont.innerHTML = '';
   if (!msgs.length) {
@@ -20606,7 +20717,7 @@ function removeSplashLogo() {
   toast('Logo supprimé', 'ok');
 }
 function renderReglagesLogoSection() {
-  var isGest = S.user && S.user.statut === 'gestionnaire';
+  var isGest = canManageUsers();
   var sec  = document.getElementById('splash-logo-section');
   var card = document.getElementById('splash-logo-card');
   if (sec)  sec.style.display  = isGest ? '' : 'none';
