@@ -3317,6 +3317,8 @@ function warmupSecondaryPages() {
 }
 
 function showPage(id) {
+  // Toujours mettre à jour la visibilité des onglets Réglages (droits peuvent avoir changé)
+  if (id === 'page-settings') _refreshSettingsTabs();
   if (_curPage === id && _pageRendered[id]) return;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var el = document.getElementById(id);
@@ -4418,6 +4420,17 @@ function canTechnical()   { return _hasDroit(['developpeur']); }
 function canInvite()      { return canManageUsers(); }
 
 function canEditComp() { return canModify(); }
+
+// Rafraîchir la visibilité des onglets Réglages selon les droits courants
+// Appelé à chaque ouverture de la page Réglages, même si déjà rendue
+function _refreshSettingsTabs() {
+  var utilTab    = document.getElementById('stab-utilisateurs');
+  var utilCreate = document.getElementById('util-create-form');
+  var staffBtn   = document.getElementById('btn-add-staff');
+  if (utilTab)    utilTab.style.display    = canManageUsers() ? '' : 'none';
+  if (utilCreate) utilCreate.style.display = canInvite()      ? '' : 'none';
+  if (staffBtn)   staffBtn.style.display   = canModify()      ? '' : 'none';
+}
 
 // ── deleteCompById : suppression avec 2-step depuis n'importe quel bouton ────
 var _dcbPending = false;
@@ -23077,6 +23090,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           // Réinitialiser la sélection pour pointer sur la compétition en cours / prochaine
           _currentCompId = null;
           renderBase(); renderHome(); renderCompetitions(); renderPilots(); updateHeader();
+          _refreshSettingsTabs(); // Actualiser les droits après sync cloud
           warmupSecondaryPages();
           // Mettre à jour le portail si affiché
           if (document.getElementById('page-dtn').style.display !== 'none') showDTNPortal();
