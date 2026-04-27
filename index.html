@@ -1607,7 +1607,15 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <div style="margin:0 12px 10px;background:rgba(0,87,255,.08);border:1px solid rgba(0,87,255,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--txt2);line-height:1.6">
           💡 Un utilisateur apparaît ici après sa première connexion depuis l'application. S'il n'est pas visible, appuyez sur <b>Actualiser</b> ou demandez-lui de se connecter et de synchroniser ses données depuis son appareil.
         </div>
-        <div style="padding:0 12px 8px">
+        <div style="padding:0 12px 8px;display:flex;flex-direction:column;gap:6px">
+          <!-- Recherche -->
+          <div style="position:relative">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--txt3)">🔍</span>
+            <input id="util-search" type="search" placeholder="Rechercher par nom, email…"
+              style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px 7px 32px;width:100%;outline:none;box-sizing:border-box"
+              oninput="renderUtilisateursTab()">
+          </div>
+          <!-- Filtre profil -->
           <select id="util-statut-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px;width:100%;outline:none" onchange="renderUtilisateursTab()">
             <option value="all">👥 Tous les profils</option>
             <option value="developpeur">⚙️ Développeurs</option>
@@ -12000,6 +12008,7 @@ function switchSettingsTab(tab, btn) {
   if (tab === 'compte')       renderSettingsCompte();
   if (tab === 'staff')        renderStaffTab();
   if (tab === 'utilisateurs') {
+    var _us = document.getElementById('util-search'); if (_us) _us.value = '';
     renderUtilisateursTab();
     // Pull silencieux pour récupérer les nouveaux utilisateurs depuis le cloud
     if (getSB() && navigator.onLine && !_syncInProgress) {
@@ -14159,19 +14168,35 @@ function renderUtilisateursTab() {
   var cont = document.getElementById('stab-utilisateurs-list');
   if (!cont) return;
   var filterStatut = (document.getElementById('util-statut-filter')||{value:'all'}).value;
+  var rawQ = ((document.getElementById('util-search')||{value:''}).value || '').trim().toLowerCase();
+  var _norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var q = _norm(rawQ);
   var realPilots = S.pilots.filter(function(p){
     if (p.id.startsWith('tp-')) return false;
     if (filterStatut !== 'all' && p.statut !== filterStatut) return false;
+    if (q) {
+      var hay = _norm((p.prenom||'')+' '+(p.nom||'')+' '+(p.email||'')+' '+(p.statut||'')+' '+(p.club||''));
+      if (hay.indexOf(q) === -1) return false;
+    }
     return true;
   });
   // Compteur
   var countEl = document.getElementById('util-count');
-  if (countEl) countEl.textContent = realPilots.length + ' utilisateur' + (realPilots.length > 1 ? 's' : '') + ' enregistré' + (realPilots.length > 1 ? 's' : '');
+  var total = S.pilots.filter(function(p){ return !p.id.startsWith('tp-'); }).length;
+  if (countEl) countEl.textContent = (q || filterStatut !== 'all')
+    ? realPilots.length + ' résultat' + (realPilots.length > 1 ? 's' : '') + ' sur ' + total
+    : total + ' utilisateur' + (total > 1 ? 's' : '') + ' enregistré' + (total > 1 ? 's' : '');
   if (!realPilots.length) {
+    var emptyMsg = (q || filterStatut !== 'all')
+      ? '🔍 Aucun résultat pour cette recherche'
+      : '👤 Aucun utilisateur enregistré';
+    var emptyHint = (q || filterStatut !== 'all')
+      ? 'Modifiez les filtres ou effacez la recherche'
+      : 'Actualisez pour récupérer les utilisateurs du cloud';
     cont.innerHTML = '<div class="card" style="text-align:center;color:var(--txt3);font-size:13px;padding:20px 16px">'
-      + '<div style="font-size:32px;margin-bottom:8px">👤</div>'
-      + 'Aucun utilisateur enregistré<br>'
-      + '<span style="font-size:11px">Actualisez pour récupérer les utilisateurs du cloud</span></div>';
+      + '<div style="font-size:32px;margin-bottom:8px">' + (q ? '🔍' : '👤') + '</div>'
+      + emptyMsg + '<br>'
+      + '<span style="font-size:11px">' + emptyHint + '</span></div>';
     return;
   }
   var statuts    = ['utilisateur','utilisateur_modif','gestionnaire','developpeur'];
