@@ -108,6 +108,13 @@ body.theme-light .nav-btn.active .nav-pip{background:rgba(0,87,255,.12)}
 /* Cards */
 .card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);margin:12px;padding:14px}
 .section-title{font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;padding:16px 16px 8px}
+.regl-sec{border-bottom:1px solid var(--bdr)}
+.regl-sec-hd{cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;user-select:none;transition:color .15s}
+.regl-sec-hd:hover{color:var(--txt2)}
+.regl-sec-hd.open{color:var(--txt2)}
+.regl-tri{font-size:9px;transition:transform .18s ease;flex-shrink:0;opacity:.7}
+.regl-sec-hd.open .regl-tri{transform:rotate(90deg)}
+.regl-sec-bd{padding:0 0 8px}
 /* MÉTÉO */
 .meteo-wrap{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:14px}
 .meteo-chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -870,7 +877,14 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             </span>
             <div id="home-todo-title" style="font-size:14px;font-weight:800">✅ À faire</div>
           </div>
-          <button onclick="event.stopPropagation();toggleHomeTodoPanel(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
+          <!-- Boutons d'action À faire -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <button onclick="event.stopPropagation();_todoPrint()" title="Imprimer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">🖨</button>
+            <button onclick="event.stopPropagation();_todoExport()" title="Exporter (JSON + CSV)" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬇</button>
+            <button onclick="event.stopPropagation();document.getElementById('_todo-import-inp').click()" title="Importer JSON" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬆</button>
+            <input type="file" id="_todo-import-inp" accept=".json" style="display:none" onchange="_todoImport(this)">
+            <button onclick="event.stopPropagation();toggleHomeTodoPanel(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
+          </div>
         </div>
         <!-- Champ ajout domaine -->
         <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;flex-shrink:0">
@@ -1207,338 +1221,387 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
       <!-- TAB RÉGLAGES -->
       <div id="stab-reglages-panel" style="display:none;overflow-y:auto">
-        <div class="section-title">Affichage</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-            <div>
-              <div style="font-size:13px;font-weight:600;color:var(--txt)">Plein écran</div>
-              <div style="font-size:11px;color:var(--txt3);margin-top:2px">Masquer les menus et volets du navigateur</div>
-            </div>
-            <button id="regl-fullscreen-btn" onclick="toggleFullscreen()" class="btn btn-sm"
-              style="flex-shrink:0;display:flex;align-items:center;gap:6px;font-size:12px;min-width:110px;justify-content:center">
-              <svg id="regl-fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-              <span id="regl-fs-label">Activer</span>
-            </button>
-          </div>
-        </div>
-        <div class="section-title">Apparence</div>
-        <div class="card">
-          <div style="display:flex;gap:8px">
-            <button id="theme-auto-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('auto')">🌗 Auto</button>
-            <button id="theme-dark-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('dark')">🌑 Sombre</button>
-            <button id="theme-light-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('light')">☀️ Clair</button>
-          </div>
-        </div>
-        <div class="section-title">Couleur d'accent</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Couleur principale des boutons, badges et indicateurs</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap" id="accent-presets">
-            <div onclick="setAccentColor('#0057FF')" style="width:32px;height:32px;border-radius:50%;background:#0057FF;cursor:pointer;border:2px solid transparent" title="Bleu STOL (défaut)"></div>
-            <div onclick="setAccentColor('#10b981')" style="width:32px;height:32px;border-radius:50%;background:#10b981;cursor:pointer;border:2px solid transparent" title="Vert"></div>
-            <div onclick="setAccentColor('#f59e0b')" style="width:32px;height:32px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid transparent" title="Ambre"></div>
-            <div onclick="setAccentColor('#ef4444')" style="width:32px;height:32px;border-radius:50%;background:#ef4444;cursor:pointer;border:2px solid transparent" title="Rouge"></div>
-            <div onclick="setAccentColor('#8b5cf6')" style="width:32px;height:32px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:2px solid transparent" title="Violet"></div>
-            <div onclick="setAccentColor('#ec4899')" style="width:32px;height:32px;border-radius:50%;background:#ec4899;cursor:pointer;border:2px solid transparent" title="Rose"></div>
-            <label style="width:32px;height:32px;border-radius:50%;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);cursor:pointer;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:14px" title="Couleur personnalisée">
-              <input type="color" id="accent-custom-inp" style="opacity:0;width:0;height:0;position:absolute" oninput="setAccentColor(this.value)">
-              ✏️
-            </label>
-          </div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:12px" onclick="setAccentColor('#0057FF')">↺ Réinitialiser</button>
-        </div>
-        <div class="section-title" id="splash-logo-section" style="display:none">Logo d'accueil</div>
-        <div class="card" id="splash-logo-card" style="display:none;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
-            <div id="regl-logo-preview" style="width:64px;height:64px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden;flex-shrink:0"></div>
-            <div style="flex:1">
-              <div style="font-size:13px;font-weight:600;margin-bottom:2px">Logo de l'écran d'accueil</div>
-              <div style="font-size:11px;color:var(--txt3)">Affiché au démarrage de l'application sur fond rond blanc</div>
-            </div>
-          </div>
-          <input type="file" id="regl-logo-inp" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-primary btn-sm" style="flex:1" onclick="document.getElementById('regl-logo-inp').click()">📷 Changer le logo</button>
-            <button class="btn btn-secondary btn-sm" onclick="removeSplashLogo()" style="color:var(--red)">Supprimer</button>
-          </div>
-        </div>
-        <div class="section-title">Notifications</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:12px;color:var(--txt2);margin-bottom:12px">Paramètres pour les messages fixés de compétition</div>
-          <div style="margin-bottom:12px">
-            <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px">Vibration</label>
-            <div style="display:flex;gap:8px">
-              <button id="vib-on-btn"  class="btn btn-sm" style="flex:1;font-size:13px" onclick="setNotifVibration('on')">📳 Activée</button>
-              <button id="vib-off-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setNotifVibration('off')">🔕 Désactivée</button>
-            </div>
-          </div>
-          <div>
-            <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px">Son d'alerte</label>
-            <select id="notif-sound-sel" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 12px;width:100%;outline:none;margin-bottom:8px" onchange="setNotifSound(this.value)">
-              <option value="bip">🔔 Bip court</option>
-              <option value="double">🔔🔔 Double bip</option>
-              <option value="chime">🎵 Sonnerie</option>
-              <option value="alerte">⚠️ Alerte</option>
-              <option value="cloche">🔔 Cloche</option>
-              <option value="off">🔇 Aucun son</option>
-            </select>
-            <button class="btn btn-secondary btn-sm" style="font-size:12px;width:100%" onclick="playNotifSound()">▶ Tester le son</button>
-          </div>
-        </div>
-        <div class="section-title">Site Web Pôle Sport — Liens mobiles</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">
-            Ces liens apparaissent sur l'accueil mobile dans la section <strong>Site Web Pôle Sport</strong>. Laissez un champ vide pour masquer le bouton correspondant.
-          </div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div class="field" style="margin-bottom:0">
-              <label>📰 Lien Actualité</label>
-              <input id="psp-inp-actualite" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('actualite',this.value)">
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <label>📅 Lien Calendrier</label>
-              <input id="psp-inp-calendrier" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('calendrier',this.value)">
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <label>📂 Lien Supports</label>
-              <input id="psp-inp-supports" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('supports',this.value)">
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <label>🏆 Lien Résultats</label>
-              <input id="psp-inp-resultats" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('resultats',this.value)">
-            </div>
-          </div>
-          <div id="psp-save-status" style="display:none;margin-top:10px;padding:7px 12px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:12px;font-weight:700;color:#10b981;text-align:center">✓ Liens sauvegardés</div>
-        </div>
-        <div class="section-title">Ressources</div>
-        <div class="card">
-          <button class="btn btn-secondary btn-full btn-sm" style="margin-bottom:8px" onclick="openLink('https://ffplum.fr/images/Sport/2025/REGLEMENT_STOL_FFPLUM_30-3-2025.pdf')">📄 Règlement STOL FFPLUM 2025</button>
-          <button class="btn btn-secondary btn-full btn-sm" onclick="openLink('https://ffplum-sport-hub.base44.app/Calendrier')">📅 Calendrier FFPLUM Sport Hub</button>
-        </div>
-        <div class="section-title">Ordre de Mission</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">Modèle d'ordre de mission de référence (PDF). Disponible dans l'onglet <strong>Encadrants</strong> pour envoi par email.</div>
-          <div id="regl-odm-container"></div>
-          <input type="file" id="regl-odm-inp" accept="application/pdf,.pdf" style="display:none" onchange="loadOdmPdf(this)">
-        </div>
-        <div class="section-title">Données locales</div>
-        <div class="card">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
-            La sauvegarde inclut <strong>toutes les données</strong> : compétitions, pilotes, collectif, budget, documents, images (en-tête, pied de page, photos).
-          </div>
+        <!-- ══ ACCORDÉON RÉGLAGES ══ -->
 
-          <!-- Export -->
-          <div style="margin-bottom:10px">
-            <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Sauvegarde</div>
-            <button class="btn btn-secondary btn-sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px" onclick="exportData()">
-              <span>⬇</span><span>Télécharger la sauvegarde complète</span><span id="export-size-badge" style="font-size:10px;opacity:.7"></span>
-            </button>
-          </div>
-
-          <!-- Import fusion (avec gestion doublons) -->
-          <div style="margin-bottom:6px">
-            <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Restauration</div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="document.getElementById('import-inp').click()">
-                🔀 Fusionner
-              </button>
-              <button class="btn btn-sm" style="flex:1;font-size:11px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444" onclick="document.getElementById('import-full-inp').click()">
-                🔄 Remplacer tout
-              </button>
-            </div>
-            <input type="file" id="import-inp"      accept=".json" style="display:none" onchange="importData(this)">
-            <input type="file" id="import-full-inp" accept=".json" style="display:none" onchange="importDataFull(this)">
-            <div style="font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.4">
-              <strong>Fusionner</strong> : gère les doublons · <strong style="color:#ef4444">Remplacer tout</strong> : écrase toutes les données locales
-            </div>
-          </div>
-
-          <!-- Indicateur taille localStorage -->
-          <div id="localstorage-info" style="margin-top:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;font-size:10px;color:var(--txt3)"></div>
-        </div>
-
-        <!-- Guide mise à jour -->
-        <div class="section-title">Mise à jour de l'application</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
-            Les données sont stockées <strong>localement dans le navigateur</strong>. Elles ne sont pas perdues lors d'une mise à jour du code, mais elles sont <strong>propres à chaque appareil et chaque navigateur</strong>.
-          </div>
-
-          <!-- Explication des 2 versions -->
-          <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.6">
-            <div style="font-weight:700;color:#3b82f6;margin-bottom:6px">📱 Version publiée</div>
-            <div style="color:var(--txt2);margin-bottom:4px">
-              <a href="https://azzounimohamed-crypto.github.io/Gestcompet/" target="_blank" style="color:#3b82f6;font-size:10px;word-break:break-all">https://azzounimohamed-crypto.github.io/Gestcompet/</a>
-            </div>
-            <div style="color:var(--txt3);font-size:10px">Données stockées dans <strong>ce navigateur</strong> sur ce domaine uniquement.</div>
-          </div>
-
-          <!-- Protocole de mise à jour -->
-          <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Protocole de mise à jour sans perte de données</div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
-              <span style="font-size:14px;flex-shrink:0">1️⃣</span>
-              <div><span style="color:var(--txt)">Sur la <strong>version publiée</strong></span> → <strong>Télécharger la sauvegarde complète</strong> (bouton ci-dessus)</div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
-              <span style="font-size:14px;flex-shrink:0">2️⃣</span>
-              <div>Développer et tester les évolutions sur la <strong>version locale</strong></div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
-              <span style="font-size:14px;flex-shrink:0">3️⃣</span>
-              <div>Publier le nouveau <code style="background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">index.html</code> sur GitHub Pages</div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
-              <span style="font-size:14px;flex-shrink:0">4️⃣</span>
-              <div>Sur la <strong>version publiée mise à jour</strong> → <strong>Remplacer tout</strong> avec le fichier de l'étape 1</div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:7px;font-size:11px">
-              <span style="font-size:14px;flex-shrink:0">✅</span>
-              <div>Toutes les données (pilotes, compétitions, images, documents) sont restaurées automatiquement.</div>
-            </div>
-          </div>
-
-          <div style="margin-top:10px;padding:8px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:7px;font-size:10px;color:var(--txt3);line-height:1.5">
-            💡 <strong>Astuce :</strong> Les données ne sont PAS effacées par une mise à jour du code. Elles le sont uniquement si tu vides le cache du navigateur ou reinstalles. La sauvegarde JSON est donc une assurance, pas une obligation à chaque mise à jour.
-          </div>
-        </div>
-        <div class="section-title">Synchronisation Base44</div>
-        <div class="card">
-          <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Importe les compétitions et les inscriptions depuis <strong>ffplum-sport-hub.base44.app</strong>. À utiliser quand de nouvelles compétitions ou inscriptions ont été ajoutées sur Base44.</div>
-          <button class="btn btn-primary btn-sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px" onclick="syncBase44All(null)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            Synchroniser depuis Base44
-          </button>
-        </div>
-        <div class="section-title">Documents officiels</div>
-        <div class="card" style="margin-bottom:4px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">
-            Configurez l'en‑tête et le bas de page intégrés dans tous les documents imprimés.
-          </div>
-
-          <!-- LAYOUT : Aperçu gauche | Réglages droite -->
-          <div style="display:flex;gap:14px;align-items:flex-start">
-
-            <!-- COLONNE GAUCHE : Mini A4 + bouton -->
-            <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px">
-              <!-- Mini A4 -->
-              <div id="regl-doc-preview" style="background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.18);box-shadow:0 3px 16px rgba(0,0,0,.3);width:150px;aspect-ratio:210/297;position:relative;overflow:hidden">
-                <!-- Lignes de contenu simulées — padding mis à jour par JS -->
-                <div id="regl-preview-content" style="position:absolute;inset:0;overflow:hidden">
-                  <div style="display:flex;flex-direction:column;gap:3px;padding:inherit;box-sizing:border-box;height:100%">
-                    <div style="height:5px;background:#e5e7eb;border-radius:2px;width:55%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:85%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:70%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:90%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:62%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:78%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:50%;flex-shrink:0"></div>
-                    <div style="height:3px;background:#f3f4f6;border-radius:2px;width:88%;flex-shrink:0"></div>
-                  </div>
-                </div>
-                <!-- Repère zone texte (pointillés bleus) -->
-                <div id="regl-preview-zone" style="position:absolute;top:14px;bottom:11px;left:11px;right:11px;border:1px dashed rgba(99,140,217,.45);pointer-events:none"></div>
-                <!-- En-tête -->
-                <div id="regl-preview-header" style="position:absolute;top:0;left:0;right:0;height:14px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:1px 4px;overflow:hidden">
-                  <span style="font-size:6px;color:#9ca3af;font-style:italic">En‑tête</span>
-                </div>
-                <!-- Bas de page -->
-                <div id="regl-preview-footer" style="position:absolute;bottom:0;left:0;right:0;height:11px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden">
-                  <span style="font-size:6px;color:#9ca3af;font-style:italic">Bas de page</span>
-                </div>
-              </div>
-              <!-- Bouton Visualiser sous l'aperçu -->
-              <button onclick="officialDocPreview()" style="width:150px;font-size:11px;padding:7px 0;border-radius:7px;border:1px solid var(--stol);background:rgba(var(--stol-rgb),.12);color:var(--stol);cursor:pointer;font-family:inherit;font-weight:700">🔍 Visualiser</button>
-              <div style="font-size:9px;color:var(--txt3);text-align:center;line-height:1.4">Pointillés bleus<br>= zone de texte</div>
-            </div>
-
-            <!-- COLONNE DROITE : tous les réglages -->
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
-
-              <!-- EN-TÊTE -->
-              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
-                <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">En‑tête</div>
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                  <div id="regl-header-preview" onclick="document.getElementById('regl-header-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  </div>
-                  <div style="flex:1;min-width:0">
-                    <input type="file" id="regl-header-inp" accept="image/*" style="display:none" onchange="officialDocUpload('header',this)">
-                    <button onclick="document.getElementById('regl-header-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
-                    <button onclick="officialDocRemove('header')" id="regl-header-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
-                    <input type="number" id="od-header-h" min="5" max="80" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('headerHeight',this.value)">
-                  </div>
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Position</div>
-                    <select id="od-header-pos" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 6px;outline:none;width:100%;box-sizing:border-box" onchange="officialDocSetConfig('headerPos',this.value)">
-                      <option value="left">← Gauche</option>
-                      <option value="center">⊙ Centre</option>
-                      <option value="right">→ Droite</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <!-- BAS DE PAGE -->
-              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
-                <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Bas de page</div>
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                  <div id="regl-footer-preview" onclick="document.getElementById('regl-footer-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  </div>
-                  <div style="flex:1;min-width:0">
-                    <input type="file" id="regl-footer-inp" accept="image/*" style="display:none" onchange="officialDocUpload('footer',this)">
-                    <button onclick="document.getElementById('regl-footer-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
-                    <button onclick="officialDocRemove('footer')" id="regl-footer-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
-                  </div>
-                </div>
+        <!-- Affichage -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Affichage</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div>
-                  <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
-                  <input type="number" id="od-footer-h" min="5" max="60" value="15" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('footerHeight',this.value)">
+                  <div style="font-size:13px;font-weight:600;color:var(--txt)">Plein écran</div>
+                  <div style="font-size:11px;color:var(--txt3);margin-top:2px">Masquer les menus et volets du navigateur</div>
                 </div>
+                <button id="regl-fullscreen-btn" onclick="toggleFullscreen()" class="btn btn-sm"
+                  style="flex-shrink:0;display:flex;align-items:center;gap:6px;font-size:12px;min-width:110px;justify-content:center">
+                  <svg id="regl-fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                  <span id="regl-fs-label">Activer</span>
+                </button>
               </div>
-
-              <!-- MARGES -->
-              <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
-                <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Marges (mm)</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Haut</div>
-                    <input type="number" id="od-mt" min="5" max="60" value="25" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginTop',this.value)">
-                  </div>
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Bas</div>
-                    <input type="number" id="od-mb" min="5" max="60" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginBottom',this.value)">
-                  </div>
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Gauche</div>
-                    <input type="number" id="od-ml" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginLeft',this.value)">
-                  </div>
-                  <div>
-                    <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Droite</div>
-                    <input type="number" id="od-mr" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginRight',this.value)">
-                  </div>
-                </div>
-              </div>
-
-            </div><!-- fin colonne droite -->
-          </div><!-- fin flex layout -->
+            </div>
+          </div>
         </div>
 
-        <div class="section-title">Import licences FFPLUM</div>
-        <div class="card">
-          <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Sélectionnez le fichier <strong>Licence 2015 2025.xlsx</strong> pour mettre à jour automatiquement les compétiteurs et le staff avec les données manquantes (genre, DDN, téléphone, email, adresse, licence, club, région).</div>
-          <div id="licence-status-bar" style="margin-bottom:8px"></div>
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('import-licence-inp').click()">📋 Importer le fichier licences FFPLUM</button>
-          <input type="file" id="import-licence-inp" accept=".xlsx,.xls" style="display:none" onchange="importLicenceFfplum(this)">
-          <div id="btn-refresh-all-licences-wrap" style="display:none;margin-top:8px">
-            <button class="btn btn-sm" style="width:100%;background:rgba(0,87,255,.12);border:1px solid rgba(0,87,255,.35);color:var(--stol);font-weight:700" onclick="refreshAllFromLicenceDB()">🔄 Mettre à jour pilotes &amp; encadrants depuis la base</button>
+        <!-- Apparence -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Apparence</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card">
+              <div style="display:flex;gap:8px">
+                <button id="theme-auto-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('auto')">🌗 Auto</button>
+                <button id="theme-dark-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('dark')">🌑 Sombre</button>
+                <button id="theme-light-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setTheme('light')">☀️ Clair</button>
+              </div>
+            </div>
           </div>
-          <div id="import-licence-result" style="margin-top:10px;display:none"></div>
+        </div>
+
+        <!-- Couleur d'accent -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Couleur d'accent</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Couleur principale des boutons, badges et indicateurs</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap" id="accent-presets">
+                <div onclick="setAccentColor('#0057FF')" style="width:32px;height:32px;border-radius:50%;background:#0057FF;cursor:pointer;border:2px solid transparent" title="Bleu STOL (défaut)"></div>
+                <div onclick="setAccentColor('#10b981')" style="width:32px;height:32px;border-radius:50%;background:#10b981;cursor:pointer;border:2px solid transparent" title="Vert"></div>
+                <div onclick="setAccentColor('#f59e0b')" style="width:32px;height:32px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid transparent" title="Ambre"></div>
+                <div onclick="setAccentColor('#ef4444')" style="width:32px;height:32px;border-radius:50%;background:#ef4444;cursor:pointer;border:2px solid transparent" title="Rouge"></div>
+                <div onclick="setAccentColor('#8b5cf6')" style="width:32px;height:32px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:2px solid transparent" title="Violet"></div>
+                <div onclick="setAccentColor('#ec4899')" style="width:32px;height:32px;border-radius:50%;background:#ec4899;cursor:pointer;border:2px solid transparent" title="Rose"></div>
+                <label style="width:32px;height:32px;border-radius:50%;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);cursor:pointer;border:2px solid transparent;display:flex;align-items:center;justify-content:center;font-size:14px" title="Couleur personnalisée">
+                  <input type="color" id="accent-custom-inp" style="opacity:0;width:0;height:0;position:absolute" oninput="setAccentColor(this.value)">
+                  ✏️
+                </label>
+              </div>
+              <button class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:12px" onclick="setAccentColor('#0057FF')">↺ Réinitialiser</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logo d'accueil (visible gestionnaire seulement) -->
+        <div class="regl-sec" id="splash-logo-section" style="display:none">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Logo d'accueil</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" id="splash-logo-card" style="margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+                <div id="regl-logo-preview" style="width:64px;height:64px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden;flex-shrink:0"></div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:600;margin-bottom:2px">Logo de l'écran d'accueil</div>
+                  <div style="font-size:11px;color:var(--txt3)">Affiché au démarrage de l'application sur fond rond blanc</div>
+                </div>
+              </div>
+              <input type="file" id="regl-logo-inp" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary btn-sm" style="flex:1" onclick="document.getElementById('regl-logo-inp').click()">📷 Changer le logo</button>
+                <button class="btn btn-secondary btn-sm" onclick="removeSplashLogo()" style="color:var(--red)">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Notifications</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:12px;color:var(--txt2);margin-bottom:12px">Paramètres pour les messages fixés de compétition</div>
+              <div style="margin-bottom:12px">
+                <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px">Vibration</label>
+                <div style="display:flex;gap:8px">
+                  <button id="vib-on-btn"  class="btn btn-sm" style="flex:1;font-size:13px" onclick="setNotifVibration('on')">📳 Activée</button>
+                  <button id="vib-off-btn" class="btn btn-sm" style="flex:1;font-size:13px" onclick="setNotifVibration('off')">🔕 Désactivée</button>
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:6px">Son d'alerte</label>
+                <select id="notif-sound-sel" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 12px;width:100%;outline:none;margin-bottom:8px" onchange="setNotifSound(this.value)">
+                  <option value="bip">🔔 Bip court</option>
+                  <option value="double">🔔🔔 Double bip</option>
+                  <option value="chime">🎵 Sonnerie</option>
+                  <option value="alerte">⚠️ Alerte</option>
+                  <option value="cloche">🔔 Cloche</option>
+                  <option value="off">🔇 Aucun son</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" style="font-size:12px;width:100%" onclick="playNotifSound()">▶ Tester le son</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Site Web Pôle Sport -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Site Web Pôle Sport — Liens mobiles</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">
+                Ces liens apparaissent sur l'accueil mobile dans la section <strong>Site Web Pôle Sport</strong>. Laissez un champ vide pour masquer le bouton correspondant.
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div class="field" style="margin-bottom:0">
+                  <label>📰 Lien Actualité</label>
+                  <input id="psp-inp-actualite" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('actualite',this.value)">
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>📅 Lien Calendrier</label>
+                  <input id="psp-inp-calendrier" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('calendrier',this.value)">
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>📂 Lien Supports</label>
+                  <input id="psp-inp-supports" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('supports',this.value)">
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>🏆 Lien Résultats</label>
+                  <input id="psp-inp-resultats" type="url" placeholder="https://…" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;width:100%" oninput="poleSportLinkChange('resultats',this.value)">
+                </div>
+              </div>
+              <div id="psp-save-status" style="display:none;margin-top:10px;padding:7px 12px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:12px;font-weight:700;color:#10b981;text-align:center">✓ Liens sauvegardés</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ressources -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Ressources</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card">
+              <button class="btn btn-secondary btn-full btn-sm" style="margin-bottom:8px" onclick="openLink('https://ffplum.fr/images/Sport/2025/REGLEMENT_STOL_FFPLUM_30-3-2025.pdf')">📄 Règlement STOL FFPLUM 2025</button>
+              <button class="btn btn-secondary btn-full btn-sm" onclick="openLink('https://ffplum-sport-hub.base44.app/Calendrier')">📅 Calendrier FFPLUM Sport Hub</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ordre de Mission -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Ordre de Mission</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">Modèle d'ordre de mission de référence (PDF). Disponible dans l'onglet <strong>Encadrants</strong> pour envoi par email.</div>
+              <div id="regl-odm-container"></div>
+              <input type="file" id="regl-odm-inp" accept="application/pdf,.pdf" style="display:none" onchange="loadOdmPdf(this)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Données locales -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Données locales</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card">
+              <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
+                La sauvegarde inclut <strong>toutes les données</strong> : compétitions, pilotes, collectif, budget, documents, images (en-tête, pied de page, photos).
+              </div>
+              <!-- Export -->
+              <div style="margin-bottom:10px">
+                <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Sauvegarde</div>
+                <button class="btn btn-secondary btn-sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px" onclick="exportData()">
+                  <span>⬇</span><span>Télécharger la sauvegarde complète</span><span id="export-size-badge" style="font-size:10px;opacity:.7"></span>
+                </button>
+              </div>
+              <!-- Import fusion -->
+              <div style="margin-bottom:6px">
+                <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Restauration</div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="document.getElementById('import-inp').click()">🔀 Fusionner</button>
+                  <button class="btn btn-sm" style="flex:1;font-size:11px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444" onclick="document.getElementById('import-full-inp').click()">🔄 Remplacer tout</button>
+                </div>
+                <input type="file" id="import-inp"      accept=".json" style="display:none" onchange="importData(this)">
+                <input type="file" id="import-full-inp" accept=".json" style="display:none" onchange="importDataFull(this)">
+                <div style="font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.4">
+                  <strong>Fusionner</strong> : gère les doublons · <strong style="color:#ef4444">Remplacer tout</strong> : écrase toutes les données locales
+                </div>
+              </div>
+              <div id="localstorage-info" style="margin-top:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;font-size:10px;color:var(--txt3)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mise à jour -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Mise à jour de l'application</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">
+                Les données sont stockées <strong>localement dans le navigateur</strong>. Elles ne sont pas perdues lors d'une mise à jour du code, mais elles sont <strong>propres à chaque appareil et chaque navigateur</strong>.
+              </div>
+              <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.6">
+                <div style="font-weight:700;color:#3b82f6;margin-bottom:6px">📱 Version publiée</div>
+                <div style="color:var(--txt2);margin-bottom:4px">
+                  <a href="https://azzounimohamed-crypto.github.io/Gestcompet/" target="_blank" style="color:#3b82f6;font-size:10px;word-break:break-all">https://azzounimohamed-crypto.github.io/Gestcompet/</a>
+                </div>
+                <div style="color:var(--txt3);font-size:10px">Données stockées dans <strong>ce navigateur</strong> sur ce domaine uniquement.</div>
+              </div>
+              <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Protocole de mise à jour sans perte de données</div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+                  <span style="font-size:14px;flex-shrink:0">1️⃣</span>
+                  <div><span style="color:var(--txt)">Sur la <strong>version publiée</strong></span> → <strong>Télécharger la sauvegarde complète</strong> (bouton ci-dessus)</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+                  <span style="font-size:14px;flex-shrink:0">2️⃣</span>
+                  <div>Développer et tester les évolutions sur la <strong>version locale</strong></div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+                  <span style="font-size:14px;flex-shrink:0">3️⃣</span>
+                  <div>Publier le nouveau <code style="background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px">index.html</code> sur GitHub Pages</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:var(--navy3);border-radius:7px;font-size:11px">
+                  <span style="font-size:14px;flex-shrink:0">4️⃣</span>
+                  <div>Sur la <strong>version publiée mise à jour</strong> → <strong>Remplacer tout</strong> avec le fichier de l'étape 1</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:7px;font-size:11px">
+                  <span style="font-size:14px;flex-shrink:0">✅</span>
+                  <div>Toutes les données (pilotes, compétitions, images, documents) sont restaurées automatiquement.</div>
+                </div>
+              </div>
+              <div style="margin-top:10px;padding:8px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:7px;font-size:10px;color:var(--txt3);line-height:1.5">
+                💡 <strong>Astuce :</strong> Les données ne sont PAS effacées par une mise à jour du code. Elles le sont uniquement si tu vides le cache du navigateur ou reinstalles. La sauvegarde JSON est donc une assurance, pas une obligation à chaque mise à jour.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Synchronisation Base44 -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Synchronisation Base44</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card">
+              <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Importe les compétitions et les inscriptions depuis <strong>ffplum-sport-hub.base44.app</strong>. À utiliser quand de nouvelles compétitions ou inscriptions ont été ajoutées sur Base44.</div>
+              <button class="btn btn-primary btn-sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px" onclick="syncBase44All(null)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Synchroniser depuis Base44
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Documents officiels -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Documents officiels</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card" style="margin-bottom:4px">
+              <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">
+                Configurez l'en‑tête et le bas de page intégrés dans tous les documents imprimés.
+              </div>
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <!-- COLONNE GAUCHE : Mini A4 + bouton -->
+                <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px">
+                  <div id="regl-doc-preview" style="background:#fff;border-radius:3px;border:1px solid rgba(0,0,0,.18);box-shadow:0 3px 16px rgba(0,0,0,.3);width:150px;aspect-ratio:210/297;position:relative;overflow:hidden">
+                    <div id="regl-preview-content" style="position:absolute;inset:0;overflow:hidden">
+                      <div style="display:flex;flex-direction:column;gap:3px;padding:inherit;box-sizing:border-box;height:100%">
+                        <div style="height:5px;background:#e5e7eb;border-radius:2px;width:55%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:85%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:70%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:90%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:62%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:78%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:50%;flex-shrink:0"></div>
+                        <div style="height:3px;background:#f3f4f6;border-radius:2px;width:88%;flex-shrink:0"></div>
+                      </div>
+                    </div>
+                    <div id="regl-preview-zone" style="position:absolute;top:14px;bottom:11px;left:11px;right:11px;border:1px dashed rgba(99,140,217,.45);pointer-events:none"></div>
+                    <div id="regl-preview-header" style="position:absolute;top:0;left:0;right:0;height:14px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:1px 4px;overflow:hidden">
+                      <span style="font-size:6px;color:#9ca3af;font-style:italic">En‑tête</span>
+                    </div>
+                    <div id="regl-preview-footer" style="position:absolute;bottom:0;left:0;right:0;height:11px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                      <span style="font-size:6px;color:#9ca3af;font-style:italic">Bas de page</span>
+                    </div>
+                  </div>
+                  <button onclick="officialDocPreview()" style="width:150px;font-size:11px;padding:7px 0;border-radius:7px;border:1px solid var(--stol);background:rgba(var(--stol-rgb),.12);color:var(--stol);cursor:pointer;font-family:inherit;font-weight:700">🔍 Visualiser</button>
+                  <div style="font-size:9px;color:var(--txt3);text-align:center;line-height:1.4">Pointillés bleus<br>= zone de texte</div>
+                </div>
+                <!-- COLONNE DROITE : réglages -->
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                  <!-- EN-TÊTE -->
+                  <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                    <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">En‑tête</div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                      <div id="regl-header-preview" onclick="document.getElementById('regl-header-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <input type="file" id="regl-header-inp" accept="image/*" style="display:none" onchange="officialDocUpload('header',this)">
+                        <button onclick="document.getElementById('regl-header-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
+                        <button onclick="officialDocRemove('header')" id="regl-header-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
+                      </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
+                        <input type="number" id="od-header-h" min="5" max="80" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('headerHeight',this.value)">
+                      </div>
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Position</div>
+                        <select id="od-header-pos" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 6px;outline:none;width:100%;box-sizing:border-box" onchange="officialDocSetConfig('headerPos',this.value)">
+                          <option value="left">← Gauche</option>
+                          <option value="center">⊙ Centre</option>
+                          <option value="right">→ Droite</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- BAS DE PAGE -->
+                  <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                    <div style="font-size:10px;font-weight:700;color:var(--stol);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Bas de page</div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                      <div id="regl-footer-preview" onclick="document.getElementById('regl-footer-inp').click()" style="width:60px;height:30px;border:1.5px dashed rgba(255,255,255,.2);border-radius:6px;cursor:pointer;overflow:hidden;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <input type="file" id="regl-footer-inp" accept="image/*" style="display:none" onchange="officialDocUpload('footer',this)">
+                        <button onclick="document.getElementById('regl-footer-inp').click()" class="btn btn-secondary btn-sm" style="width:100%;font-size:10px;margin-bottom:4px">📷 Choisir</button>
+                        <button onclick="officialDocRemove('footer')" id="regl-footer-del" class="btn btn-sm" style="width:100%;font-size:10px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);display:none">✕ Supprimer</button>
+                      </div>
+                    </div>
+                    <div>
+                      <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Hauteur (mm)</div>
+                      <input type="number" id="od-footer-h" min="5" max="60" value="15" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('footerHeight',this.value)">
+                    </div>
+                  </div>
+                  <!-- MARGES -->
+                  <div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;padding:10px">
+                    <div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Marges (mm)</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Haut</div>
+                        <input type="number" id="od-mt" min="5" max="60" value="25" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginTop',this.value)">
+                      </div>
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Bas</div>
+                        <input type="number" id="od-mb" min="5" max="60" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginBottom',this.value)">
+                      </div>
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Gauche</div>
+                        <input type="number" id="od-ml" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginLeft',this.value)">
+                      </div>
+                      <div>
+                        <div style="font-size:9px;color:var(--txt3);margin-bottom:3px">Droite</div>
+                        <input type="number" id="od-mr" min="5" max="40" value="20" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box" oninput="officialDocSetConfig('marginRight',this.value)">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Import licences FFPLUM -->
+        <div class="regl-sec">
+          <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Import licences FFPLUM</div>
+          <div class="regl-sec-bd" style="display:none">
+            <div class="card">
+              <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Sélectionnez le fichier <strong>Licence 2015 2025.xlsx</strong> pour mettre à jour automatiquement les compétiteurs et le staff avec les données manquantes (genre, DDN, téléphone, email, adresse, licence, club, région).</div>
+              <div id="licence-status-bar" style="margin-bottom:8px"></div>
+              <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('import-licence-inp').click()">📋 Importer le fichier licences FFPLUM</button>
+              <input type="file" id="import-licence-inp" accept=".xlsx,.xls" style="display:none" onchange="importLicenceFfplum(this)">
+              <div id="btn-refresh-all-licences-wrap" style="display:none;margin-top:8px">
+                <button class="btn btn-sm" style="width:100%;background:rgba(0,87,255,.12);border:1px solid rgba(0,87,255,.35);color:var(--stol);font-weight:700" onclick="refreshAllFromLicenceDB()">🔄 Mettre à jour pilotes &amp; encadrants depuis la base</button>
+              </div>
+              <div id="import-licence-result" style="margin-top:10px;display:none"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2863,6 +2926,14 @@ function getSB() {
 // ═══════════════════════════════════════════════════════
 const LS = 'geststol';  // Clé unique et définitive
 const LS_CRITICAL = 'geststol_critical'; // Réglages critiques — jamais strippés, jamais écrasés
+const LS_OD_HEADER = 'geststol_od_header'; // Image en-tête docs officiels — clé dédiée (même méthode que ffplum_logo)
+const LS_OD_FOOTER = 'geststol_od_footer'; // Image bas de page docs officiels — clé dédiée
+
+// Getter centralisé pour les images officialDocs (S > clé dédiée localStorage)
+function _getOfficialDocImg(zone) {
+  var key = zone === 'header' ? LS_OD_HEADER : LS_OD_FOOTER;
+  return (S.officialDocs && S.officialDocs[zone]) || localStorage.getItem(key) || '';
+}
 
 // ── Sauvegarde des réglages critiques dans une clé dédiée ──
 function _saveCritical() {
@@ -3078,6 +3149,10 @@ async function loadState() {
           if (!S.officialDocs.header && idbData.officialDocs.header) S.officialDocs.header = idbData.officialDocs.header;
           if (!S.officialDocs.footer && idbData.officialDocs.footer) S.officialDocs.footer = idbData.officialDocs.footer;
         }
+        // Clés dédiées localStorage (fallback 3 — même niveau que ffplum_logo)
+        if (!S.officialDocs) S.officialDocs = {};
+        if (!S.officialDocs.header) { var _h = localStorage.getItem(LS_OD_HEADER); if (_h) S.officialDocs.header = _h; }
+        if (!S.officialDocs.footer) { var _f = localStorage.getItem(LS_OD_FOOTER); if (_f) S.officialDocs.footer = _f; }
         if (idbData.settings) {
           if (!S.settings) S.settings = {};
           if (!S.settings.logo && idbData.settings.logo) S.settings.logo = idbData.settings.logo;
@@ -3112,7 +3187,7 @@ function clearLocalStorageQuota() {
   try {
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS && k !== LS_CRITICAL) { localStorage.removeItem(k); return; }
+      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo') { localStorage.removeItem(k); return; }
     });
     // Retirer les photos des pilotes dans S
     if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
@@ -7639,6 +7714,7 @@ function renderHomeTodoPanel() {
     html += '<span style="font-size:10px;color:var(--txt3);display:inline-block;transform:rotate('+(open?'90':'0')+'deg);transition:transform .18s">▶</span>';
     html += '<span style="flex:1;font-size:13px;font-weight:700;color:'+(done?'var(--txt3)':'var(--txt)')+'">'+_todoEsc(dom.label)+'</span>';
     if (domTaches.length) html += '<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+pct+'%</span>';
+    html += '<button onclick="event.stopPropagation();todoRenameDomaine(\''+dom.id+'\',this)" style="flex-shrink:0;width:22px;height:22px;border-radius:5px;border:none;background:rgba(0,87,255,.1);color:var(--stol);font-size:11px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center" title="Renommer">✏️</button>';
     html += '<button onclick="event.stopPropagation();todoDeleteDomaine(\''+dom.id+'\')" style="'+bDelDom+'" title="Supprimer ce domaine">×</button>';
     html += '</div>';
     // Barre de progression
@@ -7700,6 +7776,118 @@ function todoAddTache(domaineId) {
   renderHomeTodoPanel();
   // Remettre le focus sur le champ
   setTimeout(function(){ var el=document.getElementById('todo-inp-'+domaineId); if(el) el.focus(); }, 50);
+}
+
+// ── Renommage domaine ───────────────────────────────────────────────────────
+function todoRenameDomaine(domId, btn) {
+  var todos = getHomeTodosForCurrentComp();
+  var dom = todos.find(function(x){ return x.id===domId; });
+  if (!dom) return;
+  // Trouver le span label (frère précédent du bouton ✏️)
+  var hd   = btn.parentElement; // div en-tête du domaine
+  var span = hd.querySelector('span[style*="font-size:13px"]');
+  if (!span) return;
+  var old = dom.label;
+  var inp = document.createElement('input');
+  inp.value = old;
+  inp.style.cssText = 'flex:1;background:var(--navy2);border:1px solid var(--stol);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;padding:2px 6px;outline:none;min-width:0';
+  span.replaceWith(inp);
+  inp.focus(); inp.select();
+  function commit() {
+    var v = (inp.value||'').trim() || old;
+    dom.label = v; dom._updatedAt = Date.now();
+    saveState(); silentPush();
+    renderHomeTodoPanel();
+  }
+  inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ commit(); } else if(e.key==='Escape'){ renderHomeTodoPanel(); } });
+  inp.addEventListener('blur', function(){ setTimeout(commit, 120); });
+}
+
+// ── Impression ──────────────────────────────────────────────────────────────
+function _todoPrint() {
+  var cp = _currentCompId ? (S.comps||[]).find(function(c){ return c.id===_currentCompId; }) : null;
+  var todos = getHomeTodosForCurrentComp();
+  var domaines = todos.filter(function(t){ return t.type==='domaine'; });
+  var taches   = todos.filter(function(t){ return t.type!=='domaine'; });
+  var rows = '';
+  domaines.forEach(function(dom){
+    var dt = taches.filter(function(t){ return t.domaineId===dom.id; });
+    rows += '<tr><td colspan="2" style="background:#f3f4f6;font-weight:700;padding:6px 10px;border:1px solid #d1d5db">'+_todoEsc(dom.label)+'</td></tr>';
+    if (!dt.length) {
+      rows += '<tr><td style="padding:4px 10px 4px 24px;border:1px solid #e5e7eb;color:#9ca3af;font-style:italic" colspan="2">Aucune tâche</td></tr>';
+    }
+    dt.forEach(function(t){
+      rows += '<tr><td style="padding:4px 10px 4px 24px;border:1px solid #e5e7eb;'+(t.done?'text-decoration:line-through;color:#9ca3af':'')+'" colspan="2">'+(t.done?'☑':'☐')+' '+_todoEsc(t.label)+'</td></tr>';
+    });
+  });
+  var w = window.open('','_blank','width=700,height=900');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>À faire</title>'
+    +'<style>body{font-family:Arial,sans-serif;margin:20px;font-size:13px}h1{font-size:16px;margin-bottom:12px}table{width:100%;border-collapse:collapse}@media print{button{display:none}}</style>'
+    +'</head><body>'
+    +'<h1>✅ À faire — '+(cp?_todoEsc(cp.name||'Compétition'):'Compétition')+'</h1>'
+    +'<table>'+rows+'</table>'
+    +'<br><button onclick="window.print()">🖨 Imprimer</button>'
+    +'</body></html>');
+  w.document.close();
+}
+
+// ── Export JSON + CSV ───────────────────────────────────────────────────────
+function _todoExport() {
+  var cp = _currentCompId ? (S.comps||[]).find(function(c){ return c.id===_currentCompId; }) : null;
+  var todos = getHomeTodosForCurrentComp();
+  var name = (cp ? (cp.name||'todo').replace(/[^a-z0-9]/gi,'_') : 'todo');
+  // JSON
+  var jsonBlob = new Blob([JSON.stringify({comp: cp?cp.name:'', todos: todos}, null, 2)], {type:'application/json'});
+  var a1 = document.createElement('a');
+  a1.href = URL.createObjectURL(jsonBlob);
+  a1.download = name+'_todo.json';
+  a1.click();
+  // CSV
+  var domaines = todos.filter(function(t){ return t.type==='domaine'; });
+  var taches   = todos.filter(function(t){ return t.type!=='domaine'; });
+  var csv = 'Domaine,Tâche,Fait\n';
+  domaines.forEach(function(dom){
+    var dt = taches.filter(function(t){ return t.domaineId===dom.id; });
+    if (!dt.length) { csv += '"'+dom.label.replace(/"/g,'""')+'","",\n'; return; }
+    dt.forEach(function(t){
+      csv += '"'+dom.label.replace(/"/g,'""')+'","'+t.label.replace(/"/g,'""')+'",'+(t.done?'Oui':'Non')+'\n';
+    });
+  });
+  setTimeout(function(){
+    var a2 = document.createElement('a');
+    a2.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a2.download = name+'_todo.csv';
+    a2.click();
+  }, 300);
+  toast('Export JSON + CSV téléchargés ✓', 'ok');
+}
+
+// ── Import JSON ─────────────────────────────────────────────────────────────
+function _todoImport(input) {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      var items = Array.isArray(data) ? data : (data.todos || []);
+      if (!items.length) { toast('Fichier vide ou format invalide', 'err'); return; }
+      ensureHomeTodos();
+      if (!_currentCompId && S.comps && S.comps.length) _currentCompId = S.comps[0].id;
+      if (!_currentCompId) { toast('Sélectionnez une compétition', 'err'); return; }
+      if (!Array.isArray(S.homeTodosByComp[_currentCompId])) S.homeTodosByComp[_currentCompId] = [];
+      var existing = S.homeTodosByComp[_currentCompId];
+      var added = 0;
+      items.forEach(function(it){
+        if (!it.id || existing.find(function(x){ return x.id===it.id; })) return;
+        existing.push(it); added++;
+      });
+      saveState(); silentPush();
+      renderHomeTodoPanel();
+      toast(added+' éléments importés ✓', 'ok');
+    } catch(err) { toast('Erreur de lecture JSON', 'err'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 function todoToggleDone(itemId, done) {
@@ -12503,10 +12691,13 @@ function officialDocUpload(zone, input) {
   reader.onload = function(e) {
     if (!S.officialDocs) S.officialDocs = {};
     S.officialDocs[zone] = e.target.result;
+    // Clé dédiée — même méthode que ffplum_logo, survit à tout nettoyage
+    var lsKey = zone === 'header' ? LS_OD_HEADER : LS_OD_FOOTER;
+    try { localStorage.setItem(lsKey, e.target.result); } catch(e2) {}
     saveState();
-    _saveCritical(); // sauvegarde dans la clé dédiée
+    _saveCritical();
     _officialDocRefreshPreview();
-    _hdpSaveNow(); // push cloud immédiat
+    _hdpSaveNow();
     toast(zone === 'header' ? 'En‑tête enregistré ✓' : 'Bas de page enregistré ✓', 'ok');
   };
   reader.readAsDataURL(file);
@@ -12516,10 +12707,12 @@ function officialDocUpload(zone, input) {
 function officialDocRemove(zone) {
   if (!S.officialDocs) S.officialDocs = {};
   S.officialDocs[zone] = null;
+  var lsKey = zone === 'header' ? LS_OD_HEADER : LS_OD_FOOTER;
+  try { localStorage.removeItem(lsKey); } catch(e) {}
   saveState();
-  _saveCritical(); // sauvegarde dans la clé dédiée
+  _saveCritical();
   _officialDocRefreshPreview();
-  _hdpSaveNow(); // push cloud immédiat
+  _hdpSaveNow();
   toast('Image supprimée', 'ok');
 }
 
@@ -12541,16 +12734,18 @@ function _officialDocRefreshPreview() {
   var imgStyle = 'width:100%;height:100%;object-fit:contain;display:block';
   var svgPlaceholder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" style="color:var(--txt3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
 
-  // Miniatures en-tête / bas de page
+  // Miniatures en-tête / bas de page (via getter pour inclure les clés dédiées)
+  var hImg = _getOfficialDocImg('header');
+  var fImg = _getOfficialDocImg('footer');
   var hPrev = document.getElementById('regl-header-preview');
   var hDel  = document.getElementById('regl-header-del');
-  if (hPrev) hPrev.innerHTML = od.header ? '<img src="'+od.header+'" style="'+imgStyle+'">' : svgPlaceholder;
-  if (hDel)  hDel.style.display = od.header ? '' : 'none';
+  if (hPrev) hPrev.innerHTML = hImg ? '<img src="'+hImg+'" style="'+imgStyle+'">' : svgPlaceholder;
+  if (hDel)  hDel.style.display = hImg ? '' : 'none';
 
   var fPrev = document.getElementById('regl-footer-preview');
   var fDel  = document.getElementById('regl-footer-del');
-  if (fPrev) fPrev.innerHTML = od.footer ? '<img src="'+od.footer+'" style="'+imgStyle+'">' : svgPlaceholder;
-  if (fDel)  fDel.style.display = od.footer ? '' : 'none';
+  if (fPrev) fPrev.innerHTML = fImg ? '<img src="'+fImg+'" style="'+imgStyle+'">' : svgPlaceholder;
+  if (fDel)  fDel.style.display = fImg ? '' : 'none';
 
   // Repopuler les champs depuis S.officialDocs
   var fieldMap = { 'od-header-h':'headerHeight', 'od-footer-h':'footerHeight', 'od-mt':'marginTop', 'od-mb':'marginBottom', 'od-ml':'marginLeft', 'od-mr':'marginRight' };
@@ -12593,7 +12788,7 @@ function _officialDocRefreshPreview() {
     pHdr.style.bottom         = '';
     pHdr.style.justifyContent = justH;
     pHdr.innerHTML = od.header
-      ? '<img src="'+od.header+'" style="max-width:100%;max-height:'+(hPx-1)+'px;width:auto;height:auto;display:block">'
+      ? '<img src="'+_getOfficialDocImg('header')+'" style="max-width:100%;max-height:'+(hPx-1)+'px;width:auto;height:auto;display:block">'
       : '<span style="font-size:6px;color:#9ca3af;font-style:italic">En‑tête</span>';
   }
 
@@ -12607,7 +12802,7 @@ function _officialDocRefreshPreview() {
     pFtr.style.top            = '';
     pFtr.style.justifyContent = 'center';
     pFtr.innerHTML = od.footer
-      ? '<img src="'+od.footer+'" style="max-width:100%;max-height:'+(fPx-1)+'px;width:auto;height:auto;display:block;margin:0 auto">'
+      ? '<img src="'+_getOfficialDocImg('footer')+'" style="max-width:100%;max-height:'+(fPx-1)+'px;width:auto;height:auto;display:block;margin:0 auto">'
       : '<span style="font-size:6px;color:#9ca3af;font-style:italic">Bas de page</span>';
   }
 
@@ -12678,13 +12873,13 @@ function _openA4Doc(contentHtml, title, opts) {
   }
 
   var win = window.open('', '_blank', 'width=880,height=1120');
-  var hdrImg = od.header
+  var hdrImg = _getOfficialDocImg('header')
     ? '<div style="position:absolute;top:'+mt+'mm;left:'+ml+'mm;right:'+mr+'mm;text-align:'+hdrAlign+'">'
-      + '<img src="'+od.header+'" style="max-height:'+hh+'mm;max-width:100%;width:auto;height:auto"></div>'
+      + '<img src="'+_getOfficialDocImg('header')+'" style="max-height:'+hh+'mm;max-width:100%;width:auto;height:auto"></div>'
     : '';
-  var ftrImg = od.footer
+  var ftrImg = _getOfficialDocImg('footer')
     ? '<div style="position:absolute;bottom:'+mb+'mm;left:'+ml+'mm;right:'+mr+'mm;text-align:center">'
-      + '<img src="'+od.footer+'" style="max-height:'+fh+'mm;max-width:100%;width:auto;height:auto"></div>'
+      + '<img src="'+_getOfficialDocImg('footer')+'" style="max-height:'+fh+'mm;max-width:100%;width:auto;height:auto"></div>'
     : '';
 
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+(title||'Document')+'</title><style>');
@@ -13507,14 +13702,14 @@ function _officialDocWrap(innerHtml) {
   var posMap = { left:'left', center:'center', right:'right' };
   var hdrAlign = posMap[od.headerPos || 'left'] || 'left';
   // Header positionné à top = marge haut (pas top:0)
-  var hdr = od.header
+  var hdr = _getOfficialDocImg('header')
     ? '<div style="position:fixed;top:'+px(mt)+'px;left:'+leftPx+'px;right:'+rightPx+'px;z-index:100;text-align:'+hdrAlign+'">'
-      + '<img src="'+od.header+'" style="max-width:100%;max-height:'+px(hdrH)+'px;width:auto;height:auto;display:block;'+(hdrAlign==='center'?'margin:0 auto':hdrAlign==='right'?'margin-left:auto':'')+'"></div>'
+      + '<img src="'+_getOfficialDocImg('header')+'" style="max-width:100%;max-height:'+px(hdrH)+'px;width:auto;height:auto;display:block;'+(hdrAlign==='center'?'margin:0 auto':hdrAlign==='right'?'margin-left:auto':'')+'"></div>'
     : '';
   // Footer positionné à bottom = marge bas (pas bottom:0)
-  var ftr = od.footer
+  var ftr = _getOfficialDocImg('footer')
     ? '<div style="position:fixed;bottom:'+px(mb)+'px;left:'+leftPx+'px;right:'+rightPx+'px;z-index:100;text-align:center">'
-      + '<img src="'+od.footer+'" style="max-width:100%;max-height:'+px(ftrH)+'px;width:auto;height:auto;display:block;margin:0 auto"></div>'
+      + '<img src="'+_getOfficialDocImg('footer')+'" style="max-width:100%;max-height:'+px(ftrH)+'px;width:auto;height:auto;display:block;margin:0 auto"></div>'
     : '';
   return hdr + ftr + '<div style="padding:'+topPx+'px '+rightPx+'px '+botPx+'px '+leftPx+'px">'+innerHtml+'</div>';
 }
@@ -13557,14 +13752,14 @@ function officialDocPreview() {
   w.document.write('@media print{body{background:#fff;padding:0}.page{box-shadow:none;width:100%;min-height:0}.guide-h,.guide-v,.lbl{display:none}@page{margin:'+contentTop+'mm '+mr+'mm '+contentBot+'mm '+ml+'mm}}');
   w.document.write('</style></head><body><div class="page">');
   // Header
-  if (od.header) {
-    w.document.write('<div class="hdr"><img src="'+od.header+'" style="max-width:100%;max-height:'+hh+'mm;width:auto;height:auto"></div>');
+  if (_getOfficialDocImg('header')) {
+    w.document.write('<div class="hdr"><img src="'+_getOfficialDocImg('header')+'" style="max-width:100%;max-height:'+hh+'mm;width:auto;height:auto"></div>');
   } else {
     w.document.write('<div class="hdr" style="height:'+Math.max(hh,8)+'mm;border-bottom:1px dashed #d1d5db;align-items:center"><span style="font-size:8pt;color:#9ca3af;font-style:italic">En-tête non configuré</span></div>');
   }
   // Footer
-  if (od.footer) {
-    w.document.write('<div class="ftr"><img src="'+od.footer+'" style="max-width:100%;max-height:'+fh+'mm;width:auto;height:auto"></div>');
+  if (_getOfficialDocImg('footer')) {
+    w.document.write('<div class="ftr"><img src="'+_getOfficialDocImg('footer')+'" style="max-width:100%;max-height:'+fh+'mm;width:auto;height:auto"></div>');
   } else {
     w.document.write('<div class="ftr" style="height:'+Math.max(fh,8)+'mm;border-top:1px dashed #d1d5db;align-items:center;justify-content:center"><span style="font-size:8pt;color:#9ca3af;font-style:italic">Bas de page non configuré</span></div>');
   }
@@ -14168,6 +14363,13 @@ async function createAndInviteUser() {
     var el = document.getElementById(id); if (el) el.value = '';
   });
   renderUtilisateursTab();
+}
+
+// ── Accordéon Réglages ──────────────────────────────────
+function _tRS(hd) {
+  var bd = hd.nextElementSibling;
+  var open = hd.classList.toggle('open');
+  bd.style.display = open ? '' : 'none';
 }
 
 var _utilSortDir = 'profil'; // 'profil' | 'az' | 'za'
@@ -20784,10 +20986,9 @@ function removeSplashLogo() {
 }
 function renderReglagesLogoSection() {
   var isGest = canManageUsers();
-  var sec  = document.getElementById('splash-logo-section');
-  var card = document.getElementById('splash-logo-card');
-  if (sec)  sec.style.display  = isGest ? '' : 'none';
-  if (card) card.style.display = isGest ? '' : 'none';
+  // Le wrapper .regl-sec porte l'id — la card est toujours dans le corps de l'accordéon
+  var sec = document.getElementById('splash-logo-section');
+  if (sec) sec.style.display = isGest ? '' : 'none';
   if (!isGest) return;
   var preview = document.getElementById('regl-logo-preview');
   if (!preview) return;
