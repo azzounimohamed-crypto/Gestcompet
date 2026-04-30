@@ -2928,6 +2928,8 @@ const LS = 'geststol';  // Clé unique et définitive
 const LS_CRITICAL = 'geststol_critical'; // Réglages critiques — jamais strippés, jamais écrasés
 const LS_OD_HEADER = 'geststol_od_header'; // Image en-tête docs officiels — clé dédiée (même méthode que ffplum_logo)
 const LS_OD_FOOTER = 'geststol_od_footer'; // Image bas de page docs officiels — clé dédiée
+const LS_BUDGETS   = 'geststol_budgets';   // Sauvegarde dédiée du budget (jamais stripée, jamais écrasée)
+const LS_TODOS     = 'geststol_todos';     // Sauvegarde dédiée des À faire (jamais stripée, jamais écrasée)
 
 // Getter centralisé pour les images officialDocs (S > clé dédiée localStorage)
 function _getOfficialDocImg(zone) {
@@ -2937,12 +2939,15 @@ function _getOfficialDocImg(zone) {
 
 // ── Sauvegarde des réglages critiques dans une clé dédiée ──
 function _saveCritical() {
+  var od = S.officialDocs || {};
+  // 1. Sauvegarder les IMAGES dans leurs clés dédiées en premier (jamais écrasées par quota)
+  // Même méthode que ffplum_logo — chaque image a sa propre clé isolée
+  try { if (od.header) localStorage.setItem(LS_OD_HEADER, od.header); } catch(e) {}
+  try { if (od.footer) localStorage.setItem(LS_OD_FOOTER, od.footer); } catch(e) {}
+  // 2. Sauvegarder la config (sans images) + poleSport dans geststol_critical
   try {
-    var od = S.officialDocs || {};
     var backup = {
       officialDocs: {
-        header:       od.header       || null,
-        footer:       od.footer       || null,
         headerHeight: od.headerHeight !== undefined ? od.headerHeight : 20,
         headerPos:    od.headerPos    || 'left',
         footerHeight: od.footerHeight !== undefined ? od.footerHeight : 15,
@@ -2963,9 +2968,9 @@ function _restoreCritical() {
     var raw = localStorage.getItem(LS_CRITICAL);
     if (!raw) return;
     var bk = JSON.parse(raw);
-    // officialDocs : local prioritaire, backup comble les null/undefined
+    // officialDocs config (hauteurs, marges, position) — images dans clés dédiées
+    if (!S.officialDocs) S.officialDocs = {};
     if (bk.officialDocs) {
-      if (!S.officialDocs) S.officialDocs = {};
       var od = bk.officialDocs;
       Object.keys(od).forEach(function(k) {
         if ((S.officialDocs[k] === null || S.officialDocs[k] === undefined) && od[k] !== null && od[k] !== undefined) {
@@ -2973,6 +2978,9 @@ function _restoreCritical() {
         }
       });
     }
+    // Images : lire depuis les clés dédiées (plus fiable que geststol_critical)
+    if (!S.officialDocs.header) { try { var _h=localStorage.getItem(LS_OD_HEADER); if(_h) S.officialDocs.header=_h; } catch(e){} }
+    if (!S.officialDocs.footer) { try { var _f=localStorage.getItem(LS_OD_FOOTER); if(_f) S.officialDocs.footer=_f; } catch(e){} }
     // poleSport : même logique
     if (bk.poleSport && Object.keys(bk.poleSport).length) {
       if (!S.settings) S.settings = {};
@@ -2981,6 +2989,39 @@ function _restoreCritical() {
       Object.keys(ps).forEach(function(k) {
         if (!S.settings.poleSport[k] && ps[k]) S.settings.poleSport[k] = ps[k];
       });
+    }
+  } catch(e) {}
+  // ── Restauration budget + À faire depuis clés dédiées (filet de sécurité) ──
+  try {
+    var _bk = localStorage.getItem(LS_BUDGETS);
+    if (_bk) {
+      var _bkParsed = JSON.parse(_bk);
+      if (!S.budgets || !Object.keys(S.budgets).length) {
+        S.budgets = _bkParsed; // Restauration complète si état vide
+      } else {
+        // Fusion : ajouter les compétitions absentes de l'état courant
+        Object.keys(_bkParsed).forEach(function(cid) {
+          if (!S.budgets[cid] || (!((S.budgets[cid].engagement||[]).length) && !((S.budgets[cid].ressources||[]).length))) {
+            S.budgets[cid] = _bkParsed[cid];
+          }
+        });
+      }
+    }
+  } catch(e) {}
+  try {
+    var _tk = localStorage.getItem(LS_TODOS);
+    if (_tk) {
+      var _tkParsed = JSON.parse(_tk);
+      if (!S.homeTodosByComp || !Object.keys(S.homeTodosByComp).length) {
+        S.homeTodosByComp = _tkParsed; // Restauration complète si état vide
+      } else {
+        // Fusion : ajouter les compétitions absentes de l'état courant
+        Object.keys(_tkParsed).forEach(function(cid) {
+          if (!S.homeTodosByComp[cid] || !(S.homeTodosByComp[cid].length)) {
+            S.homeTodosByComp[cid] = _tkParsed[cid];
+          }
+        });
+      }
     }
   } catch(e) {}
 }
@@ -3187,7 +3228,7 @@ function clearLocalStorageQuota() {
   try {
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo') { localStorage.removeItem(k); return; }
+      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS) { localStorage.removeItem(k); return; }
     });
     // Retirer les photos des pilotes dans S
     if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
@@ -3236,6 +3277,9 @@ function _flushSaveState() {
   }
   // 3. Clé critique : toujours synchronisée (réglages docs + liens Pôle Sport)
   _saveCritical();
+  // 4. Clés dédiées budget + À faire (protection contre quota et merge cloud)
+  try { if (S.budgets) localStorage.setItem(LS_BUDGETS, JSON.stringify(S.budgets)); } catch(e) {}
+  try { if (S.homeTodosByComp) localStorage.setItem(LS_TODOS, JSON.stringify(S.homeTodosByComp)); } catch(e) {}
 }
 // Flush immédiat avant fermeture de page pour éviter toute perte de données
 window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
@@ -3407,7 +3451,8 @@ function warmupSecondaryPages() {
 
 function showPage(id) {
   // Toujours mettre à jour la visibilité des onglets Réglages (droits peuvent avoir changé)
-  if (id === 'page-settings') _refreshSettingsTabs();
+  // ET toujours recharger les valeurs Documents officiels (évite les valeurs par défaut après warmup)
+  if (id === 'page-settings') { _refreshSettingsTabs(); _officialDocRefreshPreview(); }
   if (_curPage === id && _pageRendered[id]) return;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var el = document.getElementById(id);
@@ -3866,9 +3911,13 @@ function saveComp() {
     saison: (document.getElementById('comp-date-from').value || '').substring(0,4) || '2026'
   };
   if (!comp.name || !comp.dateFrom) { toast('Nom et date début requis', 'err'); return; }
+  // Aligner nom et name, marquer comme personnalisé (protège contre l'écrasement par sync B44)
+  comp.nom = comp.name;
+  comp._nameCustomized = true;
   if (id) {
     var idx = S.comps.findIndex(function(c){ return c.id === id; });
-    if (idx >= 0) S.comps[idx] = comp;
+    // Fusionner plutôt que remplacer pour préserver _base44Id, lat, lng, etc.
+    if (idx >= 0) S.comps[idx] = Object.assign({}, S.comps[idx], comp);
   } else {
     S.comps.unshift(comp);
   }
@@ -10360,8 +10409,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += bTabBtn('synthese','Solde');
     htmlB += '<div style="width:1px;height:18px;background:rgba(255,255,255,.12);flex-shrink:0;margin:0 3px"></div>';
     htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" title="Imprimer A4" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">🖨️ Impr.</button>';
-    htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" title="Export Excel" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">📊 Export</button>';
-    htmlB += '<label title="Charger Excel" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--stol);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📂 Import<input type="file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importBudgetExcel(event,\''+cpIdS2+'\')"></label>';
+    htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" title="Export tableur (CSV)" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">📊 CSV</button>';
+    htmlB += '<button onclick="exportBudgetJSON(\''+cpIdS2+'\')" title="Sauvegarde JSON (restauration fidèle)" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--stol);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt)\'">⬇ Sauveg.</button>';
+    htmlB += '<label title="Restaurer depuis sauvegarde JSON" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--stol);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">⬆ Restaurer<input type="file" accept=".json" style="display:none" onchange="importBudgetJSON(event,\''+cpIdS2+'\')"></label>';
+    htmlB += '<label title="Import tableur (CSV/Excel)" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📂 CSV<input type="file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importBudgetExcel(event,\''+cpIdS2+'\')"></label>';
     htmlB += '</div>';
     htmlB += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 12px 20px">';
 
@@ -11861,8 +11912,9 @@ function updateSyncHealthPill() {
     color = '#ef4444'; text = '☁️ Non config.';
     title = 'Supabase non configuré.';
   } else if (_lastPushFailed) {
-    color = '#ef4444'; text = '☁️ Erreur push';
-    title = 'Le dernier envoi vers le cloud a échoué. Vos données récentes ne sont pas sauvegardées en ligne.';
+    color = '#ef4444'; text = '⚠️ NON SAUVEGARDÉ';
+    title = 'ATTENTION : le dernier envoi vers le cloud a échoué. Vos données récentes ne sont PAS sauvegardées en ligne. Cliquez ici.';
+    _showSyncAlerte();
   } else if (sinceSync < 0 && sincePush < 0) {
     color = '#f59e0b'; text = '☁️ En attente';
     title = 'Synchronisation jamais effectuée. Cliquez ☁️ pour synchroniser.';
@@ -14370,6 +14422,9 @@ function _tRS(hd) {
   var bd = hd.nextElementSibling;
   var open = hd.classList.toggle('open');
   bd.style.display = open ? '' : 'none';
+  // Si on ouvre la section Documents officiels, toujours rafraîchir l'aperçu
+  // (les images peuvent avoir été restaurées depuis IDB après le premier rendu)
+  if (open && bd.querySelector('#regl-doc-preview')) _officialDocRefreshPreview();
 }
 
 var _utilSortDir = 'profil'; // 'profil' | 'az' | 'za'
@@ -14968,15 +15023,21 @@ function _cleanupAllDuplicates() {
       ['engagement','ressources'].forEach(function(sec) {
         if (!Array.isArray(bgt[sec])) return;
         var tombs = ((S._deletedBudgetLines||{})[cid]||{})[sec]||{};
-        var byContent = {};
+        // Lignes avec id : dédup par id uniquement (préserver deux lignes identiques en contenu mais distinctes)
+        // Lignes sans id (ancien format) : dédup par contenu pour éviter les vrais doublons de sync
+        var byId = {}; var noId = []; var seenNoId = {};
         bgt[sec].forEach(function(l) {
           if (!l) return;
-          if (l.id && tombs[l.id]) return;
-          var ck = (l.domaine||'').trim().toLowerCase()+'|'+(l.libelle||'').trim().toLowerCase()
-                 +'|'+String(l.valeur||0)+'|'+String(l.nbjours||1)+'|'+String(l.qt||1);
-          if (!byContent[ck] || (l._updatedAt||0) >= (byContent[ck]._updatedAt||0)) byContent[ck] = l;
+          if (l.id) {
+            if (tombs[l.id]) return; // tombstone = supprimée intentionnellement
+            if (!byId[l.id] || (l._updatedAt||0) >= (byId[l.id]._updatedAt||0)) byId[l.id] = l;
+          } else {
+            var ck = (l.domaine||'').trim().toLowerCase()+'|'+(l.libelle||'').trim().toLowerCase()
+                   +'|'+String(l.valeur||0)+'|'+String(l.nbjours||1)+'|'+String(l.qt||1);
+            if (!seenNoId[ck]) { seenNoId[ck] = true; noId.push(l); }
+          }
         });
-        bgt[sec] = Object.values(byContent);
+        bgt[sec] = Object.values(byId).concat(noId);
       });
     });
   }
@@ -15207,16 +15268,19 @@ async function pullFromCloud() {
         S.partenaires[cid] = (S.partenaires[cid]||[]).filter(function(p){ return !tombs[p.id]; });
     });
   }
-  // officialDocs : objet plat (scalaires + base64), local prioritaire
+  // officialDocs : config + images — remote comble ce qui manque localement
   if (r.officialDocs && typeof r.officialDocs === 'object') {
     if (!S.officialDocs) S.officialDocs = {};
     var _rod = r.officialDocs;
     Object.keys(_rod).forEach(function(k) {
-      // Local prioritaire : ne prendre remote que si local est null/undefined
       if (S.officialDocs[k] === null || S.officialDocs[k] === undefined) {
         S.officialDocs[k] = _rod[k];
       }
     });
+    // ── Après pull : écrire les images dans les clés dédiées (même méthode que le logo)
+    // Garantit qu'elles survivent aux rechargements même si Supabase est indisponible
+    try { if (S.officialDocs.header) localStorage.setItem(LS_OD_HEADER, S.officialDocs.header); } catch(e) {}
+    try { if (S.officialDocs.footer) localStorage.setItem(LS_OD_FOOTER, S.officialDocs.footer); } catch(e) {}
   }
   S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
   // Settings — merge complet : local prioritaire, remote comble les trous
@@ -17705,7 +17769,8 @@ async function syncBase44Competitions() {
     });
     if (existing) {
       // Mise à jour sans écraser les données locales non vides
-      if (ev.title)                                  { existing.nom = ev.title; existing.name = ev.title; }
+      // Ne pas écraser un titre personnalisé manuellement par l'utilisateur
+      if (ev.title && !existing._nameCustomized)     { existing.nom = ev.title; existing.name = ev.title; }
       if (ev.start_date)                             existing.dateFrom                  = ev.start_date;
       if (ev.end_date)                               existing.dateTo                    = ev.end_date;
       if (ev.location_name)                          existing.lieu                      = ev.location_name;
@@ -17900,15 +17965,87 @@ function silentPush() {
   if (!getSB() || !navigator.onLine) return;
   _touchUpdatedAt();
   pushToCloud().then(function(){
-    _lastSyncAt   = Date.now();
-    _lastPushOkAt = Date.now();
+    _lastSyncAt     = Date.now();
+    _lastPushOkAt   = Date.now();
     _lastPushFailed = false;
+    _syncFailSince  = 0;
     updateSyncHealthPill();
+    // Sauvegarde locale de sécurité à chaque push réussi
+    _autoBackupLocal();
   }).catch(function(e){
     _lastPushFailed = true;
+    if (!_syncFailSince) _syncFailSince = Date.now();
     updateSyncHealthPill();
     console.warn('[silentPush] échec:', e);
   });
+}
+
+var _syncFailSince   = 0;
+var _syncAlerteShown = false;
+
+// ── Alerte bannière impossible à ignorer si échec cloud > 2 min ─────────────
+function _showSyncAlerte() {
+  if (_syncAlerteShown) return;
+  var failDur = _syncFailSince ? Math.round((Date.now() - _syncFailSince) / 1000) : 0;
+  if (failDur < 120) return; // attendre 2 min avant d'alerter
+  _syncAlerteShown = true;
+  var existing = document.getElementById('_sync-alerte-banner');
+  if (existing) return;
+  var div = document.createElement('div');
+  div.id = '_sync-alerte-banner';
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 4px 20px rgba(239,68,68,.5)';
+  div.innerHTML = '<span>⚠️ DONNÉES NON SAUVEGARDÉES SUR LE CLOUD depuis '+ Math.round(failDur/60) +'min — Téléchargez une sauvegarde immédiatement !</span>'
+    + '<div style="display:flex;gap:8px;flex-shrink:0">'
+    + '<button onclick="exportData()" style="background:#fff;color:#ef4444;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">⬇ Sauvegarder maintenant</button>'
+    + '<button onclick="_retrySyncAlerte()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">🔄 Réessayer</button>'
+    + '<button onclick="this.parentElement.parentElement.remove();_syncAlerteShown=false" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">✕</button>'
+    + '</div>';
+  document.body.appendChild(div);
+}
+
+function _retrySyncAlerte() {
+  var ban = document.getElementById('_sync-alerte-banner');
+  if (ban) ban.remove();
+  _syncAlerteShown = false;
+  _hdpSaveNow().then(function(){
+    _lastPushFailed = false;
+    _syncFailSince  = 0;
+    _syncAlerteShown = false;
+    toast('✅ Sauvegarde cloud réussie', 'ok');
+    updateSyncHealthPill();
+  }).catch(function(){
+    toast('❌ Échec — téléchargez la sauvegarde JSON', 'err');
+  });
+}
+
+// ── Sauvegarde locale automatique (IndexedDB externe) ────────────────────────
+// Conserve une copie dans LS_BACKUP à chaque push cloud réussi
+var LS_BACKUP_TS = 'geststol_backup_ts';
+function _autoBackupLocal() {
+  try {
+    // Ne sauvegarder que la config + métadonnées critiques (pas les images, elles ont leurs clés)
+    var snap = {
+      _backupAt: Date.now(),
+      comps:    (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
+      pilots:   (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
+      staff:    S.staff    || {},
+      compEnroll: S.compEnroll || {},
+      budgets:  S.budgets  || {},
+      homeTodosByComp: S.homeTodosByComp || {},
+      evenements: S.evenements || {},
+      officialDocs: {
+        headerHeight: (S.officialDocs||{}).headerHeight,
+        headerPos:    (S.officialDocs||{}).headerPos,
+        footerHeight: (S.officialDocs||{}).footerHeight,
+        marginTop:    (S.officialDocs||{}).marginTop,
+        marginBottom: (S.officialDocs||{}).marginBottom,
+        marginLeft:   (S.officialDocs||{}).marginLeft,
+        marginRight:  (S.officialDocs||{}).marginRight
+      }
+    };
+    localStorage.setItem('geststol_autobackup', JSON.stringify(snap));
+    localStorage.setItem(LS_BACKUP_TS, String(Date.now()));
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════
@@ -19475,17 +19612,26 @@ var _matModalCompId = null, _matModalId = null;
 function exportCompFull(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
+  // S.runs et S.staff sont des objets {compId:[...]} — ne pas les traiter comme des tableaux
+  var staffForComp = Array.isArray(S.staff)
+    ? S.staff.filter(function(s){ return s.compId===compId; })
+    : ((S.staff||{})[compId] || []);
+  var runsForComp  = (S.runs||{})[compId] || [];
+  var messagesForComp = Array.isArray(S.messages)
+    ? S.messages.filter(function(m){ return m.compId===compId; })
+    : ((S.messages||{})[compId] || []);
   var data = {
     _type: 'comp_full', _exportDate: new Date().toISOString(),
-    comp:       cp,
-    compEnroll: (S.compEnroll||{})[compId] || [],
-    runs:       (S.runs||[]).filter(function(r){ return r.compId===compId; }),
-    staff:      (S.staff||[]).filter(function(s){ return s.compId===compId; }),
-    materiel:   (S.materiel||{})[compId] || [],
+    comp:        cp,
+    compEnroll:  (S.compEnroll||{})[compId] || [],
+    runs:        runsForComp,
+    staff:       staffForComp,
+    homeTodos:   (S.homeTodosByComp||{})[compId] || [],
+    materiel:    (S.materiel||{})[compId] || [],
     evenements:  (S.evenements||{})[compId] || [],
     budgets:     (S.budgets||{})[compId] || {engagement:[],ressources:[]},
     partenaires: (S.partenaires||{})[compId] || [],
-    messages:    (S.messages||[]).filter(function(m){ return m.compId===compId; })
+    messages:    messagesForComp
   };
   var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   var a = document.createElement('a');
@@ -19511,23 +19657,32 @@ function importCompFull(inp, compId) {
         else { data.comp.id = compId; (S.comps=S.comps||[]).push(data.comp); }
       }
       if (data.compEnroll) { if(!S.compEnroll)S.compEnroll={}; S.compEnroll[compId] = data.compEnroll; }
+      // S.runs est un objet {compId:[...]}
       if (data.runs && data.runs.length) {
-        S.runs = (S.runs||[]).filter(function(r){ return r.compId!==compId; });
-        data.runs.forEach(function(r){ r.compId=compId; S.runs.push(r); });
+        if (!S.runs || typeof S.runs !== 'object') S.runs = {};
+        S.runs[compId] = data.runs.map(function(r){ return Object.assign({},r,{compId:compId}); });
       }
+      // S.staff est un objet {compId:[...]}
       if (data.staff && data.staff.length) {
-        S.staff = (S.staff||[]).filter(function(s){ return s.compId!==compId; });
-        data.staff.forEach(function(s){ s.compId=compId; S.staff.push(s); });
+        if (!S.staff || typeof S.staff !== 'object' || Array.isArray(S.staff)) S.staff = {};
+        S.staff[compId] = data.staff.map(function(s){ return Object.assign({},s,{compId:compId}); });
       }
+      if (data.homeTodos && data.homeTodos.length) { if(!S.homeTodosByComp)S.homeTodosByComp={}; S.homeTodosByComp[compId] = data.homeTodos; }
       if (data.materiel) { if(!S.materiel)S.materiel={}; S.materiel[compId] = data.materiel; }
       if (data.evenements) { if(!S.evenements)S.evenements={}; S.evenements[compId] = data.evenements; }
       if (data.budgets) { if(!S.budgets)S.budgets={}; S.budgets[compId] = data.budgets; }
       if (data.partenaires) { if(!S.partenaires)S.partenaires={}; S.partenaires[compId] = data.partenaires; }
       if (data.messages && data.messages.length) {
-        S.messages = (S.messages||[]).filter(function(m){ return m.compId!==compId; });
-        data.messages.forEach(function(m){ m.compId=compId; S.messages.push(m); });
+        // S.messages peut être tableau ou objet selon version
+        if (Array.isArray(S.messages)) {
+          S.messages = S.messages.filter(function(m){ return m.compId!==compId; });
+          data.messages.forEach(function(m){ S.messages.push(Object.assign({},m,{compId:compId})); });
+        } else {
+          if (!S.messages) S.messages = {};
+          S.messages[compId] = data.messages;
+        }
       }
-      saveState(); renderHomeDetailPanel(null); renderCompetitions();
+      saveState(); silentPush(); renderHomeDetailPanel(null); renderCompetitions();
       toast('Import compétition réussi ✓', 'ok');
     } catch(err) { toast('Fichier JSON invalide', 'err'); }
   };
@@ -20380,9 +20535,20 @@ async function exportData() {
     // 2. Fusionner avec S en cours (IDB fait autorité, S complète ce qui manque)
     var full = Object.assign({}, S, idbData || {});
     // 3. S'assurer que les champs de S qui ne sont pas dans IDB sont inclus
-    //    (officialDocs, documents, collectif, budgets, sitesSportifs…)
-    var keysToForceFromS = ['officialDocs','documents','collectif','budgets','sitesSportifs','messages','partenaires'];
+    var keysToForceFromS = ['documents','collectif','budgets','sitesSportifs','messages','partenaires'];
     keysToForceFromS.forEach(function(k) { if (S[k] !== undefined) full[k] = S[k]; });
+    // 4. officialDocs : merge intelligent — images depuis IDB/LS si S les a perdues
+    var _odIdb = (idbData && idbData.officialDocs) ? idbData.officialDocs : {};
+    full.officialDocs = Object.assign({}, _odIdb, S.officialDocs || {});
+    // Garantir les images (depuis IDB ou clés dédiées si S ne les a pas)
+    if (!full.officialDocs.header) {
+      if (_odIdb.header) full.officialDocs.header = _odIdb.header;
+      else { try { var _eh=localStorage.getItem(LS_OD_HEADER); if(_eh) full.officialDocs.header=_eh; } catch(e){} }
+    }
+    if (!full.officialDocs.footer) {
+      if (_odIdb.footer) full.officialDocs.footer = _odIdb.footer;
+      else { try { var _ef=localStorage.getItem(LS_OD_FOOTER); if(_ef) full.officialDocs.footer=_ef; } catch(e){} }
+    }
     // 4. Ajouter métadonnées de migration
     full._exportMeta = {
       date: new Date().toISOString(),
@@ -21595,6 +21761,61 @@ function importBudgetExcel(evt, compId) {
     saveState(); _hdpSaveNow();
     _refreshBudgetView();
     toast((eng.length+res.length)+' lignes importées ✓','ok');
+  };
+  reader.readAsText(file, 'UTF-8');
+  evt.target.value = '';
+}
+
+// ── Export / Import JSON budget (sauvegarde fidèle, restauration sans perte) ──
+function exportBudgetJSON(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (!cp) return;
+  var bdata = (S.budgets||{})[compId] || {engagement:[], ressources:[]};
+  var payload = {
+    _exportMeta: { date: Date.now(), comp: cp.name||compId, version: 1 },
+    compId: compId,
+    compName: cp.name || cp.nom || compId,
+    budget: bdata
+  };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Budget_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  toast('Sauvegarde budget téléchargée ✓','ok');
+}
+
+function importBudgetJSON(evt, compId) {
+  var file = evt.target.files && evt.target.files[0];
+  if (!file) { return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      var bdata = data.budget || data; // Compatibilité: fichier direct ou enveloppé
+      if (!bdata.engagement && !bdata.ressources) { toast('Format invalide — fichier non reconnu','err'); return; }
+      if (!S.budgets) S.budgets = {};
+      var existing = S.budgets[compId] || {engagement:[], ressources:[]};
+      // Fusion : ajouter les lignes absentes (par id) sans écraser ce qui existe
+      ['engagement','ressources'].forEach(function(sec) {
+        var src = Array.isArray(bdata[sec]) ? bdata[sec] : [];
+        var dst = Array.isArray(existing[sec]) ? existing[sec] : [];
+        var dstIds = {};
+        dst.forEach(function(l){ if (l.id) dstIds[l.id] = true; });
+        src.forEach(function(l) {
+          if (!l) return;
+          if (l.id && dstIds[l.id]) return; // déjà présente
+          dst.push(l);
+        });
+        existing[sec] = dst;
+      });
+      S.budgets[compId] = existing;
+      saveState(); silentPush();
+      var total = (existing.engagement||[]).length + (existing.ressources||[]).length;
+      toast(total+' lignes budget restaurées ✓','ok');
+      // Rafraîchir l'affichage
+      if (typeof renderCompDetail === 'function') renderCompDetail(_currentCompId);
+    } catch(err) { toast('Fichier JSON invalide','err'); }
   };
   reader.readAsText(file, 'UTF-8');
   evt.target.value = '';
@@ -23125,7 +23346,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     S.docSettings.police = 'Arial,Helvetica,sans-serif';
   }
   _cleanupAllDuplicates(); // nettoyage au démarrage avant toute injection
-  injectMaisoncelles2026();
+  // injectMaisoncelles2026() supprimé — la compétition est réelle et vit dans les données Supabase/localStorage
   injectCalendrier2026();
   injectCalendrierFull();
   _cleanupAllDuplicates(); // second passage après injections
