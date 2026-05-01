@@ -1412,6 +1412,16 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
                   <strong>Fusionner</strong> : gère les doublons · <strong style="color:#ef4444">Remplacer tout</strong> : écrase toutes les données locales
                 </div>
               </div>
+              <!-- Restauration depuis backup Supabase horodaté -->
+              <div style="margin-top:12px;padding:10px 12px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.25);border-radius:10px">
+                <div style="font-size:10px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">🕐 Backups automatiques cloud (7 jours)</div>
+                <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;line-height:1.5">
+                  Chaque modification est copiée automatiquement sur Supabase avec un horodatage. En cas de perte, restaurez n'importe quelle copie.
+                </div>
+                <button class="btn btn-sm" style="width:100%;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981;font-size:11px" onclick="showCloudBackups()">
+                  🕐 Voir et restaurer les copies cloud
+                </button>
+              </div>
               <div id="localstorage-info" style="margin-top:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;font-size:10px;color:var(--txt3)"></div>
             </div>
           </div>
@@ -14888,6 +14898,25 @@ async function pushToCloud() {
   }
   if (lastErr) throw lastErr;
   S._lastPushAt = payload._pushAt;
+
+  // ── Copie horodatée automatique — 7 jours de backups récupérables ──
+  // Même si data.json est écrasé/corrompu, les copies restent dans Supabase
+  try {
+    var now = new Date();
+    var pad = function(n){ return n < 10 ? '0'+n : String(n); };
+    // Clé : data_YYYY-MM-DD_HH.json — une copie par heure, max 168 fichiers (7j)
+    var backupKey = 'backups/data_'
+      + now.getUTCFullYear() + '-'
+      + pad(now.getUTCMonth()+1) + '-'
+      + pad(now.getUTCDate()) + '_'
+      + pad(now.getUTCHours()) + '.json';
+    var backupBlob = new Blob([jsonStr], { type: 'application/json' });
+    // Fire-and-forget : l'échec d'une copie ne bloque pas le push principal
+    sb.storage.from('gestappli-sync').upload(backupKey, backupBlob, {
+      upsert: true, contentType: 'application/json'
+    }).catch(function(e){ console.warn('[backup]', e.message||e); });
+  } catch(e) { /* silencieux — la copie est un bonus, pas bloquante */ }
+
   await _pushMedias(sb);
 }
 
@@ -15078,7 +15107,96 @@ function _cleanupAllDuplicates() {
   });
 }
 
-// ── PULL : lire le cloud → FUSIONNER avec local (jamais de perte de données) ──
+// ══════════════════════════════════════════════════════════════════════════════
+// CHARGEMENT INITIAL DEPUIS SUPABASE — Supabase est la source de vérité absolue
+// Appelé au démarrage AVANT tout rendu. Remplace l'état local entièrement.
+// Le localStorage n'est qu'un cache hors-ligne, jamais source principale.
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadFromSupabaseFirst() {
+  if (!navigator.onLine) return false;
+  var sb = getSB();
+  if (!sb) return false;
+
+  // Seuil minimal pour considérer les données comme valides
+  function _isDataValid(d) {
+    return d && typeof d === 'object' && Array.isArray(d.comps) && d.comps.length >= 2;
+  }
+
+  // Applique les données cloud dans S (remplace tout sauf données strictement locales)
+  function _applyCloudData(cloudData) {
+    var localUser     = S.user;
+    var localLicences = S.licenceDB;
+    var localAffiches = {};
+    var localPhotos   = {};
+    (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
+    (S.pilots  || []).forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo;   });
+    Object.keys(S).forEach(function(k) { delete S[k]; });
+    Object.assign(S, cloudData);
+    if (localUser)     S.user      = localUser;
+    if (localLicences) S.licenceDB = localLicences;
+    (S.comps   || []).forEach(function(c){ if (localAffiches[c.id]) c.affiche = localAffiches[c.id]; });
+    (S.pilots  || []).forEach(function(p){ if (localPhotos[p.id])   p.photo   = localPhotos[p.id];   });
+    if (!S.officialDocs) S.officialDocs = {};
+    if (!S.officialDocs.header) { try { var _h = localStorage.getItem(LS_OD_HEADER); if (_h) S.officialDocs.header = _h; } catch(e){} }
+    if (!S.officialDocs.footer) { try { var _f = localStorage.getItem(LS_OD_FOOTER); if (_f) S.officialDocs.footer = _f; } catch(e){} }
+  }
+
+  // Télécharge et parse un fichier depuis Supabase Storage
+  async function _downloadJSON(path) {
+    var r = await _withTimeout(sb.storage.from('gestappli-sync').download(path), 20000);
+    if (r.error || !r.data) return null;
+    var text = await r.data.text();
+    return JSON.parse(text);
+  }
+
+  try {
+    // ── Étape 1 : charger data.json (copie principale) ──
+    var cloudData = await _downloadJSON('data.json');
+
+    // ── Étape 2 : si vide ou invalide → chercher automatiquement la copie la plus récente ──
+    if (!_isDataValid(cloudData)) {
+      console.warn('[GestSTOL] data.json vide ou invalide — recherche automatique d\'une copie récente…');
+      try {
+        var listRes = await _withTimeout(
+          sb.storage.from('gestappli-sync').list('backups', { limit: 168, sortBy: { column: 'name', order: 'desc' } }),
+          15000
+        );
+        if (!listRes.error && listRes.data && listRes.data.length) {
+          // Les fichiers sont triés par nom décroissant → le premier est le plus récent
+          for (var i = 0; i < Math.min(listRes.data.length, 10); i++) {
+            var fname = listRes.data[i].name;
+            var candidate = await _downloadJSON('backups/' + fname);
+            if (_isDataValid(candidate)) {
+              console.warn('[GestSTOL] ✅ Données restaurées automatiquement depuis la copie:', fname);
+              cloudData = candidate;
+              // Réécrire data.json avec la bonne copie pour les prochains chargements
+              try {
+                var repairBlob = new Blob([JSON.stringify(cloudData)], {type:'application/json'});
+                sb.storage.from('gestappli-sync').upload('data.json', repairBlob, {upsert:true, contentType:'application/json'});
+              } catch(re){}
+              break;
+            }
+          }
+        }
+      } catch(le) { console.warn('[GestSTOL] Recherche backups:', le.message); }
+    }
+
+    if (!_isDataValid(cloudData)) {
+      console.warn('[GestSTOL] Aucune donnée valide dans Supabase — cache local conservé');
+      return false;
+    }
+
+    _applyCloudData(cloudData);
+    saveState();
+    console.log('[GestSTOL] ✅ Données Supabase chargées —', (S.comps||[]).length, 'compétitions,', (S.pilots||[]).length, 'pilotes');
+    return true;
+  } catch(e) {
+    console.warn('[GestSTOL] Supabase indisponible — cache local utilisé:', e.message);
+    return false;
+  }
+}
+
+// ── PULL : lire le cloud → FUSIONNER avec local (sync en cours de session) ──
 async function pullFromCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
   var result = await _withTimeout(
@@ -23339,17 +23457,21 @@ function injectCalendrierFull() {
 
 document.addEventListener('DOMContentLoaded', async function() {
   try {
+  // 1. Cache local (hors-ligne ou si Supabase indisponible)
   await loadState();
+  // 2. Supabase = source de vérité absolue — remplace le cache local si disponible
+  //    Ceci évite que le localStorage d'un ancien appareil écrase les données actuelles
+  await loadFromSupabaseFirst();
   // Migration police → Arial
   if (!S.docSettings) S.docSettings = {};
   if (!S.docSettings.police || S.docSettings.police.indexOf('Times') !== -1 || S.docSettings.police.indexOf('Georgia') !== -1 || S.docSettings.police.indexOf('Garamond') !== -1) {
     S.docSettings.police = 'Arial,Helvetica,sans-serif';
   }
-  _cleanupAllDuplicates(); // nettoyage au démarrage avant toute injection
-  // injectMaisoncelles2026() supprimé — la compétition est réelle et vit dans les données Supabase/localStorage
+  _cleanupAllDuplicates(); // nettoyage au démarrage
+  // injectMaisoncelles2026() supprimé — la compétition vit dans Supabase
   injectCalendrier2026();
   injectCalendrierFull();
-  _cleanupAllDuplicates(); // second passage après injections
+  _cleanupAllDuplicates();
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
@@ -23558,19 +23680,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderBase(); renderHome(); renderCompetitions();
         warmupSecondaryPages();
       }
-      var _sbStart = getSB();
-      if (_sbStart) {
-        pullFromCloud().then(function() {
-          _lastSyncAt = Date.now(); saveState();
-          // Réinitialiser la sélection pour pointer sur la compétition en cours / prochaine
-          _currentCompId = null;
-          renderBase(); renderHome(); renderCompetitions(); renderPilots(); updateHeader();
-          _refreshSettingsTabs(); // Actualiser les droits après sync cloud
-          warmupSecondaryPages();
-          // Mettre à jour le portail si affiché
-          if (document.getElementById('page-dtn').style.display !== 'none') showDTNPortal();
-        }).catch(function(){});
-      }
+      // pullFromCloud() au démarrage supprimé — loadFromSupabaseFirst() a déjà chargé
+      // les données depuis Supabase avant le rendu (source de vérité garantie).
+      // pullFromCloud() reste disponible pour la sync manuelle et périodique en session.
+      _lastSyncAt = Date.now();
     }
   }
   var photoSplash = document.getElementById('photo-splash');
