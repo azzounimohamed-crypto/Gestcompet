@@ -2201,6 +2201,39 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
 
+        <!-- ── SAUVEGARDE / RESTAURATION ── -->
+        <div class="section-title" style="padding:0 0 8px">💾 Sauvegarde &amp; Restauration</div>
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.5">
+            Téléchargez une sauvegarde complète de toutes vos données (équipages, partenaires, matériel, budgets, etc.).<br>
+            Conservez ce fichier comme archive de sécurité. Idéalement une fois par semaine.
+          </div>
+          <button class="btn btn-full btn-sm" onclick="exportGlobalBackup()" style="margin-bottom:8px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981;font-weight:700">
+            ⬇️ Télécharger sauvegarde complète (JSON)
+          </button>
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:6px;text-align:center">— ou restaurer depuis un fichier —</div>
+          <label style="display:block;text-align:center;cursor:pointer">
+            <span style="display:inline-block;padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#ef4444;font-size:12px;font-weight:700;cursor:pointer">
+              ⬆️ Restaurer depuis fichier JSON
+            </span>
+            <input type="file" accept=".json" style="display:none" onchange="importGlobalBackup(this)">
+          </label>
+          <div style="font-size:10px;color:var(--txt3);text-align:center;margin-top:6px">⚠️ La restauration remplace toutes les données actuelles</div>
+        </div>
+
+        <!-- ── HISTORIQUE DES SAUVEGARDES ── -->
+        <div class="section-title" style="padding:0 0 8px">🗓 Historique des sauvegardes cloud</div>
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.5">
+            Sauvegardes automatiques toutes les heures. Cliquez sur une entrée pour prévisualiser son contenu et la restaurer.<br>
+            <span style="color:var(--stol);font-weight:600">7 jours d'historique récupérables.</span>
+          </div>
+          <button class="btn btn-full btn-sm" onclick="loadBackupList()" style="margin-bottom:10px;background:rgba(0,87,255,.1);border:1px solid rgba(0,87,255,.25);color:var(--stol);font-weight:700">
+            🔍 Afficher l'historique des sauvegardes
+          </button>
+          <div id="backup-history-list"></div>
+        </div>
+
         <!-- ── BANNIÈRE AUTO-PROMOTION ── -->
         <div id="promo-gest-banner" style="display:none;background:rgba(0,87,255,.1);border:1px solid rgba(0,87,255,.25);border-radius:var(--rs);padding:12px 14px;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--stol);margin-bottom:4px">👑 Aucun gestionnaire défini</div>
@@ -14852,6 +14885,58 @@ function _withTimeout(promise, ms) {
 // ── PUSH : envoyer vers Supabase Storage (Option 2 — sans timeout PostgreSQL) ──
 async function pushToCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
+
+  // ══ GARDE ANTI-PERTE ══════════════════════════════════════════════════════
+  // Ne jamais pousser vers Supabase si des données critiques ont subitement disparu
+  // par rapport au dernier push réussi. Cela empêche l'écrasement accidentel du cloud.
+  (function _antiLossGuard() {
+    try {
+      var LS_LAST_COUNTS = 'geststol_last_push_counts';
+      var prevRaw = localStorage.getItem(LS_LAST_COUNTS);
+      var prev = prevRaw ? JSON.parse(prevRaw) : null;
+
+      function countStaff(obj) {
+        return Object.values(obj||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+      }
+      function countPartenaires(obj) {
+        return Object.values(obj||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+      }
+
+      var curStaff = countStaff(S.staff);
+      var curPart  = countPartenaires(S.partenaires);
+
+      if (prev) {
+        // Alerte si perte > 50% de staff ou partenaires vs dernier push réussi
+        if (prev.staff > 5 && curStaff === 0) {
+          console.error('[GestSTOL] 🚫 PUSH BLOQUÉ — staff vide (était', prev.staff, 'membres au dernier push)');
+          throw new Error('PUSH_BLOCKED_STAFF_EMPTY');
+        }
+        if (prev.staff > 5 && curStaff < prev.staff * 0.4) {
+          console.error('[GestSTOL] ⚠️ PUSH SUSPECT — staff chute de', prev.staff, 'à', curStaff);
+          // On laisse passer avec avertissement (peut être volontaire)
+        }
+        if (prev.partenaires > 3 && curPart === 0) {
+          console.error('[GestSTOL] 🚫 PUSH BLOQUÉ — partenaires vides (étaient', prev.partenaires, 'au dernier push)');
+          throw new Error('PUSH_BLOCKED_PARTENAIRES_EMPTY');
+        }
+      }
+
+      // Mémoriser les compteurs actuels pour le prochain push
+      localStorage.setItem(LS_LAST_COUNTS, JSON.stringify({
+        staff: curStaff,
+        partenaires: curPart,
+        comps: (S.comps||[]).length,
+        pilots: (S.pilots||[]).length,
+        at: Date.now()
+      }));
+    } catch(g) {
+      // Relancer uniquement si c'est notre erreur intentionnelle
+      if (g.message && g.message.indexOf('PUSH_BLOCKED') === 0) throw g;
+      // Sinon ignorer (la garde ne doit pas bloquer un push normal)
+    }
+  })();
+  // ═════════════════════════════════════════════════════════════════════════
+
   var payload = {
     comps:         S.comps.map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
     runs:          S.runs         || {},
@@ -14899,23 +14984,95 @@ async function pushToCloud() {
   if (lastErr) throw lastErr;
   S._lastPushAt = payload._pushAt;
 
-  // ── Copie horodatée automatique — 7 jours de backups récupérables ──
-  // Même si data.json est écrasé/corrompu, les copies restent dans Supabase
+  // ══ SAUVEGARDES HORODATÉES — RATE-LIMITÉES POUR MAÎTRISER LES COÛTS ═════
+  // Règle stricte : max 1 backup Storage par heure, max 1 snapshot DB par heure
+  // Vérification via localStorage → aucune opération inutile
+  // Coût mensuel estimé : ~168 fichiers × 4 Mo = 670 Mo Storage, ~24 snapshots DB/jour
+  var _bkPad = function(n){ return n < 10 ? '0'+n : String(n); };
+  var _bkNow = new Date();
+  // Clé horaire unique : YYYY-MM-DD_HH (même pour Storage et DB)
+  var _bkHourKey = _bkNow.getUTCFullYear() + '-'
+    + _bkPad(_bkNow.getUTCMonth()+1) + '-'
+    + _bkPad(_bkNow.getUTCDate()) + '_'
+    + _bkPad(_bkNow.getUTCHours());
+
+  // ── Backup Storage (max 1 fois par heure) ───────────────────────────────
   try {
-    var now = new Date();
-    var pad = function(n){ return n < 10 ? '0'+n : String(n); };
-    // Clé : data_YYYY-MM-DD_HH.json — une copie par heure, max 168 fichiers (7j)
-    var backupKey = 'backups/data_'
-      + now.getUTCFullYear() + '-'
-      + pad(now.getUTCMonth()+1) + '-'
-      + pad(now.getUTCDate()) + '_'
-      + pad(now.getUTCHours()) + '.json';
-    var backupBlob = new Blob([jsonStr], { type: 'application/json' });
-    // Fire-and-forget : l'échec d'une copie ne bloque pas le push principal
-    sb.storage.from('gestappli-sync').upload(backupKey, backupBlob, {
-      upsert: true, contentType: 'application/json'
-    }).catch(function(e){ console.warn('[backup]', e.message||e); });
-  } catch(e) { /* silencieux — la copie est un bonus, pas bloquante */ }
+    var LS_LAST_STORAGE_BK = 'geststol_last_storage_bk';
+    var lastStorageBk = localStorage.getItem(LS_LAST_STORAGE_BK) || '';
+    if (lastStorageBk !== _bkHourKey) {
+      // Pas encore sauvegardé cette heure → on upload
+      var backupKey = 'backups/data_' + _bkHourKey + '.json';
+      var backupBlob = new Blob([jsonStr], { type: 'application/json' });
+      sb.storage.from('gestappli-sync').upload(backupKey, backupBlob, {
+        upsert: true, contentType: 'application/json'
+      }).then(function(r){
+        if (!r.error) {
+          try { localStorage.setItem(LS_LAST_STORAGE_BK, _bkHourKey); } catch(e){}
+          console.log('[backup Storage] ✅', backupKey);
+        }
+      }).catch(function(e){ console.warn('[backup Storage]', e.message||e); });
+    }
+    // Conserver max 7 jours = 168 fichiers → purge silencieuse des anciens
+    // (Supabase Storage ne facture que l'espace occupé, pas les deletes)
+    var _purge7dKey = (function(){
+      var old = new Date(_bkNow.getTime() - 7*24*3600*1000);
+      return old.getUTCFullYear() + '-' + _bkPad(old.getUTCMonth()+1) + '-'
+           + _bkPad(old.getUTCDate()) + '_' + _bkPad(old.getUTCHours());
+    })();
+    var _oldKey = 'backups/data_' + _purge7dKey + '.json';
+    sb.storage.from('gestappli-sync').remove([_oldKey])
+      .catch(function(){ /* silencieux — fichier peut ne pas exister */ });
+  } catch(e) { /* silencieux */ }
+
+  // ── Snapshot table stol_shared — ÉCONOMIQUE : 1 fois par JOUR maxi ────────
+  // • 'global'     : état courant, TOUJOURS mis à jour (nécessaire pour multi-appareils)
+  // • 'v_YYYYMMDD' : snapshot QUOTIDIEN (max 7 lignes × ~4 Mo = ~28 Mo DB — très raisonnable)
+  //
+  // Pourquoi quotidien et pas horaire ?
+  //   Horaire = 168 lignes × 4 Mo = 672 Mo → dépasse le plan Supabase Free (500 Mo DB)
+  //   Quotidien =   7 lignes × 4 Mo =  28 Mo → très bien dans toute formule
+  //   Récupération horaire = via les fichiers Storage backups/ (1 par heure, 7 jours)
+  try {
+    var LS_LAST_TABLE_BK = 'geststol_last_table_bk';
+    // Clé QUOTIDIENNE : YYYY-MM-DD (pas YYYY-MM-DD_HH)
+    var _bkDayKey = _bkNow.getUTCFullYear() + '-'
+      + _bkPad(_bkNow.getUTCMonth()+1) + '-'
+      + _bkPad(_bkNow.getUTCDate());
+    var lastTableBk = localStorage.getItem(LS_LAST_TABLE_BK) || '';
+    var versionId = 'v_' + _bkDayKey.replace(/-/g,'');  // ex: v_20260501
+    var tsNow = new Date().toISOString();
+
+    (async function() {
+      try {
+        // 1. Ligne 'global' — toujours remplacée (état courant, multi-appareils)
+        await sb.from('stol_shared').upsert(
+          { id: 'global', data: payload, updated_at: tsNow },
+          { onConflict: 'id' }
+        );
+        // 2. Snapshot quotidien — seulement si pas encore fait aujourd'hui
+        if (lastTableBk !== _bkDayKey) {
+          await sb.from('stol_shared').upsert(
+            { id: versionId, data: payload, updated_at: tsNow },
+            { onConflict: 'id' }
+          );
+          try { localStorage.setItem(LS_LAST_TABLE_BK, _bkDayKey); } catch(e){}
+          console.log('[backup Table] ✅ snapshot quotidien', versionId);
+
+          // 3. Purge des snapshots > 7 jours (1 fois par jour, opération légère)
+          var purgeLimit = new Date(_bkNow.getTime() - 7*24*3600*1000);
+          var purgeLimitId = 'v_'
+            + purgeLimit.getUTCFullYear()
+            + _bkPad(purgeLimit.getUTCMonth()+1)
+            + _bkPad(purgeLimit.getUTCDate());
+          sb.from('stol_shared')
+            .delete().like('id','v_%').lt('id', purgeLimitId)
+            .then(function(){}).catch(function(e){ console.warn('[stol_shared purge]', e.message||e); });
+        }
+      } catch(dbe) { console.warn('[stol_shared] push table échoué:', dbe.message||dbe); }
+    })();
+  } catch(e) { /* silencieux */ }
+  // ═════════════════════════════════════════════════════════════════════════
 
   await _pushMedias(sb);
 }
@@ -15122,7 +15279,22 @@ async function loadFromSupabaseFirst() {
     return d && typeof d === 'object' && Array.isArray(d.comps) && d.comps.length >= 2;
   }
 
+  // ── Compteurs pour comparaison local vs cloud ──
+  function _countStaff(d) {
+    var st = (d && d.staff) || {};
+    return Object.values(st).reduce(function(t,a){ return t + (Array.isArray(a)?a.length:0); }, 0);
+  }
+  function _countPartenaires(d) {
+    var pt = (d && d.partenaires) || {};
+    return Object.values(pt).reduce(function(t,a){ return t + (Array.isArray(a)?a.length:0); }, 0);
+  }
+  function _countMaterielNamed(d) {
+    var mt = (d && d.materiel) || {};
+    return Object.values(mt).reduce(function(t,a){ return t + (Array.isArray(a)?a.filter(function(i){ return i&&(i.nom||i.name); }).length:0); }, 0);
+  }
+
   // Applique les données cloud dans S (remplace tout sauf données strictement locales)
+  // GARDE ANTI-PERTE : si le cloud a moins de données critiques que le local, on conserve le local
   function _applyCloudData(cloudData) {
     var localUser     = S.user;
     var localLicences = S.licenceDB;
@@ -15130,8 +15302,53 @@ async function loadFromSupabaseFirst() {
     var localPhotos   = {};
     (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
     (S.pilots  || []).forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo;   });
+
+    // ── Garde anti-perte : comparer les compteurs locaux vs cloud ──
+    var localStaff    = _countStaff(S);
+    var cloudStaff    = _countStaff(cloudData);
+    var localPart     = _countPartenaires(S);
+    var cloudPart     = _countPartenaires(cloudData);
+    var localMat      = _countMaterielNamed(S);
+    var cloudMat      = _countMaterielNamed(cloudData);
+
+    // Sauvegarder les champs locaux si le cloud en a moins (perte détectée)
+    var keepLocalStaff      = (localStaff > 0 && cloudStaff < localStaff);
+    var keepLocalPart       = (localPart  > 0 && cloudPart  < localPart);
+    var keepLocalMat        = (localMat   > 0 && cloudMat   < localMat);
+    var keepLocalBudgets    = false;
+    var keepLocalTodos      = false;
+
+    // Budgets : comparer lignes totales
+    var localBudgetLines = Object.values(S.budgets||{}).reduce(function(t,b){ return t + (typeof b==='object'?Object.values(b).reduce(function(t2,a){ return t2+(Array.isArray(a)?a.length:0); }, 0):0); }, 0);
+    var cloudBudgetLines = Object.values(cloudData.budgets||{}).reduce(function(t,b){ return t + (typeof b==='object'?Object.values(b).reduce(function(t2,a){ return t2+(Array.isArray(a)?a.length:0); }, 0):0); }, 0);
+    if (localBudgetLines > 0 && cloudBudgetLines < localBudgetLines) keepLocalBudgets = true;
+
+    // Todos
+    var localTodoCount = Object.values(S.homeTodosByComp||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+    var cloudTodoCount = Object.values(cloudData.homeTodosByComp||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+    if (localTodoCount > 0 && cloudTodoCount < localTodoCount) keepLocalTodos = true;
+
+    if (keepLocalStaff)   console.warn('[GestSTOL] ⚠️ GARDE: staff local ('+localStaff+') > cloud ('+cloudStaff+') — local conservé');
+    if (keepLocalPart)    console.warn('[GestSTOL] ⚠️ GARDE: partenaires local ('+localPart+') > cloud ('+cloudPart+') — local conservé');
+    if (keepLocalMat)     console.warn('[GestSTOL] ⚠️ GARDE: matériel local ('+localMat+') > cloud ('+cloudMat+') — local conservé');
+    if (keepLocalBudgets) console.warn('[GestSTOL] ⚠️ GARDE: budgets local ('+localBudgetLines+') > cloud ('+cloudBudgetLines+') — local conservé');
+    if (keepLocalTodos)   console.warn('[GestSTOL] ⚠️ GARDE: todos local ('+localTodoCount+') > cloud ('+cloudTodoCount+') — local conservé');
+
+    var savedStaff   = keepLocalStaff   ? S.staff            : null;
+    var savedPart    = keepLocalPart    ? S.partenaires      : null;
+    var savedMat     = keepLocalMat     ? S.materiel         : null;
+    var savedBudgets = keepLocalBudgets ? S.budgets          : null;
+    var savedTodos   = keepLocalTodos   ? S.homeTodosByComp  : null;
+
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
+
+    if (savedStaff)   S.staff           = savedStaff;
+    if (savedPart)    S.partenaires     = savedPart;
+    if (savedMat)     S.materiel        = savedMat;
+    if (savedBudgets) S.budgets         = savedBudgets;
+    if (savedTodos)   S.homeTodosByComp = savedTodos;
+
     if (localUser)     S.user      = localUser;
     if (localLicences) S.licenceDB = localLicences;
     (S.comps   || []).forEach(function(c){ if (localAffiches[c.id]) c.affiche = localAffiches[c.id]; });
@@ -15179,6 +15396,32 @@ async function loadFromSupabaseFirst() {
           }
         }
       } catch(le) { console.warn('[GestSTOL] Recherche backups:', le.message); }
+    }
+
+    // ── Étape 3 : si toujours invalide → chercher dans les snapshots stol_shared versionnés ──
+    if (!_isDataValid(cloudData)) {
+      console.warn('[GestSTOL] Aucune donnée dans Storage — recherche dans snapshots table stol_shared…');
+      try {
+        var snapRes = await _withTimeout(
+          sb.from('stol_shared').select('id,data,updated_at').not('id','eq','global').order('updated_at', {ascending: false}).limit(10),
+          15000
+        );
+        if (!snapRes.error && snapRes.data && snapRes.data.length) {
+          for (var si = 0; si < snapRes.data.length; si++) {
+            var snap = snapRes.data[si];
+            if (_isDataValid(snap.data)) {
+              console.warn('[GestSTOL] ✅ Données restaurées depuis snapshot table:', snap.id);
+              cloudData = snap.data;
+              // Réécrire data.json
+              try {
+                var repairBlob2 = new Blob([JSON.stringify(cloudData)], {type:'application/json'});
+                sb.storage.from('gestappli-sync').upload('data.json', repairBlob2, {upsert:true, contentType:'application/json'});
+              } catch(re2){}
+              break;
+            }
+          }
+        }
+      } catch(se) { console.warn('[GestSTOL] Recherche snapshots table:', se.message); }
     }
 
     if (!_isDataValid(cloudData)) {
@@ -18141,16 +18384,30 @@ function _retrySyncAlerte() {
 var LS_BACKUP_TS = 'geststol_backup_ts';
 function _autoBackupLocal() {
   try {
-    // Ne sauvegarder que la config + métadonnées critiques (pas les images, elles ont leurs clés)
+    // Sauvegarde complète de toutes les données critiques (sans images base64)
     var snap = {
       _backupAt: Date.now(),
-      comps:    (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
-      pilots:   (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
-      staff:    S.staff    || {},
-      compEnroll: S.compEnroll || {},
-      budgets:  S.budgets  || {},
+      _version: 2,
+      comps:          (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
+      pilots:         (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
+      ulms:           S.ulms           || {},
+      staff:          S.staff          || {},
+      compEnroll:     S.compEnroll     || {},
+      budgets:        S.budgets        || {},
+      partenaires:    S.partenaires    || {},
+      materiel:       S.materiel       || {},
+      evenements:     S.evenements     || {},
       homeTodosByComp: S.homeTodosByComp || {},
-      evenements: S.evenements || {},
+      sitesSportifs:  S.sitesSportifs  || [],
+      collectif:      S.collectif      || [],
+      partenaireTypes: S.partenaireTypes || null,
+      documents:      (S.documents||[]).map(function(d){ var dd=Object.assign({},d); delete dd.base64; return dd; }),
+      runs:           S.runs           || {},
+      messages:       S.messages       || [],
+      _deletedComps:  S._deletedComps  || [],
+      _deletedStaff:  S._deletedStaff  || {},
+      _deletedPartenaires: S._deletedPartenaires || {},
+      _deletedBudgetLines: S._deletedBudgetLines || {},
       officialDocs: {
         headerHeight: (S.officialDocs||{}).headerHeight,
         headerPos:    (S.officialDocs||{}).headerPos,
@@ -18163,7 +18420,347 @@ function _autoBackupLocal() {
     };
     localStorage.setItem('geststol_autobackup', JSON.stringify(snap));
     localStorage.setItem(LS_BACKUP_TS, String(Date.now()));
-  } catch(e) {}
+  } catch(e) {
+    // Si quota dépassé, essayer sans runs (les plus volumineux)
+    try {
+      var snap2 = JSON.parse(localStorage.getItem('geststol_autobackup')||'{}');
+      snap2._backupAt = Date.now();
+      snap2.staff       = S.staff       || {};
+      snap2.partenaires = S.partenaires || {};
+      snap2.materiel    = S.materiel    || {};
+      snap2.budgets     = S.budgets     || {};
+      snap2.homeTodosByComp = S.homeTodosByComp || {};
+      localStorage.setItem('geststol_autobackup', JSON.stringify(snap2));
+      localStorage.setItem(LS_BACKUP_TS, String(Date.now()));
+    } catch(e2) {}
+  }
+}
+
+// ── Export global complet — télécharge un fichier JSON daté ──────────────────
+function exportGlobalBackup() {
+  try {
+    var d = new Date();
+    var pad = function(n){ return n < 10 ? '0'+n : ''+n; };
+    var dateStr = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())
+                +'_'+pad(d.getHours())+'h'+pad(d.getMinutes());
+    var payload = {
+      _exportAt: d.toISOString(),
+      _type: 'global_backup_v2',
+      comps:          (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
+      pilots:         (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
+      ulms:           S.ulms           || {},
+      staff:          S.staff          || {},
+      compEnroll:     S.compEnroll     || {},
+      budgets:        S.budgets        || {},
+      partenaires:    S.partenaires    || {},
+      materiel:       S.materiel       || {},
+      evenements:     S.evenements     || {},
+      homeTodosByComp: S.homeTodosByComp || {},
+      runs:           S.runs           || {},
+      messages:       S.messages       || [],
+      sitesSportifs:  S.sitesSportifs  || [],
+      collectif:      S.collectif      || [],
+      partenaireTypes: S.partenaireTypes || null,
+      documents:      S.documents      || [],
+      officialDocs:   S.officialDocs   || {},
+      docSettings:    S.docSettings    || {},
+      _deletedComps:  S._deletedComps  || [],
+      _deletedStaff:  S._deletedStaff  || {},
+      _deletedPartenaires: S._deletedPartenaires || {},
+      _deletedBudgetLines: S._deletedBudgetLines || {},
+      _deletedDocuments:   S._deletedDocuments   || {}
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    a.download = 'GestAppli_BACKUP_' + dateStr + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('✅ Sauvegarde complète téléchargée — ' + a.download, 'ok');
+  } catch(e) {
+    toast('Erreur export: ' + (e.message||e), 'err');
+  }
+}
+
+// ── Import global — restaure depuis un fichier JSON exporté ──────────────────
+async function importGlobalBackup(input) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  if (!confirm('⚠️ RESTAURATION COMPLÈTE\n\nToutes les données actuelles seront remplacées par celles du fichier.\n\nContinuer ?')) {
+    input.value = ''; return;
+  }
+  try {
+    var text = await file.text();
+    var data = JSON.parse(text);
+    if (!data || !Array.isArray(data.comps)) {
+      toast('Fichier invalide — structure non reconnue', 'err'); return;
+    }
+    // Préserver user local et images
+    var localUser = S.user;
+    var localLicences = S.licenceDB;
+    var localAffiches = {};
+    var localPhotos   = {};
+    (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
+    (S.pilots  || []).forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo;   });
+
+    Object.keys(S).forEach(function(k){ delete S[k]; });
+    Object.assign(S, data);
+    if (localUser)     S.user      = localUser;
+    if (localLicences) S.licenceDB = localLicences;
+    (S.comps   || []).forEach(function(c){ if (localAffiches[c.id]) c.affiche = localAffiches[c.id]; });
+    (S.pilots  || []).forEach(function(p){ if (localPhotos[p.id])   p.photo   = localPhotos[p.id];   });
+
+    saveState();
+    await _hdpSaveNow();
+    renderHome(); renderCompetitions(); renderPilots(); updateHeader();
+    toast('✅ Données restaurées depuis le fichier — ' + (S.comps||[]).length + ' compétitions, ' + (S.pilots||[]).length + ' pilotes', 'ok');
+    input.value = '';
+  } catch(e) {
+    toast('Erreur importation: ' + (e.message||e), 'err');
+    input.value = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HISTORIQUE DES SAUVEGARDES — Affichage et restauration par date/heure
+// Comme un système de base de données professionnel (FileMaker, PostgreSQL…)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Compteurs de résumé d'un objet de données ─────────────────────────────
+function _backupSummary(d) {
+  if (!d || typeof d !== 'object') return null;
+  var staffCount   = Object.values(d.staff||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); },0);
+  var partCount    = Object.values(d.partenaires||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); },0);
+  var matCount     = Object.values(d.materiel||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); },0);
+  var budgetLines  = Object.values(d.budgets||{}).reduce(function(t,b){
+    return t + (typeof b==='object'&&b ? Object.values(b).reduce(function(t2,a){ return t2+(Array.isArray(a)?a.length:0); },0) : 0);
+  },0);
+  var runCount = Object.values(d.runs||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); },0);
+  return {
+    comps:   (d.comps||[]).length,
+    pilots:  (d.pilots||[]).length,
+    staff:   staffCount,
+    partenaires: partCount,
+    materiel: matCount,
+    budgets: budgetLines,
+    runs:    runCount
+  };
+}
+
+// ── Charge et affiche la liste des sauvegardes disponibles ────────────────
+async function loadBackupList() {
+  var el = document.getElementById('backup-history-list');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;color:var(--txt3);padding:16px;font-size:12px">⏳ Chargement de l\'historique…</div>';
+
+  var sb = getSB();
+  if (!sb) { el.innerHTML = '<div style="color:var(--red);font-size:12px;text-align:center;padding:10px">❌ Supabase non disponible</div>'; return; }
+
+  try {
+    // 1. Récupérer les fichiers Storage (backups/)
+    var storageRes = await _withTimeout(
+      sb.storage.from('gestappli-sync').list('backups', { limit: 200, sortBy: { column: 'name', order: 'desc' } }),
+      15000
+    );
+    var storageFiles = (!storageRes.error && storageRes.data) ? storageRes.data : [];
+
+    // 2. Récupérer les snapshots de la table stol_shared (id commence par 'v_')
+    var tableRes = await _withTimeout(
+      sb.from('stol_shared').select('id,updated_at').like('id','v_%').order('updated_at',{ascending:false}).limit(300),
+      15000
+    );
+    var tableRows = (!tableRes.error && tableRes.data) ? tableRes.data : [];
+
+    // 3. Construire la liste unifiée
+    var backups = [];
+
+    storageFiles.forEach(function(f) {
+      // Nom attendu : data_YYYY-MM-DD_HH.json
+      var m = f.name.match(/^data_(\d{4}-\d{2}-\d{2})_(\d{2})\.json$/);
+      if (!m) return;
+      var isoStr = m[1] + 'T' + m[2] + ':00:00Z';
+      var dt = new Date(isoStr);
+      backups.push({ source: 'storage', key: f.name, date: dt, size: f.metadata ? (f.metadata.size||0) : 0 });
+    });
+
+    tableRows.forEach(function(r) {
+      // Nouveau format quotidien : v_YYYYMMDD (ex: v_20260501)
+      // Ancien format horaire    : v_YYYYMMDD_HHMM (compatibilité)
+      var mDay = r.id.match(/^v_(\d{4})(\d{2})(\d{2})$/);
+      var mHour = r.id.match(/^v_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})$/);
+      if (!mDay && !mHour) return;
+      var dt = new Date(r.updated_at);
+      var label = mDay
+        ? 'Snapshot quotidien'
+        : 'Snapshot ' + mHour[4] + 'h' + mHour[5];
+      backups.push({ source: 'table', key: r.id, date: dt, size: 0, label: label });
+    });
+
+    // Trier par date décroissante
+    backups.sort(function(a,b){ return b.date - a.date; });
+
+    if (backups.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:var(--txt3);padding:16px;font-size:12px">'
+        + 'Aucune sauvegarde disponible.<br>Les sauvegardes apparaîtront ici au fil des synchronisations.</div>';
+      return;
+    }
+
+    // 4. Grouper par jour
+    var days = {};   // { "Vendredi 1 mai 2026": [{...}, ...] }
+    var dOrder = []; // ordre d'insertion des jours
+    backups.forEach(function(b) {
+      var dayKey = b.date.toLocaleDateString('fr-FR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      if (!days[dayKey]) { days[dayKey] = []; dOrder.push(dayKey); }
+      days[dayKey].push(b);
+    });
+
+    // 5. Rendre le HTML
+    var html = '<div style="font-size:11px;color:var(--txt3);margin-bottom:8px;text-align:center">'
+             + backups.length + ' sauvegardes disponibles</div>';
+
+    dOrder.forEach(function(dayKey) {
+      html += '<div style="font-size:11px;font-weight:700;color:var(--stol);padding:8px 0 4px;border-top:2px solid rgba(0,87,255,.15)">'
+            + '📅 ' + _capitalize(dayKey) + '</div>';
+
+      days[dayKey].forEach(function(b) {
+        var timeStr  = b.date.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+        var srcIcon  = b.source === 'storage' ? '☁️' : '🗄️';
+        var srcLabel = b.source === 'storage'
+          ? 'Fichier cloud · ' + timeStr
+          : (b.label || 'Table base de données');
+        var sizeStr  = b.size > 0 ? ' · ' + (b.size/1024).toFixed(0) + ' Ko' : '';
+        var keyEsc   = b.key.replace(/'/g,"\\'");
+
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--brd)">'
+              +   '<span style="font-size:14px;flex-shrink:0">' + srcIcon + '</span>'
+              +   '<div style="flex:1;min-width:0">'
+              +     '<div style="font-size:13px;font-weight:700;color:var(--txt)">' + timeStr + '</div>'
+              +     '<div style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + srcLabel + sizeStr + '</div>'
+              +   '</div>'
+              +   '<button onclick="previewBackup(\''+b.source+'\',\''+keyEsc+'\')" '
+              +     'style="padding:5px 9px;border-radius:7px;border:1px solid var(--brd);background:transparent;'
+              +     'font-size:11px;cursor:pointer;color:var(--stol);font-weight:600;white-space:nowrap;flex-shrink:0">'
+              +     '🔍 Voir'
+              +   '</button>'
+              +   '<button onclick="restoreBackup(\''+b.source+'\',\''+keyEsc+'\')" '
+              +     'style="padding:5px 9px;border-radius:7px;border:none;background:var(--stol);color:#fff;'
+              +     'font-size:11px;cursor:pointer;font-weight:700;white-space:nowrap;flex-shrink:0;margin-left:4px">'
+              +     '↩ Restaurer'
+              +   '</button>'
+              + '</div>';
+      });
+    });
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);font-size:12px;padding:10px;text-align:center">Erreur : ' + (e.message||e) + '</div>';
+  }
+}
+
+function _capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : str; }
+
+// ── Télécharge les données d'une sauvegarde (Storage ou Table) ────────────
+async function _downloadBackupData(source, key) {
+  var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
+  if (source === 'storage') {
+    var r = await _withTimeout(sb.storage.from('gestappli-sync').download('backups/' + key), 30000);
+    if (r.error) throw new Error(r.error.message || 'Download error');
+    return JSON.parse(await r.data.text());
+  } else {
+    var r2 = await _withTimeout(sb.from('stol_shared').select('data').eq('id', key).single(), 15000);
+    if (r2.error) throw new Error(r2.error.message || 'Table error');
+    return r2.data.data;
+  }
+}
+
+// ── Prévisualiser le contenu d'une sauvegarde ─────────────────────────────
+async function previewBackup(source, key) {
+  toast('⏳ Chargement de la sauvegarde…', '');
+  try {
+    var data = await _downloadBackupData(source, key);
+    var s = _backupSummary(data);
+    if (!s) { toast('Données invalides dans cette sauvegarde', 'err'); return; }
+
+    var timeLabel = source === 'storage'
+      ? key.replace('data_','').replace('.json','').replace('_',' ')
+      : key.replace(/^v_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})$/, '$4:$5 le $3/$2/$1');
+
+    var msg = '📊 CONTENU DE LA SAUVEGARDE\n'
+            + '━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+            + '🕐 ' + timeLabel + '\n\n'
+            + '🏆 Compétitions    : ' + s.comps + '\n'
+            + '👤 Pilotes         : ' + s.pilots + '\n'
+            + '🧑‍✈️ Équipage/Staff  : ' + s.staff + ' membres\n'
+            + '🤝 Partenaires     : ' + s.partenaires + '\n'
+            + '📦 Matériel        : ' + s.materiel + ' articles\n'
+            + '💰 Lignes budget   : ' + s.budgets + '\n'
+            + '🏁 Manches (runs)  : ' + s.runs + '\n'
+            + '━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+            + 'Voulez-vous RESTAURER depuis cette sauvegarde ?\n'
+            + '⚠️ Les données actuelles seront remplacées.';
+
+    if (confirm(msg)) {
+      await _applyAndRestoreBackup(data, key);
+    }
+  } catch(e) {
+    toast('Erreur prévisualisation : ' + (e.message||e), 'err');
+  }
+}
+
+// ── Restaurer directement depuis une sauvegarde ───────────────────────────
+async function restoreBackup(source, key) {
+  var label = source === 'storage'
+    ? key.replace('data_','').replace('.json','')
+    : key;
+  if (!confirm('↩ RESTAURER depuis la sauvegarde\n"' + label + '" ?\n\nToutes les données actuelles seront remplacées.\nCette action est irréversible.')) return;
+
+  toast('⏳ Restauration en cours…', '');
+  try {
+    var data = await _downloadBackupData(source, key);
+    if (!data || !Array.isArray(data.comps)) { toast('Fichier de sauvegarde invalide', 'err'); return; }
+    await _applyAndRestoreBackup(data, key);
+  } catch(e) {
+    toast('Erreur restauration : ' + (e.message||e), 'err');
+  }
+}
+
+// ── Applique les données d'une sauvegarde dans S et pousse vers cloud ─────
+async function _applyAndRestoreBackup(data, sourceKey) {
+  // Préserver identité locale et images
+  var localUser     = S.user;
+  var localLicences = S.licenceDB;
+  var localAffiches = {};
+  var localPhotos   = {};
+  (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
+  (S.pilots  || []).forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo;   });
+
+  Object.keys(S).forEach(function(k){ delete S[k]; });
+  Object.assign(S, data);
+  if (localUser)     S.user      = localUser;
+  if (localLicences) S.licenceDB = localLicences;
+  (S.comps   || []).forEach(function(c){ if (localAffiches[c.id]) c.affiche = localAffiches[c.id]; });
+  (S.pilots  || []).forEach(function(p){ if (localPhotos[p.id])   p.photo   = localPhotos[p.id];   });
+
+  saveState();
+  try {
+    await pushToCloud();
+    _renderHdpSaveBanner('ok');
+  } catch(pe) {
+    console.warn('[restore] push cloud échoué:', pe.message);
+    _renderHdpSaveBanner('err');
+  }
+
+  // Recharger l'interface complète
+  if (typeof renderHome === 'function')          renderHome();
+  if (typeof renderCompetitions === 'function')  renderCompetitions();
+  if (typeof renderPilots === 'function')        renderPilots();
+  if (typeof updateHeader === 'function')        updateHeader();
+  if (typeof renderProfileCompte === 'function') renderProfileCompte();
+
+  var s = _backupSummary(S);
+  toast('✅ Restauration réussie — ' + s.comps + ' compétitions, ' + s.staff + ' membres équipage, '
+      + s.partenaires + ' partenaires' + (sourceKey ? ' (depuis ' + sourceKey + ')' : ''), 'ok');
 }
 
 // ═══════════════════════════════════
