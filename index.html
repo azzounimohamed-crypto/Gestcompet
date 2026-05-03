@@ -899,11 +899,16 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <div id="home-todo-title" style="font-size:14px;font-weight:800">✅ À faire</div>
           </div>
           <!-- Boutons d'action À faire – colonne verticale -->
-          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">
             <button onclick="event.stopPropagation();toggleHomeTodoPanel(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
-            <button onclick="event.stopPropagation();_todoPrint()" title="Imprimer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">🖨</button>
-            <button onclick="event.stopPropagation();_todoExport()" title="Exporter (JSON + CSV)" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬇</button>
-            <button onclick="event.stopPropagation();document.getElementById('_todo-import-inp').click()" title="Importer JSON" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬆</button>
+            <!-- Bouton menu ··· -->
+            <button id="todo-action-menu-btn" onclick="event.stopPropagation();_todoToggleMenu()" title="Actions" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:16px;line-height:1;cursor:pointer;font-family:inherit;letter-spacing:1px">⋮</button>
+            <!-- Menu déroulant -->
+            <div id="todo-action-menu" style="display:none;position:absolute;top:58px;right:0;z-index:400;background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);min-width:150px;padding:4px 0;flex-direction:column">
+              <button onclick="event.stopPropagation();_todoMenuAction('print')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">🖨 Imprimer</button>
+              <button onclick="event.stopPropagation();_todoMenuAction('export')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">⬇ Exporter</button>
+              <button onclick="event.stopPropagation();_todoMenuAction('import')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left">⬆ Importer</button>
+            </div>
             <input type="file" id="_todo-import-inp" accept=".json" style="display:none" onchange="_todoImport(this)">
           </div>
         </div>
@@ -7975,6 +7980,28 @@ function todoRenameDomaine(domId, btn) {
 }
 
 // ── Impression ──────────────────────────────────────────────────────────────
+function _todoToggleMenu() {
+  var menu = document.getElementById('todo-action-menu');
+  if (!menu) return;
+  var open = menu.style.display === 'flex';
+  menu.style.display = open ? 'none' : 'flex';
+  if (!open) {
+    /* Fermer en cliquant ailleurs */
+    setTimeout(function() {
+      document.addEventListener('click', function _closeMenu() {
+        menu.style.display = 'none';
+        document.removeEventListener('click', _closeMenu);
+      });
+    }, 0);
+  }
+}
+function _todoMenuAction(action) {
+  var menu = document.getElementById('todo-action-menu');
+  if (menu) menu.style.display = 'none';
+  if (action === 'print')  _todoPrint();
+  else if (action === 'export') _todoExport();
+  else if (action === 'import') document.getElementById('_todo-import-inp').click();
+}
 function _todoPrint() {
   var cp = _currentCompId ? (S.comps||[]).find(function(c){ return c.id===_currentCompId; }) : null;
   var todos = getHomeTodosForCurrentComp();
