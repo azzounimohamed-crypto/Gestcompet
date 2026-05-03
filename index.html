@@ -483,19 +483,6 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     font-size:12px;font-weight:700;cursor:pointer;font-family:inherit
   }
   body.theme-light #home-side-rail .rail-btn{background:#fff}
-  /* Bouton Documents fixe côté droit (visible uniquement quand À faire est ouvert) */
-  #home-doc-right-btn{
-    display:none;position:fixed;right:0;
-    top:0;bottom:0;width:40px;
-    writing-mode:vertical-lr;
-    z-index:261;background:var(--navy3);
-    border:1px solid var(--bdr);border-right:none;
-    border-radius:12px 0 0 12px;
-    color:var(--txt);font-size:12px;font-weight:700;
-    cursor:pointer;font-family:inherit;
-    align-items:center;justify-content:center;
-  }
-  body.theme-light #home-doc-right-btn{background:#fff}
   body.theme-light #home-todo-panel{background:#fff}
   #home-comp-drawer-backdrop{display:none!important}
   body.theme-light #home-col-left{background:#fff}
@@ -755,8 +742,6 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">À faire</button>
   </div>
 
-  <!-- Bouton Documents fixe côté droit -->
-  <button id="home-doc-right-btn" onclick="openResultsRail()">Documents</button>
 
   <!-- PULL-TO-REFRESH indicator (mobile uniquement) -->
   <div id="ptr-bar">
@@ -6589,20 +6574,32 @@ var _homeTodoPanelOpen = false;
 function syncHomeRailVisibility() {
   var rail = document.getElementById('home-side-rail');
   if (!rail) return;
-  var drawerOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
   var onHome = (_curPage === 'page-home');
   var desktop = window.innerWidth >= 768;
-  if (!desktop || drawerOpen) { rail.style.display = 'none'; }
-  else { rail.style.display = 'flex'; }
+  /* Cacher le rail si : mobile, pas sur home, ou les DEUX volets sont ouverts */
+  if (!desktop || !onHome || (_homeCompDrawerOpen && _homeTodoPanelOpen)) {
+    rail.style.display = 'none';
+    rail.style.removeProperty('position');
+    rail.style.removeProperty('left');
+    rail.style.removeProperty('top');
+    return;
+  }
+  rail.style.display = 'flex';
+  /* Quand À faire est ouvert : fixer le rail juste à sa droite */
+  if (_homeTodoPanelOpen) {
+    rail.style.position = 'fixed';
+    rail.style.left = '264px';
+    rail.style.top  = '120px';
+  } else {
+    rail.style.removeProperty('position');
+    rail.style.removeProperty('left');
+    rail.style.removeProperty('top');
+  }
   var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo      = document.getElementById('home-open-todo-btn');
-  if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
-  if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
-  /* Bouton Documents droit : visible sur page-home desktop sauf quand volet Documents ouvert */
-  var docRightBtn = document.getElementById('home-doc-right-btn');
-  if (docRightBtn) {
-    docRightBtn.style.display = (onHome && desktop && !_homeCompDrawerOpen) ? 'flex' : 'none';
-  }
+  /* Masquer le bouton déjà actif */
+  if (btnDocuments) btnDocuments.style.display = _homeCompDrawerOpen ? 'none' : '';
+  if (btnTodo)      btnTodo.style.display      = _homeTodoPanelOpen  ? 'none' : '';
 }
 function retourFromBase() {
   // S'assurer que l'app est visible (pas le portail DTN)
