@@ -487,18 +487,19 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
   #home-side-rail{
-    position:fixed;left:-44px;top:120px;z-index:261;
-    width:36px;display:flex;flex-direction:column;gap:8px
+    position:absolute;left:-44px;top:120px;z-index:261;
+    width:40px;display:flex;flex-direction:column;gap:8px
   }
-  /* Rail collé à droite quand À faire est ouvert */
+  /* Rail collé au bord droit du bloc app quand À faire est ouvert */
   #home-side-rail.rail-right{
-    left:auto!important;right:0!important;top:108px!important;
-    height:calc(100vh - 108px);
-    justify-content:center;
+    left:auto!important;right:-40px!important;
+    top:0!important;bottom:0!important;
+    height:100%!important;
+    justify-content:center;gap:4px;
   }
   #home-side-rail.rail-right .rail-btn{
-    border-radius:12px 0 0 12px;
-    min-height:80px;
+    border-radius:0 12px 12px 0;
+    min-height:80px;border-left:none;
   }
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
@@ -6595,19 +6596,19 @@ function syncHomeRailVisibility() {
 
   if (!desktop) { rail.style.display = 'none'; return; }
 
-  if (_homeTodoPanelOpen && !_homeCompDrawerOpen) {
-    // À faire ouvert à gauche → bouton Documents collé à droite
-    rail.style.display = onHome ? 'flex' : 'none';
+  if (_homeTodoPanelOpen && !_homeCompDrawerOpen && onHome) {
+    /* À faire ouvert → bouton Documents collé au bord droit du bloc */
+    rail.style.display = 'flex';
     rail.classList.add('rail-right');
-    if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
-    if (btnTodo)      btnTodo.style.display = 'none'; // déjà ouvert
+    if (btnDocuments) btnDocuments.style.display = '';
+    if (btnTodo)      btnTodo.style.display = 'none';
   } else if (_homeCompDrawerOpen || _homeTodoPanelOpen) {
-    // Les deux ouverts : masquer le rail
+    /* Un volet ouvert sans cohabitation → masquer le rail */
     rail.style.display = 'none';
     rail.classList.remove('rail-right');
   } else {
-    // Rien d'ouvert : rail standard à gauche
-    rail.style.display = 'flex';
+    /* Rien d'ouvert : rail standard à gauche */
+    rail.style.display = desktop ? 'flex' : 'none';
     rail.classList.remove('rail-right');
     if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
     if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
@@ -6738,7 +6739,16 @@ function toggleHomeTodoPanel(forceOpen) {
   if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
-  if (next) _applyPanelPos('home-todo-panel', 'todoPanel', 20, 120);
+  if (next && todoPanel) {
+    /* Forcer pleine hauteur gauche — ignorer position sauvegardée */
+    todoPanel.style.left        = '0px';
+    todoPanel.style.top         = '108px';
+    todoPanel.style.right       = 'auto';
+    todoPanel.style.bottom      = 'auto';
+    todoPanel.style.height      = (window.innerHeight - 108) + 'px';
+    todoPanel.style.maxHeight   = 'none';
+    todoPanel.style.borderRadius= '0 14px 14px 0';
+  }
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
