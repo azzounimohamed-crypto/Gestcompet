@@ -483,6 +483,19 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     font-size:12px;font-weight:700;cursor:pointer;font-family:inherit
   }
   body.theme-light #home-side-rail .rail-btn{background:#fff}
+  /* Bouton Documents fixe côté droit (visible uniquement quand À faire est ouvert) */
+  #home-doc-right-btn{
+    display:none;position:fixed;right:0;
+    top:108px;height:calc(100vh - 108px);width:40px;
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    z-index:261;background:var(--navy3);
+    border:1px solid var(--bdr);border-right:none;
+    border-radius:12px 0 0 12px;
+    color:var(--txt);font-size:12px;font-weight:700;
+    cursor:pointer;font-family:inherit;
+    align-items:center;justify-content:center;
+  }
+  body.theme-light #home-doc-right-btn{background:#fff}
   body.theme-light #home-todo-panel{background:#fff}
   #home-comp-drawer-backdrop{display:none!important}
   body.theme-light #home-col-left{background:#fff}
@@ -736,6 +749,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="home-open-comps-btn" class="rail-btn" onclick="openResultsRail()">Documents</button>
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">À faire</button>
   </div>
+
+  <!-- Bouton Documents fixe côté droit (affiché quand À faire est ouvert) -->
+  <button id="home-doc-right-btn" onclick="openResultsRail()">Documents</button>
 
   <!-- PULL-TO-REFRESH indicator (mobile uniquement) -->
   <div id="ptr-bar">
@@ -6658,6 +6674,8 @@ function toggleHomeCompDrawer(forceOpen) {
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeCompDrawerOpen;
   _homeTodoPanelOpen = false;
   if (todoPanel) todoPanel.classList.remove('open');
+  var docRightBtn = document.getElementById('home-doc-right-btn');
+  if (docRightBtn) docRightBtn.style.display = 'none';
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
   if (next) _applyPanelPos('home-col-left', 'docPanel', 20, 120);
@@ -6680,7 +6698,17 @@ function toggleHomeTodoPanel(forceOpen) {
   if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
-  if (next) _applyPanelPos('home-todo-panel', 'todoPanel', 20, 120);
+  if (next && todoPanel) {
+    todoPanel.style.left         = '0px';
+    todoPanel.style.top          = '108px';
+    todoPanel.style.right        = 'auto';
+    todoPanel.style.bottom       = 'auto';
+    todoPanel.style.height       = (window.innerHeight - 108) + 'px';
+    todoPanel.style.maxHeight    = 'none';
+    todoPanel.style.borderRadius = '0 14px 14px 0';
+  }
+  var docRightBtn = document.getElementById('home-doc-right-btn');
+  if (docRightBtn) docRightBtn.style.display = next ? 'flex' : 'none';
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
