@@ -755,7 +755,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button id="home-open-todo-btn" class="rail-btn" onclick="openTodoRail()">À faire</button>
   </div>
 
-  <!-- Bouton Documents fixe côté droit (affiché quand À faire est ouvert) -->
+  <!-- Bouton Documents fixe côté droit -->
   <button id="home-doc-right-btn" onclick="openResultsRail()">Documents</button>
 
   <!-- PULL-TO-REFRESH indicator (mobile uniquement) -->
@@ -889,8 +889,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       </div><!-- /home-col-left -->
       <div id="home-todo-panel">
         <!-- Drag handle -->
-        <div onmousedown="_panelDragStart(event,'home-todo-panel','todoPanel')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px 8px;cursor:move;user-select:none;flex-shrink:0;border-bottom:1px solid var(--bdr)">
-          <div style="display:flex;align-items:center;gap:8px">
+        <div onmousedown="_panelDragStart(event,'home-todo-panel','todoPanel')" style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 12px 8px;cursor:move;user-select:none;flex-shrink:0;border-bottom:1px solid var(--bdr)">
+          <div style="display:flex;align-items:center;gap:8px;padding-top:3px">
             <span style="display:flex;flex-direction:column;gap:3px;opacity:.4">
               <span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span>
               <span style="display:block;width:18px;height:2px;background:currentColor;border-radius:2px"></span>
@@ -898,13 +898,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             </span>
             <div id="home-todo-title" style="font-size:14px;font-weight:800">✅ À faire</div>
           </div>
-          <!-- Boutons d'action À faire -->
-          <div style="display:flex;align-items:center;gap:4px">
+          <!-- Boutons d'action À faire – colonne verticale -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <button onclick="event.stopPropagation();toggleHomeTodoPanel(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
             <button onclick="event.stopPropagation();_todoPrint()" title="Imprimer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">🖨</button>
             <button onclick="event.stopPropagation();_todoExport()" title="Exporter (JSON + CSV)" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬇</button>
             <button onclick="event.stopPropagation();document.getElementById('_todo-import-inp').click()" title="Importer JSON" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">⬆</button>
             <input type="file" id="_todo-import-inp" accept=".json" style="display:none" onchange="_todoImport(this)">
-            <button onclick="event.stopPropagation();toggleHomeTodoPanel(false)" title="Fermer" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;line-height:1;cursor:pointer;font-family:inherit">✕</button>
           </div>
         </div>
         <!-- Champ ajout domaine -->
@@ -6587,12 +6587,17 @@ function syncHomeRailVisibility() {
   var drawerOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
   var onHome = (_curPage === 'page-home');
   var desktop = window.innerWidth >= 768;
-  if (!desktop || drawerOpen) { rail.style.display = 'none'; return; }
-  rail.style.display = 'flex';
+  if (!desktop || drawerOpen) { rail.style.display = 'none'; }
+  else { rail.style.display = 'flex'; }
   var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo      = document.getElementById('home-open-todo-btn');
   if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
   if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
+  /* Bouton Documents droit : visible sur page-home desktop sauf quand volet Documents ouvert */
+  var docRightBtn = document.getElementById('home-doc-right-btn');
+  if (docRightBtn) {
+    docRightBtn.style.display = (onHome && desktop && !_homeCompDrawerOpen) ? 'flex' : 'none';
+  }
 }
 function retourFromBase() {
   // S'assurer que l'app est visible (pas le portail DTN)
@@ -6674,16 +6679,31 @@ function _applyPanelPos(elId, key, defX, defY) {
 function toggleHomeCompDrawer(forceOpen) {
   if (window.innerWidth < 768) return;
   var drawer = document.getElementById('home-col-left');
-  var todoPanel = document.getElementById('home-todo-panel');
   var btn = document.getElementById('home-open-comps-btn');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeCompDrawerOpen;
-  _homeTodoPanelOpen = false;
-  if (todoPanel) todoPanel.classList.remove('open');
-  var docRightBtn = document.getElementById('home-doc-right-btn');
-  if (docRightBtn) docRightBtn.style.display = 'none';
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
-  if (next) _applyPanelPos('home-col-left', 'docPanel', 20, 120);
+  if (next) {
+    if (_homeTodoPanelOpen) {
+      /* À faire est ouvert : placer Documents en miroir sur la droite */
+      drawer.setAttribute('style',
+        'position:fixed!important;' +
+        'right:0!important;left:auto!important;top:0!important;bottom:0!important;' +
+        'width:300px!important;height:auto!important;max-height:none!important;' +
+        'border-radius:14px 0 0 14px!important;' +
+        'opacity:1!important;visibility:visible!important;pointer-events:auto!important;' +
+        'display:flex!important;flex-direction:column!important;overflow:hidden!important;' +
+        'background:var(--navy2);border:1px solid var(--bdr);' +
+        'box-shadow:0 8px 40px rgba(0,0,0,.45);z-index:260;'
+      );
+    } else {
+      /* Position normale draggable */
+      drawer.removeAttribute('style');
+      _applyPanelPos('home-col-left', 'docPanel', 20, 120);
+    }
+  } else {
+    drawer.removeAttribute('style');
+  }
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
@@ -6699,9 +6719,12 @@ function toggleHomeTodoPanel(forceOpen) {
   var drawer = document.getElementById('home-col-left');
   var btn = document.getElementById('home-open-todo-btn');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeTodoPanelOpen;
-  _homeCompDrawerOpen = false;
-  if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
+  /* Si À faire se ferme et que Documents était en position droite, le remettre en position normale */
+  if (!next && _homeCompDrawerOpen && drawer) {
+    drawer.removeAttribute('style');
+    _applyPanelPos('home-col-left', 'docPanel', 20, 120);
+  }
   if (todoPanel) todoPanel.classList.toggle('open', next);
   if (todoPanel) {
     if (next) {
@@ -6743,8 +6766,6 @@ function toggleHomeTodoPanel(forceOpen) {
     todoList.style.overflowY = '';
     todoList.style.flex      = '';
   }
-  var docRightBtn = document.getElementById('home-doc-right-btn');
-  if (docRightBtn) docRightBtn.style.display = next ? 'flex' : 'none';
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
