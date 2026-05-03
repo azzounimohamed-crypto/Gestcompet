@@ -486,7 +486,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   /* Bouton Documents fixe côté droit (visible uniquement quand À faire est ouvert) */
   #home-doc-right-btn{
     display:none;position:fixed;right:0;
-    top:108px;bottom:0;width:40px;
+    top:0;bottom:0;width:40px;
     writing-mode:vertical-lr;
     z-index:261;background:var(--navy3);
     border:1px solid var(--bdr);border-right:none;
@@ -6705,17 +6705,13 @@ function toggleHomeTodoPanel(forceOpen) {
   if (todoPanel) todoPanel.classList.toggle('open', next);
   if (todoPanel) {
     if (next) {
-      var pageHome = document.getElementById('page-home');
-      var ph = pageHome ? pageHome.offsetHeight : (window.innerHeight - 108);
       todoPanel.setAttribute('style',
-        'position:absolute!important;' +
-        'left:0!important;top:0!important;right:auto!important;bottom:auto!important;' +
-        'width:260px!important;' +
-        'height:' + ph + 'px!important;' +
-        'max-height:none!important;' +
+        'position:fixed!important;' +
+        'left:0!important;top:0!important;bottom:0!important;right:auto!important;' +
+        'width:260px!important;height:auto!important;max-height:none!important;' +
         'border-radius:0 14px 14px 0!important;' +
         'opacity:1!important;visibility:visible!important;pointer-events:auto!important;' +
-        'display:flex!important;flex-direction:column!important;overflow:hidden!important;' +
+        'display:flex!important;flex-direction:column!important;' +
         'background:var(--navy2);border:1px solid var(--bdr);' +
         'box-shadow:0 8px 40px rgba(0,0,0,.45);z-index:260;'
       );
@@ -6723,12 +6719,13 @@ function toggleHomeTodoPanel(forceOpen) {
       todoPanel.removeAttribute('style');
     }
   }
-  /* Forcer la hauteur du list scrollable directement */
+  /* Hauteur explicite du list pour que l'ascenseur fonctionne */
   var todoList = document.getElementById('home-todo-list');
   if (todoList) {
     if (next) {
-      var listH = ph - 100;
+      var listH = window.innerHeight - 104;
       todoList.style.height      = Math.max(100, listH) + 'px';
+      todoList.style.maxHeight   = Math.max(100, listH) + 'px';
       todoList.style.overflowY   = 'scroll';
       todoList.style.flex        = 'none';
     } else {
