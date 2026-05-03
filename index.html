@@ -6711,28 +6711,37 @@ function toggleHomeTodoPanel(forceOpen) {
         'width:260px!important;height:auto!important;max-height:none!important;' +
         'border-radius:0 14px 14px 0!important;' +
         'opacity:1!important;visibility:visible!important;pointer-events:auto!important;' +
-        'display:flex!important;flex-direction:column!important;' +
+        'display:flex!important;flex-direction:column!important;overflow:hidden!important;' +
         'background:var(--navy2);border:1px solid var(--bdr);' +
         'box-shadow:0 8px 40px rgba(0,0,0,.45);z-index:260;'
       );
+      /* Calculer la hauteur du list APRÈS que le panel est rendu */
+      setTimeout(function() {
+        var tl = document.getElementById('home-todo-list');
+        var tp = document.getElementById('home-todo-panel');
+        if (tl && tp) {
+          var panelH = tp.offsetHeight;
+          var usedH  = 0;
+          var children = tp.children;
+          for (var i = 0; i < children.length; i++) {
+            if (children[i] !== tl) usedH += children[i].offsetHeight;
+          }
+          var listH = panelH - usedH - 2;
+          tl.style.height    = Math.max(80, listH) + 'px';
+          tl.style.maxHeight = Math.max(80, listH) + 'px';
+          tl.style.overflowY = 'scroll';
+          tl.style.flex      = 'none';
+        }
+      }, 50);
     } else {
       todoPanel.removeAttribute('style');
     }
   }
-  /* Hauteur explicite du list pour que l'ascenseur fonctionne */
   var todoList = document.getElementById('home-todo-list');
-  if (todoList) {
-    if (next) {
-      var listH = window.innerHeight - 104;
-      todoList.style.height      = Math.max(100, listH) + 'px';
-      todoList.style.maxHeight   = Math.max(100, listH) + 'px';
-      todoList.style.overflowY   = 'scroll';
-      todoList.style.flex        = 'none';
-    } else {
-      todoList.style.height    = '';
-      todoList.style.overflowY = '';
-      todoList.style.flex      = '';
-    }
+  if (todoList && !next) {
+    todoList.style.height    = '';
+    todoList.style.overflowY = '';
+    todoList.style.flex      = '';
   }
   var docRightBtn = document.getElementById('home-doc-right-btn');
   if (docRightBtn) docRightBtn.style.display = next ? 'flex' : 'none';
