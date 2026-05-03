@@ -463,6 +463,21 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     transition:opacity .18s ease,visibility 0s linear .18s;
     overflow:hidden;
   }
+  /* À faire : barre latérale gauche pleine hauteur */
+  #home-todo-panel{
+    left:0!important;top:108px!important;
+    height:calc(100vh - 108px)!important;
+    max-height:none!important;
+    border-radius:0 14px 14px 0!important;
+  }
+  /* Documents en mode droite : barre latérale droite pleine hauteur */
+  #home-col-left.right-mode{
+    left:auto!important;right:40px!important;
+    top:108px!important;
+    height:calc(100vh - 108px)!important;
+    max-height:none!important;
+    border-radius:14px 0 0 14px!important;
+  }
   #home-col-left.open,#home-todo-panel.open{
     opacity:1;visibility:visible;pointer-events:auto;
     transition:opacity .18s ease,visibility 0s;
@@ -472,8 +487,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
   #home-side-rail{
-    position:absolute;left:-44px;top:120px;z-index:26;
+    position:fixed;left:-44px;top:120px;z-index:261;
     width:36px;display:flex;flex-direction:column;gap:8px
+  }
+  /* Rail collé à droite quand À faire est ouvert */
+  #home-side-rail.rail-right{
+    left:auto!important;right:0!important;top:108px!important;
+    height:calc(100vh - 108px);
+    justify-content:center;
+  }
+  #home-side-rail.rail-right .rail-btn{
+    border-radius:12px 0 0 12px;
+    min-height:80px;
   }
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
@@ -6571,24 +6596,19 @@ function syncHomeRailVisibility() {
   if (!desktop) { rail.style.display = 'none'; return; }
 
   if (_homeTodoPanelOpen && !_homeCompDrawerOpen) {
-    // À faire ouvert à gauche → bouton Documents migre à droite
+    // À faire ouvert à gauche → bouton Documents collé à droite
     rail.style.display = onHome ? 'flex' : 'none';
-    rail.style.position = 'fixed';
-    rail.style.left  = 'auto';
-    rail.style.right = '4px';
-    rail.style.top   = '120px';
+    rail.classList.add('rail-right');
     if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
     if (btnTodo)      btnTodo.style.display = 'none'; // déjà ouvert
   } else if (_homeCompDrawerOpen || _homeTodoPanelOpen) {
-    // L'un ou l'autre ouvert (état normal de masquage)
+    // Les deux ouverts : masquer le rail
     rail.style.display = 'none';
+    rail.classList.remove('rail-right');
   } else {
     // Rien d'ouvert : rail standard à gauche
     rail.style.display = 'flex';
-    rail.style.position = 'absolute';
-    rail.style.left  = '-44px';
-    rail.style.right = 'auto';
-    rail.style.top   = '120px';
+    rail.classList.remove('rail-right');
     if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
     if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
   }
@@ -6686,17 +6706,18 @@ function toggleHomeCompDrawer(forceOpen) {
   if (drawer) drawer.classList.toggle('open', next);
   if (next) {
     if (todoWasOpen) {
-      // À faire déjà ouvert à gauche → Documents s'ouvre à droite
+      // À faire déjà ouvert à gauche → Documents s'ouvre collé à droite pleine hauteur
       var el = document.getElementById('home-col-left');
-      if (el) {
-        el.style.left   = (window.innerWidth - 320) + 'px';
-        el.style.top    = '120px';
-        el.style.right  = 'auto';
-        el.style.bottom = 'auto';
-      }
+      if (el) el.classList.add('right-mode');
     } else {
+      var el = document.getElementById('home-col-left');
+      if (el) el.classList.remove('right-mode');
       _applyPanelPos('home-col-left', 'docPanel', 20, 120);
     }
+  } else {
+    // Fermeture Documents : nettoyer right-mode
+    var el = document.getElementById('home-col-left');
+    if (el) el.classList.remove('right-mode');
   }
   _syncPanelOpen();
   syncHomeRailVisibility();
