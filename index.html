@@ -463,21 +463,6 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     transition:opacity .18s ease,visibility 0s linear .18s;
     overflow:hidden;
   }
-  /* À faire : barre latérale gauche pleine hauteur */
-  #home-todo-panel{
-    left:0!important;top:108px!important;
-    height:calc(100vh - 108px)!important;
-    max-height:none!important;
-    border-radius:0 14px 14px 0!important;
-  }
-  /* Documents en mode droite : barre latérale droite pleine hauteur */
-  #home-col-left.right-mode{
-    left:auto!important;right:40px!important;
-    top:108px!important;
-    height:calc(100vh - 108px)!important;
-    max-height:none!important;
-    border-radius:14px 0 0 14px!important;
-  }
   #home-col-left.open,#home-todo-panel.open{
     opacity:1;visibility:visible;pointer-events:auto;
     transition:opacity .18s ease,visibility 0s;
@@ -487,19 +472,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
   #home-side-rail{
-    position:absolute;left:-44px;top:120px;z-index:261;
-    width:40px;display:flex;flex-direction:column;gap:8px
-  }
-  /* Rail collé au bord droit du bloc app quand À faire est ouvert */
-  #home-side-rail.rail-right{
-    left:auto!important;right:-40px!important;
-    top:0!important;bottom:0!important;
-    height:100%!important;
-    justify-content:center;gap:4px;
-  }
-  #home-side-rail.rail-right .rail-btn{
-    border-radius:0 12px 12px 0;
-    min-height:80px;border-left:none;
+    position:absolute;left:-44px;top:120px;z-index:26;
+    width:36px;display:flex;flex-direction:column;gap:8px
   }
   #home-side-rail .rail-btn{
     writing-mode:vertical-rl;transform:rotate(180deg);
@@ -6589,30 +6563,15 @@ var _homeTodoPanelOpen = false;
 function syncHomeRailVisibility() {
   var rail = document.getElementById('home-side-rail');
   if (!rail) return;
+  var drawerOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
   var onHome = (_curPage === 'page-home');
   var desktop = window.innerWidth >= 768;
+  if (!desktop || drawerOpen) { rail.style.display = 'none'; return; }
+  rail.style.display = 'flex';
   var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo      = document.getElementById('home-open-todo-btn');
-
-  if (!desktop) { rail.style.display = 'none'; return; }
-
-  if (_homeTodoPanelOpen && !_homeCompDrawerOpen && onHome) {
-    /* À faire ouvert → bouton Documents collé au bord droit du bloc */
-    rail.style.display = 'flex';
-    rail.classList.add('rail-right');
-    if (btnDocuments) btnDocuments.style.display = '';
-    if (btnTodo)      btnTodo.style.display = 'none';
-  } else if (_homeCompDrawerOpen || _homeTodoPanelOpen) {
-    /* Un volet ouvert sans cohabitation → masquer le rail */
-    rail.style.display = 'none';
-    rail.classList.remove('rail-right');
-  } else {
-    /* Rien d'ouvert : rail standard à gauche */
-    rail.style.display = desktop ? 'flex' : 'none';
-    rail.classList.remove('rail-right');
-    if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
-    if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
-  }
+  if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
+  if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
 }
 function retourFromBase() {
   // S'assurer que l'app est visible (pas le portail DTN)
@@ -6697,29 +6656,11 @@ function toggleHomeCompDrawer(forceOpen) {
   var todoPanel = document.getElementById('home-todo-panel');
   var btn = document.getElementById('home-open-comps-btn');
   var next = (typeof forceOpen === 'boolean') ? forceOpen : !_homeCompDrawerOpen;
-  var todoWasOpen = _homeTodoPanelOpen;
-  if (!todoWasOpen) {
-    // Comportement normal : fermer todo, ouvrir docs à gauche
-    _homeTodoPanelOpen = false;
-    if (todoPanel) todoPanel.classList.remove('open');
-  }
+  _homeTodoPanelOpen = false;
+  if (todoPanel) todoPanel.classList.remove('open');
   _homeCompDrawerOpen = next;
   if (drawer) drawer.classList.toggle('open', next);
-  if (next) {
-    if (todoWasOpen) {
-      // À faire déjà ouvert à gauche → Documents s'ouvre collé à droite pleine hauteur
-      var el = document.getElementById('home-col-left');
-      if (el) el.classList.add('right-mode');
-    } else {
-      var el = document.getElementById('home-col-left');
-      if (el) el.classList.remove('right-mode');
-      _applyPanelPos('home-col-left', 'docPanel', 20, 120);
-    }
-  } else {
-    // Fermeture Documents : nettoyer right-mode
-    var el = document.getElementById('home-col-left');
-    if (el) el.classList.remove('right-mode');
-  }
+  if (next) _applyPanelPos('home-col-left', 'docPanel', 20, 120);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) {
@@ -6739,16 +6680,7 @@ function toggleHomeTodoPanel(forceOpen) {
   if (drawer) drawer.classList.remove('open');
   _homeTodoPanelOpen = next;
   if (todoPanel) todoPanel.classList.toggle('open', next);
-  if (next && todoPanel) {
-    /* Forcer pleine hauteur gauche — ignorer position sauvegardée */
-    todoPanel.style.left        = '0px';
-    todoPanel.style.top         = '108px';
-    todoPanel.style.right       = 'auto';
-    todoPanel.style.bottom      = 'auto';
-    todoPanel.style.height      = (window.innerHeight - 108) + 'px';
-    todoPanel.style.maxHeight   = 'none';
-    todoPanel.style.borderRadius= '0 14px 14px 0';
-  }
+  if (next) _applyPanelPos('home-todo-panel', 'todoPanel', 20, 120);
   _syncPanelOpen();
   syncHomeRailVisibility();
   if (btn) btn.setAttribute('aria-expanded', next ? 'true' : 'false');
