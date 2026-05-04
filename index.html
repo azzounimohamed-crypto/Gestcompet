@@ -9365,21 +9365,28 @@ function _ndfSyncBudget(omId) {
   var idNdf = 'ndf_km_'+omId;
   var ligneNdf = lines.find(function(l){ return l.id === idNdf; });
   if (ligneNdf) {
-    ligneNdf.valeur = montNdf;
-    ligneNdf.nomLie = fullName;
+    ligneNdf.valeur   = montNdf;
+    ligneNdf.nomLie   = fullName;
+    ligneNdf._updatedAt = Date.now();
   } else if (montNdf > 0) {
-    lines.push({ id:idNdf, domaine:'Frais déplacement', libelle:'NDF', nomLie:fullName, valeur:montNdf, nbjours:1, qt:1 });
+    lines.push({ id:idNdf, domaine:'Frais déplacement', libelle:'NDF', nomLie:fullName, valeur:montNdf, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() });
   }
   /* ── Ligne 2 : Repas ── */
   var idRepas = 'ndf_repas_'+omId;
   var ligneRepas = lines.find(function(l){ return l.id === idRepas; });
   if (ligneRepas) {
-    ligneRepas.valeur = repas;
-    ligneRepas.nomLie = fullName;
+    ligneRepas.valeur   = repas;
+    ligneRepas.nomLie   = fullName;
+    ligneRepas._updatedAt = Date.now();
   } else if (repas > 0) {
-    lines.push({ id:idRepas, domaine:'Frais déplacement', libelle:'Repas', nomLie:fullName, valeur:repas, nbjours:1, qt:1 });
+    lines.push({ id:idRepas, domaine:'Frais déplacement', libelle:'Repas', nomLie:fullName, valeur:repas, nbjours:1, qt:1, detail:'', _updatedAt:Date.now() });
   }
   saveState();
+  _hdpSaveNow();
+  toast('✅ Lignes NDF ajoutées dans Dépenses', 'ok');
+  /* Naviguer vers l'onglet Dépenses */
+  _budgetSubTab = 'engagement';
+  _refreshBudgetView();
 }
 
 /* ── NDF : mise à jour des champs + sync budget auto ───────────────────── */
