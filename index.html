@@ -472,7 +472,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-desktop-comps-section{flex:1!important;overflow-y:auto;min-height:0}
   #home-todo-list-wrap{flex:1!important;overflow-y:auto;min-height:0}
   #home-side-rail{
-    position:fixed;left:4px;top:130px;z-index:270;
+    position:absolute;left:-44px;top:120px;z-index:26;
     width:36px;display:flex;flex-direction:column;gap:8px
   }
   #home-side-rail .rail-btn{
@@ -6619,11 +6619,22 @@ function syncHomeRailVisibility() {
   if (!rail) return;
   var onHome = (_curPage === 'page-home');
   var desktop = window.innerWidth >= 768;
-  /* Rail visible uniquement sur page-home desktop */
-  rail.style.display = (onHome && desktop) ? 'flex' : 'none';
+  if (!onHome || !desktop) { rail.style.display = 'none'; return; }
+  rail.style.display = 'flex';
+  /* Quand À faire est ouvert : fixer le rail juste à sa droite pour qu'il reste cliquable */
+  if (_homeTodoPanelOpen) {
+    rail.style.position = 'fixed';
+    rail.style.left     = '264px';
+    rail.style.top      = '120px';
+    rail.style.zIndex   = '270';
+  } else {
+    rail.style.position = 'absolute';
+    rail.style.left     = '-44px';
+    rail.style.top      = '120px';
+    rail.style.zIndex   = '26';
+  }
   var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo      = document.getElementById('home-open-todo-btn');
-  /* Cacher le bouton dont le volet est déjà ouvert */
   if (btnDocuments) btnDocuments.style.display = _homeCompDrawerOpen ? 'none' : '';
   if (btnTodo)      btnTodo.style.display      = _homeTodoPanelOpen  ? 'none' : '';
 }
