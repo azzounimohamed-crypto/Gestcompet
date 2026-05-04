@@ -9250,6 +9250,7 @@ function generateOmPdf(compId, staffOrigIdx) {
   S.ordresMission.push({
     id:        omId,
     compId:    compId,
+    compNom:   cp.nom || '',
     staffIdx:  staffOrigIdx,
     pilotId:   s.pilotId || s.id,
     nom:       nom, prenom: prenom,
@@ -9304,8 +9305,9 @@ function _omOpenHtml(html, title) {
 function _envoyerOmEmail(omId) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
   if (!om) { toast('OM introuvable','err'); return; }
-  var cp  = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
-  var cfg = S.odmConfig||{};
+  var cp      = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
+  var cpNom   = cp.nom || om.compNom || '';
+  var cfg     = S.odmConfig||{};
   var presNom     = cfg.presidentNom   || 'La Présidente';
   var presTitre   = cfg.presidentTitre || 'Présidente';
   var nomComplet  = ((om.prenom||'')+' '+(om.nom||'')).trim();
@@ -9313,11 +9315,11 @@ function _envoyerOmEmail(omId) {
   if (!dest) { toast('Email manquant — vérifiez la fiche encadrant','err'); return; }
   var ref         = _omRef(om);
   var emailPres   = cfg.presidentEmail||'';
-  var sujetConfirm= encodeURIComponent('Confirmation ODM '+ref+' — '+nomComplet+' — '+(cp.nom||''));
+  var sujetConfirm= encodeURIComponent('Confirmation ODM '+ref+' — '+nomComplet+' — '+cpNom);
   var corpsConfirm= encodeURIComponent(
     'Bonjour,\n\nJe soussigné(e) '+nomComplet+' confirme avoir pris connaissance\n'
     +'de mon Ordre de Mission (réf. '+ref+') et en accepte les conditions.\n\n'
-    +'Compétition : '+(cp.nom||'')+'\nDates        : '+(om.dates||'')+'\nFonction     : '+(om.role||'')+'\n\n'
+    +'Compétition : '+cpNom+'\nDates        : '+(om.dates||'')+'\nFonction     : '+(om.role||'')+'\n\n'
     +'Signature électronique : '+nomComplet+'\nDate : '+new Date().toLocaleDateString('fr-FR')
   );
   var lienConfirm = emailPres ? 'mailto:'+emailPres+'?subject='+sujetConfirm+'&body='+corpsConfirm : '';
@@ -9327,10 +9329,10 @@ function _envoyerOmEmail(omId) {
     ? '<a href="'+lienConfirm+'" style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:.3px">✅ Je confirme ma participation</a>'
     : '<p style="color:#6b7280;font-style:italic">Répondez à l\'email pour confirmer votre participation.</p>';
 
-  var sujetEmail = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+(cp.nom||''));
+  var sujetEmail = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+cpNom);
   var corpsEmail = encodeURIComponent(
     'Bonjour '+om.prenom+',\n\n'
-    +'Vous trouverez ci-joint votre Ordre de Mission (réf. '+ref+') pour la compétition «'+(cp.nom||'')+'».\n'
+    +'Vous trouverez ci-joint votre Ordre de Mission (réf. '+ref+') pour la compétition «'+cpNom+'».\n'
     +'Merci de cliquer sur le bouton de confirmation dans le document joint.\n\n'
     +presNom+'\n'+presTitre+' — FFPLUM'
   );
@@ -9392,13 +9394,13 @@ function _envoyerOmEmail(omId) {
     +'</div>'
 
     /* ── Intro ── */
-    +'<p class="intro">La <strong>Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM)</strong> mandate <strong>'+nomComplet+'</strong> dans le cadre de la compétition <strong>'+(cp.nom||'(voir ci-dessous)')+'</strong>.</p>'
+    +'<p class="intro">La <strong>Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM)</strong> mandate <strong>'+nomComplet+'</strong> dans le cadre de la compétition <strong>'+(cpNom||'—')+'</strong>.</p>'
 
     /* ── Détails mission ── */
     +'<div class="section"><div class="section-title">Détails de la mission</div>'
     +'<div class="row"><span class="lbl">Bénéficiaire</span><span class="val"><strong>'+nomComplet+'</strong></span></div>'
     +'<div class="row"><span class="lbl">Fonction</span><span class="val">'+(om.role||'—')+'</span></div>'
-    +'<div class="row"><span class="lbl">Compétition</span><span class="val">'+(cp.nom||'—')+'</span></div>'
+    +'<div class="row"><span class="lbl">Compétition</span><span class="val">'+(cpNom||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Lieu</span><span class="val">'+(om.lieu||cp.lieu||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Dates</span><span class="val">'+(om.dates||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Objet</span><span class="val">'+(om.objet||'—')+'</span></div>'
