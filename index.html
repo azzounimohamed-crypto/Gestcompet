@@ -1383,14 +1383,48 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
         </div>
 
-        <!-- Ordre de Mission -->
+        <!-- Ordre de Mission numérique -->
         <div class="regl-sec">
           <div class="regl-sec-hd" onclick="_tRS(this)"><span class="regl-tri">▶</span> Ordre de Mission</div>
           <div class="regl-sec-bd" style="display:none">
-            <div class="card" style="margin-bottom:4px">
-              <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">Modèle d'ordre de mission de référence (PDF). Disponible dans l'onglet <strong>Encadrants</strong> pour envoi par email.</div>
-              <div id="regl-odm-container"></div>
-              <input type="file" id="regl-odm-inp" accept="application/pdf,.pdf" style="display:none" onchange="loadOdmPdf(this)">
+            <!-- Signataire présidence -->
+            <div class="card" style="margin-bottom:8px">
+              <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Signataire Présidence</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Prénom Nom</div>
+                  <input id="regl-odm-president-nom" type="text" placeholder="Laura Macdonald" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Titre</div>
+                  <select id="regl-odm-president-titre" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none;cursor:pointer" onchange="saveOdmConfig()">
+                    <option value="Présidente">Présidente</option>
+                    <option value="Président">Président</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <!-- Barème kilométrique -->
+            <div class="card">
+              <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Barème kilométrique</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Taux 1 — libellé</div>
+                  <input id="regl-odm-bareme1-label" type="text" placeholder="Ex : Voiture ≤5 CV" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Taux 1 — €/km</div>
+                  <input id="regl-odm-bareme1-taux" type="number" step="0.001" min="0" placeholder="0.331" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Taux 2 — libellé</div>
+                  <input id="regl-odm-bareme2-label" type="text" placeholder="Ex : Voiture >5 CV" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Taux 2 — €/km</div>
+                  <input id="regl-odm-bareme2-taux" type="number" step="0.001" min="0" placeholder="0.412" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3124,7 +3158,16 @@ var S = {
     police: 'Arial,Helvetica,sans-serif',
     orgBlock: { nom: "Fédération Française d'ULM", adresse: '96 bis rue Marc Sangnier', cp: '94700', ville: 'Maisons-Alfort', tel: '01 49 81 74 43', email: 'ffplum@ffplum.org', www: 'www.ffplum.fr', accent: '#c0392b' },
     templates: []
-  }
+  },
+  odmConfig: {
+    presidentNom: 'Laura Macdonald',
+    presidentTitre: 'Présidente',
+    bareme1Label: 'Voiture ≤5 CV',
+    bareme1Taux: 0.331,
+    bareme2Label: 'Voiture >5 CV',
+    bareme2Taux: 0.412
+  },
+  ordresMission: []
 };
 
 var BASE44_APP_ID  = '699889ffedef688bae3506c8'; // Production app ID
@@ -8886,18 +8929,25 @@ async function hdgRemoveStaff(compId, idx) {
 
 // ── Ordre de Mission PDF ──────────────────────────────────────────────────
 function renderReglagesOdmSection() {
-  var c = document.getElementById('regl-odm-container');
-  if (!c) return;
-  var odm = S.odmPdfRef;
-  if (odm && odm.data) {
-    c.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--navy3);border-radius:8px;border:1px solid var(--stol)">'
-      + '<span style="font-size:20px">📄</span>'
-      + '<span style="flex:1;font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escH(odm.name||'ODM.pdf') + '</span>'
-      + '<button onclick="removeOdmPdf()" class="btn btn-secondary btn-sm" style="flex-shrink:0;color:#ef4444;font-size:11px">Supprimer</button>'
-      + '</div>';
-  } else {
-    c.innerHTML = '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="document.getElementById(\'regl-odm-inp\').click()">📂 Charger l\'ODM PDF</button>';
-  }
+  /* Charger les valeurs depuis S.odmConfig dans les inputs */
+  var cfg = S.odmConfig || {};
+  var fld = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+  fld('regl-odm-president-nom',    cfg.presidentNom   || 'Laura Macdonald');
+  fld('regl-odm-president-titre',  cfg.presidentTitre || 'Présidente');
+  fld('regl-odm-bareme1-label',    cfg.bareme1Label   || 'Voiture ≤5 CV');
+  fld('regl-odm-bareme1-taux',     cfg.bareme1Taux    || 0.331);
+  fld('regl-odm-bareme2-label',    cfg.bareme2Label   || 'Voiture >5 CV');
+  fld('regl-odm-bareme2-taux',     cfg.bareme2Taux    || 0.412);
+}
+function saveOdmConfig() {
+  if (!S.odmConfig) S.odmConfig = {};
+  S.odmConfig.presidentNom   = (document.getElementById('regl-odm-president-nom')   ||{}).value || 'Laura Macdonald';
+  S.odmConfig.presidentTitre = (document.getElementById('regl-odm-president-titre') ||{}).value || 'Présidente';
+  S.odmConfig.bareme1Label   = (document.getElementById('regl-odm-bareme1-label')   ||{}).value || 'Voiture ≤5 CV';
+  S.odmConfig.bareme1Taux    = parseFloat((document.getElementById('regl-odm-bareme1-taux')||{}).value) || 0.331;
+  S.odmConfig.bareme2Label   = (document.getElementById('regl-odm-bareme2-label')   ||{}).value || 'Voiture >5 CV';
+  S.odmConfig.bareme2Taux    = parseFloat((document.getElementById('regl-odm-bareme2-taux')||{}).value) || 0.412;
+  saveState();
 }
 function loadOdmPdf(input) {
   var file = input.files && input.files[0];
@@ -8920,6 +8970,311 @@ function removeOdmPdf() {
   _hdpSaveNow(); // push cloud immédiat
   toast('ODM supprimé','');
 }
+/* ══════════════════════════════════════════════════════════
+   ORDRE DE MISSION NUMÉRIQUE
+   ══════════════════════════════════════════════════════════ */
+function openOmForm(compId, staffOrigIdx) {
+  var staffArr = S.staff && S.staff[compId];
+  var s = staffArr && staffArr[staffOrigIdx];
+  var pilot = s ? (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{} : {};
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var cfg = S.odmConfig || {};
+
+  var prenom = pilot.prenom||s.prenom||'';
+  var nom    = pilot.nom||s.nom||'';
+  var adresse= pilot.adresse||s.adresse||'';
+  var email  = pilot.email||s.email||'';
+  var role   = s.role||'';
+  var lieu   = cp.nom||'';
+  var dateD  = cp.dateDebut||'';
+  var dateF  = cp.dateFin||'';
+  var dateStr= dateD ? (dateF && dateF!==dateD ? _fmtDate(dateD)+' au '+_fmtDate(dateF) : _fmtDate(dateD)) : '';
+
+  var b1l = escH(cfg.bareme1Label||'Voiture ≤5 CV');
+  var b2l = escH(cfg.bareme2Label||'Voiture >5 CV');
+  var b1t = cfg.bareme1Taux||0.331;
+  var b2t = cfg.bareme2Taux||0.412;
+
+  var inSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 9px;outline:none';
+  var lblSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px';
+
+  var html = '<div id="om-form-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px">'
+    + '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,.6)">'
+    /* Header */
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+    + '<div><div style="font-size:15px;font-weight:800">📋 Ordre de Mission</div>'
+    + '<div style="font-size:11px;color:var(--txt3);margin-top:1px">'+escH((prenom+' '+nom).trim()||'Encadrant')+'</div></div>'
+    + '<button onclick="closeOmForm()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:15px;cursor:pointer;font-family:inherit">✕</button>'
+    + '</div>'
+    /* Body scrollable */
+    + '<div style="overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px">'
+    /* Identité (lecture seule) */
+    + '<div style="background:var(--navy3);border-radius:10px;padding:10px 14px;font-size:12px">'
+    + '<div style="font-weight:700;margin-bottom:4px">👤 Bénéficiaire</div>'
+    + '<div><strong>'+escH((prenom+' '+nom).trim()||'—')+'</strong> · '+escH(role||'—')+'</div>'
+    + (adresse ? '<div style="color:var(--txt3);margin-top:2px">'+escH(adresse)+'</div>' : '')
+    + (email   ? '<div style="color:var(--txt3)">✉ '+escH(email)+'</div>' : '')
+    + '</div>'
+    /* Déplacement */
+    + '<div>'
+    + '<div style="'+lblSt+'">Lieu du déplacement</div>'
+    + '<input id="om-lieu" type="text" value="'+escH(lieu)+'" placeholder="Ville, site…" style="'+inSt+'">'
+    + '</div>'
+    + '<div>'
+    + '<div style="'+lblSt+'">Date(s) du déplacement</div>'
+    + '<input id="om-dates" type="text" value="'+escH(dateStr)+'" placeholder="JJ/MM/AAAA ou du … au …" style="'+inSt+'">'
+    + '</div>'
+    + '<div>'
+    + '<div style="'+lblSt+'">Objet de la mission</div>'
+    + '<textarea id="om-objet" rows="2" placeholder="Encadrement compétition, jury, formation…" style="'+inSt+';resize:vertical">'+escH(cp.nom ? 'Encadrement – '+cp.nom : '')+'</textarea>'
+    + '</div>'
+    /* Moyen de transport */
+    + '<div>'
+    + '<div style="'+lblSt+'">Moyen de déplacement</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">'
+    + _omChk('om-t-train',    '🚂 Train 2ème classe')
+    + _omChk('om-t-fedfed',   '🚗 Véhicule fédéral')
+    + _omChk('om-t-perso',    '🚗 Véhicule personnel', true)
+    + _omChk('om-t-autre',    '✈ Autre')
+    + '</div>'
+    + '<input id="om-t-precision" type="text" placeholder="Préciser si véhicule fédéral ou autre…" style="'+inSt+';margin-top:6px">'
+    + '</div>'
+    /* Frais kilométriques */
+    + '<div style="background:var(--navy3);border-radius:10px;padding:12px 14px">'
+    + '<div style="font-size:11px;font-weight:700;margin-bottom:8px">🚗 Frais kilométriques (véhicule personnel)</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    + '<div><div style="'+lblSt+'">Distance aller (km)</div><input id="om-km" type="number" min="0" placeholder="0" style="'+inSt+'" oninput="_omCalcKm()"></div>'
+    + '<div><div style="'+lblSt+'">Barème applicable</div>'
+    + '<select id="om-bareme" style="'+inSt+';cursor:pointer" onchange="_omCalcKm()">'
+    + '<option value="'+b1t+'">'+b1l+' — '+b1t+' €/km</option>'
+    + '<option value="'+b2t+'">'+b2l+' — '+b2t+' €/km</option>'
+    + '</select></div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px;font-size:12px">'
+    + '<input type="checkbox" id="om-km-ar" checked onchange="_omCalcKm()" style="cursor:pointer">'
+    + '<label for="om-km-ar" style="cursor:pointer;color:var(--txt2)">Aller-retour</label>'
+    + '<div style="flex:1"></div>'
+    + '<div style="font-weight:700;font-size:13px" id="om-km-total">— €</div>'
+    + '</div>'
+    + '</div>'
+    /* Autoroute + Repas */
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div><div style="'+lblSt+'">Autoroute (€)</div><input id="om-autoroute" type="number" min="0" step="0.01" placeholder="0.00" style="'+inSt+'" oninput="_omCalcTotal()"></div>'
+    + '<div><div style="'+lblSt+'">Repas (€)</div><input id="om-repas" type="number" min="0" step="0.01" placeholder="0.00" style="'+inSt+'" oninput="_omCalcTotal()"></div>'
+    + '</div>'
+    /* Total estimé */
+    + '<div style="background:rgba(0,87,255,.08);border:1px solid rgba(0,87,255,.25);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--stol)">Total estimé frais</div>'
+    + '<div style="font-size:16px;font-weight:800;color:var(--stol)" id="om-total-global">— €</div>'
+    + '</div>'
+    + '</div>'/* /body */
+    /* Footer */
+    + '<div style="display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--bdr);flex-shrink:0">'
+    + '<button onclick="closeOmForm()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="generateOmPdf(\''+escS(compId)+'\','+staffOrigIdx+')" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 Générer & Envoyer l\'OM</button>'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  _omCalcKm();
+}
+function _omChk(id, label, checked) {
+  return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">'
+    + '<input type="checkbox" id="'+id+'"'+(checked?' checked':'')+'> '+label+'</label>';
+}
+function _omCalcKm() {
+  var km  = parseFloat((document.getElementById('om-km')||{}).value)||0;
+  var taux= parseFloat((document.getElementById('om-bareme')||{}).value)||0;
+  var ar  = document.getElementById('om-km-ar') && document.getElementById('om-km-ar').checked;
+  var dist= ar ? km*2 : km;
+  var tot = dist * taux;
+  var el  = document.getElementById('om-km-total');
+  if (el) el.textContent = tot > 0 ? tot.toFixed(2)+' €' : '— €';
+  _omCalcTotal();
+}
+function _omCalcTotal() {
+  var km   = parseFloat((document.getElementById('om-km')||{}).value)||0;
+  var taux = parseFloat((document.getElementById('om-bareme')||{}).value)||0;
+  var ar   = document.getElementById('om-km-ar') && document.getElementById('om-km-ar').checked;
+  var dist = ar ? km*2 : km;
+  var autorH= parseFloat((document.getElementById('om-autoroute')||{}).value)||0;
+  var repas = parseFloat((document.getElementById('om-repas')||{}).value)||0;
+  var tot   = dist*taux + autorH + repas;
+  var el    = document.getElementById('om-total-global');
+  if (el) el.textContent = (dist*taux + autorH + repas) > 0 ? tot.toFixed(2)+' €' : '— €';
+}
+function closeOmForm() {
+  var el = document.getElementById('om-form-overlay');
+  if (el) el.remove();
+}
+
+function generateOmPdf(compId, staffOrigIdx) {
+  var staffArr = S.staff && S.staff[compId];
+  var s = staffArr && staffArr[staffOrigIdx];
+  var pilot = s ? (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{} : {};
+  var cfg = S.odmConfig || {};
+
+  var prenom = pilot.prenom||s.prenom||'';
+  var nom    = pilot.nom||s.nom||'';
+  var adresse= pilot.adresse||s.adresse||'';
+  var email  = pilot.email||s.email||'';
+  var role   = s.role||'';
+
+  var lieu   = (document.getElementById('om-lieu')||{}).value||'';
+  var dates  = (document.getElementById('om-dates')||{}).value||'';
+  var objet  = (document.getElementById('om-objet')||{}).value||'';
+
+  var tTrain = document.getElementById('om-t-train')  && document.getElementById('om-t-train').checked;
+  var tFed   = document.getElementById('om-t-fedfed') && document.getElementById('om-t-fedfed').checked;
+  var tPerso = document.getElementById('om-t-perso')  && document.getElementById('om-t-perso').checked;
+  var tAutre = document.getElementById('om-t-autre')  && document.getElementById('om-t-autre').checked;
+  var tPrec  = (document.getElementById('om-t-precision')||{}).value||'';
+
+  var km     = parseFloat((document.getElementById('om-km')||{}).value)||0;
+  var taux   = parseFloat((document.getElementById('om-bareme')||{}).value)||0;
+  var ar     = document.getElementById('om-km-ar') && document.getElementById('om-km-ar').checked;
+  var dist   = ar ? km*2 : km;
+  var kmTot  = dist * taux;
+  var autorH = parseFloat((document.getElementById('om-autoroute')||{}).value)||0;
+  var repas  = parseFloat((document.getElementById('om-repas')||{}).value)||0;
+  var total  = kmTot + autorH + repas;
+
+  var baremeLabel = (document.getElementById('om-bareme')||{}).options
+    ? (document.getElementById('om-bareme').options[document.getElementById('om-bareme').selectedIndex]||{}).text||''
+    : '';
+
+  var today = new Date();
+  var todayStr = today.toLocaleDateString('fr-FR');
+  var presNom   = cfg.presidentNom   || 'Laura Macdonald';
+  var presTitre = cfg.presidentTitre || 'Présidente';
+  var dtnPrenom = (S.docSettings&&S.docSettings.signataire&&S.docSettings.signataire.prenom)||'Mohamed';
+  var dtnNom    = (S.docSettings&&S.docSettings.signataire&&S.docSettings.signataire.nom)||'AZZOUNI';
+
+  /* Moyens cochés */
+  var moyens = [];
+  if (tTrain) moyens.push('Train 2ème classe');
+  if (tFed)   moyens.push('Véhicule fédéral'+(tPrec?' ('+tPrec+')':''));
+  if (tPerso) moyens.push('Véhicule personnel');
+  if (tAutre) moyens.push('Autre'+(tPrec?' ('+tPrec+')':''));
+  var moyenStr = moyens.join(', ') || '—';
+
+  /* Lignes frais */
+  var fraisLines = '';
+  if (tPerso && km > 0) {
+    fraisLines += '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">Indemnités kilométriques</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;color:#555">'+dist+' km × '+taux+' €/km ('+baremeLabel+')'+(ar?' A/R':'')+'</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700">'+kmTot.toFixed(2)+' €</td></tr>';
+  }
+  if (autorH > 0) {
+    fraisLines += '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">Autoroute</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;color:#555">Sur justificatif</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700">'+autorH.toFixed(2)+' €</td></tr>';
+  }
+  if (repas > 0) {
+    fraisLines += '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">Repas</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;color:#555">Sur justificatif</td>'
+      + '<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700">'+repas.toFixed(2)+' €</td></tr>';
+  }
+
+  var chkBox = function(v){ return '<span style="display:inline-block;width:13px;height:13px;border:1.5px solid #333;border-radius:2px;margin-right:5px;vertical-align:middle;background:'+(v?'#c0392b':'#fff')+'">'+(v?'<span style="color:#fff;font-size:10px;line-height:13px;display:block;text-align:center">✓</span>':'')+'</span>'; };
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;margin:0;padding:0}'
+    + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}button{display:none!important}}'
+    + '</style></head><body style="padding:28px 36px">'
+    /* En-tête */
+    + '<table style="width:100%;margin-bottom:20px"><tr>'
+    + '<td style="width:180px;vertical-align:top">'
+    + '<div style="font-weight:700;font-size:11px;color:#c0392b;line-height:1.6">Fédération Française d\'ULM<br><span style="font-weight:400;color:#444">96 bis rue Marc Sangnier<br>94700 Maisons-Alfort<br>01 49 81 74 43<br>ffplum@ffplum.org<br>www.ffplum.fr</span></div>'
+    + '</td>'
+    + '<td style="text-align:center;vertical-align:middle">'
+    + '<div style="font-size:22px;font-weight:900;letter-spacing:.5px;color:#c0392b">Ordre de mission</div>'
+    + '</td>'
+    + '<td style="width:180px"></td>'
+    + '</tr></table>'
+    + '<div style="border-top:2px solid #c0392b;margin-bottom:18px"></div>'
+    /* Bénéficiaire */
+    + '<table style="width:100%;margin-bottom:14px"><tr>'
+    + '<td style="width:50%;padding-bottom:8px"><strong>Nom :</strong> '+escH(nom)+'</td>'
+    + '<td style="width:50%;padding-bottom:8px"><strong>Prénom :</strong> '+escH(prenom)+'</td>'
+    + '</tr><tr>'
+    + '<td colspan="2" style="padding-bottom:8px"><strong>Fonction :</strong> '+escH(role)+'</td>'
+    + '</tr><tr>'
+    + '<td colspan="2"><strong>Adresse domicile :</strong> '+escH(adresse||'—')+'</td>'
+    + '</tr></table>'
+    /* Autorisation */
+    + '<div style="background:#fafafa;border:1.5px solid #c0392b;border-radius:6px;padding:12px 16px;margin-bottom:14px">'
+    + '<div style="font-size:13px;font-weight:800;color:#c0392b;margin-bottom:10px">Est autorisé(e) à se rendre,</div>'
+    + '<div style="margin-bottom:6px"><strong>Lieu du déplacement :</strong> '+escH(lieu||'—')+'</div>'
+    + '<div style="margin-bottom:6px"><strong>Date(s) :</strong> '+escH(dates||'—')+'</div>'
+    + '<div><strong>Objet de la mission :</strong> '+escH(objet||'—')+'</div>'
+    + '</div>'
+    /* Moyen */
+    + '<div style="margin-bottom:14px">'
+    + '<div style="font-weight:700;margin-bottom:6px">Les moyens de déplacement :</div>'
+    + '<div style="display:flex;flex-direction:column;gap:4px;padding-left:8px">'
+    + '<div>'+chkBox(tTrain)+' Train 2ème classe</div>'
+    + '<div>'+chkBox(tFed)+' Véhicule fédéral'+(tFed&&tPrec?' ('+escH(tPrec)+')':'')+'</div>'
+    + '<div>'+chkBox(tPerso)+' Véhicule personnel</div>'
+    + '<div>'+chkBox(tAutre)+' Autre'+(tAutre&&tPrec?' ('+escH(tPrec)+')':'')+'</div>'
+    + '</div></div>'
+    /* Frais */
+    + '<div style="margin-bottom:16px">'
+    + '<div style="font-weight:700;margin-bottom:8px">Frais :</div>'
+    + '<p style="font-style:italic;font-size:11px;color:#555;margin:0 0 10px;line-height:1.5">Les frais de déplacement et d\'hébergement validés qui concernent la mission sont pris en charge par la Fédération durant la mission selon le barème en vigueur. Le covoiturage est à privilégier.</p>'
+    + (fraisLines ? '<table style="width:100%;border-collapse:collapse;margin-bottom:8px">'
+      + '<thead><tr style="background:#f0f0f0"><th style="padding:5px 8px;text-align:left;font-size:11px">Nature</th><th style="padding:5px 8px;text-align:left;font-size:11px">Détail</th><th style="padding:5px 8px;text-align:right;font-size:11px">Montant</th></tr></thead>'
+      + '<tbody>'+fraisLines+'</tbody>'
+      + '<tfoot><tr style="background:#c0392b"><td colspan="2" style="padding:6px 8px;font-weight:800;color:#fff">TOTAL ESTIMÉ</td><td style="padding:6px 8px;text-align:right;font-weight:900;font-size:14px;color:#fff">'+total.toFixed(2)+' €</td></tr></tfoot>'
+      + '</table>' : '')
+    + '</div>'
+    /* Signatures */
+    + '<div style="border-top:1px solid #ddd;padding-top:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:24px">'
+    + '<div style="flex:1;text-align:center">'
+    + '<div style="font-size:11px;color:#555;margin-bottom:4px">A : Maisons-Alfort &nbsp;&nbsp; Le : '+todayStr+'</div>'
+    + '<div style="font-weight:800;margin-bottom:20px">Le DTN,</div>'
+    + '<div style="border-bottom:1px solid #bbb;margin-bottom:4px;height:40px"></div>'
+    + '<div style="font-size:11px;color:#555">'+escH(dtnPrenom+' '+dtnNom)+'</div>'
+    + '</div>'
+    + '<div style="flex:1;text-align:center">'
+    + '<div style="font-size:11px;color:#555;margin-bottom:4px">A : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Le :</div>'
+    + '<div style="font-weight:800;margin-bottom:20px">Le/La bénéficiaire,</div>'
+    + '<div style="border-bottom:1px solid #bbb;margin-bottom:4px;height:40px"></div>'
+    + '<div style="font-size:11px;color:#555">'+escH((prenom+' '+nom).trim())+'</div>'
+    + '</div>'
+    + '<div style="flex:1;text-align:center">'
+    + '<div style="font-size:11px;color:#555;margin-bottom:4px">A : Maisons-Alfort &nbsp;&nbsp; Le :</div>'
+    + '<div style="font-weight:800;margin-bottom:20px">'+escH(presTitre)+',</div>'
+    + '<div style="border-bottom:1px solid #bbb;margin-bottom:4px;height:40px"></div>'
+    + '<div style="font-size:11px;color:#555">'+escH(presNom)+'</div>'
+    + '</div>'
+    + '</div>'
+    /* Pied */
+    + '<div style="border-top:1px solid #eee;margin-top:20px;padding-top:10px;font-size:9px;color:#999;text-align:center">Reconnue d\'utilité publique — Agréée Ministère des Sports, Ministère des Transports et CNFAS — Inscrite au Code de l\'Aviation Civile</div>'
+    /* Bouton imprimer */
+    + '<div style="text-align:center;margin-top:20px">'
+    + '<button onclick="window.print()" style="padding:10px 28px;background:#c0392b;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimer / Enregistrer en PDF</button>'
+    + '</div>'
+    + '</body></html>';
+
+  var win = window.open('', '_blank', 'width=800,height:1000');
+  if (!win) { toast('Autorisez les popups pour générer le PDF', 'err'); return; }
+  win.document.write(html);
+  win.document.close();
+
+  /* Email optionnel */
+  if (email) {
+    var subj = encodeURIComponent('Ordre de Mission FFPLUM – '+((prenom+' '+nom).trim()));
+    var body = encodeURIComponent('Bonjour '+prenom+',\n\nVeuillez trouver ci-joint votre ordre de mission.\n\nCordialement,\n'+dtnPrenom+' '+dtnNom+'\nDirecteur Technique National – FFPLUM');
+    setTimeout(function(){
+      window.open('mailto:'+encodeURIComponent(email)+'?subject='+subj+'&body='+body);
+    }, 800);
+  }
+  closeOmForm();
+  toast('OM généré ✓'+(email?' — email prêt':''), 'ok');
+}
+
 function sendOdmToStaff(compId, staffOrigIdx) {
   var odm = S.odmPdfRef;
   if (!odm || !odm.data) { toast('Aucun ODM — déposez-le dans Gestion → Réglages',''); return; }
@@ -10217,9 +10572,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(tel2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(email2||'—')+'</div>';
         html3 += '<div style="display:flex;align-items:center;justify-content:center;gap:4px">';
-        if (S.odmPdfRef && S.odmPdfRef.data) {
-          html3 += '<button onclick="event.stopPropagation();sendOdmToStaff(\''+cidS+'\','+si+')" style="width:30px;height:28px;border-radius:6px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:10px;font-weight:800;cursor:pointer;font-family:inherit" title="Envoyer l\'ODM par email">ODM</button>';
-        }
+        html3 += '<button onclick="event.stopPropagation();openOmForm(\''+cidS+'\','+si+')" style="width:30px;height:28px;border-radius:6px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:10px;font-weight:800;cursor:pointer;font-family:inherit" title="Créer un ordre de mission">OM</button>';
         html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Supprimer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
         html3 += '</div>';
         html3 += '</div>';
