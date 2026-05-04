@@ -1402,6 +1402,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
                     <option value="Président">Président</option>
                   </select>
                 </div>
+                <div style="grid-column:1/-1">
+                  <div style="font-size:10px;color:var(--txt3);margin-bottom:3px">Email de la présidence</div>
+                  <input id="regl-odm-president-email" type="email" placeholder="presidente@ffplum.fr" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none" oninput="saveOdmConfig()">
+                </div>
               </div>
             </div>
             <!-- Barème kilométrique -->
@@ -8950,6 +8954,7 @@ function renderReglagesOdmSection() {
   var fld = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
   fld('regl-odm-president-nom',    cfg.presidentNom   || 'Laura Macdonald');
   fld('regl-odm-president-titre',  cfg.presidentTitre || 'Présidente');
+  fld('regl-odm-president-email',  cfg.presidentEmail || '');
   fld('regl-odm-bareme1-label',    cfg.bareme1Label   || 'Encadrants');
   fld('regl-odm-bareme1-taux',     cfg.bareme1Taux    || 0.408);
   fld('regl-odm-bareme2-label',    cfg.bareme2Label   || 'Compétiteurs');
@@ -8959,6 +8964,7 @@ function saveOdmConfig() {
   if (!S.odmConfig) S.odmConfig = {};
   S.odmConfig.presidentNom   = (document.getElementById('regl-odm-president-nom')   ||{}).value || 'Laura Macdonald';
   S.odmConfig.presidentTitre = (document.getElementById('regl-odm-president-titre') ||{}).value || 'Présidente';
+  S.odmConfig.presidentEmail = (document.getElementById('regl-odm-president-email') ||{}).value || '';
   S.odmConfig.bareme1Label   = (document.getElementById('regl-odm-bareme1-label')   ||{}).value || 'Encadrants';
   S.odmConfig.bareme1Taux    = parseFloat((document.getElementById('regl-odm-bareme1-taux')||{}).value) || 0.408;
   S.odmConfig.bareme2Label   = (document.getElementById('regl-odm-bareme2-label')   ||{}).value || 'Compétiteurs';
@@ -9281,52 +9287,74 @@ function _envoyerOmEmail(omId) {
   if (!om) { toast('OM introuvable','err'); return; }
   var cp  = (S.comps||[]).find(function(c){ return c.id===om.compId; })||{};
   var cfg = S.odmConfig||{};
-  var _fmtD = function(iso){ if(!iso) return ''; var p=iso.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso; };
 
   var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
   var dest = om.email || '';
-  if (!dest) { toast('Email de l\'encadrant manquant','err'); return; }
+  if (!dest) { toast('Email de l\'encadrant manquant — vérifiez la fiche','err'); return; }
 
-  var sujet = encodeURIComponent('Ordre de Mission — '+cp.nom+' — '+nomComplet);
+  /* Référence unique de l'OM */
+  var ref = om.id.replace('om_','OM-');
 
-  var ligneTransport = [];
-  var tr = om.transport||{};
-  if (tr.train)   ligneTransport.push('Train');
-  if (tr.federal) ligneTransport.push('Véhicule fédéral');
-  if (tr.perso)   ligneTransport.push('Véhicule personnel');
-  if (tr.autre)   ligneTransport.push('Autre');
-  if (tr.precision) ligneTransport.push('('+tr.precision+')');
+  /* Transport */
+  var tr = om.transport||{}, ligneTransport = [];
+  if (tr.train)     ligneTransport.push('Train/Transport en commun');
+  if (tr.federal)   ligneTransport.push('Véhicule fédéral');
+  if (tr.perso)     ligneTransport.push('Véhicule personnel');
+  if (tr.autre)     ligneTransport.push('Autre');
+  if (tr.precision) ligneTransport.push('Précision : '+tr.precision);
 
+  /* Lien de confirmation vers la présidente */
+  var emailPres = cfg.presidentEmail || '';
+  var sujetRetour = 'Confirmation ODM '+ref+' — '+nomComplet+' — '+( cp.nom||'');
+  var corpsRetour = 'Bonjour,\n\nJe soussigné(e) '+(om.prenom||'')+' '+(om.nom||'')+', confirme avoir pris connaissance\nde mon Ordre de Mission (réf. '+ref+') et accepte les conditions.\n\nCompétition : '+(cp.nom||'')+'\nDates        : '+(om.dates||'')+'\nFonction     : '+(om.role||'')+'\n\nSignature électronique : '+(nomComplet)+'\nDate : '+(new Date().toLocaleDateString('fr-FR'));
+  var lienConfirmation = emailPres
+    ? 'mailto:'+emailPres+'?subject='+encodeURIComponent(sujetRetour)+'&body='+encodeURIComponent(corpsRetour)
+    : '';
+
+  var sujet = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+( cp.nom||''));
+
+  var sep = '════════════════════════════════════════';
   var corps = [
-    'Bonjour '+om.prenom+',',
+    'Bonjour '+(om.prenom||'')+',',
     '',
-    'Veuillez trouver ci-dessous votre Ordre de Mission pour la compétition :',
+    'La Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM)',
+    'vous adresse votre Ordre de Mission officiel.',
     '',
-    '─────────────────────────────',
-    '  ORDRE DE MISSION',
-    '─────────────────────────────',
-    'Nom           : '+(om.prenom||'')+' '+(om.nom||''),
-    'Fonction      : '+(om.role||''),
-    'Compétition   : '+(cp.nom||''),
-    'Lieu          : '+(om.lieu||cp.lieu||''),
-    'Dates         : '+(om.dates||''),
-    'Objet         : '+(om.objet||''),
-    'Transport     : '+(ligneTransport.join(', ')||'—'),
-    '─────────────────────────────',
+    sep,
+    '         ORDRE DE MISSION  |  Réf. '+ref,
+    sep,
     '',
-    'Merci de répondre à cet email pour confirmer votre participation.',
+    '  Bénéficiaire  : '+(om.prenom||'')+' '+(om.nom||''),
+    '  Fonction      : '+(om.role||''),
+    '  Compétition   : '+(cp.nom||''),
+    '  Lieu          : '+(om.lieu||cp.lieu||''),
+    '  Dates         : '+(om.dates||''),
+    '  Objet         : '+(om.objet||''),
+    '  Transport     : '+(ligneTransport.join(' / ')||'—'),
     '',
-    'Cordialement,',
+    sep,
+    '',
+    'ACTION REQUISE',
+    '──────────────',
+    'Pour confirmer votre participation, répondez à cet email'+(emailPres ? ' OU' : ''),
+    (emailPres ? 'cliquez sur le lien ci-dessous :\n\n  >> '+lienConfirmation : ''),
+    '',
+    'Votre réponse sera transmise automatiquement à la présidence.',
+    '',
+    sep,
+    '',
     cfg.presidentNom||'La Présidente',
-    cfg.presidentTitre||'',
-    'FFPLUM'
-  ].join('\n');
+    cfg.presidentTitre||'Présidente',
+    'Fédération Française de Planeurs Ultra-Légers Motorisés',
+    'www.ffplum.fr',
+    sep
+  ].filter(function(l){ return l !== undefined; }).join('\n');
 
   window.location.href = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+encodeURIComponent(corps);
   om.statut = 'signe_encadrant';
   om.statutDate = new Date().toISOString();
   saveState();
-  toast('Email ODM ouvert pour '+nomComplet,'ok');
+  toast('📧 ODM envoyé à '+nomComplet,'ok');
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 }
 
@@ -9339,44 +9367,95 @@ function _envoyerNdfEmail(omId) {
 
   var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
   var dest = om.email || '';
-  if (!dest) { toast('Email de l\'encadrant manquant','err'); return; }
+  if (!dest) { toast('Email de l\'encadrant manquant — vérifiez la fiche','err'); return; }
 
-  var sujet = encodeURIComponent('Note de Frais (NDF) — '+cp.nom+' — '+nomComplet);
+  var ref = om.id.replace('om_','OM-');
+  var emailPres = cfg.presidentEmail || '';
+
+  /* Lien de retour NDF remplie vers la présidente */
+  var sujetRetour = 'Note de Frais '+ref+' — '+nomComplet;
+  var corpsRetour = [
+    'Bonjour,',
+    '',
+    'Veuillez trouver ci-dessous ma Note de Frais (réf. '+ref+') :',
+    '',
+    'Nom           : '+(om.prenom||'')+' '+(om.nom||''),
+    'Compétition   : '+(cp.nom||''),
+    'Dates         : '+(om.dates||''),
+    '',
+    '── Frais de déplacement ──────────────',
+    'Distance aller (km)  : ___________',
+    'Barème               : ☐ Encadrants ('+( cfg.bareme1Taux||0.408)+' €/km)  ☐ Compétiteurs ('+(cfg.bareme2Taux||0.200)+' €/km)',
+    'Aller-retour         : ☐ Oui  ☐ Non',
+    'Frais autoroute (€)  : ___________',
+    '',
+    '── Frais de repas ────────────────────',
+    'Nombre de repas      : ___________',
+    'Montant total (€)    : ___________',
+    '',
+    '── Total NDF ─────────────────────────',
+    'TOTAL RÉCLAMÉ (€)    : ___________',
+    '',
+    'Pièces jointes : ☐ Tickets péage  ☐ Notes restaurant  ☐ RIB (si 1er remboursement)',
+  ].join('\n');
+  var lienRetour = emailPres
+    ? 'mailto:'+emailPres+'?subject='+encodeURIComponent(sujetRetour)+'&body='+encodeURIComponent(corpsRetour)
+    : '';
+
+  var sujet = encodeURIComponent('Note de Frais '+ref+' — FFPLUM — '+(cp.nom||''));
+  var sep = '════════════════════════════════════════';
 
   var corps = [
-    'Bonjour '+om.prenom+',',
+    'Bonjour '+(om.prenom||'')+',',
     '',
-    'Suite à votre participation à la compétition «'+( cp.nom||'')+' »,',
-    'merci de compléter et retourner votre note de frais :',
+    'Suite à votre participation à la compétition «'+(cp.nom||'')+'»,',
+    'nous vous prions de bien vouloir compléter votre Note de Frais.',
     '',
-    '─────────────────────────────',
-    '  NOTE DE FRAIS',
-    '─────────────────────────────',
-    'Nom        : '+(om.prenom||'')+' '+(om.nom||''),
-    'Compétition: '+(cp.nom||''),
-    'Dates      : '+(om.dates||''),
+    sep,
+    '         NOTE DE FRAIS  |  Réf. '+ref,
+    sep,
     '',
-    'À RENSEIGNER ET RETOURNER PAR EMAIL :',
+    '  Bénéficiaire  : '+(om.prenom||'')+' '+(om.nom||''),
+    '  Compétition   : '+(cp.nom||''),
+    '  Dates         : '+(om.dates||''),
     '',
-    '[ ] Distance aller (km)  : ______',
-    '[ ] Barème               : ☐ Encadrants ('+( cfg.bareme1Taux||0.408)+' €/km)  ☐ Compétiteurs ('+(cfg.bareme2Taux||0.200)+' €/km)',
-    '[ ] Aller-retour         : ☐ Oui  ☐ Non',
-    '[ ] Frais autoroute (€)  : ______',
-    '[ ] Frais repas (€)      : ______',
+    sep,
     '',
-    'Joindre à votre réponse :',
-    '  • Les tickets de péage / notes de restaurant',
-    '  • Une copie de votre relevé d\'identité bancaire si premier remboursement',
-    '─────────────────────────────',
+    'INSTRUCTIONS',
+    '────────────',
+    '1. Complétez les informations ci-dessous',
+    '2. Joignez vos justificatifs (tickets, notes de restaurant)',
+    '3. Retournez cet email'+(emailPres ? ' OU cliquez sur le lien de retour' : ' à l\'expéditeur'),
     '',
-    'Cordialement,',
+    (lienRetour ? '>> LIEN DE RETOUR NDF :\n   '+lienRetour+'\n' : ''),
+    '── Frais de déplacement ──────────────',
+    'Distance aller (km)  : ___________',
+    'Barème               : ☐ Encadrants ('+( cfg.bareme1Taux||0.408)+' €/km)  ☐ Compétiteurs ('+(cfg.bareme2Taux||0.200)+' €/km)',
+    'Aller-retour         : ☐ Oui  ☐ Non',
+    'Frais autoroute (€)  : ___________',
+    '',
+    '── Frais de repas ────────────────────',
+    'Montant total (€)    : ___________',
+    '',
+    '── Total NDF ─────────────────────────',
+    'TOTAL RÉCLAMÉ (€)    : ___________',
+    '',
+    'Pièces à joindre :',
+    '  • Tickets de péage',
+    '  • Notes de restaurant',
+    '  • RIB (uniquement si premier remboursement)',
+    '',
+    sep,
+    '',
     cfg.presidentNom||'La Présidente',
-    cfg.presidentTitre||'',
-    'FFPLUM'
-  ].join('\n');
+    cfg.presidentTitre||'Présidente',
+    'Fédération Française de Planeurs Ultra-Légers Motorisés',
+    'www.ffplum.fr',
+    sep
+  ].filter(function(l){ return l !== undefined; }).join('\n');
 
   window.location.href = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+encodeURIComponent(corps);
-  toast('Email NDF ouvert pour '+nomComplet,'ok');
+  toast('📋 NDF envoyée à '+nomComplet,'ok');
 }
 
 /* ── NDF : rendu HTML commun mobile + desktop ──────────────────────────── */
