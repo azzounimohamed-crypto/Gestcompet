@@ -9275,6 +9275,110 @@ function _omCycleStatut(omId) {
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 }
 
+/* ── Envoi ODM par email (mailto:) ──────────────────────────────────────── */
+function _envoyerOmEmail(omId) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) { toast('OM introuvable','err'); return; }
+  var cp  = (S.comps||[]).find(function(c){ return c.id===om.compId; })||{};
+  var cfg = S.odmConfig||{};
+  var _fmtD = function(iso){ if(!iso) return ''; var p=iso.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:iso; };
+
+  var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
+  var dest = om.email || '';
+  if (!dest) { toast('Email de l\'encadrant manquant','err'); return; }
+
+  var sujet = encodeURIComponent('Ordre de Mission — '+cp.nom+' — '+nomComplet);
+
+  var ligneTransport = [];
+  var tr = om.transport||{};
+  if (tr.train)   ligneTransport.push('Train');
+  if (tr.federal) ligneTransport.push('Véhicule fédéral');
+  if (tr.perso)   ligneTransport.push('Véhicule personnel');
+  if (tr.autre)   ligneTransport.push('Autre');
+  if (tr.precision) ligneTransport.push('('+tr.precision+')');
+
+  var corps = [
+    'Bonjour '+om.prenom+',',
+    '',
+    'Veuillez trouver ci-dessous votre Ordre de Mission pour la compétition :',
+    '',
+    '─────────────────────────────',
+    '  ORDRE DE MISSION',
+    '─────────────────────────────',
+    'Nom           : '+(om.prenom||'')+' '+(om.nom||''),
+    'Fonction      : '+(om.role||''),
+    'Compétition   : '+(cp.nom||''),
+    'Lieu          : '+(om.lieu||cp.lieu||''),
+    'Dates         : '+(om.dates||''),
+    'Objet         : '+(om.objet||''),
+    'Transport     : '+(ligneTransport.join(', ')||'—'),
+    '─────────────────────────────',
+    '',
+    'Merci de répondre à cet email pour confirmer votre participation.',
+    '',
+    'Cordialement,',
+    cfg.presidentNom||'La Présidente',
+    cfg.presidentTitre||'',
+    'FFPLUM'
+  ].join('\n');
+
+  window.location.href = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+encodeURIComponent(corps);
+  om.statut = 'signe_encadrant';
+  om.statutDate = new Date().toISOString();
+  saveState();
+  toast('Email ODM ouvert pour '+nomComplet,'ok');
+  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+}
+
+/* ── Envoi fiche NDF par email (mailto:) ────────────────────────────────── */
+function _envoyerNdfEmail(omId) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) { toast('OM introuvable','err'); return; }
+  var cp  = (S.comps||[]).find(function(c){ return c.id===om.compId; })||{};
+  var cfg = S.odmConfig||{};
+
+  var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
+  var dest = om.email || '';
+  if (!dest) { toast('Email de l\'encadrant manquant','err'); return; }
+
+  var sujet = encodeURIComponent('Note de Frais (NDF) — '+cp.nom+' — '+nomComplet);
+
+  var corps = [
+    'Bonjour '+om.prenom+',',
+    '',
+    'Suite à votre participation à la compétition «'+( cp.nom||'')+' »,',
+    'merci de compléter et retourner votre note de frais :',
+    '',
+    '─────────────────────────────',
+    '  NOTE DE FRAIS',
+    '─────────────────────────────',
+    'Nom        : '+(om.prenom||'')+' '+(om.nom||''),
+    'Compétition: '+(cp.nom||''),
+    'Dates      : '+(om.dates||''),
+    '',
+    'À RENSEIGNER ET RETOURNER PAR EMAIL :',
+    '',
+    '[ ] Distance aller (km)  : ______',
+    '[ ] Barème               : ☐ Encadrants ('+( cfg.bareme1Taux||0.408)+' €/km)  ☐ Compétiteurs ('+(cfg.bareme2Taux||0.200)+' €/km)',
+    '[ ] Aller-retour         : ☐ Oui  ☐ Non',
+    '[ ] Frais autoroute (€)  : ______',
+    '[ ] Frais repas (€)      : ______',
+    '',
+    'Joindre à votre réponse :',
+    '  • Les tickets de péage / notes de restaurant',
+    '  • Une copie de votre relevé d\'identité bancaire si premier remboursement',
+    '─────────────────────────────',
+    '',
+    'Cordialement,',
+    cfg.presidentNom||'La Présidente',
+    cfg.presidentTitre||'',
+    'FFPLUM'
+  ].join('\n');
+
+  window.location.href = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+encodeURIComponent(corps);
+  toast('Email NDF ouvert pour '+nomComplet,'ok');
+}
+
 /* ── NDF : rendu HTML commun mobile + desktop ──────────────────────────── */
 function _renderNdfContent(cp, cfg2) {
   var bEscL = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
@@ -9834,7 +9938,7 @@ function _staffToggleSort(col) {
 }
 
 // ── Redimensionnement colonnes Encadrants ──────────────────────────────────
-var _staffColWidths = [40, 170, 130, 68, 92, 150, 66]; // avatar|nom|fonction|licence|tel|email|btns
+var _staffColWidths = [40, 170, 130, 68, 92, 150, 130]; // avatar|nom|fonction|licence|tel|email|odm-ndf
 var _staffResizing  = null;
 function _staffGetTpl() { return _staffColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _staffApplyTpl() {
@@ -10748,7 +10852,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         + '<div onmousedown="_staffResizeStart(event,'+(i+3)+')" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
         + '</div>';
     });
-    html3 += '<div style="'+_hStS+';text-align:center">ODM</div>';
+    html3 += '<div style="'+_hStS+';text-align:center">ODM / NDF</div>';
     html3 += '</div>';
     }
     html3 += '<div style="flex:1;overflow-y:auto">';
@@ -10833,13 +10937,24 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var _omList = (S.ordresMission||[]).filter(function(o){ return o.compId===cidS && (o.pilotId===(s.pilotId||s.id)); });
         var _omLast = _omList.length ? _omList[_omList.length-1] : null;
         var _omStatutColor = {'genere':'#f59e0b','signe_encadrant':'#3b82f6','signe_president':'#8b5cf6','valide':'#22c55e'}[_omLast&&_omLast.statut] || '';
-        var _omStatutLbl   = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'Validé'}[_omLast&&_omLast.statut] || '';
-        html3 += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">';
-        html3 += '<button onclick="event.stopPropagation();openOmForm(\''+cidS+'\','+si+')" style="width:30px;height:22px;border-radius:5px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:9px;font-weight:800;cursor:pointer;font-family:inherit" title="Créer un ordre de mission">+ OM</button>';
-        if (_omLast) {
-          html3 += '<div onclick="event.stopPropagation();_omCycleStatut(\''+_omLast.id+'\')" style="font-size:8px;font-weight:700;color:'+_omStatutColor+';cursor:pointer;text-align:center;white-space:nowrap" title="Cliquer pour changer le statut">'+_omStatutLbl+'</div>';
+        var _omStatutLbl   = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'✅ Validé'}[_omLast&&_omLast.statut] || '';
+        var _btnSt = 'padding:2px 6px;border-radius:5px;border:1px solid;font-size:9px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap';
+        html3 += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:2px 0">';
+        /* Ligne 1 : créer OM + statut */
+        html3 += '<div style="display:flex;align-items:center;gap:3px">';
+        if (canEditS) html3 += '<button onclick="event.stopPropagation();openOmForm(\''+cidS+'\','+si+')" style="'+_btnSt+';border-color:var(--stol);background:none;color:var(--stol)" title="Créer un OM">+ OM</button>';
+        if (_omLast) html3 += '<div onclick="event.stopPropagation();_omCycleStatut(\''+_omLast.id+'\')" style="font-size:8px;font-weight:700;color:'+_omStatutColor+';cursor:pointer;white-space:nowrap" title="Changer statut">'+_omStatutLbl+'</div>';
+        html3 += '</div>';
+        /* Ligne 2 : bouton envoyer ODM */
+        if (_omLast && email2) {
+          html3 += '<button onclick="event.stopPropagation();_envoyerOmEmail(\''+_omLast.id+'\')" style="'+_btnSt+';border-color:#3b82f6;background:none;color:#3b82f6;width:100%" title="Envoyer ODM par email">📧 ODM</button>';
         }
-        html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+';width:22px;height:22px;font-size:14px" title="Supprimer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
+        /* Ligne 3 : bouton envoyer NDF (seulement si OM validé) */
+        if (_omLast && _omLast.statut==='valide' && email2) {
+          html3 += '<button onclick="event.stopPropagation();_envoyerNdfEmail(\''+_omLast.id+'\')" style="'+_btnSt+';border-color:#10b981;background:none;color:#10b981;width:100%" title="Envoyer fiche NDF par email">📋 NDF</button>';
+        }
+        /* Ligne 4 : supprimer */
+        html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+';width:22px;height:22px;font-size:14px" title="Supprimer">×</button>' : '');
         html3 += '</div>';
         html3 += '</div>';
       }
@@ -11069,7 +11184,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += bTabBtn('engagement','💸 Dépenses');
       htmlB += bTabBtn('ressources','💰 Recettes');
       htmlB += bTabBtn('synthese','⚖️ Solde');
-      htmlB += bTabBtn('ndf','📋 NDF');
       htmlB += '</div>';
       htmlB += '<div style="flex:1;overflow-y:auto;padding:12px 12px 20px">';
 
@@ -11144,8 +11258,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid #3b82f6;text-align:center"><div style="font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total Recettes</div><div style="font-size:28px;font-weight:900;color:#3b82f6">'+totRes.toFixed(2)+' €</div></div>';
         htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid '+soldeColor+';text-align:center"><div style="font-size:11px;font-weight:700;color:'+soldeColor+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Solde</div><div style="font-size:32px;font-weight:900;color:'+soldeColor+'">'+(solde>=0?'+':'')+solde.toFixed(2)+' €</div></div>';
         htmlB += '</div>';
-      } else if (bSub === 'ndf') {
-        htmlB += _renderNdfContent(cp, S.odmConfig||{});
       }
       htmlB += '</div></div>';
       return htmlB;
@@ -11158,7 +11270,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += bTabBtn('engagement','Dépenses');
     htmlB += bTabBtn('ressources','Recettes');
     htmlB += bTabBtn('synthese','Solde');
-    htmlB += bTabBtn('ndf','📋 NDF');
     htmlB += '<div style="width:1px;height:18px;background:rgba(255,255,255,.12);flex-shrink:0;margin:0 3px"></div>';
     htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" title="Imprimer A4" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">🖨️ Impr.</button>';
     htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" title="Export tableur (CSV)" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">📊 CSV</button>';
@@ -11257,9 +11368,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
     } else {
       /* ── Synthèse ou NDF ── */
-      if (bSub === 'ndf') {
-        htmlB += _renderNdfContent(cp, S.odmConfig||{});
-      } else {
+      {
       var totEng = calcTotal(bdata.engagement);
       var totRes = calcTotal(bdata.ressources);
       var solde  = totRes - totEng;
