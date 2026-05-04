@@ -9029,9 +9029,11 @@ function openOmForm(compId, staffOrigIdx) {
     + '<div style="'+lblSt+'">Lieu du déplacement</div>'
     + '<input id="om-lieu" type="text" value="'+escH(lieu)+'" placeholder="Ville, site…" style="'+inSt+'">'
     + '</div>'
-    + '<div>'
-    + '<div style="'+lblSt+'">Date(s) du déplacement</div>'
-    + '<input id="om-dates" type="text" value="'+escH(dateStr)+'" placeholder="JJ/MM/AAAA ou du … au …" style="'+inSt+'">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div><div style="'+lblSt+'">Date début</div>'
+    + '<input id="om-date-debut" type="date" value="'+escH(dateD)+'" style="'+inSt+';cursor:pointer"></div>'
+    + '<div><div style="'+lblSt+'">Date fin</div>'
+    + '<input id="om-date-fin" type="date" value="'+escH(dateF)+'" style="'+inSt+';cursor:pointer"></div>'
     + '</div>'
     + '<div>'
     + '<div style="'+lblSt+'">Objet de la mission</div>'
@@ -9058,7 +9060,6 @@ function openOmForm(compId, staffOrigIdx) {
     + '</div>';
 
   document.body.insertAdjacentHTML('beforeend', html);
-  _omCalcKm();
 }
 function _omChk(id, label, checked) {
   return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">'
@@ -9104,8 +9105,11 @@ function generateOmPdf(compId, staffOrigIdx) {
   var email  = pilot.email||s.email||'';
   var role   = s.role||'';
 
+  var _fmtD = function(d){ if(!d) return ''; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; };
   var lieu   = (document.getElementById('om-lieu')||{}).value||'';
-  var dates  = (document.getElementById('om-dates')||{}).value||'';
+  var dDebut = (document.getElementById('om-date-debut')||{}).value||'';
+  var dFin   = (document.getElementById('om-date-fin')||{}).value||'';
+  var dates  = dDebut ? (dFin && dFin!==dDebut ? 'Du '+_fmtD(dDebut)+' au '+_fmtD(dFin) : _fmtD(dDebut)) : '';
   var objet  = (document.getElementById('om-objet')||{}).value||'';
 
   var tTrain = document.getElementById('om-t-train')  && document.getElementById('om-t-train').checked;
