@@ -9316,11 +9316,70 @@ function _renderNdfContent(cp, cfg2) {
       + '<input type="checkbox"'+(ar2?' checked':'')+' onchange="_ndfUpdate(\''+omId+'\',\'ar\',this.checked)"> Aller-retour</label>';
     h += '<div style="flex:1"></div>';
     h += '<div id="ndf-total-'+om.id+'" style="font-size:13px;font-weight:800;color:var(--stol)">'+(tot2>0?'Total : '+tot2.toFixed(2)+' €':'')+'</div>';
-    h += '<button onclick="_ndfGenPdf(\''+omId+'\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Note de frais</button>';
+    h += '<button onclick="_ndfSyncBudget(\''+omId+'\')" title="Créer ou mettre à jour la ligne dans Dépenses" style="padding:6px 12px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">→ Dépenses</button>';
+    h += '<button onclick="_ndfGenPdf(\''+omId+'\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF</button>';
     h += '</div>';
     h += '</div>'; /* /card */
   });
   return h;
+}
+
+/* ── NDF → Budget Dépenses : créer ou mettre à jour la ligne engagement ─── */
+function _ndfSyncBudget(omId) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) return;
+  var ndf  = om.ndf || {};
+  var cfg  = S.odmConfig || {};
+  /* calcul total */
+  var km   = parseFloat(ndf.km)        || 0;
+  var taux = parseFloat(ndf.bareme)    || cfg.bareme1Taux || 0.331;
+  var ar   = ndf.ar !== false;
+  var dist = ar ? km*2 : km;
+  var total= parseFloat((dist*taux + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0)).toFixed(2));
+  if (total <= 0) { toast('Saisissez au moins la distance (km) avant de synchroniser',''); return; }
+  /* accès au budget de la compétition */
+  if (!S.budget)              S.budget = {};
+  if (!S.budget[om.compId])  S.budget[om.compId] = {};
+  if (!S.budget[om.compId].engagement) S.budget[om.compId].engagement = [];
+  var lines    = S.budget[om.compId].engagement;
+  var fullName = ((om.prenom||'')+' '+(om.nom||'')).trim();
+  /* 1. cherche une ligne déjà liée à cet OM */
+  var ligne = lines.find(function(l){ return l._omId === omId; });
+  /* 2. sinon cherche par nomLie + domaine NDF */
+  if (!ligne) {
+    ligne = lines.find(function(l){
+      return (l.nomLie||'').trim() === fullName
+          && (l.domaine||'').toLowerCase().replace(/[^a-z]/g,'').indexOf('frais') >= 0;
+    });
+  }
+  /* 3. sinon cherche par nomLie seul */
+  if (!ligne) {
+    ligne = lines.find(function(l){ return (l.nomLie||'').trim() === fullName; });
+  }
+  if (ligne) {
+    /* mise à jour du montant */
+    ligne.valeur  = total;
+    ligne._omId   = omId;
+    ligne.nbjours = 1;
+    ligne.qt      = 1;
+    toast('Ligne "'+fullName+'" mise à jour : '+total+' €','ok');
+  } else {
+    /* création */
+    var newId = 'ndf_'+Date.now();
+    lines.push({
+      id:      newId,
+      domaine: 'Frais déplacement',
+      libelle: 'NDF · '+(om.lieu||'déplacement'),
+      nomLie:  fullName,
+      valeur:  total,
+      nbjours: 1,
+      qt:      1,
+      _omId:   omId
+    });
+    toast('Ligne NDF créée pour '+fullName+' : '+total+' €','ok');
+  }
+  saveState();
+  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 }
 
 /* ── NDF : mise à jour des champs ──────────────────────────────────────── */
