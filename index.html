@@ -9222,8 +9222,183 @@ function generateOmPdf(compId, staffOrigIdx) {
       window.open('mailto:'+encodeURIComponent(email)+'?subject='+subj+'&body='+body);
     }, 800);
   }
+  /* ── Archivage OM ── */
+  if (!S.ordresMission) S.ordresMission = [];
+  var omId = 'om_' + Date.now();
+  S.ordresMission.push({
+    id:        omId,
+    compId:    compId,
+    staffIdx:  staffOrigIdx,
+    pilotId:   s.pilotId || s.id,
+    nom:       nom, prenom: prenom,
+    role:      role, email: email,
+    lieu:      lieu, dates: dates, objet: objet,
+    transport: { train:tTrain, federal:tFed, perso:tPerso, autre:tAutre, precision:tPrec },
+    genere:    new Date().toISOString(),
+    statut:    'genere'   /* genere | signe_encadrant | signe_president | valide */
+  });
+  saveState();
+
   closeOmForm();
   toast('OM généré ✓'+(email?' — email prêt':''), 'ok');
+
+  /* Rafraîchir la vue encadrants pour afficher le statut */
+  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+}
+
+function _omCycleStatut(omId) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) return;
+  var cycle = ['genere','signe_encadrant','signe_president','valide'];
+  var lbl   = {'genere':'Généré','signe_encadrant':'Signé encadrant','signe_president':'Signé présidente','valide':'Validé ✓'};
+  var idx   = cycle.indexOf(om.statut);
+  om.statut = cycle[(idx+1) % cycle.length];
+  om.statutDate = new Date().toISOString();
+  saveState();
+  toast('OM → '+lbl[om.statut], 'ok');
+  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+}
+
+/* ── NDF : mise à jour des champs ──────────────────────────────────────── */
+function _ndfUpdate(omId, field, value) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) return;
+  if (!om.ndf) om.ndf = {};
+  if (field === 'ar') {
+    om.ndf.ar = !!value;
+  } else if (field === 'bareme') {
+    om.ndf.bareme = parseFloat(value) || 0;
+  } else {
+    om.ndf[field] = parseFloat(value) || 0;
+  }
+  saveState();
+  /* Recalcul du total affiché sans re-render complet */
+  var ndf = om.ndf;
+  var km2    = parseFloat(ndf.km)    || 0;
+  var taux2  = parseFloat(ndf.bareme)|| (S.odmConfig&&S.odmConfig.bareme1Taux)||0.331;
+  var ar2    = ndf.ar !== false;
+  var dist2  = ar2 ? km2*2 : km2;
+  var total2 = dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
+  var totalEl = document.getElementById('ndf-total-'+omId);
+  if (totalEl) { totalEl.textContent = total2 > 0 ? 'Total : '+total2.toFixed(2)+' €' : ''; }
+}
+
+/* ── NDF : génération PDF Note de frais ────────────────────────────────── */
+function _ndfGenPdf(omId) {
+  var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  if (!om) { toast('OM introuvable','err'); return; }
+  var cfg  = S.odmConfig || {};
+  var ndf  = om.ndf || {};
+  var _esc = function(s){ return escH(s||''); };
+  var _fmtD = function(iso){
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  };
+  /* Calcul */
+  var km       = parseFloat(ndf.km)        || 0;
+  var taux     = parseFloat(ndf.bareme)    || cfg.bareme1Taux || 0.331;
+  var barLabel = taux === (cfg.bareme2Taux||0.412) ? (cfg.bareme2Label||'Voiture >5 CV') : (cfg.bareme1Label||'Voiture ≤5 CV');
+  var autoroute= parseFloat(ndf.autoroute) || 0;
+  var repas    = parseFloat(ndf.repas)     || 0;
+  var ar       = ndf.ar !== false;
+  var dist     = ar ? km*2 : km;
+  var montKm   = dist * taux;
+  var total    = montKm + autoroute + repas;
+  var today    = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  /* HTML du PDF */
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    + '<title>Note de Frais</title>'
+    + '<style>'
+    + 'body{font-family:Arial,sans-serif;font-size:11pt;color:#111;margin:0;padding:0}'
+    + '.page{width:210mm;min-height:297mm;padding:18mm 18mm 16mm;box-sizing:border-box}'
+    + 'h1{font-size:15pt;font-weight:800;text-align:center;margin:0 0 4px}'
+    + 'h2{font-size:11pt;font-weight:700;text-align:center;margin:0 0 16px;color:#555}'
+    + '.red{color:#c0392b}'
+    + '.header-band{background:#c0392b;color:#fff;padding:10px 16px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}'
+    + '.header-band .org{font-size:13pt;font-weight:800;letter-spacing:.5px}'
+    + '.header-band .doc{font-size:10pt;font-weight:700;opacity:.9}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:14px}'
+    + 'th{background:#c0392b;color:#fff;padding:6px 8px;text-align:left;font-size:10pt;font-weight:700}'
+    + 'td{padding:6px 8px;border-bottom:1px solid #e0e0e0;font-size:10pt;vertical-align:top}'
+    + 'tr:nth-child(even) td{background:#fafafa}'
+    + '.total-row td{background:#fff3cd!important;font-weight:800;font-size:11pt;border-top:2px solid #c0392b}'
+    + '.section-title{font-size:10pt;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;border-bottom:2px solid #c0392b;padding-bottom:3px}'
+    + '.sig-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px}'
+    + '.sig-box{border:1.5px solid #c0392b;border-radius:6px;padding:14px 10px;min-height:90px}'
+    + '.sig-box .sig-title{font-size:9pt;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}'
+    + '.sig-box .sig-name{font-size:10pt;font-weight:700;margin-bottom:14px}'
+    + '.sig-box .sig-date{font-size:9pt;color:#666}'
+    + '.footer{text-align:center;font-size:8pt;color:#999;margin-top:30px;border-top:1px solid #ddd;padding-top:8px}'
+    + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    + '</style></head><body><div class="page">'
+    /* En-tête bande rouge */
+    + '<div class="header-band">'
+    + '<span class="org">🪂 FFPLUM</span>'
+    + '<span class="doc">NOTE DE FRAIS</span>'
+    + '</div>'
+    /* Titre */
+    + '<h1>Note de Frais de Déplacement</h1>'
+    + '<h2>Fédération Française de Parachutisme et de Vol Ultra-Léger Motorisé</h2>'
+    /* Bénéficiaire */
+    + '<div class="section-title">Bénéficiaire</div>'
+    + '<table><thead><tr><th>Nom</th><th>Prénom</th><th>Rôle</th><th>Email</th></tr></thead><tbody>'
+    + '<tr><td>'+_esc(om.nom)+'</td><td>'+_esc(om.prenom)+'</td><td>'+_esc(om.role)+'</td><td>'+_esc(om.email)+'</td></tr>'
+    + '</tbody></table>'
+    /* Référence OM */
+    + '<div class="section-title">Ordre de Mission de référence</div>'
+    + '<table><thead><tr><th>Lieu / Compétition</th><th>Dates</th><th>Objet</th><th>N° OM</th></tr></thead><tbody>'
+    + '<tr><td>'+_esc(om.lieu)+'</td><td>'+_esc(om.dates)+'</td><td>'+_esc(om.objet)+'</td><td style="font-size:9pt;color:#666">'+_esc(om.id)+'</td></tr>'
+    + '</tbody></table>'
+    /* Détail des frais */
+    + '<div class="section-title">Détail des frais</div>'
+    + '<table><thead><tr><th>Nature</th><th style="text-align:right">Montant</th></tr></thead><tbody>'
+    + '<tr><td>Indemnités kilométriques — '+_esc(barLabel)+'<br>'
+    + '<span style="font-size:9pt;color:#666">'+km.toFixed(0)+' km aller'+(ar?' × 2 (A/R)':'')+' = '+dist.toFixed(0)+' km × '+taux+' €/km</span></td>'
+    + '<td style="text-align:right;font-weight:700">'+montKm.toFixed(2)+' €</td></tr>'
+    + (autoroute > 0 ? '<tr><td>Péages autoroute</td><td style="text-align:right;font-weight:700">'+autoroute.toFixed(2)+' €</td></tr>' : '')
+    + (repas > 0     ? '<tr><td>Frais de repas</td><td style="text-align:right;font-weight:700">'+repas.toFixed(2)+' €</td></tr>' : '')
+    + '<tr class="total-row"><td>TOTAL À REMBOURSER</td><td style="text-align:right">'+total.toFixed(2)+' €</td></tr>'
+    + '</tbody></table>'
+    /* Zones de signature */
+    + '<div class="section-title">Signatures</div>'
+    + '<div class="sig-grid">'
+    /* DTN */
+    + '<div class="sig-box">'
+    + '<div class="sig-title">Le DTN</div>'
+    + '<div class="sig-name">Direction Technique Nationale</div>'
+    + '<div class="sig-date">Date : '+today+'</div>'
+    + '<div style="margin-top:22px;height:1px;background:#c0392b;opacity:.4"></div>'
+    + '</div>'
+    /* Bénéficiaire */
+    + '<div class="sig-box">'
+    + '<div class="sig-title">Le Bénéficiaire</div>'
+    + '<div class="sig-name">'+_esc(om.prenom)+' '+_esc(om.nom)+'</div>'
+    + '<div class="sig-date">Lu et approuvé</div>'
+    + '<div style="margin-top:22px;height:1px;background:#c0392b;opacity:.4"></div>'
+    + '</div>'
+    /* Présidente */
+    + '<div class="sig-box">'
+    + '<div class="sig-title">'+_esc(cfg.presidentTitre||'Présidente')+'</div>'
+    + '<div class="sig-name">'+_esc(cfg.presidentNom||'Laura Macdonald')+'</div>'
+    + '<div class="sig-date">Date :</div>'
+    + '<div style="margin-top:22px;height:1px;background:#c0392b;opacity:.4"></div>'
+    + '</div>'
+    + '</div>'
+    /* Pied de page */
+    + '<div class="footer">FFPLUM — Document généré le '+today+' — Confidentiel</div>'
+    + '</div></body></html>';
+  /* Ouverture dans un nouvel onglet pour impression / téléchargement */
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les popups pour générer le PDF','err'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.focus(); w.print(); }, 400);
+  /* Mise à jour statut si encore 'genere' → passe à signe_encadrant après NDF */
+  /* (optionnel : on laisse le cycle manuel via l'encadrant) */
+  toast('Note de frais générée ✓','ok');
 }
 
 function sendOdmToStaff(compId, staffOrigIdx) {
@@ -10522,9 +10697,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(lic2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(tel2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(email2||'—')+'</div>';
-        html3 += '<div style="display:flex;align-items:center;justify-content:center;gap:4px">';
-        html3 += '<button onclick="event.stopPropagation();openOmForm(\''+cidS+'\','+si+')" style="width:30px;height:28px;border-radius:6px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:10px;font-weight:800;cursor:pointer;font-family:inherit" title="Créer un ordre de mission">OM</button>';
-        html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+'" title="Supprimer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
+        /* Statut OM de cet encadrant pour cette compétition */
+        var _omList = (S.ordresMission||[]).filter(function(o){ return o.compId===cidS && (o.pilotId===(s.pilotId||s.id)); });
+        var _omLast = _omList.length ? _omList[_omList.length-1] : null;
+        var _omStatutColor = {'genere':'#f59e0b','signe_encadrant':'#3b82f6','signe_president':'#8b5cf6','valide':'#22c55e'}[_omLast&&_omLast.statut] || '';
+        var _omStatutLbl   = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'Validé'}[_omLast&&_omLast.statut] || '';
+        html3 += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">';
+        html3 += '<button onclick="event.stopPropagation();openOmForm(\''+cidS+'\','+si+')" style="width:30px;height:22px;border-radius:5px;border:1px solid var(--stol);background:none;color:var(--stol);font-size:9px;font-weight:800;cursor:pointer;font-family:inherit" title="Créer un ordre de mission">+ OM</button>';
+        if (_omLast) {
+          html3 += '<div onclick="event.stopPropagation();_omCycleStatut(\''+_omLast.id+'\')" style="font-size:8px;font-weight:700;color:'+_omStatutColor+';cursor:pointer;text-align:center;white-space:nowrap" title="Cliquer pour changer le statut">'+_omStatutLbl+'</div>';
+        }
+        html3 += (canEditS ? '<button onclick="event.stopPropagation();hdgRemoveStaff(\''+cidS+'\','+si+')" style="'+_rmBS+';width:22px;height:22px;font-size:14px" title="Supprimer">×</button>' : '<span style="font-size:12px;color:var(--txt3)">›</span>');
         html3 += '</div>';
         html3 += '</div>';
       }
@@ -10754,6 +10937,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += bTabBtn('engagement','💸 Dépenses');
       htmlB += bTabBtn('ressources','💰 Recettes');
       htmlB += bTabBtn('synthese','⚖️ Solde');
+      htmlB += bTabBtn('ndf','📋 NDF');
       htmlB += '</div>';
       htmlB += '<div style="flex:1;overflow-y:auto;padding:12px 12px 20px">';
 
@@ -10840,6 +11024,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += bTabBtn('engagement','Dépenses');
     htmlB += bTabBtn('ressources','Recettes');
     htmlB += bTabBtn('synthese','Solde');
+    htmlB += bTabBtn('ndf','📋 NDF');
     htmlB += '<div style="width:1px;height:18px;background:rgba(255,255,255,.12);flex-shrink:0;margin:0 3px"></div>';
     htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" title="Imprimer A4" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">🖨️ Impr.</button>';
     htmlB += '<button onclick="exportBudgetExcel(\''+cpIdS2+'\')" title="Export tableur (CSV)" style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s" onmouseover="this.style.color=\'var(--txt)\'" onmouseout="this.style.color=\'var(--txt3)\'">📊 CSV</button>';
@@ -11008,6 +11193,73 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
       htmlB += '</div>';
     }
+
+    /* ── NDF : Notes de frais liées aux OM ───────────────────────────── */
+    if (bSub === 'ndf') {
+      var cfg2 = S.odmConfig || {};
+      var omPourCetteComp = (S.ordresMission||[]).filter(function(o){ return o.compId === cp.id; });
+      if (!omPourCetteComp.length) {
+        htmlB += '<div style="padding:40px;text-align:center;color:var(--txt3)">'
+          + '<div style="font-size:32px;margin-bottom:12px">📋</div>'
+          + '<div style="font-size:14px;font-weight:700;margin-bottom:6px">Aucun ordre de mission</div>'
+          + '<div style="font-size:12px">Créez d\'abord un OM depuis l\'onglet Encadrants</div>'
+          + '</div>';
+      } else {
+        var statCoul = {'genere':'#f59e0b','signe_encadrant':'#3b82f6','signe_president':'#8b5cf6','valide':'#22c55e'};
+        var statLbl  = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'Validé'};
+        omPourCetteComp.forEach(function(om) {
+          var ndf = om.ndf || {};
+          var hasNdf = om.ndf && (om.ndf.km || om.ndf.autoroute || om.ndf.repas);
+          var sc = statCoul[om.statut]||'#999';
+          var sl = statLbl[om.statut]||om.statut;
+          var omIdS = om.id.replace(/'/g,"\\'");
+          htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+sc+'">';
+          /* En-tête OM */
+          htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+          htmlB += '<div><div style="font-size:13px;font-weight:800">'+(om.prenom||'')+' '+(om.nom||'')+'</div>'
+            + '<div style="font-size:11px;color:var(--txt3)">'+(om.role||'')+(om.lieu?' · '+om.lieu:'')+(om.dates?' · '+om.dates:'')+'</div></div>';
+          htmlB += '<div style="display:flex;align-items:center;gap:8px">';
+          htmlB += '<span style="font-size:10px;font-weight:700;color:'+sc+';background:'+sc+'22;padding:3px 8px;border-radius:20px">'+sl+'</span>';
+          htmlB += '</div></div>';
+          /* Formulaire NDF */
+          htmlB += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">';
+          var ndfIn = function(fld, lbl, unit, val) {
+            return '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">'+lbl+(unit?' ('+unit+')':'')+'</div>'
+              + '<input type="number" min="0" step="0.01" value="'+(val||'')+'" placeholder="0"'
+              + ' style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;text-align:right"'
+              + ' oninput="_ndfUpdate(\''+omIdS+'\',\''+fld+'\',this.value)">'
+              + '</div>';
+          };
+          htmlB += ndfIn('km',        'Distance aller', 'km',  ndf.km);
+          var b1l2 = bEsc(cfg2.bareme1Label||'≤5 CV'); var b1t2 = cfg2.bareme1Taux||0.331;
+          var b2l2 = bEsc(cfg2.bareme2Label||'>5 CV'); var b2t2 = cfg2.bareme2Taux||0.412;
+          htmlB += '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">Barème</div>'
+            + '<select style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;cursor:pointer" id="ndf-bareme-'+om.id+'" onchange="_ndfUpdate(\''+omIdS+'\',\'bareme\',this.value)">'
+            + '<option value="'+b1t2+'"'+(ndf.bareme==b1t2?' selected':'')+'>'+b1l2+'</option>'
+            + '<option value="'+b2t2+'"'+(ndf.bareme==b2t2?' selected':'')+'>'+b2l2+'</option>'
+            + '</select></div>';
+          htmlB += ndfIn('autoroute', 'Autoroute',     '€',  ndf.autoroute);
+          htmlB += ndfIn('repas',     'Repas',         '€',  ndf.repas);
+          htmlB += '</div>';
+          /* Case A/R + total calculé */
+          var km2   = parseFloat(ndf.km)||0;
+          var taux2 = parseFloat(ndf.bareme)||b1t2;
+          var ar2   = ndf.ar !== false;
+          var dist2 = ar2 ? km2*2 : km2;
+          var total2= dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
+          htmlB += '<div style="display:flex;align-items:center;gap:12px">';
+          htmlB += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">'
+            + '<input type="checkbox" id="ndf-ar-'+om.id+'"'+(ar2?' checked':'')
+            + ' onchange="_ndfUpdate(\''+omIdS+'\',\'ar\',this.checked)"> Aller-retour</label>';
+          htmlB += '<div style="flex:1"></div>';
+          htmlB += '<div id="ndf-total-'+om.id+'" style="font-size:13px;font-weight:800;color:var(--stol)">'+(total2 > 0 ? 'Total : '+total2.toFixed(2)+' €' : '')+'</div>';
+          htmlB += '<button onclick="_ndfGenPdf(\''+omIdS+'\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Note de frais</button>';
+          htmlB += '</div>';
+          htmlB += '</div>'; /* /card OM */
+        });
+      }
+    }
+
     htmlB += '</div></div>';
     return htmlB;
 
