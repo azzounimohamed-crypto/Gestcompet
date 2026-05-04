@@ -9259,6 +9259,70 @@ function _omCycleStatut(omId) {
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 }
 
+/* ── NDF : rendu HTML commun mobile + desktop ──────────────────────────── */
+function _renderNdfContent(cp, cfg2) {
+  var bEscL = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var omList = (S.ordresMission||[]).filter(function(o){ return o.compId === cp.id; });
+  var h = '';
+  if (!omList.length) {
+    return '<div style="padding:40px;text-align:center;color:var(--txt3)">'
+      + '<div style="font-size:32px;margin-bottom:12px">📋</div>'
+      + '<div style="font-size:14px;font-weight:700;margin-bottom:6px">Aucun ordre de mission</div>'
+      + '<div style="font-size:12px">Créez d\'abord un OM depuis l\'onglet Encadrants</div>'
+      + '</div>';
+  }
+  var statCoul = {'genere':'#f59e0b','signe_encadrant':'#3b82f6','signe_president':'#8b5cf6','valide':'#22c55e'};
+  var statLbl  = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'Validé'};
+  var b1t = cfg2.bareme1Taux||0.331;
+  var b2t = cfg2.bareme2Taux||0.412;
+  omList.forEach(function(om) {
+    var ndf  = om.ndf || {};
+    var sc   = statCoul[om.statut]||'#999';
+    var sl   = statLbl[om.statut]||om.statut;
+    var omId = om.id.replace(/'/g,"\\'");
+    h += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+sc+'">';
+    /* En-tête */
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+    h += '<div><div style="font-size:13px;font-weight:800">'+bEscL(om.prenom)+' '+bEscL(om.nom)+'</div>'
+      + '<div style="font-size:11px;color:var(--txt3)">'+bEscL(om.role||'')+(om.lieu?' · '+bEscL(om.lieu):'')+(om.dates?' · '+bEscL(om.dates):'')+'</div></div>';
+    h += '<span style="font-size:10px;font-weight:700;color:'+sc+';background:'+sc+'22;padding:3px 8px;border-radius:20px">'+sl+'</span>';
+    h += '</div>';
+    /* Grille champs */
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">';
+    var ndfIn = function(fld, lbl, unit, val) {
+      return '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">'+lbl+(unit?' ('+unit+')':'')+'</div>'
+        + '<input type="number" min="0" step="0.01" value="'+(val!=null&&val!==''?val:'')+'" placeholder="0"'
+        + ' style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;text-align:right"'
+        + ' oninput="_ndfUpdate(\''+omId+'\',\''+fld+'\',this.value)">'
+        + '</div>';
+    };
+    h += ndfIn('km',       'Distance aller','km', ndf.km);
+    h += '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">Barème</div>'
+      + '<select style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;cursor:pointer" onchange="_ndfUpdate(\''+omId+'\',\'bareme\',this.value)">'
+      + '<option value="'+b1t+'"'+(parseFloat(ndf.bareme)===b1t?' selected':(!ndf.bareme?' selected':''))+'>'+bEscL(cfg2.bareme1Label||'≤5 CV')+'</option>'
+      + '<option value="'+b2t+'"'+(parseFloat(ndf.bareme)===b2t?' selected':'')+'>'+bEscL(cfg2.bareme2Label||'>5 CV')+'</option>'
+      + '</select></div>';
+    h += ndfIn('autoroute','Autoroute',     '€',  ndf.autoroute);
+    h += ndfIn('repas',    'Repas',         '€',  ndf.repas);
+    h += '</div>';
+    /* A/R + total */
+    var km2   = parseFloat(ndf.km)||0;
+    var taux2 = parseFloat(ndf.bareme)||b1t;
+    var ar2   = ndf.ar !== false;
+    var dist2 = ar2 ? km2*2 : km2;
+    var tot2  = dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
+    h += '<div style="display:flex;align-items:center;gap:12px">';
+    h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">'
+      + '<input type="checkbox"'+(ar2?' checked':'')+' onchange="_ndfUpdate(\''+omId+'\',\'ar\',this.checked)"> Aller-retour</label>';
+    h += '<div style="flex:1"></div>';
+    h += '<div id="ndf-total-'+om.id+'" style="font-size:13px;font-weight:800;color:var(--stol)">'+(tot2>0?'Total : '+tot2.toFixed(2)+' €':'')+'</div>';
+    h += '<button onclick="_ndfGenPdf(\''+omId+'\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Note de frais</button>';
+    h += '</div>';
+    h += '</div>'; /* /card */
+  });
+  return h;
+}
+
 /* ── NDF : mise à jour des champs ──────────────────────────────────────── */
 function _ndfUpdate(omId, field, value) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
@@ -11002,7 +11066,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlB += '<span style="font-size:22px;font-weight:900;color:'+secColor+'">'+tot.toFixed(2)+' €</span>';
         htmlB += '</div>';
 
-      } else { // synthese mobile
+      } else if (bSub === 'synthese') {
         var totEng = calcTotal(bdata.engagement);
         var totRes = calcTotal(bdata.ressources);
         var solde  = totRes - totEng;
@@ -11012,6 +11076,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid #3b82f6;text-align:center"><div style="font-size:11px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Total Recettes</div><div style="font-size:28px;font-weight:900;color:#3b82f6">'+totRes.toFixed(2)+' €</div></div>';
         htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:16px;border-top:4px solid '+soldeColor+';text-align:center"><div style="font-size:11px;font-weight:700;color:'+soldeColor+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Solde</div><div style="font-size:32px;font-weight:900;color:'+soldeColor+'">'+(solde>=0?'+':'')+solde.toFixed(2)+' €</div></div>';
         htmlB += '</div>';
+      } else if (bSub === 'ndf') {
+        htmlB += _renderNdfContent(cp, S.odmConfig||{});
       }
       htmlB += '</div></div>';
       return htmlB;
@@ -11121,7 +11187,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<span id="budget-total-'+section+'" style="font-size:16px;font-weight:900;color:'+secColor+'">'+tot.toFixed(2)+' €</span>';
       htmlB += '</div>';
 
-    } else { // synthese = Budget E/R
+    } else if (bSub === 'synthese') { // Solde
       var totEng = calcTotal(bdata.engagement);
       var totRes = calcTotal(bdata.ressources);
       var solde  = totRes - totEng;
@@ -11195,69 +11261,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
 
     /* ── NDF : Notes de frais liées aux OM ───────────────────────────── */
-    if (bSub === 'ndf') {
-      var cfg2 = S.odmConfig || {};
-      var omPourCetteComp = (S.ordresMission||[]).filter(function(o){ return o.compId === cp.id; });
-      if (!omPourCetteComp.length) {
-        htmlB += '<div style="padding:40px;text-align:center;color:var(--txt3)">'
-          + '<div style="font-size:32px;margin-bottom:12px">📋</div>'
-          + '<div style="font-size:14px;font-weight:700;margin-bottom:6px">Aucun ordre de mission</div>'
-          + '<div style="font-size:12px">Créez d\'abord un OM depuis l\'onglet Encadrants</div>'
-          + '</div>';
-      } else {
-        var statCoul = {'genere':'#f59e0b','signe_encadrant':'#3b82f6','signe_president':'#8b5cf6','valide':'#22c55e'};
-        var statLbl  = {'genere':'Généré','signe_encadrant':'Signé enc.','signe_president':'Signé prés.','valide':'Validé'};
-        omPourCetteComp.forEach(function(om) {
-          var ndf = om.ndf || {};
-          var hasNdf = om.ndf && (om.ndf.km || om.ndf.autoroute || om.ndf.repas);
-          var sc = statCoul[om.statut]||'#999';
-          var sl = statLbl[om.statut]||om.statut;
-          var omIdS = om.id.replace(/'/g,"\\'");
-          htmlB += '<div style="background:var(--navy3);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+sc+'">';
-          /* En-tête OM */
-          htmlB += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
-          htmlB += '<div><div style="font-size:13px;font-weight:800">'+(om.prenom||'')+' '+(om.nom||'')+'</div>'
-            + '<div style="font-size:11px;color:var(--txt3)">'+(om.role||'')+(om.lieu?' · '+om.lieu:'')+(om.dates?' · '+om.dates:'')+'</div></div>';
-          htmlB += '<div style="display:flex;align-items:center;gap:8px">';
-          htmlB += '<span style="font-size:10px;font-weight:700;color:'+sc+';background:'+sc+'22;padding:3px 8px;border-radius:20px">'+sl+'</span>';
-          htmlB += '</div></div>';
-          /* Formulaire NDF */
-          htmlB += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">';
-          var ndfIn = function(fld, lbl, unit, val) {
-            return '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">'+lbl+(unit?' ('+unit+')':'')+'</div>'
-              + '<input type="number" min="0" step="0.01" value="'+(val||'')+'" placeholder="0"'
-              + ' style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;text-align:right"'
-              + ' oninput="_ndfUpdate(\''+omIdS+'\',\''+fld+'\',this.value)">'
-              + '</div>';
-          };
-          htmlB += ndfIn('km',        'Distance aller', 'km',  ndf.km);
-          var b1l2 = bEsc(cfg2.bareme1Label||'≤5 CV'); var b1t2 = cfg2.bareme1Taux||0.331;
-          var b2l2 = bEsc(cfg2.bareme2Label||'>5 CV'); var b2t2 = cfg2.bareme2Taux||0.412;
-          htmlB += '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">Barème</div>'
-            + '<select style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;cursor:pointer" id="ndf-bareme-'+om.id+'" onchange="_ndfUpdate(\''+omIdS+'\',\'bareme\',this.value)">'
-            + '<option value="'+b1t2+'"'+(ndf.bareme==b1t2?' selected':'')+'>'+b1l2+'</option>'
-            + '<option value="'+b2t2+'"'+(ndf.bareme==b2t2?' selected':'')+'>'+b2l2+'</option>'
-            + '</select></div>';
-          htmlB += ndfIn('autoroute', 'Autoroute',     '€',  ndf.autoroute);
-          htmlB += ndfIn('repas',     'Repas',         '€',  ndf.repas);
-          htmlB += '</div>';
-          /* Case A/R + total calculé */
-          var km2   = parseFloat(ndf.km)||0;
-          var taux2 = parseFloat(ndf.bareme)||b1t2;
-          var ar2   = ndf.ar !== false;
-          var dist2 = ar2 ? km2*2 : km2;
-          var total2= dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
-          htmlB += '<div style="display:flex;align-items:center;gap:12px">';
-          htmlB += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">'
-            + '<input type="checkbox" id="ndf-ar-'+om.id+'"'+(ar2?' checked':'')
-            + ' onchange="_ndfUpdate(\''+omIdS+'\',\'ar\',this.checked)"> Aller-retour</label>';
-          htmlB += '<div style="flex:1"></div>';
-          htmlB += '<div id="ndf-total-'+om.id+'" style="font-size:13px;font-weight:800;color:var(--stol)">'+(total2 > 0 ? 'Total : '+total2.toFixed(2)+' €' : '')+'</div>';
-          htmlB += '<button onclick="_ndfGenPdf(\''+omIdS+'\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Note de frais</button>';
-          htmlB += '</div>';
-          htmlB += '</div>'; /* /card OM */
-        });
-      }
+    } else if (bSub === 'ndf') {
+      htmlB += _renderNdfContent(cp, S.odmConfig||{});
     }
 
     htmlB += '</div></div>';
