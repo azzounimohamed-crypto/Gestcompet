@@ -8974,9 +8974,18 @@ function removeOdmPdf() {
    ORDRE DE MISSION NUMÉRIQUE
    ══════════════════════════════════════════════════════════ */
 function openOmForm(compId, staffOrigIdx) {
+  /* helpers locaux */
+  var _esc = function(s){ return escH(s||''); };
+  var _fmtD = function(d){
+    if (!d) return '';
+    var p = d.split('-');
+    return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : d;
+  };
+
   var staffArr = S.staff && S.staff[compId];
   var s = staffArr && staffArr[staffOrigIdx];
-  var pilot = s ? (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{} : {};
+  if (!s) { toast('Encadrant introuvable','err'); return; }
+  var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
   var cfg = S.odmConfig || {};
 
@@ -8985,10 +8994,10 @@ function openOmForm(compId, staffOrigIdx) {
   var adresse= pilot.adresse||s.adresse||'';
   var email  = pilot.email||s.email||'';
   var role   = s.role||'';
-  var lieu   = cp.nom||'';
+  var lieu   = cp.lieu||cp.site||cp.nom||'';
   var dateD  = cp.dateDebut||'';
   var dateF  = cp.dateFin||'';
-  var dateStr= dateD ? (dateF && dateF!==dateD ? _fmtDate(dateD)+' au '+_fmtDate(dateF) : _fmtDate(dateD)) : '';
+  var dateStr= dateD ? (dateF && dateF!==dateD ? _fmtD(dateD)+' au '+_fmtD(dateF) : _fmtD(dateD)) : '';
 
   var b1l = escH(cfg.bareme1Label||'Voiture ≤5 CV');
   var b2l = escH(cfg.bareme2Label||'Voiture >5 CV');
@@ -9071,7 +9080,7 @@ function openOmForm(compId, staffOrigIdx) {
     /* Footer */
     + '<div style="display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--bdr);flex-shrink:0">'
     + '<button onclick="closeOmForm()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
-    + '<button onclick="generateOmPdf(\''+escS(compId)+'\','+staffOrigIdx+')" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 Générer & Envoyer l\'OM</button>'
+    + '<button onclick="generateOmPdf(\''+compId.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',' +staffOrigIdx+')" style="flex:2;padding:10px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📄 Générer & Envoyer l\'OM</button>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -9110,9 +9119,11 @@ function closeOmForm() {
 }
 
 function generateOmPdf(compId, staffOrigIdx) {
+  var _esc = function(s){ return escH(s||''); };
   var staffArr = S.staff && S.staff[compId];
   var s = staffArr && staffArr[staffOrigIdx];
-  var pilot = s ? (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{} : {};
+  if (!s) { toast('Encadrant introuvable','err'); return; }
+  var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
   var cfg = S.odmConfig || {};
 
   var prenom = pilot.prenom||s.prenom||'';
