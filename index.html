@@ -6617,26 +6617,15 @@ var _homeTodoPanelOpen = false;
 function syncHomeRailVisibility() {
   var rail = document.getElementById('home-side-rail');
   if (!rail) return;
+  var drawerOpen = _homeCompDrawerOpen || _homeTodoPanelOpen;
   var onHome = (_curPage === 'page-home');
   var desktop = window.innerWidth >= 768;
-  if (!onHome || !desktop) { rail.style.display = 'none'; return; }
+  if (!desktop || drawerOpen) { rail.style.display = 'none'; return; }
   rail.style.display = 'flex';
-  /* Quand À faire est ouvert : fixer le rail juste à sa droite pour qu'il reste cliquable */
-  if (_homeTodoPanelOpen) {
-    rail.style.position = 'fixed';
-    rail.style.left     = '264px';
-    rail.style.top      = '120px';
-    rail.style.zIndex   = '270';
-  } else {
-    rail.style.position = 'absolute';
-    rail.style.left     = '-44px';
-    rail.style.top      = '120px';
-    rail.style.zIndex   = '26';
-  }
   var btnDocuments = document.getElementById('home-open-comps-btn');
   var btnTodo      = document.getElementById('home-open-todo-btn');
-  if (btnDocuments) btnDocuments.style.display = _homeCompDrawerOpen ? 'none' : '';
-  if (btnTodo)      btnTodo.style.display      = _homeTodoPanelOpen  ? 'none' : '';
+  if (btnDocuments) btnDocuments.style.display = onHome ? '' : 'none';
+  if (btnTodo)      btnTodo.style.display      = onHome ? '' : 'none';
 }
 function retourFromBase() {
   // S'assurer que l'app est visible (pas le portail DTN)
