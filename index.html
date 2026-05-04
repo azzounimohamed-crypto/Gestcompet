@@ -9304,8 +9304,10 @@ function _omOpenHtml(html, title) {
 function _envoyerOmEmail(omId) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
   if (!om) { toast('OM introuvable','err'); return; }
-  var cp  = (S.comps||[]).find(function(c){ return c.id===om.compId; })||{};
+  var cp  = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
   var cfg = S.odmConfig||{};
+  var presNom     = cfg.presidentNom   || 'La Présidente';
+  var presTitre   = cfg.presidentTitre || 'Présidente';
   var nomComplet  = ((om.prenom||'')+' '+(om.nom||'')).trim();
   var dest        = om.email||'';
   if (!dest) { toast('Email manquant — vérifiez la fiche encadrant','err'); return; }
@@ -9330,57 +9332,100 @@ function _envoyerOmEmail(omId) {
     'Bonjour '+om.prenom+',\n\n'
     +'Vous trouverez ci-joint votre Ordre de Mission (réf. '+ref+') pour la compétition «'+(cp.nom||'')+'».\n'
     +'Merci de cliquer sur le bouton de confirmation dans le document joint.\n\n'
-    +cfg.presidentNom+'\n'+(cfg.presidentTitre||'Présidente')+' FFPLUM'
+    +presNom+'\n'+presTitre+' — FFPLUM'
   );
   var lienEmail = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujetEmail+'&body='+corpsEmail;
 
-  var logo = (S.settings&&S.settings.logo) ? '<img src="'+S.settings.logo+'" style="height:60px;object-fit:contain">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8;letter-spacing:1px">FFPLUM</div>';
+  var logo    = (S.settings&&S.settings.logo) ? '<img src="'+S.settings.logo+'" style="height:60px;object-fit:contain">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8;letter-spacing:1px">FFPLUM</div>';
+  var sigImg  = (S.docSettings&&S.docSettings.signatureImage) ? '<img src="'+S.docSettings.signatureImage+'" style="max-height:60px;max-width:180px;object-fit:contain">' : '';
+  var today   = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
 
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ODM '+ref+'</title>'
-    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;color:#111;padding:24px 12px}'
-    +'.card{background:#fff;border-radius:12px;max-width:640px;margin:0 auto;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}'
+    +'body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;color:#111;padding:24px 12px}'
+    +'.card{background:#fff;border-radius:12px;max-width:680px;margin:0 auto;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}'
     +'.hdr{background:#1d4ed8;padding:24px 32px;display:flex;align-items:center;justify-content:space-between}'
-    +'.hdr-title{color:#fff;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.85}'
-    +'.hdr-ref{color:#93c5fd;font-size:12px;margin-top:4px}'
+    +'.hdr-title{color:#fff;font-size:14px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}'
+    +'.hdr-ref{color:#93c5fd;font-size:11px;margin-top:5px}'
     +'.body{padding:32px}'
-    +'.greeting{font-size:18px;font-weight:700;margin-bottom:8px}'
-    +'.intro{color:#374151;font-size:14px;line-height:1.6;margin-bottom:24px}'
-    +'.section{background:#f8fafc;border-radius:8px;padding:20px;margin-bottom:20px;border-left:4px solid #1d4ed8}'
-    +'.row{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:13px}'
+    +'.intro{color:#374151;font-size:14px;line-height:1.7;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid #e5e7eb}'
+    +'.section{margin-bottom:24px}'
+    +'.section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1d4ed8;margin-bottom:10px}'
+    +'.row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;align-items:baseline}'
     +'.row:last-child{border-bottom:none}'
-    +'.lbl{color:#6b7280;min-width:120px;font-weight:600;flex-shrink:0}'
+    +'.lbl{color:#6b7280;min-width:130px;font-weight:700;flex-shrink:0;font-size:11px;text-transform:uppercase;letter-spacing:.3px}'
     +'.val{color:#111;font-weight:500}'
-    +'.action{text-align:center;padding:24px;background:#eff6ff;border-radius:8px;margin-bottom:20px}'
-    +'.action p{font-size:13px;color:#374151;margin-bottom:16px;line-height:1.5}'
-    +'.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}'
-    +'.tbtn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:7px;border:1px solid #d1d5db;background:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;color:#374151}'
+    +'.action{text-align:center;padding:28px;background:#eff6ff;border-radius:10px;margin-bottom:24px;border:1px solid #bfdbfe}'
+    +'.action p{font-size:13px;color:#1e40af;margin-bottom:18px;line-height:1.6;font-weight:500}'
+    +'.sig-block{display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:20px;border-top:2px solid #e5e7eb;gap:20px}'
+    +'.sig-side{flex:1}'
+    +'.sig-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:6px}'
+    +'.sig-name{font-size:13px;font-weight:700;color:#111}'
+    +'.sig-title{font-size:11px;color:#6b7280}'
+    +'.sig-line{border-top:1px solid #d1d5db;margin-top:12px;padding-top:6px}'
+    +'.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb}'
+    +'.tbtn{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:7px;border:1px solid #d1d5db;background:#fff;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;color:#374151;white-space:nowrap}'
     +'.tbtn:hover{background:#f9fafb}'
-    +'.ftr{background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;line-height:1.7}'
-    +'@media print{.toolbar{display:none}.card{box-shadow:none}.action{border:2px solid #1d4ed8}}'
+    +'.tbtn-note{font-size:11px;color:#6b7280;align-self:center;margin-left:4px}'
+    +'.ftr{background:#1d4ed8;padding:16px 32px;font-size:11px;color:#bfdbfe;display:flex;justify-content:space-between;align-items:center}'
+    +'@media print{'
+    +'.toolbar{display:none!important}'
+    +'body{background:#fff;padding:0}'
+    +'.card{box-shadow:none;border-radius:0;max-width:100%}'
+    +'.action{border:2px solid #1d4ed8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'.hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'.ftr{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'}'
     +'</style></head><body>'
     +'<div class="card">'
-    +'<div class="hdr"><div>'+logo+'</div><div style="text-align:right"><div class="hdr-title">Ordre de Mission</div><div class="hdr-ref">Réf. '+ref+'</div></div></div>'
+    +'<div class="hdr"><div>'+logo+'</div>'
+    +'<div style="text-align:right"><div class="hdr-title">Ordre de Mission</div>'
+    +'<div class="hdr-ref">Réf. '+ref+' &nbsp;·&nbsp; Émis le '+today+'</div></div></div>'
     +'<div class="body">'
+
+    /* ── Toolbar ── */
     +'<div class="toolbar">'
-    +'<a href="'+lienEmail+'" class="tbtn" onclick="this.style.background=\'#eff6ff\'">📧 Envoyer par email</a>'
-    +'<button class="tbtn" onclick="window.print()">🖨 Imprimer / PDF</button>'
+    +'<a href="'+lienEmail+'" class="tbtn" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">📧 Envoyer par email</a>'
+    +'<button class="tbtn" onclick="window.print()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">🖨 Télécharger / Imprimer PDF</button>'
+    +'<span class="tbtn-note">💡 Enregistrez le PDF puis joignez-le à votre email</span>'
     +'</div>'
-    +'<div class="greeting">Bonjour '+(om.prenom||'')+',</div>'
-    +'<p class="intro">La <strong>Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM)</strong>'
-    +' vous adresse votre Ordre de Mission pour la compétition <strong>'+(cp.nom||'')+'</strong>.</p>'
-    +'<div class="section">'
-    +'<div class="row"><span class="lbl">Bénéficiaire</span><span class="val">'+nomComplet+'</span></div>'
+
+    /* ── Intro ── */
+    +'<p class="intro">La <strong>Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM)</strong> mandate <strong>'+nomComplet+'</strong> dans le cadre de la compétition <strong>'+(cp.nom||'(voir ci-dessous)')+'</strong>.</p>'
+
+    /* ── Détails mission ── */
+    +'<div class="section"><div class="section-title">Détails de la mission</div>'
+    +'<div class="row"><span class="lbl">Bénéficiaire</span><span class="val"><strong>'+nomComplet+'</strong></span></div>'
     +'<div class="row"><span class="lbl">Fonction</span><span class="val">'+(om.role||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Compétition</span><span class="val">'+(cp.nom||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Lieu</span><span class="val">'+(om.lieu||cp.lieu||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Dates</span><span class="val">'+(om.dates||'—')+'</span></div>'
     +'<div class="row"><span class="lbl">Objet</span><span class="val">'+(om.objet||'—')+'</span></div>'
-    +'<div class="row"><span class="lbl">Transport</span><span class="val">'+_omTransport(om)+'</span></div>'
+    +'<div class="row"><span class="lbl">Transport autorisé</span><span class="val">'+_omTransport(om)+'</span></div>'
     +'</div>'
-    +'<div class="action"><p>Pour valider votre Ordre de Mission, cliquez sur le bouton ci-dessous.<br>Votre confirmation sera envoyée automatiquement à la présidence.</p>'
+
+    /* ── Bouton confirmation ── */
+    +'<div class="action"><p>✍️ Pour valider cet Ordre de Mission, cliquez sur le bouton ci-dessous.<br>Votre confirmation sera transmise automatiquement à la présidence.</p>'
     +btnConfirm+'</div>'
+
+    /* ── Bloc signatures ── */
+    +'<div class="sig-block">'
+    +'<div class="sig-side">'
+    +'<div class="sig-label">Signature de la présidence</div>'
+    +(sigImg ? sigImg : '<div style="height:50px;border-bottom:1px solid #d1d5db;margin-bottom:4px"></div>')
+    +'<div class="sig-line"><div class="sig-name">'+(presNom)+'</div><div class="sig-title">'+presTitre+' FFPLUM</div></div>'
     +'</div>'
-    +'<div class="ftr"><strong>'+(cfg.presidentNom||'La Présidente')+'</strong> · '+(cfg.presidentTitre||'Présidente')+'<br>Fédération Française de Planeurs Ultra-Légers Motorisés · www.ffplum.fr</div>'
+    +'<div class="sig-side" style="text-align:right">'
+    +'<div class="sig-label">Signature du bénéficiaire</div>'
+    +'<div style="height:50px;border-bottom:1px solid #d1d5db;margin-bottom:4px"></div>'
+    +'<div class="sig-line"><div class="sig-name">'+nomComplet+'</div><div class="sig-title">Date : ___________</div></div>'
+    +'</div>'
+    +'</div>'
+
+    +'</div>'/* fin .body */
+    +'<div class="ftr"><span>Fédération Française de Planeurs Ultra-Légers Motorisés &nbsp;·&nbsp; www.ffplum.fr</span>'
+    +'<span>Document officiel — '+ref+'</span></div>'
     +'</div></body></html>';
 
   _omOpenHtml(html, 'ODM '+ref);
@@ -9395,8 +9440,10 @@ function _envoyerOmEmail(omId) {
 function _envoyerNdfEmail(omId) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
   if (!om) { toast('OM introuvable','err'); return; }
-  var cp  = (S.comps||[]).find(function(c){ return c.id===om.compId; })||{};
+  var cp  = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
   var cfg = S.odmConfig||{};
+  var presNom2    = cfg.presidentNom   || 'La Présidente';
+  var presTitre2  = cfg.presidentTitre || 'Présidente';
   var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
   var dest       = om.email||'';
   if (!dest) { toast('Email manquant — vérifiez la fiche encadrant','err'); return; }
@@ -9408,7 +9455,7 @@ function _envoyerNdfEmail(omId) {
     'Bonjour '+om.prenom+',\n\n'
     +'Veuillez compléter votre Note de Frais (réf. '+ref+') pour la compétition «'+(cp.nom||'')+'».\n'
     +'Ouvrez le document joint, complétez les champs et cliquez sur le bouton d\'envoi.\n\n'
-    +cfg.presidentNom+'\n'+(cfg.presidentTitre||'Présidente')+' FFPLUM'
+    +presNom2+'\n'+presTitre2+' — FFPLUM'
   );
   var lienEmail = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujetEmail+'&body='+corpsEmail;
 
