@@ -3162,10 +3162,10 @@ var S = {
   odmConfig: {
     presidentNom: 'Laura Macdonald',
     presidentTitre: 'Présidente',
-    bareme1Label: 'Voiture ≤5 CV',
-    bareme1Taux: 0.331,
-    bareme2Label: 'Voiture >5 CV',
-    bareme2Taux: 0.412
+    bareme1Label: 'Encadrants',
+    bareme1Taux: 0.408,
+    bareme2Label: 'Compétiteur',
+    bareme2Taux: 0.200
   },
   ordresMission: []
 };
@@ -9325,64 +9325,48 @@ function _renderNdfContent(cp, cfg2) {
 }
 
 /* ── NDF → Budget Dépenses : créer ou mettre à jour la ligne engagement ─── */
+/* ── NDF → Budget : crée/met à jour 2 lignes (NDF + Repas) ─────────────── */
 function _ndfSyncBudget(omId) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
   if (!om) return;
-  var ndf  = om.ndf || {};
-  var cfg  = S.odmConfig || {};
-  /* calcul total */
-  var km   = parseFloat(ndf.km)        || 0;
-  var taux = parseFloat(ndf.bareme)    || cfg.bareme1Taux || 0.331;
-  var ar   = ndf.ar !== false;
-  var dist = ar ? km*2 : km;
-  var total= parseFloat((dist*taux + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0)).toFixed(2));
-  if (total <= 0) { toast('Saisissez au moins la distance (km) avant de synchroniser',''); return; }
-  /* accès au budget de la compétition */
-  if (!S.budget)              S.budget = {};
-  if (!S.budget[om.compId])  S.budget[om.compId] = {};
-  if (!S.budget[om.compId].engagement) S.budget[om.compId].engagement = [];
-  var lines    = S.budget[om.compId].engagement;
+  var ndf      = om.ndf || {};
+  var cfg      = S.odmConfig || {};
+  var km       = parseFloat(ndf.km)        || 0;
+  var taux     = parseFloat(ndf.bareme)    || cfg.bareme1Taux || 0.408;
+  var ar       = ndf.ar !== false;
+  var dist     = ar ? km*2 : km;
+  var montKm   = parseFloat((dist * taux).toFixed(2));
+  var autoroute= parseFloat(ndf.autoroute) || 0;
+  var repas    = parseFloat(ndf.repas)     || 0;
+  var montNdf  = parseFloat((montKm + autoroute).toFixed(2));
   var fullName = ((om.prenom||'')+' '+(om.nom||'')).trim();
-  /* 1. cherche une ligne déjà liée à cet OM */
-  var ligne = lines.find(function(l){ return l._omId === omId; });
-  /* 2. sinon cherche par nomLie + domaine NDF */
-  if (!ligne) {
-    ligne = lines.find(function(l){
-      return (l.nomLie||'').trim() === fullName
-          && (l.domaine||'').toLowerCase().replace(/[^a-z]/g,'').indexOf('frais') >= 0;
-    });
+  /* Accès budget */
+  if (!S.budgets)                          S.budgets = {};
+  if (!S.budgets[om.compId])               S.budgets[om.compId] = {engagement:[],ressources:[]};
+  if (!S.budgets[om.compId].engagement)    S.budgets[om.compId].engagement = [];
+  var lines = S.budgets[om.compId].engagement;
+  /* ── Ligne 1 : NDF (km + autoroute) ── */
+  var idNdf = 'ndf_km_'+omId;
+  var ligneNdf = lines.find(function(l){ return l.id === idNdf; });
+  if (ligneNdf) {
+    ligneNdf.valeur = montNdf;
+    ligneNdf.nomLie = fullName;
+  } else if (montNdf > 0) {
+    lines.push({ id:idNdf, domaine:'Frais déplacement', libelle:'NDF', nomLie:fullName, valeur:montNdf, nbjours:1, qt:1 });
   }
-  /* 3. sinon cherche par nomLie seul */
-  if (!ligne) {
-    ligne = lines.find(function(l){ return (l.nomLie||'').trim() === fullName; });
-  }
-  if (ligne) {
-    /* mise à jour du montant */
-    ligne.valeur  = total;
-    ligne._omId   = omId;
-    ligne.nbjours = 1;
-    ligne.qt      = 1;
-    toast('Ligne "'+fullName+'" mise à jour : '+total+' €','ok');
-  } else {
-    /* création */
-    var newId = 'ndf_'+Date.now();
-    lines.push({
-      id:      newId,
-      domaine: 'Frais déplacement',
-      libelle: 'NDF · '+(om.lieu||'déplacement'),
-      nomLie:  fullName,
-      valeur:  total,
-      nbjours: 1,
-      qt:      1,
-      _omId:   omId
-    });
-    toast('Ligne NDF créée pour '+fullName+' : '+total+' €','ok');
+  /* ── Ligne 2 : Repas ── */
+  var idRepas = 'ndf_repas_'+omId;
+  var ligneRepas = lines.find(function(l){ return l.id === idRepas; });
+  if (ligneRepas) {
+    ligneRepas.valeur = repas;
+    ligneRepas.nomLie = fullName;
+  } else if (repas > 0) {
+    lines.push({ id:idRepas, domaine:'Frais déplacement', libelle:'Repas', nomLie:fullName, valeur:repas, nbjours:1, qt:1 });
   }
   saveState();
-  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 }
 
-/* ── NDF : mise à jour des champs ──────────────────────────────────────── */
+/* ── NDF : mise à jour des champs + sync budget auto ───────────────────── */
 function _ndfUpdate(omId, field, value) {
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
   if (!om) return;
@@ -9394,16 +9378,18 @@ function _ndfUpdate(omId, field, value) {
   } else {
     om.ndf[field] = parseFloat(value) || 0;
   }
-  saveState();
-  /* Recalcul du total affiché sans re-render complet */
-  var ndf = om.ndf;
-  var km2    = parseFloat(ndf.km)    || 0;
-  var taux2  = parseFloat(ndf.bareme)|| (S.odmConfig&&S.odmConfig.bareme1Taux)||0.331;
-  var ar2    = ndf.ar !== false;
-  var dist2  = ar2 ? km2*2 : km2;
-  var total2 = dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
+  /* Recalcul total affiché */
+  var ndf   = om.ndf;
+  var cfg   = S.odmConfig || {};
+  var km2   = parseFloat(ndf.km)    || 0;
+  var taux2 = parseFloat(ndf.bareme)|| cfg.bareme1Taux || 0.408;
+  var ar2   = ndf.ar !== false;
+  var dist2 = ar2 ? km2*2 : km2;
+  var total2= dist2*taux2 + (parseFloat(ndf.autoroute)||0) + (parseFloat(ndf.repas)||0);
   var totalEl = document.getElementById('ndf-total-'+omId);
   if (totalEl) { totalEl.textContent = total2 > 0 ? 'Total : '+total2.toFixed(2)+' €' : ''; }
+  /* Sync automatique vers budget dépenses */
+  _ndfSyncBudget(omId);
 }
 
 /* ── NDF : génération PDF Note de frais ────────────────────────────────── */
