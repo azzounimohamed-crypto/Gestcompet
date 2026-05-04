@@ -3326,6 +3326,13 @@ async function loadState() {
   if (!_odc.bareme2Label || _oldB2.indexOf(_odc.bareme2Label) !== -1) _odc.bareme2Label = 'Compétiteurs';
   if (!_odc.bareme1Taux || _odc.bareme1Taux === 0.331) _odc.bareme1Taux = 0.408;
   if (!_odc.bareme2Taux || _odc.bareme2Taux === 0.412) _odc.bareme2Taux = 0.200;
+  /* Migrer les anciens taux dans les NDF des OM */
+  (S.ordresMission||[]).forEach(function(om){
+    if (om.ndf && om.ndf.bareme) {
+      if (om.ndf.bareme === 0.331) om.ndf.bareme = 0.408;
+      if (om.ndf.bareme === 0.412) om.ndf.bareme = 0.200;
+    }
+  });
 }
 
 function clearLocalStorageQuota() {
@@ -9308,8 +9315,8 @@ function _renderNdfContent(cp, cfg2) {
     h += ndfIn('km',       'Distance aller','km', ndf.km);
     h += '<div><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:3px">Barème</div>'
       + '<select style="width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;cursor:pointer" onchange="_ndfUpdate(\''+omId+'\',\'bareme\',this.value)">'
-      + '<option value="'+b1t+'"'+(parseFloat(ndf.bareme)===b1t?' selected':(!ndf.bareme?' selected':''))+'>'+bEscL(cfg2.bareme1Label||'≤5 CV')+'</option>'
-      + '<option value="'+b2t+'"'+(parseFloat(ndf.bareme)===b2t?' selected':'')+'>'+bEscL(cfg2.bareme2Label||'>5 CV')+'</option>'
+      + '<option value="'+b1t+'"'+(parseFloat(ndf.bareme)===b1t?' selected':(!ndf.bareme||parseFloat(ndf.bareme)===0.331?' selected':''))+'>'+bEscL(cfg2.bareme1Label||'Encadrants')+'</option>'
+      + '<option value="'+b2t+'"'+(parseFloat(ndf.bareme)===b2t||parseFloat(ndf.bareme)===0.412?' selected':'')+'>'+bEscL(cfg2.bareme2Label||'Compétiteurs')+'</option>'
       + '</select></div>';
     h += ndfIn('autoroute','Autoroute',     '€',  ndf.autoroute);
     h += ndfIn('repas',    'Repas',         '€',  ndf.repas);
