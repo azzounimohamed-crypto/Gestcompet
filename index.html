@@ -3053,7 +3053,8 @@ function _saveCritical() {
         marginLeft:   od.marginLeft   !== undefined ? od.marginLeft   : 20,
         marginRight:  od.marginRight  !== undefined ? od.marginRight  : 20
       },
-      poleSport: (S.settings && S.settings.poleSport) || {}
+      poleSport: (S.settings && S.settings.poleSport) || {},
+      odmConfig: S.odmConfig || {}
     };
     localStorage.setItem(LS_CRITICAL, JSON.stringify(backup));
   } catch(e) {}
@@ -3085,6 +3086,16 @@ function _restoreCritical() {
       var ps = bk.poleSport;
       Object.keys(ps).forEach(function(k) {
         if (!S.settings.poleSport[k] && ps[k]) S.settings.poleSport[k] = ps[k];
+      });
+    }
+    // odmConfig : restaurer presidentEmail, comptableEmail, etc.
+    if (bk.odmConfig && Object.keys(bk.odmConfig).length) {
+      if (!S.odmConfig) S.odmConfig = {};
+      var odc = bk.odmConfig;
+      Object.keys(odc).forEach(function(k) {
+        if ((S.odmConfig[k] === null || S.odmConfig[k] === undefined || S.odmConfig[k] === '') && odc[k] !== null && odc[k] !== undefined) {
+          S.odmConfig[k] = odc[k];
+        }
       });
     }
   } catch(e) {}
@@ -3394,7 +3405,7 @@ function _flushSaveState() {
     console.warn('saveState error', e);
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,moyens:S.moyens||[]})));
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,moyens:S.moyens||[],odmConfig:S.odmConfig||{},ordresMission:S.ordresMission||[],docSettings:S.docSettings||{},settings:S.settings||{}})));
     } catch(e2) { console.warn('saveState critical fail', e2); }
   }
   // 3. Clé critique : toujours synchronisée (réglages docs + liens Pôle Sport)
