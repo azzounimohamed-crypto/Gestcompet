@@ -25297,8 +25297,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   // 1. Cache local (hors-ligne ou si Supabase indisponible)
   await loadState();
   // 2. Supabase = source de vérité absolue — remplace le cache local si disponible
-  //    Ceci évite que le localStorage d'un ancien appareil écrase les données actuelles
-  await loadFromSupabaseFirst();
+  //    Timeout 5s pour éviter un blocage si Supabase est lent
+  await Promise.race([loadFromSupabaseFirst(), new Promise(function(r){ setTimeout(r, 3000); })]);
   // Migration police → Arial
   if (!S.docSettings) S.docSettings = {};
   if (!S.docSettings.police || S.docSettings.police.indexOf('Times') !== -1 || S.docSettings.police.indexOf('Georgia') !== -1 || S.docSettings.police.indexOf('Garamond') !== -1) {
