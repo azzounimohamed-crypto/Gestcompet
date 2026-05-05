@@ -9415,7 +9415,7 @@ function _envoyerOmEmail(omId) {
   var tok = om.portalToken;
 
   /* ── 2. URL portail (URL publique Supabase Storage, connue à l'avance) ── */
-  var portailUrl = 'https://azzounimohamed-crypto.github.io/Gestcompet/portail_om.html';
+  var portailUrl = 'https://azzounimohamed-crypto.github.io/Gestcompet/';
   var lienPortail = portailUrl + (portailUrl.includes('?')?'&':'?') + 't=' + tok;
 
   /* ── 3. Ouvrir le client email IMMÉDIATEMENT (geste utilisateur conservé) ── */
@@ -25148,7 +25148,108 @@ function injectCalendrierFull() {
   saveState();
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   PORTAIL ENCADRANT / PRÉSIDENTE — affiché quand ?t=TOKEN dans l'URL
+══════════════════════════════════════════════════════════════════════ */
+function _renderPortail(D, tok, role, sb) {
+  var f = function(v){ return v||'—'; };
+  var fd = function(iso){ return iso ? new Date(iso).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) : ''; };
+  var ft = function(v){ if(!v) return '—'; var l=[]; if(v.train)l.push('Train'); if(v.federal)l.push('Véhicule fédéral'); if(v.perso)l.push('Véhicule personnel'); if(v.autre)l.push('Autre'); if(v.precision)l.push('('+v.precision+')'); return l.join(' · ')||'—'; };
+  var baseUrl = location.href.split('?')[0];
+  var cfg = D.odmConfig||{};
+  var nom = (D.prenom||'')+' '+(D.nom||'');
+  var st = D.statut||'genere';
+
+  var css = '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f0f4f8;min-height:100vh}.bar{background:#1d4ed8;color:#fff;padding:16px 20px;position:sticky;top:0;z-index:10}.bar-logo{font-size:17px;font-weight:900;letter-spacing:1px}.bar-sub{font-size:11px;color:#93c5fd;margin-top:2px}.wrap{max-width:600px;margin:0 auto;padding:20px 14px 40px}.banner{border-radius:12px;padding:16px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:14px}.banner.att{background:#fef3c7;border-left:4px solid #f59e0b}.banner.con{background:#dbeafe;border-left:4px solid #3b82f6}.banner.val{background:#dcfce7;border-left:4px solid #22c55e}.banner.ndf{background:#f3e8ff;border-left:4px solid #9333ea}.card{background:#fff;border-radius:12px;box-shadow:0 1px 8px rgba(0,0,0,.07);margin-bottom:14px;overflow:hidden}.ch{padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e5e7eb;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#6b7280}.cb{padding:16px 18px}.row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:14px;gap:8px}.row:last-child{border-bottom:none}.rl{color:#6b7280;font-weight:600;min-width:110px;font-size:12px}.rv{color:#111;font-weight:500;text-align:right}.steps{display:flex;flex-direction:column;gap:12px}.step{display:flex;gap:10px;align-items:flex-start}.dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;font-weight:700}.dot.ok{background:#dcfce7;color:#166534}.dot.todo{background:#f1f5f9;color:#9ca3af}.step-lbl{font-size:13px;font-weight:700}.step-date{font-size:11px;color:#6b7280;margin-top:2px}.btn{display:block;width:100%;padding:14px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px}.btn-blue{background:#1d4ed8;color:#fff}.btn-green{background:#16a34a;color:#fff}.btn-grey{background:#f1f5f9;color:#374151;border:1px solid #e2e8f0}.inp-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:#374151;margin-bottom:4px;margin-top:10px}.inp{width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:4px}.inp:focus{outline:none;border-color:#1d4ed8}.tot{background:#eff6ff;border-radius:8px;padding:14px;text-align:center;font-size:22px;font-weight:900;color:#1d4ed8;margin:14px 0}.chk{display:flex;align-items:center;gap:8px;font-size:14px;margin:8px 0;cursor:pointer}.chk input{width:16px;height:16px}</style>';
+
+  var banners = {genere:{cls:'att',ico:'📋',txt:'En attente de votre confirmation'},confirme_enc:{cls:'con',ico:'⏳',txt:'Confirmé — en attente de validation'},valide:{cls:'val',ico:'✅',txt:'Mission validée'},ndf_envoyee:{cls:'ndf',ico:'📊',txt:'NDF en cours de traitement'},ndf_validee:{cls:'val',ico:'💳',txt:'NDF validée — remboursement en cours'}};
+  var bn = banners[st]||banners.genere;
+
+  function row(l,v){ return '<div class="row"><span class="rl">'+l+'</span><span class="rv">'+v+'</span></div>'; }
+  function stepH(done,ico,lbl,date){ return '<div class="step"><div class="dot '+(done?'ok':'todo')+'">'+(done?'✓':ico)+'</div><div><div class="step-lbl" style="color:'+(done?'#166534':'#9ca3af')+'">'+lbl+'</div>'+(done&&date?'<div class="step-date">'+fd(date)+'</div>':'')+'</div></div>'; }
+
+  var ficheHtml = '<div class="card"><div class="ch">📋 Ordre de Mission — N° '+f(D.ref)+'</div><div class="cb">'
+    +row('Bénéficiaire','<strong>'+f(D.prenom)+' '+f(D.nom)+'</strong>')
+    +row('Fonction',f(D.role))
+    +row('Compétition',f(D.compNom))
+    +row('Lieu',f(D.lieu))
+    +row('Dates',f(D.dates))
+    +row('Transport',ft(D.transport))
+    +'</div></div>';
+
+  var suiviHtml = '<div class="card"><div class="ch">📍 Suivi</div><div class="cb"><div class="steps">'
+    +stepH(['confirme_enc','valide','ndf_envoyee','ndf_validee'].includes(st),'✍️','Confirmation encadrant',D.confirme_at)
+    +stepH(['valide','ndf_envoyee','ndf_validee'].includes(st),'✅','Validation présidence',D.valide_at)
+    +stepH(['ndf_envoyee','ndf_validee'].includes(st),'📊','NDF déposée',D.ndf_at)
+    +stepH(['ndf_validee'].includes(st),'💳','Remboursement validé',D.ndf_validee_at)
+    +'</div></div></div>';
+
+  var actionHtml = '';
+  if (role==='pres'||role==='president') {
+    if (st==='confirme_enc') {
+      actionHtml = '<div class="card"><div class="ch">⚖️ Votre décision</div><div class="cb"><button class="btn btn-green" onclick="_pValider()">✅ Valider cette mission</button><button class="btn btn-grey" onclick="_pRejeter()">✗ Rejeter</button></div></div>';
+    } else {
+      actionHtml = '<div class="card"><div class="cb" style="text-align:center;color:#6b7280;padding:20px">'+({genere:'⏳ En attente de confirmation encadrant',valide:'✅ Mission déjà validée',ndf_envoyee:'📊 NDF en cours',ndf_validee:'💳 Terminée'}[st]||'—')+'</div></div>';
+    }
+  } else {
+    if (st==='genere') {
+      actionHtml = '<div class="card"><div class="ch">✍️ Confirmation</div><div class="cb"><p style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:16px">Confirmez votre participation. Votre confirmation sera transmise à la présidence.</p><button class="btn btn-blue" onclick="_eConfirmer()">✅ Je confirme ma participation</button></div></div>';
+    } else if (st==='valide') {
+      actionHtml = '<div class="card"><div class="ch">📊 Note de Frais</div><div class="cb">'
+        +'<label class="inp-lbl">Barème kilométrique</label>'
+        +'<select class="inp" id="n-bar" onchange="_calc()">'
+        +'<option value="'+(cfg.bareme1Taux||0.408)+'">'+(cfg.bareme1Label||'Encadrants')+' — '+(cfg.bareme1Taux||0.408)+' €/km</option>'
+        +'<option value="'+(cfg.bareme2Taux||0.200)+'">'+(cfg.bareme2Label||'Compétiteurs')+' — '+(cfg.bareme2Taux||0.200)+' €/km</option>'
+        +'</select>'
+        +'<label class="inp-lbl">Kilométrage</label><input class="inp" type="number" id="n-km" min="0" step="1" oninput="_calc()" placeholder="0 km">'
+        +'<label class="chk"><input type="checkbox" id="n-ar" onchange="_calc()"> Aller-retour (km × 2)</label>'
+        +'<label class="inp-lbl">Repas (€)</label><input class="inp" type="number" id="n-rep" min="0" step="0.01" oninput="_calc()" placeholder="0.00">'
+        +'<label class="inp-lbl">Commentaire</label><textarea class="inp" id="n-note" rows="2" placeholder="Précisez si nécessaire…"></textarea>'
+        +'<div class="tot" id="n-tot">Total : — €</div>'
+        +'<button class="btn btn-blue" onclick="_eNdf()">📤 Envoyer ma NDF</button>'
+        +'</div></div>';
+    }
+  }
+
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Portail Mission FFPLUM</title>'+css+'</head><body>'
+    +'<div class="bar"><div class="bar-logo">🪂 FFPLUM</div><div class="bar-sub" id="bar-ref">Réf. '+f(D.ref)+' · '+f(D.prenom)+' '+f(D.nom)+'</div></div>'
+    +'<div class="wrap">'
+    +'<div class="banner '+bn.cls+'"><span style="font-size:28px">'+bn.ico+'</span><strong>'+bn.txt+'</strong></div>'
+    +ficheHtml+suiviHtml+actionHtml
+    +'</div>'
+    +'<script>'
+    +'var D='+JSON.stringify(D)+';'
+    +'var TOK="'+tok+'";'
+    +'var SB_URL="https://wctpwgnavsvyueypgicd.supabase.co";'
+    +'var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjdHB3Z25hdnN2eXVleXBnaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjgxMzUsImV4cCI6MjA5MDAwNDEzNX0.W--8Qr5Pf0Dsy8CGlsLOCWRRIyK6VOINp3zXzM3ii2M";'
+    +'function _sbSave(patch){Object.assign(D,patch,{updated_at:new Date().toISOString()});return fetch(SB_URL+"/rest/v1/stol_shared?id=eq.om_p_"+TOK,{method:"PATCH",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({data:JSON.stringify(D)})});}'
+    +'function _eConfirmer(){var b=document.querySelector(".btn-blue");if(b){b.disabled=true;b.textContent="⏳…";}var cfg=D.odmConfig||{};var n=(D.prenom||"")+" "+(D.nom||"");var url=location.href.replace(/&?r=[^&]*/,"").replace(/[?&]r=[^&]*/,"");var presUrl=url+(url.includes("?")?"&":"?")+"r=pres";var s=encodeURIComponent("✅ Confirmation ODM "+D.ref+" — "+n+" — "+(D.compNom||""));var c=encodeURIComponent("Bonjour "+(cfg.presidentNom||"")+"\n\n"+n+" a confirmé sa participation.\n\nMission : "+D.ref+" | Dates : "+(D.dates||"—")+" | Fonction : "+(D.role||"—")+"\n\n👉 Valider ici :\n"+presUrl+"\n\nCordialement,\n"+n);_sbSave({statut:"confirme_enc",confirme_at:new Date().toISOString()}).then(function(){location.reload();window.location.href="mailto:"+(cfg.presidentEmail||"")+"?subject="+s+"&body="+c;});}'
+    +'function _pValider(){var b=document.getElementById?document.querySelector(".btn-green"):null;if(b){b.disabled=true;b.textContent="⏳…";}var cfg=D.odmConfig||{};var url=location.href.replace(/[?&]r=[^&]*/g,"");var s=encodeURIComponent("✅ Mission validée — "+D.ref+" — "+(D.compNom||""));var c=encodeURIComponent("Bonjour "+(D.prenom||"")+"\n\nVotre Ordre de Mission ("+D.ref+") a été validé.\n\nAccédez à votre espace pour déposer votre NDF :\n"+url+"\n\nCordialement,\n"+(cfg.presidentNom||"La Présidente")+" — FFPLUM");_sbSave({statut:"valide",valide_at:new Date().toISOString()}).then(function(){location.reload();window.location.href="mailto:"+(D.email||"")+"?subject="+s+"&body="+c;});}'
+    +'function _pRejeter(){if(!confirm("Rejeter cet OM ?"))return;_sbSave({statut:"genere",rejete_at:new Date().toISOString()}).then(function(){location.reload();});}'
+    +'function _calc(){var km=parseFloat(document.getElementById("n-km").value)||0;var bar=parseFloat(document.getElementById("n-bar").value)||0;var ar=document.getElementById("n-ar").checked;var rep=parseFloat(document.getElementById("n-rep").value)||0;var tot=(ar?km*2:km)*bar+rep;var el=document.getElementById("n-tot");if(el)el.textContent="Total : "+tot.toFixed(2)+" €";}'
+    +'function _eNdf(){var km=parseFloat(document.getElementById("n-km").value)||0;var bar=parseFloat(document.getElementById("n-bar").value)||0;var ar=document.getElementById("n-ar").checked;var rep=parseFloat(document.getElementById("n-rep").value)||0;var note=(document.getElementById("n-note").value||"").trim();var tot=(ar?km*2:km)*bar+rep;var cfg=D.odmConfig||{};var n=(D.prenom||"")+" "+(D.nom||"");var s=encodeURIComponent("📊 NDF "+D.ref+" — "+n);var c=encodeURIComponent("Bonjour,\n\nNDF de "+n+" / Compétition : "+(D.compNom||"—")+"\n\nKm : "+km+(ar?" (A/R)":"")+" × "+bar+" €/km = "+((ar?km*2:km)*bar).toFixed(2)+" €\nRepas : "+rep.toFixed(2)+" €\nTotal : "+tot.toFixed(2)+" €"+(note?"\nComment : "+note:"")+"\n\nCordialement,\n"+n);_sbSave({statut:"ndf_envoyee",ndf:{km:km,bareme:bar,ar:ar,repas:rep,notes:note,total:tot,date:new Date().toISOString()},ndf_at:new Date().toISOString()}).then(function(){location.reload();window.location.href="mailto:"+(cfg.comptableEmail||cfg.presidentEmail||"")+"?subject="+s+"&body="+c;});}'
+    +'<\/script></body></html>';
+
+  document.open(); document.write(html); document.close();
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
+  /* ── Détection portail encadrant (?t=TOKEN) ── */
+  (function(){
+    var p = new URLSearchParams(location.search);
+    var tok = p.get('t') || p.get('token');
+    if (!tok) return;
+    var role = p.get('r') || p.get('role') || 'enc';
+    /* Charger le CSS Supabase + afficher portail */
+    document.body.innerHTML = '<div id="p-loading" style="font-family:-apple-system,Arial,sans-serif;background:#f0f4f8;min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:16px;color:#374151">⏳ Chargement de votre espace mission…</div>';
+    var sb = supabase.createClient('https://wctpwgnavsvyueypgicd.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjdHB3Z25hdnN2eXVleXBnaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjgxMzUsImV4cCI6MjA5MDAwNDEzNX0.W--8Qr5Pf0Dsy8CGlsLOCWRRIyK6VOINp3zXzM3ii2M');
+    sb.from('stol_shared').select('data').eq('id','om_p_'+tok).single().then(function(res){
+      if (res.error || !res.data) { document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:40px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><div style="font-size:18px;color:#991b1b;font-weight:700">Mission introuvable</div><div style="color:#6b7280;margin-top:8px">Ce lien est invalide ou expiré.</div></div>'; return; }
+      var D = typeof res.data.data==='string' ? JSON.parse(res.data.data) : res.data.data;
+      _renderPortail(D, tok, role, sb);
+    });
+    throw '__PORTAL__';
+  })();
   try {
   // 1. Cache local (hors-ligne ou si Supabase indisponible)
   await loadState();
@@ -27933,6 +28034,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     }, 2000);
   }
+  } catch(e) {
+    if (e === '__PORTAL__') return;
+    console.error('DOMContentLoaded error:', e);
   }
 });
 
