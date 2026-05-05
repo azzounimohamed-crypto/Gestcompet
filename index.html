@@ -25234,22 +25234,6 @@ function _renderPortail(D, tok, role, sb) {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
-  /* ── Détection portail encadrant (?t=TOKEN) ── */
-  (function(){
-    var p = new URLSearchParams(location.search);
-    var tok = p.get('t') || p.get('token');
-    if (!tok) return;
-    var role = p.get('r') || p.get('role') || 'enc';
-    /* Charger le CSS Supabase + afficher portail */
-    document.body.innerHTML = '<div id="p-loading" style="font-family:-apple-system,Arial,sans-serif;background:#f0f4f8;min-height:100vh;display:flex;align-items:center;justify-content:center;font-size:16px;color:#374151">⏳ Chargement de votre espace mission…</div>';
-    var sb = supabase.createClient('https://wctpwgnavsvyueypgicd.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjdHB3Z25hdnN2eXVleXBnaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjgxMzUsImV4cCI6MjA5MDAwNDEzNX0.W--8Qr5Pf0Dsy8CGlsLOCWRRIyK6VOINp3zXzM3ii2M');
-    sb.from('stol_shared').select('data').eq('id','om_p_'+tok).single().then(function(res){
-      if (res.error || !res.data) { document.body.innerHTML='<div style="font-family:Arial,sans-serif;padding:40px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><div style="font-size:18px;color:#991b1b;font-weight:700">Mission introuvable</div><div style="color:#6b7280;margin-top:8px">Ce lien est invalide ou expiré.</div></div>'; return; }
-      var D = typeof res.data.data==='string' ? JSON.parse(res.data.data) : res.data.data;
-      _renderPortail(D, tok, role, sb);
-    });
-    throw '__PORTAL__';
-  })();
   try {
   // 1. Cache local (hors-ligne ou si Supabase indisponible)
   await loadState();
@@ -28034,9 +28018,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     }, 2000);
   }
-  } catch(e) {
-    if (e === '__PORTAL__') return;
-    console.error('DOMContentLoaded error:', e);
   }
 });
 
