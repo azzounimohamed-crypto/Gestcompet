@@ -9254,7 +9254,7 @@ function generateOmPdf(compId, staffOrigIdx) {
   S.ordresMission.push({
     id:        omId,
     compId:    compId,
-    compNom:   cp.name || cp.nom || '',
+    compNom:   cp.name || cp.nom || cp.titre || '',
     staffIdx:  staffOrigIdx,
     pilotId:   s.pilotId || s.id,
     nom:       nom, prenom: prenom,
@@ -9312,7 +9312,7 @@ function openOdmValidationPanel() {
   } else {
     pending.forEach(function(om) {
       var cp = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
-      var cpNom = cp.name||cp.nom||om.compNom||'—';
+      var cpNom = cp.name||cp.nom||cp.titre||om.compNom||'—';
       var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
       var ref = om.id.replace('om_','OM-');
       var sujetDTN = encodeURIComponent('ODM Validé — '+ref+' — '+nomComplet);
@@ -9400,7 +9400,7 @@ function _envoyerOmEmail(omId) {
   console.log('[DEBUG] OM trouvé:', om ? 'OUI' : 'NON');
   if (!om) { toast('OM introuvable','err'); return; }
   var cp      = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
-  var cpNom   = cp.name || cp.nom || om.compNom || '';
+  var cpNom   = cp.name || cp.nom || cp.titre || om.compNom || (om.lieu?'Mission à '+om.lieu:'') || '';
   var cfg     = S.odmConfig||{};
   var presNom    = cfg.presidentNom   || 'La Présidente';
   var presTitre  = cfg.presidentTitre || 'Présidente';
@@ -9478,7 +9478,7 @@ function _imprimerOm(omId) {
   if (!om) { toast('OM introuvable','err'); return; }
   /* Générer le document ODM */
   var cp      = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
-  var cpNom   = cp.name || cp.nom || om.compNom || '';
+  var cpNom   = cp.name || cp.nom || cp.titre || om.compNom || (om.lieu?'Mission à '+om.lieu:'') || '';
   var cfg     = S.odmConfig||{};
   var presNom = cfg.presidentNom||'La Présidente', presTitre = cfg.presidentTitre||'Présidente';
   var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
@@ -24996,7 +24996,8 @@ function injectCalendrier2026() {
     if (deleted.find(function(t){ return t.id === cp.id; })) return; // supprimée par id
     // Vérifier aussi par nom+date pour ne pas créer de doublon si l'entrée existe avec un autre id
     var nameKey = (cp.name||'').trim().toLowerCase()+'|'+(cp.dateFrom||'');
-    if (S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; })) return;
+    var existingCal = S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; });
+    if (existingCal) { if (!existingCal.name && cp.name) existingCal.name = cp.name; if (!existingCal.nom && cp.nom) existingCal.nom = cp.nom; return; }
     S.comps.push(cp);
     S.compEnroll = S.compEnroll || {};
     S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
@@ -25012,7 +25013,8 @@ function injectCalendrierFull() {
   function _add(cp) {
     if (_deletedIds[cp.id]) return; // supprimée définitivement
     var nameKey = (cp.name||'').trim().toLowerCase()+'|'+(cp.dateFrom||'');
-    if (S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; })) return;
+    var existingCal = S.comps.find(function(x){ return x.id === cp.id || (x.name||'').trim().toLowerCase()+'|'+(x.dateFrom||'') === nameKey; });
+    if (existingCal) { if (!existingCal.name && cp.name) existingCal.name = cp.name; if (!existingCal.nom && cp.nom) existingCal.nom = cp.nom; return; }
     S.comps.push(cp);
     S.compEnroll[cp.id] = S.compEnroll[cp.id] || [];
   }
@@ -25515,6 +25517,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       // Préserver les données utilisateur (affiche, desc modifiés) — ne mettre à jour que les champs fixes
       if (!existing.oaci && comp.oaci) existing.oaci = comp.oaci;
       if (!existing.region && comp.region) existing.region = comp.region;
+      // Mettre à jour le nom si manquant (migration nom→name)
+      if (!existing.name && comp.name) existing.name = comp.name;
+      if (!existing.nom && comp.nom) existing.nom = comp.nom;
     }
   });
   saveState();
