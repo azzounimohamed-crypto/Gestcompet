@@ -25234,6 +25234,21 @@ function _renderPortail(D, tok, role, sb) {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+  /* ── Portail encadrant : si ?t=TOKEN dans l'URL, afficher le portail ── */
+  var _pTok = new URLSearchParams(location.search).get('t');
+  if (_pTok) {
+    var _pRole = new URLSearchParams(location.search).get('r') || 'enc';
+    document.body.style.cssText = 'margin:0;font-family:-apple-system,Arial,sans-serif;background:#f0f4f8;min-height:100vh';
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:16px;color:#374151">⏳ Chargement de votre espace mission…</div>';
+    try {
+      var _pSb = supabase.createClient(SB_URL, SB_KEY);
+      var _pRes = await _pSb.from('stol_shared').select('data').eq('id','om_p_'+_pTok).single();
+      if (_pRes.error || !_pRes.data) { document.body.innerHTML='<div style="padding:40px;text-align:center"><div style="font-size:48px">⚠️</div><div style="font-size:18px;color:#991b1b;font-weight:700;margin-top:16px">Mission introuvable</div><div style="color:#6b7280;margin-top:8px">Ce lien est invalide ou expiré.</div></div>'; return; }
+      var _pD = typeof _pRes.data.data==='string' ? JSON.parse(_pRes.data.data) : _pRes.data.data;
+      _renderPortail(_pD, _pTok, _pRole, _pSb);
+    } catch(_pe) { document.body.innerHTML='<div style="padding:40px;text-align:center;color:#991b1b">Erreur de connexion. Vérifiez votre connexion internet.</div>'; }
+    return;
+  }
   try {
   // 1. Cache local (hors-ligne ou si Supabase indisponible)
   await loadState();
