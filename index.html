@@ -9241,14 +9241,6 @@ function generateOmPdf(compId, staffOrigIdx) {
   win.document.write(html);
   win.document.close();
 
-  /* Email optionnel */
-  if (email) {
-    var subj = encodeURIComponent('Ordre de Mission FFPLUM – '+((prenom+' '+nom).trim()));
-    var body = encodeURIComponent('Bonjour '+prenom+',\n\nVeuillez trouver ci-joint votre ordre de mission.\n\nCordialement,\n'+dtnPrenom+' '+dtnNom+'\nDirecteur Technique National – FFPLUM');
-    setTimeout(function(){
-      window.open('mailto:'+encodeURIComponent(email)+'?subject='+subj+'&body='+body);
-    }, 800);
-  }
   /* ── Archivage OM ── */
   if (!S.ordresMission) S.ordresMission = [];
   var omId = 'om_' + Date.now();
@@ -9263,15 +9255,19 @@ function generateOmPdf(compId, staffOrigIdx) {
     lieu:      lieu, dates: dates, objet: objet,
     transport: { train:tTrain, federal:tFed, perso:tPerso, autre:tAutre, precision:tPrec },
     genere:    new Date().toISOString(),
-    statut:    'genere'   /* genere | signe_encadrant | signe_president | valide */
+    statut:    'genere'
   });
   saveState();
 
   closeOmForm();
-  toast('OM généré ✓'+(email?' — email prêt':''), 'ok');
-
-  /* Rafraîchir la vue encadrants pour afficher le statut */
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+
+  /* ── Envoi portail ── */
+  if (email) {
+    setTimeout(function(){ _envoyerOmEmail(omId); }, 300);
+  } else {
+    toast('OM archivé ✓ — aucun email (pas d'adresse)', 'ok');
+  }
 }
 
 function _omCycleStatut(omId) {
