@@ -9408,22 +9408,39 @@ function _envoyerOmEmail(omId) {
   );
   var lienConfirm = emailPres ? 'mailto:'+emailPres+'?subject='+sujetConfirm+'&body='+corpsConfirm : '';
 
-  /* Bouton de confirmation — onclick pour compatibilité Safari/blob: */
-  var mailtoConfirm = emailPres
-    ? 'mailto:'+emailPres+'?subject='+sujetConfirm+'&body='+corpsConfirm
-    : 'mailto:?subject='+sujetConfirm+'&body='+corpsConfirm;
-  var btnConfirm = '<button onclick="window.location.href=this.dataset.mailto" data-mailto="'+mailtoConfirm.replace(/"/g,'&quot;')+'" '
-    +'style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:.3px;cursor:pointer;font-family:inherit">✅ Je confirme ma participation</button>'
-    +(emailPres ? '' : '<p style="font-size:12px;color:#6b7280;margin-top:10px">⚠️ Renseignez l\'email de la présidence dans Réglages → Ordre de Mission pour un envoi automatique dirigé</p>');
-
-  var sujetEmail = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+cpNom);
-  var corpsEmail = encodeURIComponent(
-    'Bonjour '+om.prenom+',\n\n'
-    +'Vous trouverez ci-joint votre Ordre de Mission (réf. '+ref+') pour la compétition «'+cpNom+'».\n'
-    +'Merci de cliquer sur le bouton de confirmation dans le document joint.\n\n'
-    +presNom+'\n'+presTitre+' — FFPLUM'
-  );
-  var lienEmail = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujetEmail+'&body='+corpsEmail;
+  /* Corps email envoyé à l'encadrant — contient tous les détails ODM + lien de confirmation */
+  var sujetEmail  = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+cpNom);
+  var lignesEmail = [
+    'Bonjour '+om.prenom+',',
+    '',
+    'La Fédération Française de Planeurs Ultra-Légers Motorisés (FFPLUM) vous confie',
+    'la mission suivante dans le cadre de la compétition «'+cpNom+'».',
+    '',
+    '─────────────────────────────────',
+    'ORDRE DE MISSION N° '+ref,
+    '─────────────────────────────────',
+    'Bénéficiaire : '+nomComplet,
+    'Fonction     : '+(om.role||'—'),
+    'Compétition  : '+(cpNom||'—'),
+    'Lieu         : '+(om.lieu||cp.lieu||'—'),
+    'Dates        : '+(om.dates||'—'),
+    'Objet        : '+(om.objet||'—'),
+    'Transport    : '+_omTransport(om),
+    '─────────────────────────────────',
+    '',
+    '✅ CONFIRMATION DE PARTICIPATION',
+    emailPres
+      ? 'Pour confirmer votre participation, cliquez sur le lien ci-dessous'
+        +'\n(ou répondez simplement à cet email) :'
+        +'\n\n'+lienConfirm
+      : 'Pour confirmer votre participation, répondez simplement à cet email.',
+    '',
+    'Cordialement,',
+    presNom,
+    presTitre+' — FFPLUM'
+  ];
+  var corpsEmail = encodeURIComponent(lignesEmail.join('\n'));
+  var lienEmail  = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujetEmail+'&body='+corpsEmail;
 
   var logo    = (S.settings&&S.settings.logo) ? '<img src="'+S.settings.logo+'" style="height:60px;object-fit:contain">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8;letter-spacing:1px">FFPLUM</div>';
   var sigImg  = (S.docSettings&&S.docSettings.signatureImage) ? '<img src="'+S.docSettings.signatureImage+'" style="max-height:60px;max-width:180px;object-fit:contain">' : '';
@@ -9475,9 +9492,9 @@ function _envoyerOmEmail(omId) {
 
     /* ── Toolbar ── */
     +'<div class="toolbar">'
-    +'<a href="'+lienEmail+'" class="tbtn" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">📧 Envoyer par email</a>'
-    +'<button class="tbtn" onclick="window.print()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">🖨 Télécharger / Imprimer PDF</button>'
-    +'<span class="tbtn-note">💡 Enregistrez le PDF puis joignez-le à votre email</span>'
+    +'<a href="'+lienEmail+'" class="tbtn" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">📧 Envoyer par email à l\'encadrant(e)</a>'
+    +'<button class="tbtn" onclick="window.print()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">🖨 Imprimer / PDF</button>'
+    +'<span class="tbtn-note">💡 L\'email contient tous les détails + lien de confirmation vers la présidence</span>'
     +'</div>'
 
     /* ── Intro ── */
@@ -9494,9 +9511,14 @@ function _envoyerOmEmail(omId) {
     +'<div class="row"><span class="lbl">Transport autorisé</span><span class="val">'+_omTransport(om)+'</span></div>'
     +'</div>'
 
-    /* ── Bouton confirmation ── */
-    +'<div class="action"><p>✍️ Pour valider cet Ordre de Mission, cliquez sur le bouton ci-dessous.<br>Votre confirmation sera transmise automatiquement à la présidence.</p>'
-    +btnConfirm+'</div>'
+    /* ── Note officielle ── */
+    +'<div class="action"><p>📋 <strong>Ce document est l\'Ordre de Mission officiel.</strong><br>'
+    +'Cliquez <strong>«&nbsp;Envoyer par email&nbsp;»</strong> ci-dessus pour l\'envoyer à l\'encadrant(e).<br>'
+    +'L\'email inclut tous les détails et le lien de confirmation pour la présidence.</p>'
+    +(emailPres
+      ? '<p style="margin-top:10px;font-size:12px;color:#1e40af">✅ Lien de confirmation pré-rempli vers : <strong>'+emailPres+'</strong></p>'
+      : '<p style="margin-top:10px;font-size:12px;color:#dc2626">⚠️ Email de la présidence non renseigné — configurez-le dans Réglages → ODM</p>')
+    +'</div>'
 
     /* ── Bloc signatures ── */
     +'<div class="sig-block">'
