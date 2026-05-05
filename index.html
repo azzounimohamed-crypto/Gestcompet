@@ -9135,6 +9135,7 @@ function generateOmPdf(compId, staffOrigIdx) {
   var s = staffArr && staffArr[staffOrigIdx];
   if (!s) { toast('Encadrant introuvable','err'); return; }
   var pilot = (S.pilots||[]).find(function(p){ return p.id===(s.pilotId||s.id); })||{};
+  var cp  = (S.comps||[]).find(function(c){ return String(c.id)===String(compId); })||{};
   var cfg = S.odmConfig || {};
 
   var prenom = pilot.prenom||s.prenom||'';
@@ -9261,16 +9262,16 @@ function generateOmPdf(compId, staffOrigIdx) {
     lieu:      lieu, dates: dates, objet: objet,
     transport: { train:tTrain, federal:tFed, perso:tPerso, autre:tAutre, precision:tPrec },
     genere:    new Date().toISOString(),
-    statut:    'genere',
-    _pdfHtml:  html
+    statut:    'genere'
   });
   saveState();
 
   closeOmForm();
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 
-  /* ── Envoi portail (direct, sans setTimeout pour respecter le geste utilisateur) ── */
+  /* ── Envoi portail ── */
   if (email) {
+    console.log('[DEBUG] Appel _envoyerOmEmail', omId, 'email:', email);
     _envoyerOmEmail(omId);
   } else {
     toast('OM archivé ✓ — aucun email (adresse manquante)', 'ok');
@@ -9394,7 +9395,9 @@ var _PORTAIL_B64 = 'PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImZyIj4KPGhlYWQ+CjxtZXRh
 
 /* ── ODM : envoi portail (upload Supabase + email avec lien) ─────────────── */
 function _envoyerOmEmail(omId) {
+  console.log('[DEBUG] _envoyerOmEmail appelée avec', omId);
   var om = (S.ordresMission||[]).find(function(o){ return o.id===omId; });
+  console.log('[DEBUG] OM trouvé:', om ? 'OUI' : 'NON');
   if (!om) { toast('OM introuvable','err'); return; }
   var cp      = (S.comps||[]).find(function(c){ return String(c.id)===String(om.compId); })||{};
   var cpNom   = cp.nom || om.compNom || '';
@@ -9438,7 +9441,9 @@ function _envoyerOmEmail(omId) {
    +'• Déposer votre Note de Frais\n\n'
    +'Cordialement,\n'+presNom+'\n'+presTitre+' — FFPLUM'
   );
-  window.location.href = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+corps;
+  var mailtoUrl = 'mailto:'+encodeURIComponent(dest)+'?subject='+sujet+'&body='+corps;
+  console.log('[DEBUG] mailto URL longueur:', mailtoUrl.length, 'dest:', dest);
+  window.location.href = mailtoUrl;
 
   /* ── 4. Màj statut local ── */
   om.statut = 'signe_encadrant';
