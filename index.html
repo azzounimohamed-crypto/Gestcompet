@@ -9415,12 +9415,12 @@ function _envoyerOmEmail(omId) {
   var tok = om.portalToken;
 
   /* ── 2. URL portail (URL publique Supabase Storage, connue à l'avance) ── */
-  var SB_STORAGE = 'https://wctpwgnavsvyueypgicd.supabase.co/storage/v1/object/public/gestappli-sync/portail_om.html';
-  var portailUrl = (cfg._portailUrl) || SB_STORAGE;
+  var portailUrl = 'https://azzounimohamed-crypto.github.io/Gestcompet/portail_om.html';
   var lienPortail = portailUrl + (portailUrl.includes('?')?'&':'?') + 't=' + tok;
 
   /* ── 3. Ouvrir le client email IMMÉDIATEMENT (geste utilisateur conservé) ── */
-  var sujet = encodeURIComponent('Ordre de Mission '+ref+' — '+cpNom+' — FFPLUM');
+  var cpLabel = cpNom || om.compNom || '';
+  var sujet = encodeURIComponent('Ordre de Mission '+ref+(cpLabel?' — '+cpLabel:'')+' — FFPLUM');
   var corps = encodeURIComponent(
     'Bonjour '+om.prenom+',\n\n'
    +'La FFPLUM vous mandate pour la compétition «'+cpNom+'».\n\n'
@@ -9469,15 +9469,7 @@ function _envoyerOmEmail(omId) {
   sb2.from('stol_shared').upsert({ id:'om_p_'+tok, data:JSON.stringify(portalData) })
     .then(function(){ console.log('[portail] données sauvées'); })
     .catch(function(e){ console.warn('[portail] save error', e); });
-  /* Upload portail HTML si pas encore fait */
-  if (!cfg._portailUrl) {
-    try {
-      var blob = new Blob([atob(_PORTAIL_B64)], {type:'text/html;charset=utf-8'});
-      sb2.storage.from('gestappli-sync').upload('portail_om.html', blob, {upsert:true, contentType:'text/html;charset=utf-8'})
-        .then(function(){ console.log('[portail] HTML uploadé'); })
-        .catch(function(e){ console.warn('[portail] upload error', e); });
-    } catch(e) { console.warn('[portail] blob error', e); }
-  }
+  /* portail_om.html hébergé sur GitHub Pages — pas d'upload nécessaire */
 }
 
 /* ── ODM : ouvrir le document pour impression / PDF ─────────────────────── */
