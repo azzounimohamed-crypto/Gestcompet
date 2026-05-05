@@ -9408,10 +9408,13 @@ function _envoyerOmEmail(omId) {
   );
   var lienConfirm = emailPres ? 'mailto:'+emailPres+'?subject='+sujetConfirm+'&body='+corpsConfirm : '';
 
-  /* Bouton de confirmation */
-  var btnConfirm = lienConfirm
-    ? '<a href="'+lienConfirm+'" style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:.3px">✅ Je confirme ma participation</a>'
-    : '<p style="color:#6b7280;font-style:italic">Répondez à l\'email pour confirmer votre participation.</p>';
+  /* Bouton de confirmation — onclick pour compatibilité Safari/blob: */
+  var mailtoConfirm = emailPres
+    ? 'mailto:'+emailPres+'?subject='+sujetConfirm+'&body='+corpsConfirm
+    : 'mailto:?subject='+sujetConfirm+'&body='+corpsConfirm;
+  var btnConfirm = '<button onclick="window.location.href=this.dataset.mailto" data-mailto="'+mailtoConfirm.replace(/"/g,'&quot;')+'" '
+    +'style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:.3px;cursor:pointer;font-family:inherit">✅ Je confirme ma participation</button>'
+    +(emailPres ? '' : '<p style="font-size:12px;color:#6b7280;margin-top:10px">⚠️ Renseignez l\'email de la présidence dans Réglages → Ordre de Mission pour un envoi automatique dirigé</p>');
 
   var sujetEmail = encodeURIComponent('Ordre de Mission '+ref+' — FFPLUM — '+cpNom);
   var corpsEmail = encodeURIComponent(
