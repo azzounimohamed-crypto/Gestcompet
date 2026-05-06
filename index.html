@@ -25177,38 +25177,59 @@ function _renderPortail(D, tok, role, sb) {
     window.location.href = 'mailto:'+encodeURIComponent(to||'')+'?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(corps);
   }
 
-  function row(l,v){ return '<div class="p-row"><span class="p-rl">'+l+'</span><span class="p-rv">'+v+'</span></div>'; }
-  function stepH(done,ico,lbl,date){ return '<div class="p-step"><div class="p-step-line"></div><div class="p-dot '+(done?'ok':'todo')+'">'+(done?'✓':ico)+'</div><div style="padding-top:4px"><div class="p-sl '+(done?'done':'todo')+'">'+lbl+'</div>'+(done&&date?'<div class="p-sdate">'+fd(date)+'</div>':'')+'</div></div>'; }
+  /* ── Ligne d'info : "Label : Valeur en gras" ── */
+  function row(l,v){ return '<div class="p-row"><span class="p-rl">'+l+' :</span><span class="p-rv">'+v+'</span></div>'; }
 
-  var banners = {genere:{cls:'att',ico:'📋',txt:'En attente de confirmation',sub:'Veuillez confirmer votre participation à cette mission.'},confirme_enc:{cls:'con',ico:'⏳',txt:'Confirmé — en attente de validation',sub:'Votre confirmation a été transmise à la présidence.'},valide:{cls:'val',ico:'✅',txt:'Mission validée',sub:'Félicitations ! Déposez votre note de frais.'},ndf_envoyee:{cls:'ndf',ico:'📊',txt:'NDF envoyée',sub:'Votre note de frais est en cours de traitement.'},ndf_validee:{cls:'val',ico:'💳',txt:'NDF validée',sub:'Votre remboursement est en cours.'}};
+  /* ── Étape horizontale numérotée ── */
+  function stepH(done, num, lbl, date){
+    var d = done?'ok':'todo';
+    var datePart = (done&&date)?'<span class="p-sdate">'+fd(date)+'</span>':'';
+    return '<div class="p-step"><div class="p-dot '+d+'">'+num+'</div><div class="p-step-lbl '+(done?'done':'')+'">'+lbl+datePart+'</div></div>';
+  }
+
+  var banners = {
+    genere:       {cls:'att', ico:'📋', txt:'En attente de votre confirmation'},
+    confirme_enc: {cls:'con', ico:'⏳', txt:'Confirmé — en attente de validation présidence'},
+    valide:       {cls:'val', ico:'✅', txt:'Mission validée — déposez votre NDF'},
+    ndf_envoyee:  {cls:'ndf', ico:'📊', txt:'NDF transmise — traitement en cours'},
+    ndf_validee:  {cls:'val', ico:'💳', txt:'NDF validée — remboursement en cours'}
+  };
   var bn = banners[st]||banners.genere;
 
-  var ficheH = '<div class="p-card"><div class="p-ch">📋 Ordre de Mission — N° '+f(D.ref)+'</div><div class="p-cb">'
+  /* ── Fiche mission ── */
+  var ficheH = '<div class="p-card">'
     +row('Bénéficiaire','<strong>'+f(D.prenom)+' '+f(D.nom)+'</strong>')
-    +row('Fonction',f(D.role))+row('Compétition',f(D.compNom))
-    +row('Lieu',f(D.lieu))+row('Dates',f(D.dates))+row('Transport',ft(D.transport))
+    +row('Fonction', f(D.role))
+    +row('Compétition', f(D.compNom))
+    +row('Lieu', f(D.lieu))
+    +row('Dates', f(D.dates))
+    +row('Transport', ft(D.transport))
+    +'</div>';
+
+  /* ── Suivi (étapes horizontales numérotées) ── */
+  var suiviH = '<div class="p-card p-card-suivi">'
+    +'<div class="p-suivi-title">Suivi</div>'
+    +'<div class="p-steps">'
+    +stepH(['confirme_enc','valide','ndf_envoyee','ndf_validee'].includes(st), 1, 'Confirmation', D.confirme_at)
+    +stepH(['valide','ndf_envoyee','ndf_validee'].includes(st), 2, 'Validation', D.valide_at)
+    +stepH(['ndf_envoyee','ndf_validee'].includes(st), 3, 'NDF<br>déposée', D.ndf_at)
+    +stepH(['ndf_validee'].includes(st), 4, 'Remboursement<br>validé', D.ndf_validee_at)
     +'</div></div>';
 
-  var suiviH = '<div class="p-card"><div class="p-ch">📍 Suivi</div><div class="p-cb"><div class="p-steps">'
-    +stepH(['confirme_enc','valide','ndf_envoyee','ndf_validee'].includes(st),'✍️','Confirmation encadrant',D.confirme_at)
-    +stepH(['valide','ndf_envoyee','ndf_validee'].includes(st),'✅','Validation présidence',D.valide_at)
-    +stepH(['ndf_envoyee','ndf_validee'].includes(st),'📊','NDF déposée',D.ndf_at)
-    +stepH(['ndf_validee'].includes(st),'💳','Remboursement validé',D.ndf_validee_at)
-    +'</div></div></div>';
-
+  /* ── Bloc action ── */
   var actionH = '';
   if (role==='pres'||role==='president') {
     actionH = st==='confirme_enc'
-      ? '<div class="p-card"><div class="p-ch">⚖️ Décision présidence</div><div class="p-cb"><div class="p-action-sub">'+f(D.prenom)+' '+f(D.nom)+' a confirmé sa participation. Validez ou rejetez cette mission.</div><button class="p-btn p-green" id="p-btn-val">✅ Valider cette mission</button><button class="p-btn p-grey" id="p-btn-rej">✕ Rejeter la mission</button></div></div>'
-      : '<div class="p-card"><div class="p-cb" style="text-align:center;padding:28px 20px">'+(st==='genere'?'<div style="font-size:40px;margin-bottom:10px">⏳</div><div style="color:#94a3b8;font-weight:600">En attente de confirmation encadrant</div>':st==='valide'?'<div style="font-size:40px;margin-bottom:10px">✅</div><div style="color:#166534;font-weight:700">Mission déjà validée</div>':'<div style="font-size:40px;margin-bottom:10px">📊</div><div style="color:#6b7280;font-weight:600">En cours de traitement</div>')+'</div></div>';
+      ? '<div class="p-card"><div class="p-cb"><div class="p-action-sub"><strong>'+f(D.prenom)+' '+f(D.nom)+'</strong> a confirmé sa participation. Veuillez valider ou rejeter cette mission.</div><button class="p-btn p-green" id="p-btn-val">✅ Valider cette mission</button><button class="p-btn p-grey" id="p-btn-rej">✕ Rejeter la mission</button></div></div>'
+      : '<div class="p-card"><div class="p-cb" style="text-align:center;padding:24px 18px">'+(st==='genere'?'<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#6b7280;font-weight:600;font-size:14px">En attente de confirmation encadrant</div>':st==='valide'?'<div style="font-size:36px;margin-bottom:8px">✅</div><div style="color:#15803d;font-weight:700;font-size:14px">Mission déjà validée</div>':'<div style="font-size:36px;margin-bottom:8px">📊</div><div style="color:#6b7280;font-weight:600;font-size:14px">En cours de traitement</div>')+'</div></div>';
   } else {
     if (st==='genere') {
-      actionH = '<div class="p-card"><div class="p-ch">✍️ Votre confirmation</div><div class="p-cb"><div class="p-action-sub">En confirmant votre participation, la présidence sera notifiée par email pour valider votre mission.</div><button class="p-btn p-blue" id="p-btn-conf">✅ Je confirme ma participation</button></div></div>';
+      actionH = '<button class="p-btn p-blue" id="p-btn-conf">Je confirme ma participation</button>';
     } else if (st==='valide') {
-      actionH = '<div class="p-card"><div class="p-ch">📊 Note de frais</div><div class="p-cb"><div class="p-action-sub">Votre mission est validée. Renseignez vos frais de déplacement pour remboursement.</div>'
+      actionH = '<div class="p-card"><div class="p-card-title">Note de frais</div><div class="p-cb"><div class="p-action-sub">Votre mission est validée. Renseignez vos frais pour obtenir votre remboursement.</div>'
         +'<label class="p-lbl">Barème kilométrique</label><select class="p-inp" id="p-bar"><option value="'+(cfg.bareme1Taux||0.408)+'">'+(cfg.bareme1Label||'Encadrants')+' — '+(cfg.bareme1Taux||0.408)+' €/km</option><option value="'+(cfg.bareme2Taux||0.200)+'">'+(cfg.bareme2Label||'Compétiteurs')+' — '+(cfg.bareme2Taux||0.200)+' €/km</option></select>'
         +'<label class="p-lbl">Kilométrage</label><input class="p-inp" type="number" id="p-km" min="0" step="1" placeholder="0 km">'
-        +'<label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;font-weight:600;cursor:pointer;color:#374151"><input type="checkbox" id="p-ar" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer"> Trajet aller-retour (km × 2)</label>'
+        +'<label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;cursor:pointer;color:#374151"><input type="checkbox" id="p-ar" style="width:18px;height:18px;accent-color:#1a2744;cursor:pointer"> Trajet aller-retour (km × 2)</label>'
         +'<label class="p-lbl">Repas (€)</label><input class="p-inp" type="number" id="p-rep" min="0" step="0.01" placeholder="0.00">'
         +'<label class="p-lbl">Commentaire (facultatif)</label><textarea class="p-inp" id="p-note" rows="3" placeholder="Précisions éventuelles…" style="resize:vertical"></textarea>'
         +'<div class="p-total-box" id="p-tot">Total estimé : — €</div>'
@@ -25217,69 +25238,73 @@ function _renderPortail(D, tok, role, sb) {
     }
   }
 
-  /* ── Injecter le CSS portail ── */
+  /* ── CSS portail — design document officiel ── */
   var styleEl = document.getElementById('p-style');
   if (!styleEl) { styleEl = document.createElement('style'); styleEl.id='p-style'; document.head.appendChild(styleEl); }
   styleEl.textContent = `
 #p-overlay *{box-sizing:border-box;margin:0;padding:0}
-#p-overlay{position:fixed;inset:0;background:#eef2f7;z-index:99999;overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1e293b;min-height:100vh}
-.p-bar{background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);color:#fff;padding:0;position:sticky;top:0;z-index:10;box-shadow:0 2px 16px rgba(0,0,0,.3)}
-.p-bar-inner{display:flex;align-items:center;gap:14px;padding:14px 20px;max-width:720px;margin:0 auto;width:100%}
-.p-logo-box{width:44px;height:44px;background:rgba(255,255,255,.18);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-.p-logo-txt{font-size:18px;font-weight:900;letter-spacing:.3px;line-height:1.15}
-.p-logo-sub{font-size:11px;color:#bfdbfe;margin-top:2px;font-weight:500}
-.p-ref-pill{margin-left:auto;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
-.p-wrap{max-width:720px;margin:0 auto;padding:28px 20px 60px;width:100%}
-.p-banner{border-radius:14px;padding:18px 20px;margin-bottom:22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-width:1.5px;border-style:solid}
-.p-banner-ico{font-size:32px;flex-shrink:0;line-height:1}
-.p-banner-txt{flex:1}
-.p-banner-title{font-size:16px;font-weight:800;margin-bottom:3px}
-.p-banner-sub{font-size:13px;font-weight:500;opacity:.75}
-.p-banner.att{background:#fffbeb;border-color:#fcd34d;color:#92400e}
-.p-banner.con{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
-.p-banner.val{background:#f0fdf4;border-color:#86efac;color:#14532d}
-.p-banner.ndf{background:#faf5ff;border-color:#c4b5fd;color:#581c87}
-.p-card{background:#fff;border-radius:18px;box-shadow:0 2px 20px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);margin-bottom:18px;overflow:hidden}
-.p-ch{padding:14px 22px;background:#f8fafc;border-bottom:1.5px solid #f1f5f9;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#94a3b8;display:flex;align-items:center;gap:8px}
-.p-cb{padding:4px 22px 20px}
-.p-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #f1f5f9;font-size:14px;gap:16px}
+#p-overlay{position:fixed;inset:0;background:#eef2f7;z-index:99999;overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#1a2744;min-height:100vh}
+/* ── En-tête ── */
+.p-header{background:#1a2744;padding:26px 20px 20px;text-align:center;color:#fff}
+.p-header-logo{width:62px;height:62px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 12px;box-shadow:0 3px 12px rgba(0,0,0,.25)}
+.p-header-title{font-size:21px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#fff;line-height:1.2}
+/* ── Barre référence ── */
+.p-ref-bar{background:#2c5999;padding:11px 20px;text-align:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+/* ── Contenu ── */
+.p-wrap{max-width:480px;margin:0 auto;padding:20px 16px 60px;width:100%}
+/* ── Bannière statut ── */
+.p-banner{border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600;border-left:4px solid;display:flex;align-items:center;gap:10px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.07)}
+.p-banner.att{border-color:#f59e0b;color:#92400e}
+.p-banner.con{border-color:#3b82f6;color:#1d4ed8}
+.p-banner.val{border-color:#22c55e;color:#15803d}
+.p-banner.ndf{border-color:#a855f7;color:#7e22ce}
+/* ── Carte blanche ── */
+.p-card{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,0,0,.07);margin-bottom:16px;overflow:hidden}
+.p-card-title{padding:11px 18px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6b7280;border-bottom:1px solid #f3f4f6;background:#fafafa}
+.p-cb{padding:16px 18px}
+/* ── Lignes d'info ── */
+.p-row{display:flex;justify-content:space-between;align-items:baseline;padding:11px 18px;border-bottom:1px solid #f3f4f6;font-size:14px;gap:12px}
 .p-row:last-child{border-bottom:none}
-.p-rl{color:#64748b;font-weight:700;min-width:110px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;padding-top:1px}
-.p-rv{color:#0f172a;font-weight:600;text-align:right;word-break:break-word;flex:1}
-.p-steps{display:flex;flex-direction:column}
-.p-step{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid #f8fafc;position:relative}
-.p-step:last-child{border-bottom:none}
-.p-step-line{position:absolute;left:14px;top:44px;bottom:-16px;width:2px;background:#e2e8f0;border-radius:2px}
-.p-step:last-child .p-step-line{display:none}
-.p-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;font-weight:900;border:2px solid transparent;margin-top:1px}
-.p-dot.ok{background:#dcfce7;color:#15803d;border-color:#86efac}
-.p-dot.todo{background:#f1f5f9;color:#cbd5e1;border-color:#e2e8f0}
-.p-sl{font-size:14px;font-weight:700;margin-bottom:3px}
-.p-sl.done{color:#15803d}
-.p-sl.todo{color:#94a3b8}
-.p-sdate{font-size:11px;color:#94a3b8;font-weight:600}
-.p-btn{display:block;width:100%;padding:16px 20px;border-radius:14px;border:none;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:12px;letter-spacing:.2px}
+.p-rl{color:#6b7280;font-weight:400;flex-shrink:0;white-space:nowrap}
+.p-rv{font-weight:700;color:#1a2744;text-align:right;word-break:break-word}
+/* ── Boutons ── */
+.p-btn{display:block;width:100%;padding:16px 20px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:12px;letter-spacing:.3px;text-align:center}
 .p-btn:last-child{margin-bottom:0}
-.p-btn:disabled{opacity:.45;cursor:default}
-.p-blue{background:#2563eb;color:#fff;box-shadow:0 4px 16px rgba(37,99,235,.4)}
-.p-green{background:#16a34a;color:#fff;box-shadow:0 4px 16px rgba(22,163,74,.4)}
-.p-red{background:#dc2626;color:#fff;box-shadow:0 4px 16px rgba(220,38,38,.3)}
-.p-grey{background:#f8fafc;color:#475569;border:2px solid #e2e8f0}
-.p-lbl{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:6px;margin-top:16px}
+.p-btn:disabled{opacity:.5;cursor:default}
+.p-blue{background:#1a2744;color:#fff}
+.p-green{background:#15803d;color:#fff}
+.p-red{background:#dc2626;color:#fff}
+.p-grey{background:#f3f4f6;color:#374151;border:1.5px solid #e5e7eb}
+/* ── Suivi horizontal ── */
+.p-suivi-title{padding:14px 18px 10px;font-size:15px;font-weight:800;color:#2c5999;text-align:center;border-bottom:1px solid #f3f4f6}
+.p-steps{display:flex;justify-content:space-around;padding:20px 6px 18px;position:relative}
+.p-steps::before{content:'';position:absolute;top:36px;left:18%;right:18%;height:2px;background:#e5e7eb;z-index:0}
+.p-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;z-index:1;gap:0}
+.p-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;margin-bottom:8px;flex-shrink:0}
+.p-dot.ok{background:#1a2744;color:#fff}
+.p-dot.todo{background:#e5e7eb;color:#9ca3af}
+.p-step-lbl{font-size:10px;font-weight:600;text-align:center;color:#9ca3af;line-height:1.35;max-width:64px}
+.p-step-lbl.done{color:#1a2744;font-weight:700}
+.p-sdate{display:block;font-size:9px;color:#9ca3af;margin-top:3px;font-weight:400}
+/* ── Formulaire NDF ── */
+.p-action-sub{font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.6}
+.p-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:6px;margin-top:14px}
 .p-lbl:first-child{margin-top:0}
-.p-inp,.p-sel{width:100%;padding:12px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;color:#0f172a;background:#fafafa}
-.p-inp:focus,.p-sel:focus{border-color:#2563eb;background:#fff}
-.p-total-box{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #bfdbfe;border-radius:14px;padding:16px 20px;margin:16px 0;font-size:22px;font-weight:900;color:#1e40af;text-align:center}
-.p-action-sub{font-size:13px;color:#64748b;margin-bottom:20px;margin-top:14px;line-height:1.6}
+.p-inp{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;color:#1a2744;background:#fff}
+.p-inp:focus{border-color:#2c5999}
+.p-total-box{background:#eef2f7;border:1.5px solid #c7d2fe;border-radius:10px;padding:14px 18px;margin:14px 0;font-size:20px;font-weight:800;color:#1a2744;text-align:center}
 `
 
-  /* ── Injecter le HTML ── */
+  /* ── HTML portail ── */
   var ov = document.getElementById('p-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id='p-overlay'; document.body.appendChild(ov); }
-  ov.innerHTML = '<div class="p-bar"><div class="p-bar-inner"><div class="p-logo-box">🪂</div><div><div class="p-logo-txt">FFPLUM Sport</div><div class="p-logo-sub">Espace mission encadrant</div></div><div class="p-ref-pill">'+f(D.ref)+'</div></div></div>'
+  ov.innerHTML = '<div class="p-header"><div class="p-header-logo">🪂</div><div class="p-header-title">FFPLUM SPORT</div></div>'
+    +'<div class="p-ref-bar">ORDRE DE MISSION N° '+f(D.ref)+'</div>'
     +'<div class="p-wrap">'
-    +'<div class="p-banner '+bn.cls+'"><div class="p-banner-ico">'+bn.ico+'</div><div class="p-banner-txt"><div class="p-banner-title">'+bn.txt+'</div><div class="p-banner-sub">'+f(D.prenom)+' '+f(D.nom)+'</div></div></div>'
-    +ficheH+suiviH+actionH
+    +'<div class="p-banner '+bn.cls+'"><span style="font-size:18px;line-height:1">'+bn.ico+'</span><span>'+bn.txt+'</span></div>'
+    +ficheH
+    +actionH
+    +suiviH
     +'</div>';
 
   /* ── Brancher les boutons ── */
