@@ -22956,7 +22956,9 @@ function handleLogoUpload(inp) {
   reader.onload = function(e) {
     if (!S.settings) S.settings = {};
     S.settings.logo = e.target.result;
-    localStorage.setItem('ffplum_logo', e.target.result); // compat legacy
+    localStorage.setItem('ffplum_logo', e.target.result);
+    /* ── Sauvegarder dans Supabase org_logo (accès portail encadrant) ── */
+    try { var _sb=getSB(); if(_sb) _sb.from('stol_shared').upsert({id:'org_logo', data:JSON.stringify({logo:e.target.result, updated_at:new Date().toISOString()})}).then(function(){ console.log('[org_logo] logo sauvé dans Supabase'); }); } catch(_e){}
     saveState(); silentPush();
     renderReglagesLogoSection(); updateHeader();
     toast('Logo mis à jour ✓', 'ok');
@@ -25392,6 +25394,16 @@ document.addEventListener('DOMContentLoaded', async function() {
       var _pRes = await _pSb.from('stol_shared').select('data').eq('id','om_p_'+_pTok).single();
       if (_pRes.error || !_pRes.data) { document.body.innerHTML='<div style="padding:40px;text-align:center"><div style="font-size:48px">⚠️</div><div style="font-size:18px;color:#991b1b;font-weight:700;margin-top:16px">Mission introuvable</div><div style="color:#6b7280;margin-top:8px">Ce lien est invalide ou expiré.</div></div>'; return; }
       var _pD = typeof _pRes.data.data==='string' ? JSON.parse(_pRes.data.data) : _pRes.data.data;
+      /* ── Charger le logo depuis org_logo si absent du record OM ── */
+      if (!_pD.logoUrl) {
+        try {
+          var _lr = await _pSb.from('stol_shared').select('data').eq('id','org_logo').single();
+          if (!_lr.error && _lr.data && _lr.data.data) {
+            var _ld = typeof _lr.data.data==='string' ? JSON.parse(_lr.data.data) : _lr.data.data;
+            if (_ld && _ld.logo) _pD.logoUrl = _ld.logo;
+          }
+        } catch(_le) {}
+      }
       _renderPortail(_pD, _pTok, _pRole, _pSb);
     } catch(_pe) { document.body.innerHTML='<div style="padding:40px;text-align:center;color:#991b1b">Erreur de connexion. Vérifiez votre connexion internet.</div>'; }
     return;
