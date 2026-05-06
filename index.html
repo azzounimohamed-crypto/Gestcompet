@@ -25199,8 +25199,8 @@ function _renderPortail(D, tok, role, sb) {
   };
   var bn = banners[st]||banners.genere;
 
-  /* ── Fiche mission ── */
-  var ficheH = '<div class="p-card">'
+  /* ── Fiche mission (lignes dans la carte principale) ── */
+  var ficheH = '<div class="p-rows">'
     +row('Bénéficiaire','<strong>'+f(D.prenom)+' '+f(D.nom)+'</strong>')
     +row('Fonction', f(D.role))
     +row('Compétition', f(D.compNom))
@@ -25209,8 +25209,8 @@ function _renderPortail(D, tok, role, sb) {
     +row('Transport', ft(D.transport))
     +'</div>';
 
-  /* ── Suivi (étapes horizontales numérotées) ── */
-  var suiviH = '<div class="p-card p-card-suivi">'
+  /* ── Suivi (section dans la carte principale) ── */
+  var suiviH = '<div class="p-suivi-section">'
     +'<div class="p-suivi-title">Suivi</div>'
     +'<div class="p-steps">'
     +stepH(['confirme_enc','valide','ndf_envoyee','ndf_validee'].includes(st), 1, 'Confirmation', D.confirme_at)
@@ -25219,111 +25219,113 @@ function _renderPortail(D, tok, role, sb) {
     +stepH(['ndf_validee'].includes(st), 4, 'Remboursement<br>validé', D.ndf_validee_at)
     +'</div></div>';
 
-  /* ── Bloc action ── */
+  /* ── Bloc action (toujours dans la carte principale) ── */
   var actionH = '';
   if (role==='pres'||role==='president') {
     actionH = st==='confirme_enc'
-      ? '<div class="p-card"><div class="p-cb"><div class="p-action-sub"><strong>'+f(D.prenom)+' '+f(D.nom)+'</strong> a confirmé sa participation. Veuillez valider ou rejeter cette mission.</div><button class="p-btn p-green" id="p-btn-val">✅ Valider cette mission</button><button class="p-btn p-grey" id="p-btn-rej">✕ Rejeter la mission</button></div></div>'
-      : '<div class="p-card"><div class="p-cb" style="text-align:center;padding:24px 18px">'+(st==='genere'?'<div style="font-size:36px;margin-bottom:8px">⏳</div><div style="color:#6b7280;font-weight:600;font-size:14px">En attente de confirmation encadrant</div>':st==='valide'?'<div style="font-size:36px;margin-bottom:8px">✅</div><div style="color:#15803d;font-weight:700;font-size:14px">Mission déjà validée</div>':'<div style="font-size:36px;margin-bottom:8px">📊</div><div style="color:#6b7280;font-weight:600;font-size:14px">En cours de traitement</div>')+'</div></div>';
+      ? '<div class="p-action-sub"><strong>'+f(D.prenom)+' '+f(D.nom)+'</strong> a confirmé sa participation. Veuillez valider ou rejeter cette mission.</div><button class="p-btn p-green" id="p-btn-val">✅ Valider cette mission</button><button class="p-btn p-grey" id="p-btn-rej">✕ Rejeter la mission</button>'
+      : '<div style="text-align:center;padding:10px 0 4px">'+(st==='genere'?'<div style="font-size:34px;margin-bottom:8px">⏳</div><div style="color:#6b7280;font-weight:600;font-size:13px">En attente de confirmation encadrant</div>':st==='valide'?'<div style="font-size:34px;margin-bottom:8px">✅</div><div style="color:#15803d;font-weight:700;font-size:13px">Mission déjà validée</div>':'<div style="font-size:34px;margin-bottom:8px">📊</div><div style="color:#6b7280;font-weight:600;font-size:13px">En cours de traitement</div>')+'</div>';
   } else {
     if (st==='genere') {
       actionH = '<button class="p-btn p-blue" id="p-btn-conf">Je confirme ma participation</button>';
     } else if (st==='valide') {
-      actionH = '<div class="p-card"><div class="p-card-title">Note de frais</div><div class="p-cb"><div class="p-action-sub">Votre mission est validée. Renseignez vos frais pour obtenir votre remboursement.</div>'
+      actionH = '<div class="p-action-sub">Votre mission est validée. Renseignez vos frais pour obtenir votre remboursement.</div>'
         +'<label class="p-lbl">Barème kilométrique</label><select class="p-inp" id="p-bar"><option value="'+(cfg.bareme1Taux||0.408)+'">'+(cfg.bareme1Label||'Encadrants')+' — '+(cfg.bareme1Taux||0.408)+' €/km</option><option value="'+(cfg.bareme2Taux||0.200)+'">'+(cfg.bareme2Label||'Compétiteurs')+' — '+(cfg.bareme2Taux||0.200)+' €/km</option></select>'
         +'<label class="p-lbl">Kilométrage</label><input class="p-inp" type="number" id="p-km" min="0" step="1" placeholder="0 km">'
-        +'<label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;cursor:pointer;color:#374151"><input type="checkbox" id="p-ar" style="width:18px;height:18px;accent-color:#1a2744;cursor:pointer"> Trajet aller-retour (km × 2)</label>'
+        +'<label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;cursor:pointer;color:#374151"><input type="checkbox" id="p-ar" style="width:18px;height:18px;accent-color:#1e3d78;cursor:pointer"> Trajet aller-retour (km × 2)</label>'
         +'<label class="p-lbl">Repas (€)</label><input class="p-inp" type="number" id="p-rep" min="0" step="0.01" placeholder="0.00">'
         +'<label class="p-lbl">Commentaire (facultatif)</label><textarea class="p-inp" id="p-note" rows="3" placeholder="Précisions éventuelles…" style="resize:vertical"></textarea>'
         +'<div class="p-total-box" id="p-tot">Total estimé : — €</div>'
-        +'<button class="p-btn p-blue" id="p-btn-ndf">📤 Envoyer ma note de frais</button>'
-        +'</div></div>';
+        +'<button class="p-btn p-blue" id="p-btn-ndf">📤 Envoyer ma note de frais</button>';
     }
   }
 
-  /* ── CSS portail — design document officiel FFPLUM ── */
+  /* ══════════════════════════════════════════════════
+     CSS portail — une seule carte blanche, structure
+     identique à la maquette de référence
+  ══════════════════════════════════════════════════ */
   var styleEl = document.getElementById('p-style');
   if (!styleEl) { styleEl = document.createElement('style'); styleEl.id='p-style'; document.head.appendChild(styleEl); }
   styleEl.textContent = `
 #p-overlay *{box-sizing:border-box;margin:0;padding:0}
-#p-overlay{position:fixed;inset:0;background:#d8e4f2;z-index:99999;overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#1a2e50;min-height:100vh;display:flex;flex-direction:column}
-/* ── En-tête ── */
-.p-header{background:#1e3d78;padding:32px 20px 28px;text-align:center;color:#fff}
-.p-header-logo{width:74px;height:74px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 16px rgba(0,0,0,.32);overflow:hidden;padding:4px}
-.p-header-logo img{width:100%;height:100%;object-fit:contain;border-radius:50%}
-.p-header-title{font-size:22px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#fff;line-height:1.3}
+#p-overlay{position:fixed;inset:0;background:#dae5f3;z-index:99999;overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#1a2e50;min-height:100vh}
+/* ── Zone centrale ── */
+.p-wrap{max-width:420px;margin:0 auto;padding:22px 14px 44px;width:100%}
+/* ═══ CARTE PRINCIPALE UNIQUE ═══ */
+.p-main-card{background:#fff;border-radius:18px;box-shadow:0 6px 32px rgba(0,0,0,.13);overflow:hidden}
+/* ── En-tête : logo gauche + titre centré ── */
+.p-header{display:flex;align-items:center;padding:18px 18px 14px;background:#fff;position:relative;min-height:72px}
+.p-header-logo{width:52px;height:52px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eef2f9;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+.p-header-logo img{width:100%;height:100%;object-fit:contain}
+.p-header-title{position:absolute;left:0;right:0;text-align:center;font-size:18px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;color:#1e3d78;pointer-events:none;padding:0 66px}
 /* ── Barre référence ── */
-.p-ref-bar{background:#2459a8;padding:13px 20px;text-align:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
-/* ── Contenu central ── */
-.p-wrap{flex:1;max-width:480px;margin:0 auto;padding:28px 16px 20px;width:100%}
-/* ── Bannière statut ── */
-.p-banner{border-radius:10px;padding:13px 16px;margin-bottom:22px;font-size:13px;font-weight:600;border-left:4px solid;display:flex;align-items:center;gap:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08)}
-.p-banner.att{border-color:#f59e0b;color:#92400e}
-.p-banner.con{border-color:#3b82f6;color:#1d4ed8}
-.p-banner.val{border-color:#22c55e;color:#15803d}
-.p-banner.ndf{border-color:#a855f7;color:#7e22ce}
-/* ── Carte blanche ── */
-.p-card{background:#fff;border-radius:14px;box-shadow:0 3px 18px rgba(0,0,0,.09);margin-bottom:0;overflow:hidden}
-.p-card-title{padding:12px 20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#6b7280;border-bottom:1px solid #f0f2f5;background:#fafbfc}
-.p-cb{padding:18px 20px}
+.p-ref-bar{background:#1e3d78;padding:11px 18px;text-align:center;color:#fff;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;line-height:1.3}
+/* ── Bannière statut (dans la carte, petite) ── */
+.p-banner{margin:12px 18px 0;border-radius:8px;padding:9px 13px;font-size:12px;font-weight:600;border-left:4px solid;display:flex;align-items:center;gap:8px}
+.p-banner.att{border-color:#f59e0b;color:#92400e;background:#fffbeb}
+.p-banner.con{border-color:#3b82f6;color:#1d4ed8;background:#eff6ff}
+.p-banner.val{border-color:#22c55e;color:#15803d;background:#f0fdf4}
+.p-banner.ndf{border-color:#a855f7;color:#7e22ce;background:#faf5ff}
 /* ── Lignes d'info ── */
-.p-row{padding:16px 20px;border-bottom:1px solid #f0f2f5;font-size:15px;line-height:1.5}
-.p-row:last-child{border-bottom:none;padding-bottom:20px}
-.p-rl{color:#5a6b80;font-weight:400}
+.p-rows{padding:4px 0}
+.p-row{padding:13px 18px;border-bottom:1px solid #f0f2f5;font-size:14px;line-height:1.5}
+.p-row:last-child{border-bottom:none;padding-bottom:16px}
+.p-rl{color:#5a6b80}
 .p-rv{font-weight:700;color:#1a2e50}
-/* ── Séparateur entre carte et bouton ── */
-.p-btn-wrap{margin-top:22px;margin-bottom:0}
-/* ── Bouton principal — grand et visible ── */
-.p-btn{display:block;width:100%;padding:20px 24px;border-radius:12px;border:none;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:14px;letter-spacing:.3px;text-align:center;line-height:1.2}
+/* ── Section bouton / action ── */
+.p-action-wrap{padding:14px 18px 20px;border-top:1px solid #f0f2f5}
+/* ── Boutons ── */
+.p-btn{display:block;width:100%;padding:18px 20px;border-radius:11px;border:none;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:12px;letter-spacing:.3px;text-align:center;line-height:1.2}
 .p-btn:last-child{margin-bottom:0}
 .p-btn:disabled{opacity:.5;cursor:default}
-.p-blue{background:#1e3d78;color:#fff;box-shadow:0 5px 20px rgba(30,61,120,.38)}
-.p-green{background:#15803d;color:#fff;box-shadow:0 4px 16px rgba(21,128,61,.35)}
+.p-blue{background:#1e3d78;color:#fff;box-shadow:0 4px 18px rgba(30,61,120,.32)}
+.p-green{background:#15803d;color:#fff;box-shadow:0 4px 14px rgba(21,128,61,.3)}
 .p-red{background:#dc2626;color:#fff}
-.p-grey{background:#f3f4f6;color:#374151;border:1.5px solid #e5e7eb;box-shadow:none}
-/* ── Carte Suivi — espace généreux au-dessus ── */
-.p-card-suivi{margin-top:32px}
-/* ── Suivi horizontal numéroté ── */
-.p-suivi-title{padding:18px 20px 14px;font-size:16px;font-weight:800;color:#2459a8;text-align:center;border-bottom:1px solid #f0f2f5}
-.p-steps{display:flex;justify-content:space-around;padding:26px 8px 24px;position:relative}
-.p-steps::before{content:'';position:absolute;top:44px;left:16%;right:16%;height:2px;background:#dde3ec;z-index:0}
+.p-grey{background:#f3f4f6;color:#374151;border:1.5px solid #e5e7eb}
+/* ── Section Suivi (dans la carte, séparée par un filet) ── */
+.p-suivi-section{border-top:2px solid #f0f2f5}
+.p-suivi-title{padding:18px 18px 10px;font-size:15px;font-weight:800;color:#2459a8;text-align:center}
+.p-steps{display:flex;justify-content:space-around;padding:10px 6px 24px;position:relative}
+.p-steps::before{content:'';position:absolute;top:27px;left:18%;right:18%;height:2px;background:#dde3ec;z-index:0}
 .p-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative;z-index:1}
-.p-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;margin-bottom:10px;flex-shrink:0}
+.p-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;margin-bottom:8px;flex-shrink:0}
 .p-dot.ok{background:#1e3d78;color:#fff}
-.p-dot.todo{background:#dde3ec;color:#9aa5b4}
-.p-step-lbl{font-size:10px;font-weight:600;text-align:center;color:#9aa5b4;line-height:1.4;max-width:68px}
+.p-dot.todo{background:#e5eaf0;color:#9aa5b4}
+.p-step-lbl{font-size:10px;font-weight:600;text-align:center;color:#9aa5b4;line-height:1.35;max-width:68px}
 .p-step-lbl.done{color:#1e3d78;font-weight:700}
-.p-sdate{display:block;font-size:9px;color:#9aa5b4;margin-top:3px;font-weight:400}
+.p-sdate{display:block;font-size:9px;color:#9aa5b4;margin-top:2px}
 /* ── Formulaire NDF ── */
-.p-action-sub{font-size:14px;color:#5a6b80;margin-bottom:18px;line-height:1.7}
-.p-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a6b80;margin-bottom:7px;margin-top:16px}
+.p-action-sub{font-size:13px;color:#5a6b80;margin-bottom:14px;line-height:1.6}
+.p-lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a6b80;margin-bottom:6px;margin-top:14px}
 .p-lbl:first-child{margin-top:0}
-.p-inp{width:100%;padding:13px 15px;border:1.5px solid #dde3ec;border-radius:9px;font-size:15px;font-family:inherit;outline:none;color:#1a2e50;background:#fff}
+.p-inp{width:100%;padding:12px 14px;border:1.5px solid #dde3ec;border-radius:8px;font-size:14px;font-family:inherit;outline:none;color:#1a2e50;background:#fff}
 .p-inp:focus{border-color:#2459a8}
-.p-total-box{background:#eef2f9;border:1.5px solid #b8cef0;border-radius:10px;padding:15px 20px;margin:16px 0;font-size:22px;font-weight:800;color:#1e3d78;text-align:center}
-/* ── Pied de page ── */
-.p-footer{background:#1e3d78;color:rgba(255,255,255,.65);text-align:center;padding:18px 20px;font-size:11px;font-weight:500;letter-spacing:.6px;line-height:1.7;margin-top:32px}
-.p-footer strong{color:rgba(255,255,255,.9);font-weight:700}
+.p-total-box{background:#eef2f9;border:1.5px solid #b8cef0;border-radius:10px;padding:14px 18px;margin:14px 0;font-size:20px;font-weight:800;color:#1e3d78;text-align:center}
+/* ── Pied de page (hors carte) ── */
+.p-footer{text-align:center;padding:20px 16px 10px;font-size:11px;color:#6a84a8;line-height:1.8;font-weight:500}
+.p-footer strong{color:#1e3d78;font-weight:700}
 `
 
-  /* ── Logo : photo uploadée dans Réglages, sinon SVG FFPLUM ── */
+  /* ── Logo : photo des Réglages, sinon SVG FFPLUM ── */
   var _appLogo = _getAppLogo();
   var logoInner = _appLogo
-    ? '<img src="'+_appLogo+'" style="width:100%;height:100%;object-fit:contain;border-radius:50%">'
-    : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="66" height="66"><circle cx="30" cy="30" r="29" fill="#1e3d78"/><circle cx="30" cy="30" r="24" fill="#fff"/><path d="M8 34Q19 20 30 24Q41 20 52 34Q40 26 30 28Q20 26 8 34Z" fill="#1e3d78"/><rect x="18" y="40" width="7" height="5" rx="1" fill="#002395"/><rect x="26" y="40" width="8" height="5" rx="1" fill="#eee" stroke="#ccc" stroke-width="0.5"/><rect x="35" y="40" width="7" height="5" rx="1" fill="#ED2939"/><text x="30" y="19" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="7.5" fill="#1e3d78" letter-spacing="1.5">FFPLUM</text></svg>';
+    ? '<img src="'+_appLogo+'" style="width:100%;height:100%;object-fit:contain">'
+    : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="50" height="50"><circle cx="30" cy="30" r="29" fill="#1e3d78"/><circle cx="30" cy="30" r="24" fill="#fff"/><path d="M8 34Q19 20 30 24Q41 20 52 34Q40 26 30 28Q20 26 8 34Z" fill="#1e3d78"/><rect x="18" y="40" width="7" height="5" rx="1" fill="#002395"/><rect x="26" y="40" width="8" height="5" rx="1" fill="#eee" stroke="#ccc" stroke-width="0.5"/><rect x="35" y="40" width="7" height="5" rx="1" fill="#ED2939"/><text x="30" y="19" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="7.5" fill="#1e3d78" letter-spacing="1.5">FFPLUM</text></svg>';
 
-  /* ── HTML portail ── */
+  /* ══════════════ HTML portail ══════════════ */
   var ov = document.getElementById('p-overlay');
   if (!ov) { ov = document.createElement('div'); ov.id='p-overlay'; document.body.appendChild(ov); }
-  ov.innerHTML = '<div class="p-header"><div class="p-header-logo">'+logoInner+'</div><div class="p-header-title">FFPLUM SPORT</div></div>'
+  ov.innerHTML = '<div class="p-wrap">'
+    +'<div class="p-main-card">'
+    +'<div class="p-header"><div class="p-header-logo">'+logoInner+'</div><div class="p-header-title">FFPLUM SPORT</div></div>'
     +'<div class="p-ref-bar">ORDRE DE MISSION N° '+f(D.ref)+'</div>'
-    +'<div class="p-wrap">'
-    +'<div class="p-banner '+bn.cls+'"><span style="font-size:18px;line-height:1;flex-shrink:0">'+bn.ico+'</span><span>'+bn.txt+'</span></div>'
+    +'<div class="p-banner '+bn.cls+'"><span style="font-size:16px;line-height:1;flex-shrink:0">'+bn.ico+'</span><span>'+bn.txt+'</span></div>'
     +ficheH
-    +'<div class="p-btn-wrap">'+actionH+'</div>'
+    +'<div class="p-action-wrap">'+actionH+'</div>'
     +suiviH
     +'</div>'
-    +'<div class="p-footer"><strong>FFPLUM</strong> · Fédération Française de Planeurs Ultra-Légers Motorisés<br>Espace mission encadrant</div>';
+    +'<div class="p-footer"><strong>FFPLUM</strong> · Fédération Française de Planeurs Ultra-Légers Motorisés<br>Espace mission encadrant</div>'
+    +'</div>';
 
   /* ── Brancher les boutons ── */
   var btnConf = document.getElementById('p-btn-conf');
