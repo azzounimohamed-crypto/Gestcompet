@@ -29263,6 +29263,9 @@ function _msSanitizeFilename(date, lib, tarif) {
   return d + '_' + l + '_' + t + 'EU';
 }
 
+// Photos compressées à partager vers iCloud après envoi
+var _msPhotosForShare = [];
+
 async function ndfMobileSendAll() {
   var token = window._msToken;
   if (!token || !_msTickets.length) return;
@@ -29275,9 +29278,9 @@ async function ndfMobileSendAll() {
       sb = window.supabase.createClient(SB_URL, SB_KEY);
   } catch(e){}
 
-  // ── 1. Sauvegarder les photos sur l'ordinateur via le serveur local ────────
+  // ── 1. Compresser les photos ─────────────────────────────────────────────────
+  _msPhotosForShare = [];
   var photoCount = 0;
-  // Le serveur Python tourne sur la même origine que cette page
   var serverOrigin = (location.protocol === 'http:') ? location.origin : null;
   for (var i = 0; i < _msTickets.length; i++) {
     var t = _msTickets[i];
@@ -29287,20 +29290,24 @@ async function ndfMobileSendAll() {
       var blob = await _msCompressImage(t._file, 1600, 0.78);
       if (!blob) continue;
       var fname = _msSanitizeFilename(t.date, t.libelle, t.tarif) + '.jpg';
+      t.photoName = fname;
+      // Conserver pour partage iCloud
+      _msPhotosForShare.push(new File([blob], fname, { type: 'image/jpeg' }));
+      // Si serveur local disponible → sauvegarde directe dans tickets/
       if (serverOrigin) {
-        // Upload direct vers le serveur Python local → sauvegarde dans tickets/
-        var r = await fetch(serverOrigin + '/upload-ticket', {
-          method: 'POST',
-          headers: { 'Content-Type': 'image/jpeg', 'X-Filename': fname },
-          body: blob
-        });
-        if (r.ok) { t.photoName = fname; photoCount++; }
+        try {
+          var r = await fetch(serverOrigin + '/upload-ticket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'image/jpeg', 'X-Filename': fname },
+            body: blob
+          });
+          if (r.ok) { photoCount++; }
+        } catch(e) {}
       }
-    } catch(e) { /* photo non critique, on continue */ }
+    } catch(e) { /* photo non critique */ }
   }
 
-  // ── 2. Uploader le JSON batch ────────────────────────────────────────────
-  // Ne pas envoyer les File objects (non sérialisables)
+  // ── 2. Uploader le JSON batch via Supabase ───────────────────────────────────
   var ticketsClean = _msTickets.map(function(t){
     return { date:t.date, libelle:t.libelle, tarif:t.tarif, photoName:t.photoName||'' };
   });
@@ -29316,33 +29323,68 @@ async function ndfMobileSendAll() {
         var res = await sb.storage.from('gestappli-sync').upload(scanPath, blobJ, { upsert:true, contentType:'application/json' });
         if (!res.error) { uploadOk = true; break; }
       }
-      var r = await fetch(SB_URL + '/storage/v1/object/gestappli-sync/' + scanPath, {
+      var r2 = await fetch(SB_URL + '/storage/v1/object/gestappli-sync/' + scanPath, {
         method: 'POST',
         headers: { 'Authorization':'Bearer '+SB_KEY, 'Content-Type':'application/json', 'x-upsert':'true' },
         body: payload
       });
-      if (r.ok) { uploadOk = true; }
+      if (r2.ok) { uploadOk = true; }
     } catch(e) {
-      if (attempt < 3) await new Promise(function(r){ setTimeout(r, 1200 * attempt); });
+      if (attempt < 3) await new Promise(function(rr){ setTimeout(rr, 1200 * attempt); });
     }
   }
 
-  var listEl  = document.getElementById('ms-list');
+  var listEl    = document.getElementById('ms-list');
   var fixedBtn2 = document.getElementById('ms-fixed-send');
   if (uploadOk) {
-    var msg = _msTickets.length + ' ticket(s) envoyé(s) !';
-    if (photoCount > 0) msg += '<br><span style="font-size:12px;color:rgba(255,255,255,.5)">📁 ' + photoCount + ' photo(s) sauvegardée(s)</span>';
-    if (listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px">'
-      + '<div style="font-size:52px;margin-bottom:12px">✅</div>'
-      + '<div style="font-size:17px;font-weight:800;margin-bottom:8px">' + msg + '</div>'
-      + '<div style="font-size:13px;color:rgba(255,255,255,.5)">Vérifiez votre ordinateur.</div>'
-      + '</div>';
-    if (fixedBtn2) fixedBtn2.style.display = 'none'; // masquer le bouton fixe après envoi
+    if (fixedBtn2) fixedBtn2.style.display = 'none';
+    var nbPhotos = _msPhotosForShare.length;
+    var nbTickets = _msTickets.length;
     _msTickets = [];
+
+    // ── Message de succès + bouton iCloud si des photos sont disponibles ────────
+    var successHtml = '<div style="text-align:center;padding:24px">'
+      + '<div style="font-size:52px;margin-bottom:12px">✅</div>'
+      + '<div style="font-size:17px;font-weight:800;margin-bottom:6px">' + nbTickets + ' ticket(s) envoyé(s) !</div>'
+      + '<div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:20px">Vérifiez votre ordinateur.</div>';
+
+    if (nbPhotos > 0) {
+      // Vérifier si le Web Share API supporte les fichiers (iOS 15+)
+      var canShareFiles = navigator.canShare && navigator.canShare({ files: _msPhotosForShare });
+      if (canShareFiles) {
+        successHtml += '<button onclick="ndfMobileSharePhotos()" style="width:100%;padding:14px;border:none;border-radius:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">'
+          + '📂 Enregistrer ' + nbPhotos + ' photo(s) dans iCloud Drive</button>'
+          + '<div style="font-size:11px;color:rgba(255,255,255,.35)">Choisissez iCloud Drive → dossier GestAppli-tickets</div>';
+      } else {
+        successHtml += '<div style="font-size:12px;color:rgba(255,255,255,.4)">📸 ' + nbPhotos + ' photo(s) prête(s) — partagez depuis votre Appareil photo</div>';
+      }
+    }
+    successHtml += '</div>';
+    if (listEl) listEl.innerHTML = successHtml;
   } else {
     if (btn) { btn.disabled = false; btn.textContent = '📤 Envoyer tout (' + _msTickets.length + ' ticket' + (_msTickets.length>1?'s':'') + ')'; }
     var errEl = document.getElementById('ms-error');
     if (errEl) { errEl.style.display=''; errEl.textContent='❌ Échec de l\'envoi. Vérifiez votre connexion WiFi et réessayez.'; }
+  }
+}
+
+// Partager les photos vers iCloud Drive via la feuille de partage iOS
+async function ndfMobileSharePhotos() {
+  if (!_msPhotosForShare.length) return;
+  try {
+    await navigator.share({
+      files: _msPhotosForShare,
+      title: 'Tickets Gest\'Appli'
+    });
+    // L'utilisateur a partagé → vider le tableau
+    _msPhotosForShare = [];
+    var listEl = document.getElementById('ms-list');
+    if (listEl) {
+      var btn2 = listEl.querySelector('button[onclick="ndfMobileSharePhotos()"]');
+      if (btn2) { btn2.textContent = '✅ Photos partagées'; btn2.disabled = true; }
+    }
+  } catch(e) {
+    // Annulé par l'utilisateur ou erreur — on ne fait rien
   }
 }
 
