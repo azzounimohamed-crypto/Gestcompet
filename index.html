@@ -28893,6 +28893,8 @@ function _ndfMobileScanPage(token) {
     +'<div id="ms-list" style="display:none;width:100%;max-width:400px;margin-top:16px"></div>'
 
     +'</div>';
+  // Vérifier s'il y a un brouillon sauvegardé à restaurer
+  setTimeout(_msRestoreDraft, 300);
 }
 
 // ── Prétraitement image pour Tesseract (niveaux de gris + binarisation Otsu) ──
@@ -29155,6 +29157,53 @@ function _ndfMobileApplyOCR(text) {
 
 // ── Scan mobile : accumulation locale puis envoi groupé ──────────────────────
 var _msTickets = []; // tickets accumulés sur le téléphone (envoyés en une fois)
+var _MS_SAVE_KEY = 'gestappli_scan_draft'; // clé localStorage
+
+// Sauvegarde automatique (sans les File objects non-sérialisables)
+function _msSaveDraft() {
+  try {
+    var draft = _msTickets.map(function(t){ return { date:t.date, libelle:t.libelle, tarif:t.tarif }; });
+    localStorage.setItem(_MS_SAVE_KEY, JSON.stringify({ ts: Date.now(), tickets: draft }));
+  } catch(e) {}
+}
+
+// Restaurer un brouillon sauvegardé
+function _msRestoreDraft() {
+  try {
+    var raw = localStorage.getItem(_MS_SAVE_KEY);
+    if (!raw) return;
+    var draft = JSON.parse(raw);
+    // Ignorer les brouillons de plus de 24h
+    if (!draft || !draft.tickets || (Date.now() - draft.ts) > 86400000) { localStorage.removeItem(_MS_SAVE_KEY); return; }
+    if (!draft.tickets.length) return;
+    // Proposer la restauration
+    var banner = document.createElement('div');
+    banner.id = 'ms-draft-banner';
+    banner.style.cssText = 'background:rgba(124,58,237,.2);border:1px solid #7c3aed;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;width:100%;max-width:400px';
+    banner.innerHTML = '💾 <b>' + draft.tickets.length + ' ticket(s)</b> non envoyés retrouvés.'
+      + '<div style="display:flex;gap:8px;margin-top:8px">'
+      + '<button onclick="_msApplyDraft()" style="flex:1;padding:8px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↩ Restaurer</button>'
+      + '<button onclick="_msClearDraft()" style="flex:1;padding:8px;border:none;border-radius:8px;background:rgba(255,255,255,.1);color:#fff;font-size:12px;cursor:pointer;font-family:inherit">🗑 Ignorer</button>'
+      + '</div>';
+    var listEl = document.getElementById('ms-list');
+    if (listEl && listEl.parentNode) listEl.parentNode.insertBefore(banner, listEl);
+  } catch(e) {}
+}
+function _msApplyDraft() {
+  try {
+    var raw = localStorage.getItem(_MS_SAVE_KEY);
+    if (!raw) return;
+    var draft = JSON.parse(raw);
+    _msTickets = draft.tickets.map(function(t){ return { date:t.date, libelle:t.libelle, tarif:t.tarif, _file:null }; });
+    _msClearDraft();
+    ndfMobileRenderList();
+  } catch(e) {}
+}
+function _msClearDraft() {
+  localStorage.removeItem(_MS_SAVE_KEY);
+  var b = document.getElementById('ms-draft-banner');
+  if (b) b.remove();
+}
 
 function ndfMobileAddToList() {
   var date  = (document.getElementById('ms-date')||{}).value||'';
@@ -29164,12 +29213,13 @@ function ndfMobileAddToList() {
   var inpEl = document.getElementById('ms-inp');
   var file  = (inpEl && inpEl.files && inpEl.files[0]) ? inpEl.files[0] : null;
   _msTickets.push({ date:date, libelle:lib, tarif:tarif, _file:file });
+  _msSaveDraft(); // ← sauvegarde automatique à chaque ajout
   // Réinitialiser le formulaire
   var prevEl = document.getElementById('ms-preview');
   var progEl = document.getElementById('ms-progress');
   var resEl  = document.getElementById('ms-result');
   var errEl  = document.getElementById('ms-error');
-  var inpEl  = document.getElementById('ms-inp');
+  var inpEl2 = document.getElementById('ms-inp');
   var barEl  = document.getElementById('ms-bar');
   var staEl  = document.getElementById('ms-status');
   if (prevEl) prevEl.style.display = 'none';
@@ -29178,7 +29228,7 @@ function ndfMobileAddToList() {
   if (errEl)  { errEl.style.display = 'none'; errEl.textContent = ''; }
   if (barEl)  barEl.style.width = '0%';
   if (staEl)  staEl.textContent = 'Analyse en cours…';
-  if (inpEl)  inpEl.value = '';
+  if (inpEl2) inpEl2.value = '';
   // Mettre à jour la liste affichée
   ndfMobileRenderList();
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -29341,6 +29391,7 @@ async function ndfMobileSendAll() {
     var nbPhotos = _msPhotosForShare.length;
     var nbTickets = _msTickets.length;
     _msTickets = [];
+    _msClearDraft(); // brouillon envoyé avec succès → effacer
 
     // ── Message de succès + bouton iCloud si des photos sont disponibles ────────
     var successHtml = '<div style="text-align:center;padding:24px">'
@@ -29362,9 +29413,13 @@ async function ndfMobileSendAll() {
     successHtml += '</div>';
     if (listEl) listEl.innerHTML = successHtml;
   } else {
-    if (btn) { btn.disabled = false; btn.textContent = '📤 Envoyer tout (' + _msTickets.length + ' ticket' + (_msTickets.length>1?'s':'') + ')'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Réessayer (' + _msTickets.length + ' ticket' + (_msTickets.length>1?'s':'') + ')'; }
     var errEl = document.getElementById('ms-error');
-    if (errEl) { errEl.style.display=''; errEl.textContent='❌ Échec de l\'envoi. Vérifiez votre connexion WiFi et réessayez.'; }
+    if (errEl) {
+      errEl.style.display='';
+      errEl.innerHTML = '❌ Échec de l\'envoi — vos données sont <b>sauvegardées</b>.<br>'
+        + '<span style="font-size:12px;opacity:.8">Vérifiez votre connexion puis tapez le bouton violet.</span>';
+    }
   }
 }
 
