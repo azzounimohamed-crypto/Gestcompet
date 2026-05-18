@@ -12118,24 +12118,87 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
     // ── DESKTOP LAYOUT (≥768px) ────────────────────────────────────────────────
     var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
-    // Sous-onglets + boutons actions dans la même barre
-    htmlB += '<div style="display:flex;align-items:center;gap:2px;margin:10px 12px 0;flex-shrink:0;background:var(--navy3);border-radius:10px;padding:3px">';
-    htmlB += bTabBtn('engagement','Dépenses');
-    htmlB += bTabBtn('ressources','Recettes');
-    htmlB += bTabBtn('synthese','Solde');
-    htmlB += bTabBtn('avance','💵 Avances');
-    htmlB += '<div style="width:1px;height:18px;background:rgba(255,255,255,.12);flex-shrink:0;margin:0 3px"></div>';
-    var _bgtBtnSt = 'flex-shrink:0;display:flex;align-items:center;gap:3px;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap';
-    htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" style="'+_bgtBtnSt+'">🖨️ Impr.</button>';
-    htmlB += '<select onchange="exportBudgetFmt(this.value,\''+cpIdS2+'\');this.selectedIndex=0" style="'+_bgtBtnSt+'"><option value="">⬇ Exporter…</option><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="json">JSON</option></select>';
-    htmlB += '<label style="'+_bgtBtnSt+'">⬆ Importer<input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importBudgetAuto(event,\''+cpIdS2+'\')"></label>';
+
+    // ── 1. Cartes métriques ─────────────────────────────────────────────────
+    var _dEng  = calcTotal(bdata.engagement||[]);
+    var _dRes  = calcTotal(bdata.ressources||[]);
+    var _dSol  = _dRes - _dEng;
+    var _dSolC = _dSol >= 0 ? '#10b981' : '#ef4444';
+    var _dAv   = (bdata.engagement||[]).filter(function(l){return l.avance;}).reduce(function(s,l){return s+computeCout(l);},0);
+    var _dPct  = _dRes > 0 ? Math.min(100, Math.round(_dEng / _dRes * 100)) : (_dEng > 0 ? 100 : 0);
+    var _nEng  = (bdata.engagement||[]).length;
+    var _nRes  = (bdata.ressources||[]).length;
+
+    // helper carte métrique
+    var _mkCard = function(color, label, amount, sub, barPct, clickTab) {
+      var cs = 'flex:1;min-width:0;border-radius:14px;background:var(--navy3);border:1px solid var(--bdr);'
+             + 'border-left:4px solid '+color+';padding:13px 16px 11px;overflow:hidden;position:relative;'
+             + (clickTab ? 'cursor:pointer;transition:background .12s;' : '');
+      var oc = clickTab ? ' onclick="switchBudgetSubTab(\''+clickTab+'\')"' : '';
+      var oh = clickTab ? ' onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" onmouseout="this.style.background=\'var(--navy3)\'"' : '';
+      var r = '<div style="'+cs+'"'+oc+oh+'>';
+      r += '<div style="font-size:10px;font-weight:800;color:'+color+';text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">'+label+'</div>';
+      r += '<div style="font-size:26px;font-weight:900;color:var(--txt);letter-spacing:-.8px;line-height:1">'+amount+'</div>';
+      if (sub) r += '<div style="font-size:11px;color:var(--txt3);margin-top:5px">'+sub+'</div>';
+      if (barPct !== null && barPct !== undefined) {
+        r += '<div style="margin-top:8px;height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden">'
+           + '<div style="height:100%;width:'+barPct+'%;background:'+color+';border-radius:2px;transition:width .3s"></div>'
+           + '</div>';
+      }
+      r += '</div>';
+      return r;
+    };
+
+    htmlB += '<div style="display:flex;gap:10px;margin:10px 12px 0;flex-shrink:0">';
+    htmlB += _mkCard('#ef4444','💸 Dépenses', _dEng.toFixed(2)+' €', _nEng+' ligne'+(  _nEng!==1?'s':''), _dPct, 'engagement');
+    htmlB += _mkCard('#10b981','💰 Recettes', _dRes.toFixed(2)+' €', _nRes+' ligne'+(_nRes!==1?'s':''), null, 'ressources');
+    htmlB += _mkCard(_dSolC,  '⚖️ Solde net', (_dSol>=0?'+':'')+_dSol.toFixed(2)+' €', _dPct+'% des recettes consommées', _dPct, null);
+    if (_dAv > 0) {
+      htmlB += _mkCard('#f59e0b','💵 Avances', _dAv.toFixed(2)+' €', 'à rembourser', null, 'avance');
+    }
     htmlB += '</div>';
+
+    // ── 2. Contrôle segmenté + boutons actions ──────────────────────────────
+    var _segBtn = function(id, lbl, ac) {
+      var a = bSub === id;
+      return '<button onclick="switchBudgetSubTab(\''+id+'\')" style="'
+           + 'padding:6px 16px;border-radius:20px;border:none;'
+           + 'background:'+(a?ac:'transparent')+';'
+           + 'color:'+(a?'#fff':'var(--txt3)')+';'
+           + 'font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;'
+           + 'transition:all .15s;white-space:nowrap">'+lbl+'</button>';
+    };
+    var _actBtn = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;'
+                + 'border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);'
+                + 'font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;'
+                + 'transition:background .12s';
+    var _svgPrint = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    var _svgDl    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var _svgUl    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+
+    htmlB += '<div style="display:flex;align-items:center;gap:8px;margin:8px 12px 0;flex-shrink:0">';
+    // Contrôle segmenté
+    htmlB += '<div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:24px;padding:3px">';
+    htmlB += _segBtn('engagement','💸 Dépenses','#ef4444');
+    htmlB += _segBtn('ressources','💰 Recettes','#10b981');
+    htmlB += _segBtn('avance','💵 Avances','#f59e0b');
+    htmlB += _segBtn('synthese','📊 Synthèse','var(--stol)');
+    htmlB += '</div>';
+    // Spacer
+    htmlB += '<div style="flex:1"></div>';
+    // Boutons actions
+    htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" style="'+_actBtn+'" onmouseover="this.style.background=\'rgba(255,255,255,.08)\'" onmouseout="this.style.background=\'var(--navy3)\'">'+_svgPrint+' Imprimer</button>';
+    htmlB += '<select onchange="exportBudgetFmt(this.value,\''+cpIdS2+'\');this.selectedIndex=0" style="'+_actBtn+';appearance:none;-webkit-appearance:none"><option value="">'+_svgDl+' Exporter…</option><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="json">JSON</option></select>';
+    htmlB += '<label style="'+_actBtn+'" onmouseover="this.style.background=\'rgba(255,255,255,.08)\'" onmouseout="this.style.background=\'var(--navy3)\'">'+_svgUl+' Importer<input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importBudgetAuto(event,\''+cpIdS2+'\')"></label>';
+    htmlB += '</div>';
+
+    // ── 3. Contenu scrollable ───────────────────────────────────────────────
     htmlB += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 12px 20px">';
 
     if (bSub === 'engagement' || bSub === 'ressources') {
       var section  = bSub;
       var lines    = bdata[section];
-      var secColor = section === 'engagement' ? '#ef4444' : '#3b82f6';
+      var secColor = section === 'engagement' ? '#ef4444' : '#10b981';
       var hStyle   = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap';
       var addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
       var nInp     = 'type="number" min="0" step="0.01"';
