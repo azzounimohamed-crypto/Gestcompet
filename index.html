@@ -11947,15 +11947,38 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
     // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
     if (isMobBgt) {
-      var htmlB = '<div style="display:flex;flex-direction:column;height:100%">';
-      // Sub-tabs as pills
-      htmlB += '<div style="display:flex;gap:4px;margin:10px 12px 0;flex-shrink:0;background:var(--navy3);border-radius:10px;padding:3px">';
-      htmlB += bTabBtn('engagement','💸 Dépenses');
-      htmlB += bTabBtn('ressources','💰 Recettes');
-      htmlB += bTabBtn('synthese','⚖️ Solde');
-      htmlB += bTabBtn('avance','💵 Avances');
+      // "Solde" n'est plus un onglet mobile (remplacé par le bandeau) → rediriger
+      if (bSub === 'synthese') { bSub = 'engagement'; _budgetSubTab = 'engagement'; }
+      var totEng = calcTotal(bdata.engagement||[]);
+      var totRes = calcTotal(bdata.ressources||[]);
+      var soldeMob = totRes - totEng;
+      var soldeCMob = soldeMob >= 0 ? '#10b981' : '#ef4444';
+      var totAvM = (bdata.engagement||[]).filter(function(l){ return l.avance; }).reduce(function(s,l){ return s+computeCout(l); },0);
+
+      var htmlB = '<div style="display:flex;flex-direction:column;height:100%;position:relative">';
+
+      // ── 1. Solde banner — toujours visible ─────────────────────────────────
+      htmlB += '<div style="margin:10px 12px 6px;background:var(--navy3);border-radius:12px;padding:10px 14px;border:1px solid var(--bdr);flex-shrink:0">';
+      htmlB += '<div style="display:flex;justify-content:space-between;margin-bottom:6px">';
+      htmlB += '<span style="font-size:11px;color:#ef4444;font-weight:700">💸 Dépenses : '+totEng.toFixed(2)+' €</span>';
+      htmlB += '<span style="font-size:11px;color:#10b981;font-weight:700">💰 Recettes : '+totRes.toFixed(2)+' €</span>';
       htmlB += '</div>';
-      htmlB += '<div style="flex:1;overflow-y:auto;padding:12px 12px 20px">';
+      htmlB += '<div style="text-align:center;font-size:22px;font-weight:900;color:'+soldeCMob+';letter-spacing:-.5px">';
+      htmlB += (soldeMob>=0?'+':'')+soldeMob.toFixed(2)+' €';
+      htmlB += '<span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:6px">solde</span>';
+      htmlB += '</div>';
+      htmlB += '</div>';
+
+      // ── 2. Deux onglets principaux (Dépenses / Recettes) ───────────────────
+      var isEng = bSub === 'engagement';
+      var isRes = bSub === 'ressources';
+      htmlB += '<div style="display:flex;gap:8px;margin:0 12px 8px;flex-shrink:0">';
+      htmlB += '<button onclick="switchBudgetSubTab(\'engagement\')" style="flex:1;min-height:48px;border-radius:10px;border:2px solid '+(isEng?'#ef4444':'transparent')+';background:'+(isEng?'rgba(239,68,68,.15)':'var(--navy3)')+';color:'+(isEng?'#ef4444':'var(--txt2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s">💸 Dépenses</button>';
+      htmlB += '<button onclick="switchBudgetSubTab(\'ressources\')" style="flex:1;min-height:48px;border-radius:10px;border:2px solid '+(isRes?'#10b981':'transparent')+';background:'+(isRes?'rgba(16,185,129,.15)':'var(--navy3)')+';color:'+(isRes?'#10b981':'var(--txt2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s">💰 Recettes</button>';
+      htmlB += '</div>';
+
+      // ── Contenu scrollable ─────────────────────────────────────────────────
+      htmlB += '<div style="flex:1;overflow-y:auto;padding:0 12px '+(bSub==='avance'?'20':'70')+'px">';
 
       if (bSub === 'engagement' || bSub === 'ressources') {
         var section  = bSub;
@@ -12071,7 +12094,25 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlB += '</div>';
         htmlB += '</div>';
       }
-      htmlB += '</div></div>';
+      htmlB += '</div>'; // fin contenu scrollable
+
+      // ── 3. Pill flottante Avances ────────────────────────────────────────────
+      var isAv = bSub === 'avance';
+      htmlB += '<div style="position:absolute;bottom:16px;right:14px;z-index:10">';
+      htmlB += '<button onclick="switchBudgetSubTab(\'avance\')" style="'
+             + 'padding:9px 18px;border-radius:24px;'
+             + 'background:'+(isAv?'#f59e0b':'var(--navy3)')+';'
+             + 'color:'+(isAv?'#000':'#f59e0b')+';'
+             + 'border:1.5px solid #f59e0b;'
+             + 'font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;'
+             + 'box-shadow:0 2px 16px rgba(0,0,0,.45);'
+             + 'white-space:nowrap;'
+             + 'transition:all .15s">'
+             + '💵 Avances'+(totAvM>0?' · '+totAvM.toFixed(2)+' €':'')
+             + '</button>';
+      htmlB += '</div>';
+
+      htmlB += '</div>'; // fin main flex container
       return htmlB;
     }
 
