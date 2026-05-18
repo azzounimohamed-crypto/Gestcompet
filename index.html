@@ -29187,10 +29187,16 @@ function ndfMobileAddToList() {
 function ndfMobileRenderList() {
   var listEl = document.getElementById('ms-list');
   if (!listEl) return;
-  if (!_msTickets.length) { listEl.style.display = 'none'; return; }
+  // Gérer le bouton fixe en bas
+  var fixedBtn = document.getElementById('ms-fixed-send');
+  if (!_msTickets.length) {
+    listEl.style.display = 'none';
+    if (fixedBtn) fixedBtn.style.display = 'none';
+    return;
+  }
   listEl.style.display = '';
   var total = _msTickets.reduce(function(s, t){ return s + (t.tarif||0); }, 0);
-  var html = '<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:14px;margin-bottom:12px">';
+  var html = '<div style="background:rgba(255,255,255,.06);border-radius:14px;padding:14px;margin-bottom:100px">';
   html += '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">';
   html += '📋 ' + _msTickets.length + ' ticket(s) en attente</div>';
   _msTickets.forEach(function(t, i) {
@@ -29209,9 +29215,17 @@ function ndfMobileRenderList() {
   html += '<span style="font-size:16px;font-weight:900;color:#34d399">'+total.toFixed(2)+' €</span>';
   html += '</div>';
   html += '</div>';
-  html += '<button onclick="ndfMobileSendAll()" style="width:100%;padding:15px;border:none;border-radius:14px;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">';
-  html += '📤 Envoyer tout à l\'ordinateur (' + _msTickets.length + ' ticket'+ (_msTickets.length>1?'s':'') +')</button>';
   listEl.innerHTML = html;
+  // Bouton fixe en bas de l'écran — toujours visible quelle que soit la longueur de la liste
+  if (!fixedBtn) {
+    fixedBtn = document.createElement('div');
+    fixedBtn.id = 'ms-fixed-send';
+    fixedBtn.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:12px 16px 24px;background:linear-gradient(to top,#0a0f28 70%,transparent);z-index:999';
+    document.body.appendChild(fixedBtn);
+  }
+  fixedBtn.style.display = '';
+  fixedBtn.innerHTML = '<button onclick="ndfMobileSendAll()" style="width:100%;padding:16px;border:none;border-radius:14px;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 24px rgba(124,58,237,.5)">'
+    + '📤 Envoyer tout (' + _msTickets.length + ' ticket'+ (_msTickets.length>1?'s':'') +' · ' + total.toFixed(2) + ' €)</button>';
 }
 
 function ndfMobileRemoveTicket(idx) {
@@ -29313,7 +29327,8 @@ async function ndfMobileSendAll() {
     }
   }
 
-  var listEl = document.getElementById('ms-list');
+  var listEl  = document.getElementById('ms-list');
+  var fixedBtn2 = document.getElementById('ms-fixed-send');
   if (uploadOk) {
     var msg = _msTickets.length + ' ticket(s) envoyé(s) !';
     if (photoCount > 0) msg += '<br><span style="font-size:12px;color:rgba(255,255,255,.5)">📁 ' + photoCount + ' photo(s) sauvegardée(s)</span>';
@@ -29322,9 +29337,10 @@ async function ndfMobileSendAll() {
       + '<div style="font-size:17px;font-weight:800;margin-bottom:8px">' + msg + '</div>'
       + '<div style="font-size:13px;color:rgba(255,255,255,.5)">Vérifiez votre ordinateur.</div>'
       + '</div>';
+    if (fixedBtn2) fixedBtn2.style.display = 'none'; // masquer le bouton fixe après envoi
     _msTickets = [];
   } else {
-    if (btn) { btn.disabled = false; btn.textContent = '📤 Envoyer tout à l\'ordinateur (' + _msTickets.length + ' tickets)'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Envoyer tout (' + _msTickets.length + ' ticket' + (_msTickets.length>1?'s':'') + ')'; }
     var errEl = document.getElementById('ms-error');
     if (errEl) { errEl.style.display=''; errEl.textContent='❌ Échec de l\'envoi. Vérifiez votre connexion WiFi et réessayez.'; }
   }
