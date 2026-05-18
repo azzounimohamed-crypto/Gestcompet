@@ -11162,21 +11162,37 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var html5 = '';
     // ── Barre d'actions (desktop uniquement) ──
     if (!_isMobEquip) {
-    var _eqpBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
-    html5 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
-    html5 += '<button onclick="hdgPrintEquipage(\''+cid+'\')" style="'+_eqpBtnSt+'">🖨 Imprimer</button>';
-    html5 += '<select onchange="exportEquipageFmt(this.value,\''+cid+'\');this.selectedIndex=0" style="'+_eqpBtnSt+'"><option value="">⬇ Exporter…</option><option value="excel">Excel (.xlsx)</option><option value="csv">CSV</option><option value="json">JSON</option></select>';
-    html5 += '<label style="'+_eqpBtnSt+'">⬆ Importer<input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importEquipageAuto(this,\''+cid+'\')"></label>';
-    // Bouton Licence — actif si licenceDB chargée, grisé sinon
+    var _eqpGlass = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s';
+    var _eqpDl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var _eqpUl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+    var _eqpPr = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    var _eqpMI = function(ico,lbl,oc){ return '<button onclick="'+oc+';_eqpActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+ico+'<span>'+lbl+'</span></button>'; };
     var _hasLdb = S.licenceDB && Object.keys(S.licenceDB).length > 0;
     var _ldbCount = _hasLdb ? Object.keys(S.licenceDB).length : 0;
-    var _ldbSt = _hasLdb
-      ? 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid rgba(0,87,255,.4);background:rgba(0,87,255,.1);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap'
-      : 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;opacity:.6';
-    var _ldbTitle = _hasLdb ? 'Mettre à jour les compétiteurs depuis la base licences FFPLUM ('+_ldbCount+' licences)' : 'Aucune base licences — importez d\'abord dans Réglages';
+    html5 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+    // Bouton Licences (conservé séparé car action distincte)
+    var _ldbSt = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid '
+      + (_hasLdb ? 'rgba(37,99,235,.45);background:rgba(37,99,235,.18);color:#93c5fd' : 'rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--txt3);opacity:.7')
+      + ';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+    var _ldbTitle = _hasLdb ? 'Mettre à jour depuis la base licences FFPLUM ('+_ldbCount+' licences)' : 'Aucune base licences — importez d\'abord dans Réglages';
     html5 += '<button onclick="hdgRefreshFromLicence(\''+cid+'\')" style="'+_ldbSt+'" title="'+_ldbTitle+'">📋 Licences'
       + (_hasLdb ? ' <span style="font-size:9px;background:#1d4ed8;color:#fff;border-radius:4px;padding:1px 4px">'+_ldbCount+'</span>' : '')
       + '</button>';
+    // Bouton Actions unifié
+    html5 += '<div style="position:relative" id="eqp-act-wrap">';
+    html5 += '<div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 8px">';
+    html5 += '<button onclick="_eqpActMenu()" style="'+_eqpGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
+    html5 += '</div>';
+    html5 += '<div id="eqp-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    html5 += _eqpMI(_eqpPr,'Imprimer',          'hdgPrintEquipage(\''+cid+'\')');
+    html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    html5 += _eqpMI(_eqpDl,'Exporter Excel',     'exportEquipageFmt(\'excel\',\''+cid+'\')');
+    html5 += _eqpMI(_eqpDl,'Exporter CSV',       'exportEquipageFmt(\'csv\',\''+cid+'\')');
+    html5 += _eqpMI(_eqpDl,'Exporter JSON',      'exportEquipageFmt(\'json\',\''+cid+'\')');
+    html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    html5 += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_eqpUl+'<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importEquipageAuto(this,\''+cid+'\');_eqpActClose()"></label>';
+    html5 += '</div>';
+    html5 += '</div>';
     html5 += '</div>';
     }
     // ── En-tête fixe (desktop uniquement) ──
@@ -11596,11 +11612,26 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _isMobStaff = window.innerWidth < 768;
     var _stfTpl = _staffGetTpl();
     var html3  = '';
-    // ── Barre d'actions encadrement ──
-    var _stfActBtnSt = 'display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+    // ── Barre d'actions encadrement — bouton Actions unifié ──
+    var _stfGlass = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s';
+    var _stfDl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var _stfUl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+    var _stfMI = function(ico,lbl,oc){ return '<button onclick="'+oc+';_stfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+ico+'<span>'+lbl+'</span></button>'; };
     html3 += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
-    html3 += '<select onchange="exportStaffFmt(this.value,\''+cidS+'\');this.selectedIndex=0" style="'+_stfActBtnSt+';cursor:pointer"><option value="">⬇ Exporter…</option><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="json">JSON</option></select>';
-    if (canEditS) html3 += '<label style="'+_stfActBtnSt+'">⬆ Importer<input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importStaffAuto(this,\''+cidS+'\')"></label>';
+    html3 += '<div style="position:relative" id="stf-act-wrap">';
+    html3 += '<div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 8px">';
+    html3 += '<button onclick="_stfActMenu()" style="'+_stfGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
+    html3 += '</div>';
+    html3 += '<div id="stf-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:200px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    html3 += _stfMI(_stfDl,'Exporter CSV',   'exportStaffFmt(\'csv\',\''+cidS+'\')');
+    html3 += _stfMI(_stfDl,'Exporter Excel', 'exportStaffFmt(\'excel\',\''+cidS+'\')');
+    html3 += _stfMI(_stfDl,'Exporter JSON',  'exportStaffFmt(\'json\',\''+cidS+'\')');
+    if (canEditS) {
+      html3 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+      html3 += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_stfUl+'<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importStaffAuto(this,\''+cidS+'\');_stfActClose()"></label>';
+    }
+    html3 += '</div>';
+    html3 += '</div>';
     html3 += '</div>';
     // ── En-tête fixe (desktop uniquement) ──
     if (!_isMobStaff) {
@@ -27384,6 +27415,24 @@ function printNoteAvance(compId) {
   setTimeout(function(){ w.print(); }, 700);
 }
 
+function _makeActMenu(menuId, wrapId) {
+  var m = document.getElementById(menuId);
+  if (!m) return;
+  var open = m.style.display !== 'none';
+  m.style.display = open ? 'none' : 'block';
+  if (!open) {
+    setTimeout(function() {
+      document.addEventListener('click', function _cl(e) {
+        var wrap = document.getElementById(wrapId);
+        if (!wrap || !wrap.contains(e.target)) { m.style.display = 'none'; document.removeEventListener('click', _cl); }
+      });
+    }, 0);
+  }
+}
+function _stfActMenu()  { _makeActMenu('stf-act-menu','stf-act-wrap'); }
+function _stfActClose() { var m=document.getElementById('stf-act-menu'); if(m) m.style.display='none'; }
+function _eqpActMenu()  { _makeActMenu('eqp-act-menu','eqp-act-wrap'); }
+function _eqpActClose() { var m=document.getElementById('eqp-act-menu'); if(m) m.style.display='none'; }
 function _compActMenu() {
   var m = document.getElementById('cp-act-menu');
   if (!m) return;
