@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Gest'Appli · Scanner un ticket</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #0a0f28;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px 40px;
+  }
+  .badge { font-size: 12px; font-weight: 800; color: #a78bfa; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  h1 { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: rgba(255,255,255,.45); margin-bottom: 32px; }
+  .upload-zone {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    cursor: pointer; width: 100%; max-width: 360px;
+    background: rgba(255,255,255,.06);
+    border: 2px dashed rgba(255,255,255,.2);
+    border-radius: 20px; padding: 32px 20px; margin-bottom: 24px;
+    transition: background .2s;
+  }
+  .upload-zone:active { background: rgba(255,255,255,.1); }
+  .upload-zone span:first-child { font-size: 56px; }
+  .upload-zone .lbl { font-size: 16px; font-weight: 700; }
+  .upload-zone .hint { font-size: 12px; color: rgba(255,255,255,.4); text-align: center; }
+  #ms-preview { display:none; width:100%; max-width:360px; margin-bottom:20px; }
+  #ms-preview img { width:100%; border-radius:14px; border:2px solid rgba(255,255,255,.1); max-height:260px; object-fit:contain; background:#000; }
+  #ms-progress { display:none; width:100%; max-width:360px; text-align:center; margin-bottom:20px; }
+  #ms-status { font-size:14px; font-weight:600; margin-bottom:12px; color:#a78bfa; }
+  .bar-track { width:100%; height:8px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden; }
+  #ms-bar { height:100%; width:0%; background:#7c3aed; border-radius:4px; transition:width .25s; }
+  #ms-result { display:none; width:100%; max-width:360px; }
+  .result-card { background:rgba(255,255,255,.06); border-radius:16px; padding:20px; margin-bottom:16px; }
+  .field-label { font-size:10px; color:rgba(255,255,255,.4); text-transform:uppercase; letter-spacing:.6px; margin-bottom:4px; }
+  .result-card input {
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    border-radius: 10px; color: #fff; font-size: 15px;
+    padding: 10px 12px; width: 100%; font-family: inherit; outline: none;
+  }
+  .result-card input:focus { border-color: #7c3aed; }
+  .fields { display:flex; flex-direction:column; gap:12px; }
+  .fields .amount input { font-size: 18px; font-weight: 800; text-align: right; }
+  .send-btn {
+    width:100%; padding:16px; border:none; border-radius:14px;
+    background:#7c3aed; color:#fff; font-size:16px; font-weight:800;
+    cursor:pointer; font-family:inherit; letter-spacing:.3px;
+  }
+  .send-btn:active { background:#6d28d9; }
+  #ms-sent { display:none; text-align:center; padding:20px; }
+  #ms-sent .icon { font-size:56px; margin-bottom:16px; }
+  #ms-sent h2 { font-size:20px; font-weight:800; margin-bottom:8px; }
+  #ms-sent p { font-size:14px; color:rgba(255,255,255,.5); }
+  #ms-error { display:none; background:#7c2d12; border:1px solid #ea580c; border-radius:12px; padding:14px; width:100%; max-width:360px; margin-bottom:16px; font-size:13px; line-height:1.6; }
+  .no-token { text-align:center; padding:40px 20px; color:rgba(255,255,255,.5); }
+</style>
+</head>
+<body>
+
+<div class="badge">Gest'Appli · Mode scan</div>
+<h1>📷 Scanner un ticket</h1>
+<div class="sub" id="session-label">Chargement…</div>
+
+<div id="ms-error"></div>
+<div id="app-content"></div>
+
+<script>
+const SB_URL = 'https://wctpwgnavsvyueypgicd.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjdHB3Z25hdnN2eXVleXBnaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjgxMzUsImV4cCI6MjA5MDAwNDEzNX0.W--8Qr5Pf0Dsy8CGlsLOCWRRIyK6VOINp3zXzM3ii2M';
+
+// 'rt' = relay token
+var token = new URLSearchParams(location.search).get('rt');
+
+if (!token) {
+  document.getElementById('session-label').textContent = '';
+  document.getElementById('app-content').innerHTML =
+    '<div class="no-token">⚠️ Aucun token détecté.<br>Scannez le QR code depuis l\'application Gest\'Appli.</div>';
+} else {
+  document.getElementById('session-label').textContent = 'Session : ' + token;
+  document.getElementById('app-content').innerHTML = `
+    <label for="ms-inp" class="upload-zone">
+      <span>📸</span>
+      <span class="lbl">Appuyez pour photographier</span>
+      <span class="hint">Le ticket doit être à plat et bien éclairé</span>
+    </label>
+    <input type="file" id="ms-inp" accept="image/*" capture="environment" style="display:none">
+
+    <div id="ms-preview"><img id="ms-img"></div>
+
+    <div id="ms-progress">
+      <div id="ms-status">Analyse en cours…</div>
+      <div class="bar-track"><div id="ms-bar"></div></div>
+    </div>
+
+    <div id="ms-result">
+      <div class="result-card">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px">Résultats détectés</div>
+        <div class="fields">
+          <div>
+            <div class="field-label">📅 Date</div>
+            <input id="ms-date" type="date">
+          </div>
+          <div>
+            <div class="field-label">🏷 Libellé</div>
+            <input id="ms-lib" placeholder="Type de dépense…">
+          </div>
+          <div class="amount">
+            <div class="field-label">💶 Montant (€)</div>
+            <input id="ms-tar" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+      <button class="send-btn" onclick="sendResult()">✅ Envoyer à l'ordinateur</button>
+    </div>
+
+    <div id="ms-sent">
+      <div class="icon">✅</div>
+      <h2>Données envoyées !</h2>
+      <p>Vérifiez votre ordinateur.</p>
+    </div>
+  `;
+
+  document.getElementById('ms-inp').addEventListener('change', async function() {
+    if (!this.files || !this.files[0]) return;
+    var file = this.files[0];
+    var prev = document.getElementById('ms-preview');
+    var img  = document.getElementById('ms-img');
+    if (prev && img) { img.src = URL.createObjectURL(file); prev.style.display = ''; }
+    var prog = document.getElementById('ms-progress');
+    var sta  = document.getElementById('ms-status');
+    if (prog) prog.style.display = '';
+    if (sta)  { sta.style.color = '#a78bfa'; sta.textContent = 'Prétraitement image…'; }
+
+    // Lire + prétraiter
+    var dataUrl = await new Promise(function(res) {
+      var r = new FileReader(); r.onload = function(e){ res(e.target.result); }; r.readAsDataURL(file);
+    });
+    var processedUrl = await preprocessForOCR(dataUrl);
+    if (sta) sta.textContent = 'Chargement Tesseract…';
+
+    loadTesseract(function() {
+      Tesseract.recognize(processedUrl, 'fra', {
+        logger: function(m) {
+          if (m.status === 'recognizing text') {
+            var bar = document.getElementById('ms-bar');
+            var st  = document.getElementById('ms-status');
+            var p = Math.round((m.progress||0)*100);
+            if (bar) bar.style.width = p + '%';
+            if (st) st.textContent = 'Analyse OCR… ' + p + '%';
+          }
+        },
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1'
+      }).then(function(result) {
+        if (prog) prog.style.display = 'none';
+        applyOCR(result.data.text);
+      }).catch(function() {
+        if (prog) prog.style.display = 'none';
+        applyOCR('');
+      });
+    });
+  });
+}
+
+// ── Prétraitement : niveaux de gris + binarisation Otsu ──────────────────────
+function preprocessForOCR(dataUrl) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var W = img.width, H = img.height;
+      var scale = (W < 1200) ? Math.min(3, Math.ceil(1200 / W)) : 1;
+      var w = W * scale, h = H * scale;
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      var imageData = ctx.getImageData(0, 0, w, h);
+      var d = imageData.data, len = d.length;
+      // Niveaux de gris
+      var gray = new Uint8Array(w * h);
+      for (var i = 0, p = 0; i < len; i += 4, p++)
+        gray[p] = Math.round(0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]);
+      // Otsu
+      var hist = new Array(256).fill(0);
+      for (var i = 0; i < gray.length; i++) hist[gray[i]]++;
+      var total = gray.length, sum = 0;
+      for (var i = 0; i < 256; i++) sum += i * hist[i];
+      var sumB = 0, wB = 0, wF = 0, maxVar = 0, thr = 128;
+      for (var i = 0; i < 256; i++) {
+        wB += hist[i]; if (!wB) continue;
+        wF = total - wB; if (!wF) break;
+        sumB += i * hist[i];
+        var mB = sumB / wB, mF = (sum - sumB) / wF;
+        var vv = wB * wF * (mB - mF) * (mB - mF);
+        if (vv > maxVar) { maxVar = vv; thr = i; }
+      }
+      thr = Math.min(thr + 15, 230);
+      for (var i = 0, p = 0; i < len; i += 4, p++) {
+        var v2 = gray[p] < thr ? 0 : 255;
+        d[i] = d[i+1] = d[i+2] = v2; d[i+3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = function() { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+function loadTesseract(cb) {
+  if (window.Tesseract) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
+  s.onload = cb; s.onerror = function(){ cb(); };
+  document.head.appendChild(s);
+}
+
+function applyOCR(text) {
+  var lines = (text||'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  var full  = lines.join(' ');
+  var norm  = function(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var fullN = norm(full);
+
+  // ── Corrections OCR ──────────────────────────────────────────────────────────
+  var ocrFix = function(s) {
+    return s.replace(/[oO](\d)/g,'0$1').replace(/(\d)[oO]/g,'$10')
+             .replace(/[lI](\d)/g,'1$1').replace(/(\d)[lI]/g,'$11')
+             .replace(/[Ss](\d)/g,'5$1').replace(/(\d)[Ss]/g,'$15')
+             .replace(/[Zz](\d)/g,'2$1').replace(/(\d)[Zz]/g,'$12');
+  };
+  var cleanLine = function(l){ return ocrFix(l.replace(/\.{2,}/g,' ').replace(/\s+/g,' ').trim()); };
+
+  // ── Dates ────────────────────────────────────────────────────────────────────
+  var _curYear = new Date().getFullYear();
+  var _fix2Y = function(y2str){ var y2=parseInt(y2str); var fy=y2<50?2000+y2:1900+y2; if(_curYear-fy>2)fy=_curYear; return String(fy); };
+  var _pad2  = function(n){ return String(parseInt(n)).padStart(2,'0'); };
+  var _mFr   = {'jan':1,'janv':1,'janvier':1,'fev':2,'fevr':2,'fevrier':2,'mar':3,'mars':3,'avr':4,'avril':4,'mai':5,'jun':6,'juin':6,'jul':7,'juil':7,'juillet':7,'aou':8,'aout':8,'sep':9,'sept':9,'septembre':9,'oct':10,'octobre':10,'nov':11,'novembre':11,'dec':12,'decembre':12};
+
+  var datePats = [
+    { re:/\b(\d{1,2})[.\/\-](\d{2})[.\/\-](\d{4})\b/, fn:function(m){ return m[3]+'-'+_pad2(m[2])+'-'+_pad2(m[1]); } },
+    { re:/\b(\d{1,2})[.\/\-](\d{2})[.\/\-](\d{2})\b/,  fn:function(m){ return _fix2Y(m[3])+'-'+_pad2(m[2])+'-'+_pad2(m[1]); } },
+    { re:/\b(\d{4})[.\-](\d{2})[.\-](\d{2})\b/,         fn:function(m){ return m[1]+'-'+m[2]+'-'+m[3]; } },
+    { re:/\b(\d{1,2})\s+([a-zé]+\.?)\s+(\d{4})\b/i, fn:function(m){ var mn=norm(m[2].replace('.',''));var mo=_mFr[mn];if(!mo)return null;return m[3]+'-'+_pad2(mo)+'-'+_pad2(m[1]); } },
+    { re:/\b(\d{1,2})\s+([a-zé]+\.?)\s+(\d{2})\b/i, fn:function(m){ var mn=norm(m[2].replace('.',''));var mo=_mFr[mn];if(!mo)return null;return _fix2Y(m[3])+'-'+_pad2(mo)+'-'+_pad2(m[1]); } }
+  ];
+  var _tryDate = function(l) {
+    var cl = cleanLine(l);
+    for (var ri=0; ri<datePats.length; ri++) {
+      var dm = cl.match(datePats[ri].re); if (!dm) continue;
+      try { var d2=datePats[ri].fn(dm); if(!d2) continue; var dt=new Date(d2); if(!isNaN(dt.getTime())&&dt.getFullYear()>=2000&&dt.getFullYear()<=_curYear+1) return d2; } catch(e){}
+    }
+    return null;
+  };
+
+  var date = '';
+  var dKw = lines.filter(function(l){ var ln=l.toLowerCase(); return /\bdate\b/.test(ln)||/\ble\s+\d/.test(ln)||/\bdu\s+\d/.test(ln); });
+  for (var di=0; di<dKw.length&&!date; di++) { date = _tryDate(dKw[di]) || ''; }
+  for (var di=0; di<lines.length&&!date; di++) {
+    if (/^\d{5,}$/.test(lines[di].trim())) continue;
+    if (/^[RN]°?\s*\w{10,}/.test(lines[di].trim())) continue;
+    date = _tryDate(lines[di]) || '';
+  }
+
+  // ── Montant TTC ──────────────────────────────────────────────────────────────
+  var amRx = /(\d{1,5}[,.][\dOolIsSzZ]{1,2})/g;
+  var exAmt = function(str) {
+    var res=[], x, r=new RegExp(amRx.source,'g');
+    while((x=r.exec(str))!==null){ var v=parseFloat(ocrFix(x[1]).replace(',','.')); if(!isNaN(v)&&v>=0.5&&v<50000) res.push(v); }
+    return res;
+  };
+  var ttcKw = ['total ttc','montant ttc','net ttc','ttc','net a payer','solde a payer','a payer','total a payer','vous avez paye','paiement','total','solde'];
+  var tarif = 0;
+  for (var kw=0; kw<ttcKw.length&&!tarif; kw++) {
+    for (var ti=lines.length-1; ti>=0&&!tarif; ti--) {
+      if (norm(lines[ti]).indexOf(ttcKw[kw])>=0) {
+        var vals=exAmt(ocrFix(lines[ti]+' '+(lines[ti+1]||'')));
+        if (vals.length) tarif=vals[vals.length-1];
+      }
+    }
+  }
+  if (!tarif) {
+    var halfText=lines.slice(Math.floor(lines.length/2)).join(' ');
+    var euroRe=/(\d{1,5}[,.][\dOolI]{1,2})\s*[€E](?:uro)?/gi, x2, lastEuro=0;
+    while((x2=euroRe.exec(halfText))!==null){ var vv=parseFloat(ocrFix(x2[1]).replace(',','.')); if(!isNaN(vv)&&vv>=0.5&&vv<50000) lastEuro=vv; }
+    tarif=lastEuro;
+  }
+  if (!tarif) { var all=exAmt(ocrFix(full)); tarif=all.length?all[all.length-1]:0; }
+
+  // ── Libellé ──────────────────────────────────────────────────────────────────
+  var libelle='', cats=[
+    ['Carburant', ['carburant','essence','diesel','gazole','sp95','sp98','sp 95','sp 98','e10','gasoil','total energie','bp','shell','esso','station']],
+    ['Péage',     ['peage','vinci','sanef','cofiroute','aprr','asf','area','escota','autoroute']],
+    ['Repas',     ['restaurant','brasserie','cafe','pizza','kebab','mcdonald','burger','repas','dejeuner','diner','snack','traiteur','boulangerie']],
+    ['Hôtel',     ['hotel','ibis','novotel','mercure','nuit','chambre']],
+    ['Parking',   ['parking','horodateur','stationnement']],
+    ['Transport', ['taxi','uber','train','sncf','tgv','bus','ratp','transilien']],
+    ['Fournitures',['fournitures','papeterie','bureau','materiel']],
+    ['Téléphonie',['sfr','orange','bouygues','free mobile','telephone']]
+  ];
+  for (var ci=0; ci<cats.length&&!libelle; ci++)
+    for (var ki=0; ki<cats[ci][1].length&&!libelle; ki++)
+      if (fullN.indexOf(cats[ci][1][ki])>=0) libelle=cats[ci][0];
+  if (!libelle)
+    for (var li=0; li<Math.min(lines.length,5); li++)
+      if (lines[li].length>4&&!/^\d/.test(lines[li])) { libelle=lines[li].substring(0,40); break; }
+
+  var dEl=document.getElementById('ms-date'), lEl=document.getElementById('ms-lib'), tEl=document.getElementById('ms-tar');
+  if (dEl) dEl.value = date;
+  if (lEl) lEl.value = libelle;
+  if (tEl) tEl.value = tarif || '';
+
+  var res = document.getElementById('ms-result');
+  if (res) res.style.display = '';
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+async function sendResult() {
+  var date  = (document.getElementById('ms-date')||{}).value||'';
+  var lib   = (document.getElementById('ms-lib')||{}).value||'';
+  var tarif = parseFloat((document.getElementById('ms-tar')||{}).value)||0;
+  var data  = { date:date, libelle:lib, tarif:tarif };
+  try {
+    if (!window.supabase) {
+      await new Promise(function(res, rej){
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    var sb = window.supabase.createClient(SB_URL, SB_KEY);
+    var blob = new Blob([JSON.stringify(data)], { type:'application/json' });
+    var res = await sb.storage.from('gestappli-sync').upload('scans/'+token+'.json', blob, { upsert:true, contentType:'application/json' });
+    if (res.error) throw new Error(res.error.message);
+    document.getElementById('ms-result').style.display  = 'none';
+    document.getElementById('ms-preview').style.display = 'none';
+    document.getElementById('ms-sent').style.display    = '';
+  } catch(err) {
+    var errEl = document.getElementById('ms-error');
+    if (errEl) { errEl.style.display=''; errEl.textContent = '❌ Erreur envoi : ' + (err.message||err); }
+  }
+}
+</script>
+</body>
+</html>
