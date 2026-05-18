@@ -29749,11 +29749,113 @@ function _renderNDFReelleRows() {
     html += '<td style="padding:4px 3px"><input id="bnr-qt-'+i+'" type="number" min="1" step="1" style="'+iS+';text-align:center;max-width:60px" value="'+(a.qt||1)+'" oninput="bdmNDFReelleSt('+i+')"></td>';
     html += '<td id="bnr-st-'+i+'" style="padding:4px 8px;font-size:12px;font-weight:700;color:#2563eb;text-align:right;white-space:nowrap">'+st.toFixed(2)+' €</td>';
     html += '<td style="padding:4px 3px;text-align:center"><input id="bnr-av-'+i+'" type="checkbox"'+(a.avance?' checked':'')+' style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b"></td>';
+    // ── Colonne photo ──────────────────────────────────────────────────────────
+    html += '<td style="padding:4px 3px;text-align:center">';
+    if (a.photo) {
+      // Miniature + clic pour voir/partager
+      html += '<img src="'+a.photo+'" onclick="bdmNDFPhotoView('+i+')" '
+            + 'style="width:36px;height:36px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid #3b82f6" title="Voir / Partager vers iCloud">';
+    } else {
+      // Bouton appareil photo
+      html += '<label title="Ajouter une photo" style="cursor:pointer;font-size:18px;line-height:1">📷'
+            + '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bdmNDFPhotoAttach('+i+',this)">'
+            + '</label>';
+    }
+    html += '</td>';
+    // ── Bouton supprimer ───────────────────────────────────────────────────────
     html += '<td style="padding:4px 3px;text-align:center"><button onclick="bdmNDFReelleCollect();bdmNDFReelleRemove('+i+')" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:900;padding:0 6px;line-height:1" title="Supprimer">×</button></td>';
     html += '</tr>';
   });
   container.innerHTML = html;
   _updateNDFReelleTotal();
+}
+
+// ── Attacher une photo à une ligne NDF Réelle ─────────────────────────────────
+async function bdmNDFPhotoAttach(idx, inp) {
+  if (!inp.files || !inp.files[0]) return;
+  var file = inp.files[0];
+  // Compresser en miniature (400px, affichage) et stocker en base64
+  var thumb = await _bdmNDFCompressThumb(file, 400, 0.65);
+  bdmNDFReelleCollect();
+  if (_bdmNDFReelle[idx]) {
+    _bdmNDFReelle[idx].photo     = thumb;          // base64 miniature
+    _bdmNDFReelle[idx]._photoFile = file;           // File original pour iCloud
+    _bdmNDFReelle[idx].photoName = (function(){
+      var a = _bdmNDFReelle[idx];
+      return _msSanitizeFilename ? _msSanitizeFilename(a.date, a.libelle, a.tarif)+'.jpg' : 'ticket-'+idx+'.jpg';
+    })();
+  }
+  _renderNDFReelleRows();
+}
+
+// Compression miniature (même logique que _msCompressImage)
+function _bdmNDFCompressThumb(file, maxW, quality) {
+  return new Promise(function(resolve) {
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+// ── Voir / Partager la photo d'une ligne vers iCloud Drive ────────────────────
+function bdmNDFPhotoView(idx) {
+  var a = _bdmNDFReelle[idx];
+  if (!a || !a.photo) return;
+  // Créer une popup légère
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px';
+  var imgEl = document.createElement('img');
+  imgEl.src = a.photo;
+  imgEl.style.cssText = 'max-width:100%;max-height:60vh;border-radius:12px;object-fit:contain';
+  var label = document.createElement('div');
+  label.style.cssText = 'color:#fff;font-size:13px;font-weight:600;text-align:center;opacity:.8';
+  label.textContent = (a.libelle||'Ticket') + (a.tarif ? '  —  ' + parseFloat(a.tarif).toFixed(2) + ' €' : '');
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center';
+  // Bouton iCloud (si file original disponible)
+  if (a._photoFile && navigator.canShare) {
+    var shareBtn = document.createElement('button');
+    shareBtn.textContent = '📂 Enregistrer dans iCloud Drive';
+    shareBtn.style.cssText = 'padding:12px 18px;border:none;border-radius:12px;background:#3b82f6;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit';
+    shareBtn.onclick = async function() {
+      try {
+        var fname = a.photoName || 'ticket.jpg';
+        var shareFile = new File([a._photoFile], fname, { type:'image/jpeg' });
+        if (navigator.canShare({ files:[shareFile] })) {
+          await navigator.share({ files:[shareFile], title:'Ticket '+fname });
+        }
+      } catch(e) {}
+    };
+    btnRow.appendChild(shareBtn);
+  }
+  // Bouton supprimer photo
+  var delBtn = document.createElement('button');
+  delBtn.textContent = '🗑 Supprimer la photo';
+  delBtn.style.cssText = 'padding:12px 18px;border:none;border-radius:12px;background:rgba(239,68,68,.2);color:#ef4444;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit';
+  delBtn.onclick = function() {
+    bdmNDFReelleCollect();
+    if (_bdmNDFReelle[idx]) { delete _bdmNDFReelle[idx].photo; delete _bdmNDFReelle[idx]._photoFile; delete _bdmNDFReelle[idx].photoName; }
+    document.body.removeChild(ov);
+    _renderNDFReelleRows();
+  };
+  // Bouton fermer
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ Fermer';
+  closeBtn.style.cssText = 'padding:12px 18px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:none;color:#fff;font-size:14px;cursor:pointer;font-family:inherit';
+  closeBtn.onclick = function() { document.body.removeChild(ov); };
+  btnRow.appendChild(delBtn);
+  btnRow.appendChild(closeBtn);
+  ov.appendChild(imgEl); ov.appendChild(label); ov.appendChild(btnRow);
+  ov.addEventListener('click', function(e){ if(e.target===ov) document.body.removeChild(ov); });
+  document.body.appendChild(ov);
 }
 function bdmNDFReelleAdd() {
   _bdmNDFReelle.push({ id:'r'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false });
@@ -30120,6 +30222,7 @@ function renderBudgetDetailContent(overrideDomaine) {
       html += '<th style="'+thRl+';text-align:center">Qté</th>';
       html += '<th style="'+thRl+';text-align:right">Sous-total</th>';
       html += '<th style="'+thRl+';text-align:center;color:#f59e0b">☐ Avances</th>';
+      html += '<th style="'+thRl+';text-align:center" title="Photo du ticket">🖼️</th>';
       html += '<th style="'+thRl+'"></th>';
       html += '</tr></thead>';
       html += '<tbody id="bdm-ndf-reelle-rows"></tbody>';
