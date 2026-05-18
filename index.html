@@ -12186,11 +12186,34 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += '</div>';
     // Spacer
     htmlB += '<div style="flex:1"></div>';
-    // Boutons actions — fond clair derrière
-    htmlB += '<div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 8px">';
-    htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\')" style="'+_actBtn+'" onmouseover="this.style.background=\'rgba(255,255,255,.22)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'">'+_svgPrint+' Imprimer</button>';
-    htmlB += '<select onchange="exportBudgetFmt(this.value,\''+cpIdS2+'\');this.selectedIndex=0" style="'+_actBtn+';appearance:none;-webkit-appearance:none"><option value="">'+_svgDl+' Exporter…</option><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option><option value="json">JSON</option></select>';
-    htmlB += '<label style="'+_actBtn+'" onmouseover="this.style.background=\'rgba(255,255,255,.22)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'">'+_svgUl+' Importer<input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importBudgetAuto(event,\''+cpIdS2+'\')"></label>';
+    // Bouton actions unique avec menu déroulant
+    htmlB += '<div style="position:relative" id="bgt-act-wrap">';
+    htmlB += '<button onclick="_bgtActMenu(\''+cpIdS2+'\')" style="'+_actBtn+';gap:6px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18)" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.13)\'">';
+    htmlB += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+    htmlB += ' Actions';
+    htmlB += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="6 9 12 15 18 9"/></svg>';
+    htmlB += '</button>';
+    htmlB += '<div id="bgt-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:200px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    // Imprimer
+    htmlB += '<button onclick="printBudgetA4(\''+cpIdS2+'\');_bgtActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'
+           + _svgPrint + '<span>Imprimer</span></button>';
+    // Séparateur
+    htmlB += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    // Export CSV
+    htmlB += '<button onclick="exportBudgetFmt(\'csv\',\''+cpIdS2+'\');_bgtActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'
+           + _svgDl + '<span>Exporter CSV</span></button>';
+    // Export Excel
+    htmlB += '<button onclick="exportBudgetFmt(\'excel\',\''+cpIdS2+'\');_bgtActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'
+           + _svgDl + '<span>Exporter Excel (.xlsx)</span></button>';
+    // Export JSON
+    htmlB += '<button onclick="exportBudgetFmt(\'json\',\''+cpIdS2+'\');_bgtActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'
+           + _svgDl + '<span>Exporter JSON</span></button>';
+    // Séparateur
+    htmlB += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    // Importer (label file input)
+    htmlB += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'
+           + _svgUl + '<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importBudgetAuto(event,\''+cpIdS2+'\');_bgtActClose()"></label>';
+    htmlB += '</div>';
     htmlB += '</div>';
     htmlB += '</div>';
 
@@ -27355,6 +27378,28 @@ function printNoteAvance(compId) {
   setTimeout(function(){ w.print(); }, 700);
 }
 
+function _bgtActMenu(cpId) {
+  var m = document.getElementById('bgt-act-menu');
+  if (!m) return;
+  var open = m.style.display !== 'none';
+  m.style.display = open ? 'none' : 'block';
+  if (!open) {
+    // Fermer en cliquant dehors
+    setTimeout(function() {
+      document.addEventListener('click', function _cl(e) {
+        var wrap = document.getElementById('bgt-act-wrap');
+        if (!wrap || !wrap.contains(e.target)) {
+          _bgtActClose();
+          document.removeEventListener('click', _cl);
+        }
+      });
+    }, 0);
+  }
+}
+function _bgtActClose() {
+  var m = document.getElementById('bgt-act-menu');
+  if (m) m.style.display = 'none';
+}
 function switchBudgetSubTab(sub) {
   _budgetSubTab = sub;
   if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') {
