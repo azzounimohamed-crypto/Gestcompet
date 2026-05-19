@@ -4197,7 +4197,9 @@ function renderCompetitions() {
   var pratique = (document.getElementById('comp-pratique-filter') || {}).value || 'all';
   var discipl  = (document.getElementById('comp-discipline-filter') || {}).value || 'all';
   var search   = ((document.getElementById('comp-search-filter') || {}).value || '').trim().toLowerCase();
-  var list = S.comps.filter(function(cp){
+  var _comps = Array.isArray(S.comps) ? S.comps : [];
+  var _runs  = S.runs && typeof S.runs === 'object' ? S.runs : {};
+  var list = _comps.filter(function(cp){
     if (saison   !== 'all' && cp.saison    !== saison)   return false;
     if (pratique !== 'all' && cp.pratique  !== pratique) return false;
     if (discipl  !== 'all' && cp.discipline !== discipl) return false;
@@ -4209,7 +4211,7 @@ function renderCompetitions() {
     )) return false;
     return true;
   });
-  list.sort(function(a,b){ return a.dateFrom.localeCompare(b.dateFrom); });
+  list.sort(function(a,b){ return (a.dateFrom||'').localeCompare(b.dateFrom||''); });
   if (!list.length) { c.innerHTML = '<div style="text-align:center;color:var(--txt3);padding:32px;font-size:14px">Aucune comp&eacute;tition<br><span style="font-size:12px">Utilisez + Cr&eacute;er pour en ajouter</span></div>'; return; }
   c.innerHTML = '';
   list.forEach(function(cp) {
@@ -4217,7 +4219,7 @@ function renderCompetitions() {
     var status = today < cp.dateFrom ? 'badge-prog' : today <= (cp.dateTo||cp.dateFrom) ? 'badge-enc' : 'badge-term';
     var statusLabel = status === 'badge-prog' ? 'Programmée' : status === 'badge-enc' ? 'En cours' : 'Terminée';
     var typeLabel = {'comp-internationale':'🌍 Internationale','cdf':'🏆 Nationale','regional':'🔵 Régionale','comp-regionale':'🔵 Régionale','entrainement-national':'🟡 Entraînement national','entrainement':'🟡 Entraînement','stage':'📚 Stage'}[cp.type] || (cp.type||'');
-    var runCount = S.runs[cp.id] ? S.runs[cp.id].length : 0;
+    var runCount = _runs[cp.id] ? _runs[cp.id].length : 0;
     var card = document.createElement('div');
     card.className = 'comp-card';
     card.style.cssText = 'padding:0;overflow:hidden;display:flex;align-items:stretch';
@@ -18445,6 +18447,10 @@ async function loadFromSupabaseFirst() {
     _applyCloudData(cloudData);
     saveState();
     console.log('[GestSTOL] ✅ Données Supabase chargées —', (S.comps||[]).length, 'compétitions,', (S.pilots||[]).length, 'pilotes');
+    // Re-render views if already displayed (cas où Supabase répond après le rendu initial)
+    if (typeof renderCompetitions === 'function') { try { renderCompetitions(); } catch(e){} }
+    if (typeof renderHome === 'function') { try { renderHome(); } catch(e){} }
+    if (typeof updateHeader === 'function') { try { updateHeader(); } catch(e){} }
     return true;
   } catch(e) {
     console.warn('[GestSTOL] Supabase indisponible — cache local utilisé:', e.message);
@@ -30896,6 +30902,8 @@ function openDTNModule(module) {
     }
 
     // Afficher Compétitions en premier
+    if (!S.comps || !Array.isArray(S.comps)) S.comps = [];
+    if (!S.runs  || typeof S.runs !== 'object') S.runs = {};
     showPage('page-competitions');
     renderCompetitions();
     renderBase();
