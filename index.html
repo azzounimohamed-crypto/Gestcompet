@@ -505,7 +505,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #home-col-right{display:none!important}
   #home-detail-panel{display:flex!important;flex-direction:column;overflow:visible;position:relative;height:100%;z-index:22}
   #home-detail-comp{position:absolute!important;inset:0!important;height:100%!important;display:flex;flex-direction:column;overflow:hidden}
-  #hdp-tab-content{flex:1!important;overflow:hidden!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+  #hdp-tab-content{flex:1!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+  #hdp-tab-content.hdp-full-h{overflow:hidden!important}
   #page-settings .page-inner{display:flex;flex-direction:column;height:calc(100vh - 108px);overflow:hidden}
   #settings-tabs{flex-shrink:0}
   #stab-compte-panel,#stab-reglages-panel,#stab-utilisateurs-panel,#stab-apropos-panel{flex:1;overflow-y:auto;min-height:0}
@@ -519,6 +520,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     height:calc(100vh - 108px);
     overflow-y:auto;
     overflow-x:hidden;
+  }
+  /* Compétitions : header fixe + liste scrollable */
+  #page-competitions.active{
+    overflow-y:hidden;
+    overflow-x:hidden;
+    display:flex;
+    flex-direction:column;
   }
   #page-moyens.active,#page-acteurs.active{
     display:flex!important;
@@ -1047,12 +1055,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
     <!-- PAGE COMPÉTITIONS -->
     <div class="page active" id="page-competitions">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;flex-wrap:wrap;gap:8px;flex-shrink:0">
         <div style="font-size:18px;font-weight:700">Compétitions</div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap">
           <!-- Groupe vitré -->
           <div class="mob-hidden" style="display:flex;gap:4px;align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 6px">
-            <button onclick="openGlobalGantt()" title="Planning global de la saison" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(16,185,129,.35);background:rgba(16,185,129,.12);color:#34d399;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background='rgba(16,185,129,.22)'" onmouseout="this.style.background='rgba(16,185,129,.12)'">
+            <button onclick="openGlobalGantt()" title="Planning global de la saison" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               Planning global
             </button>
@@ -1077,7 +1085,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         </div>
       </div>
       <!-- Barre de filtres -->
-      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px;flex-wrap:wrap;flex-shrink:0">
         <!-- Recherche -->
         <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;min-width:140px;flex:1">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1102,7 +1110,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <option value="stol">STOL</option>
         </select>
       </div>
-      <div id="comp-list"></div>
+      <div id="comp-list" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
     </div>
 
     <!-- PAGE COMPÉTITEURS -->
@@ -2875,9 +2883,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <!-- Photo -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
       <div id="pm-photo-wrap" onclick="document.getElementById('pm-photo-inp').click()"
-        style="width:64px;height:64px;border-radius:50%;background:var(--navy3);border:2px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0">
+        style="width:96px;height:96px;border-radius:50%;background:var(--navy3);border:2px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0">
         <img id="pm-photo-img" style="display:none;width:100%;height:100%;object-fit:cover">
-        <span id="pm-photo-icon" style="font-size:24px">📷</span>
+        <span id="pm-photo-icon" style="font-size:32px">📷</span>
       </div>
       <input type="file" id="pm-photo-inp" accept="image/*" style="display:none" onchange="handlePMPhoto(this)">
       <div style="font-size:12px;color:var(--txt2)">Photo du compétiteur<br><span style="font-size:11px;color:var(--txt3)">Appuyer sur le cercle</span></div>
@@ -2892,6 +2900,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       </div>
       <div class="field" style="margin-bottom:0"><label>Prénom *</label><input type="text" id="pm-prenom"></div>
       <div class="field" style="margin-bottom:0"><label>Nom *</label><input type="text" id="pm-nom"></div>
+    </div>
+    <div class="field" style="margin-bottom:8px"><label>Rôle</label>
+      <select id="pm-role" onchange="pmToggleULM()" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
+        <option value="Pilote">Pilote</option>
+        <option value="Co-pilote">Co-pilote</option>
+        <option value="Passager">Passager</option>
+      </select>
     </div>
     <div class="grid2">
       <div class="field"><label>Date de naissance</label><input type="date" id="pm-ddn"></div>
@@ -2915,27 +2930,48 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
     <div class="grid2">
       <div class="field"><label>Adresse</label><input type="text" id="pm-adresse" placeholder="Rue, CP Ville…" oninput="pmAutoRegion(this.value)"></div>
-      <div class="field"><label>Région</label>
+      <div class="field"><label>Région / Pays</label>
         <select id="pm-region" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
           <option value="">— Choisir —</option>
-          <option>Auvergne-Rhône-Alpes</option><option>Bourgogne-Franche-Comté</option>
-          <option>Bretagne</option><option>Centre-Val de Loire</option><option>Corse</option>
-          <option>Grand Est</option><option>Hauts-de-France</option><option>Île-de-France</option>
-          <option>Normandie</option><option>Nouvelle-Aquitaine</option><option>Occitanie</option>
-          <option>Pays de la Loire</option><option>Provence-Alpes-Côte d'Azur</option><option>Étranger</option>
+          <optgroup label="Régions françaises">
+            <option>Auvergne-Rhône-Alpes</option><option>Bourgogne-Franche-Comté</option>
+            <option>Bretagne</option><option>Centre-Val de Loire</option><option>Corse</option>
+            <option>Grand Est</option><option>Hauts-de-France</option><option>Île-de-France</option>
+            <option>Normandie</option><option>Nouvelle-Aquitaine</option><option>Occitanie</option>
+            <option>Pays de la Loire</option><option>Provence-Alpes-Côte d'Azur</option>
+            <option>Guadeloupe</option><option>Guyane</option><option>La Réunion</option>
+            <option>Martinique</option><option>Mayotte</option>
+          </optgroup>
+          <optgroup label="Pays étrangers">
+            <option value="Étranger">Étranger (non précisé)</option>
+            <option>Albanie</option><option>Allemagne</option><option>Andorre</option>
+            <option>Autriche</option><option>Belgique</option><option>Biélorussie</option>
+            <option>Bosnie-Herzégovine</option><option>Bulgarie</option><option>Chypre</option>
+            <option>Croatie</option><option>Danemark</option><option>Espagne</option>
+            <option>Estonie</option><option>Finlande</option><option>Géorgie</option>
+            <option>Grèce</option><option>Hongrie</option><option>Irlande</option>
+            <option>Islande</option><option>Italie</option><option>Kosovo</option>
+            <option>Lettonie</option><option>Liechtenstein</option><option>Lituanie</option>
+            <option>Luxembourg</option><option>Macédoine du Nord</option><option>Malte</option>
+            <option>Moldavie</option><option>Monaco</option><option>Monténégro</option>
+            <option>Norvège</option><option>Pays-Bas</option><option>Pologne</option>
+            <option>Portugal</option><option>République tchèque</option><option>Roumanie</option>
+            <option>Royaume-Uni</option><option>Russie</option><option>Saint-Marin</option>
+            <option>Serbie</option><option>Slovaquie</option><option>Slovénie</option>
+            <option>Suède</option><option>Suisse</option><option>Turquie</option>
+            <option>Ukraine</option><option>Afrique du Sud</option><option>Algérie</option>
+            <option>Argentine</option><option>Australie</option><option>Brésil</option>
+            <option>Canada</option><option>Chili</option><option>Colombie</option>
+            <option>États-Unis</option><option>Japon</option><option>Maroc</option>
+            <option>Mexique</option><option>Nouvelle-Zélande</option><option>Pérou</option>
+            <option>Tunisie</option><option>Uruguay</option>
+          </optgroup>
         </select>
       </div>
     </div>
     <!-- ── ULM / Machine ── -->
     <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">ULM / Machine</div>
-    <div class="field"><label>Pratique</label>
-      <select id="pm-pratique" onchange="updatePMClasse()" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
-        <option value="">— Non précisé —</option>
-        <option value="microlight">Microlight</option>
-        <option value="paramoteur">Paramoteur</option>
-        <option value="multi">Multi-pratiques</option>
-      </select>
-    </div>
+    <!-- Classe + Immat toujours visibles -->
     <div class="field"><label>Classe ULM</label>
       <select id="pm-classe" onchange="updatePMClasse()">
         <option value="multiaxes">Multiaxes (classe 3)</option>
@@ -2944,26 +2980,36 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <option value="paramotor">Paramoteur (classe 1)</option>
       </select>
     </div>
-    <div id="pm-aile-row" class="field">
-      <label>Type aile</label>
-      <select id="pm-aile"><option value="haute">Aile haute</option><option value="basse">Aile basse</option></select>
-    </div>
-    <div class="field"><label>Places</label>
-      <select id="pm-places"><option value="mono">Monoplace</option><option value="bi">Biplace</option></select>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Marque</label><input type="text" id="pm-marque" placeholder="Zenith…"></div>
-      <div class="field"><label>Modèle</label><input type="text" id="pm-modele" placeholder="CH701…"></div>
-    </div>
-    <div class="grid2">
+    <div class="field"><label>Immatriculation</label><input type="text" id="pm-immat" placeholder="F-JXXX" style="text-transform:uppercase"></div>
+    <!-- Bloc masqué si rôle ≠ Pilote -->
+    <div id="pm-ulm-pilot-only">
+      <div class="field"><label>Pratique</label>
+        <select id="pm-pratique" onchange="updatePMClasse()" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
+          <option value="">— Non précisé —</option>
+          <option value="microlight">Microlight</option>
+          <option value="paramoteur">Paramoteur</option>
+          <option value="multi">Multi-pratiques</option>
+        </select>
+      </div>
+      <div id="pm-aile-row" class="field">
+        <label>Type aile</label>
+        <select id="pm-aile"><option value="haute">Aile haute</option><option value="basse">Aile basse</option></select>
+      </div>
+      <div class="field"><label>Places</label>
+        <select id="pm-places"><option value="mono">Monoplace</option><option value="bi">Biplace</option></select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Marque</label><input type="text" id="pm-marque" placeholder="Zenith…"></div>
+        <div class="field"><label>Modèle</label><input type="text" id="pm-modele" placeholder="CH701…"></div>
+      </div>
       <div class="field"><label>Moteur</label><input type="text" id="pm-moteur"></div>
-      <div class="field"><label>Immatriculation</label><input type="text" id="pm-immat" placeholder="F-JXXX" style="text-transform:uppercase"></div>
-    </div>
-    <div class="field"><label>Catégorie compétition</label>
-      <select id="pm-categorie">
-        <option value="classable">Classable</option>
-        <option value="access">Accès STOL (non classable)</option>
-      </select>
+      <div class="field"><label>Catégorie compétition</label>
+        <select id="pm-categorie" onchange="pmAutoSetClasse()">
+          <option value="">— Non précisé —</option>
+          <option value="classable">Classable</option>
+          <option value="access">Accès STOL (non classable)</option>
+        </select>
+      </div>
     </div>
     <!-- ── Inscription ── -->
     <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">Inscription</div>
@@ -3078,6 +3124,47 @@ const LS_OD_HEADER = 'geststol_od_header'; // Image en-tête docs officiels — 
 const LS_OD_FOOTER = 'geststol_od_footer'; // Image bas de page docs officiels — clé dédiée
 const LS_BUDGETS   = 'geststol_budgets';   // Sauvegarde dédiée du budget (jamais stripée, jamais écrasée)
 const LS_TODOS     = 'geststol_todos';     // Sauvegarde dédiée des À faire (jamais stripée, jamais écrasée)
+
+// ── Régions & Pays — listes partagées ────────────────────────────────────
+var _FR_REGIONS = [
+  'Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne',
+  'Centre-Val de Loire','Corse','Grand Est','Hauts-de-France',
+  'Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie',
+  'Pays de la Loire',"Provence-Alpes-Côte d'Azur",
+  'Guadeloupe','Guyane','La Réunion','Martinique','Mayotte'
+];
+var _PAYS_ETRANGERS = [
+  // Valeur de repli (rétro-compatibilité données existantes)
+  'Étranger',
+  // Europe
+  'Albanie','Allemagne','Andorre','Autriche','Belgique','Biélorussie',
+  'Bosnie-Herzégovine','Bulgarie','Chypre','Croatie','Danemark','Espagne',
+  'Estonie','Finlande','Géorgie','Grèce','Hongrie','Irlande','Islande',
+  'Italie','Kosovo','Lettonie','Liechtenstein','Lituanie','Luxembourg',
+  'Macédoine du Nord','Malte','Moldavie','Monaco','Monténégro','Norvège',
+  'Pays-Bas','Pologne','Portugal','République tchèque','Roumanie',
+  'Royaume-Uni','Russie','Saint-Marin','Serbie','Slovaquie','Slovénie',
+  'Suède','Suisse','Turquie','Ukraine',
+  // Hors Europe
+  'Afrique du Sud','Algérie','Argentine','Australie','Brésil','Canada',
+  'Chili','Colombie','États-Unis','Japon','Maroc','Mexique',
+  'Nouvelle-Zélande','Pérou','Tunisie','Uruguay'
+];
+/** Construit les <option> groupés Régions françaises / Pays étrangers */
+function _mkRegionOpts(curVal) {
+  var o = '<option value="">— Choisir —</option>';
+  o += '<optgroup label="Régions françaises">';
+  _FR_REGIONS.forEach(function(r){
+    o += '<option value="'+r+'"'+(curVal===r?' selected':'')+'>'+r+'</option>';
+  });
+  o += '</optgroup><optgroup label="Pays étrangers">';
+  _PAYS_ETRANGERS.forEach(function(r){
+    var lbl = r === 'Étranger' ? 'Étranger (non précisé)' : r;
+    o += '<option value="'+r+'"'+(curVal===r?' selected':'')+'>'+lbl+'</option>';
+  });
+  o += '</optgroup>';
+  return o;
+}
 
 // Getter centralisé pour les images officialDocs (S > clé dédiée localStorage)
 function _getOfficialDocImg(zone) {
@@ -3412,13 +3499,21 @@ async function loadState() {
 function clearLocalStorageQuota() {
   // Libère de la place en supprimant les photos base64 et clés externes
   // IMPORTANT : LS_CRITICAL est préservé — il contient les réglages essentiels
+  // Les clés de largeurs de colonnes sont également préservées
+  var _COL_KEYS = ['gestappli_staffColWidths','gestappli_equipColWidths3','gestappli_bgtColWidths'];
   try {
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS) { localStorage.removeItem(k); return; }
+      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS && _COL_KEYS.indexOf(k) === -1) { localStorage.removeItem(k); return; }
     });
     // Retirer les photos des pilotes dans S
     if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
+    // Réécrire les largeurs en mémoire pour la session en cours
+    try {
+      if (typeof _staffColWidths !== 'undefined') localStorage.setItem('gestappli_staffColWidths', JSON.stringify(_staffColWidths));
+      if (typeof _equipColWidths !== 'undefined') localStorage.setItem('gestappli_equipColWidths3', JSON.stringify(_equipColWidths));
+      if (typeof _bgtColWidths   !== 'undefined') localStorage.setItem('gestappli_bgtColWidths',   JSON.stringify(_bgtColWidths));
+    } catch(e2) {}
     console.log('[Storage] Nettoyage quota effectué');
   } catch(e) { console.warn('clearLocalStorageQuota', e); }
 }
@@ -4223,7 +4318,7 @@ function renderCompetitions() {
     var card = document.createElement('div');
     card.className = 'comp-card';
     card.style.cssText = 'padding:0;overflow:hidden;display:flex;align-items:stretch';
-    card.onclick = (function(id){ return function(){ if(window.innerWidth>=768){_homeDetailTab='infos';showPage('page-home');setTimeout(function(){showHomeCompDetail(id);},60);}else{openCompMobileDetail(id);} }; })(cp.id);
+    card.onclick = (function(id){ return function(){ if(window.innerWidth>=768){_homeDetailTab='infos';showPage('page-home');document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){b.classList.remove('active');});var _dnrC=document.getElementById('dnr-competitions');if(_dnrC)_dnrC.classList.add('active');setTimeout(function(){showHomeCompDetail(id);},60);}else{openCompMobileDetail(id);} }; })(cp.id);
     // Affiche à gauche
     if (cp.affiche) {
       var aWrap = document.createElement('div');
@@ -8715,6 +8810,15 @@ function eqpInlineSave(pilotId, field, value, compId) {
 }
 
 // Met à jour les options de classe selon la pratique choisie dans le tableau Équipage
+function eqpSaveULMField(pilotId, field, value, compId) {
+  if (!S.ulms) S.ulms = {};
+  if (!S.ulms[pilotId]) S.ulms[pilotId] = [{}];
+  if (!S.ulms[pilotId][0]) S.ulms[pilotId][0] = {};
+  S.ulms[pilotId][0][field] = value;
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+}
+
 function eqpUpdateClasse(pilotId, pratique) {
   var el = document.getElementById('eq-cls-'+pilotId);
   if (!el) return;
@@ -10400,7 +10504,8 @@ function renderHomeDetailPanel(cp) {
     html += '</div>';
     // ── Contenu onglet ──
     var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires');
-    html += '<div style="flex:1;background:var(--navy4);' + (_isFullH ? 'overflow:hidden;display:flex;flex-direction:column' : 'overflow-y:auto;padding:16px') + '" id="hdp-tab-content">';
+    var _isInfosTab = (_homeDetailTab === 'infos');
+    html += '<div style="flex:1;background:var(--navy4);' + (_isFullH ? 'overflow:hidden;display:flex;flex-direction:column' : ('overflow-y:auto' + (_isInfosTab ? '' : ';padding:16px'))) + '" id="hdp-tab-content"' + (_isFullH ? ' class="hdp-full-h"' : '') + '>';
     html += renderHDPTabContent(cp, _homeDetailTab, runs, enrolled, staffList);
     html += '</div>';
   }
@@ -10479,6 +10584,7 @@ function initBaseMaps(comps, enrolledSet) {
   }
 }
 var REGION_LL = {
+  // ── Régions françaises ──
   'Auvergne-Rhône-Alpes':[45.44,4.38],
   'Bourgogne-Franche-Comté':[47.28,5.00],
   'Bretagne':[48.20,-2.93],
@@ -10491,8 +10597,161 @@ var REGION_LL = {
   'Nouvelle-Aquitaine':[45.00,0.58],
   'Occitanie':[43.89,2.83],
   'Pays de la Loire':[47.76,-0.33],
-  'Provence-Alpes-Côte d\'Azur':[43.93,6.07],
-  'Étranger':[51.5,10.0]
+  "Provence-Alpes-Côte d'Azur":[43.93,6.07],
+  // ── DOM-TOM ──
+  'Guadeloupe':[16.27,-61.60],
+  'Guyane':[3.93,-53.13],
+  'La Réunion':[-21.11,55.53],
+  'Martinique':[14.64,-61.01],
+  'Mayotte':[-12.83,45.17],
+  // ── Europe ──
+  'Albanie':[41.15,20.17],
+  'Allemagne':[51.17,10.45],
+  'Andorre':[42.55,1.60],
+  'Autriche':[47.52,14.55],
+  'Belgique':[50.50,4.47],
+  'Biélorussie':[53.71,27.97],
+  'Bosnie-Herzégovine':[44.17,17.72],
+  'Bulgarie':[42.73,25.48],
+  'Chypre':[35.13,33.43],
+  'Croatie':[45.10,15.20],
+  'Danemark':[56.26,9.50],
+  'Espagne':[40.46,-3.75],
+  'Estonie':[58.60,25.01],
+  'Finlande':[61.92,25.75],
+  'Géorgie':[42.32,43.36],
+  'Grèce':[39.07,21.82],
+  'Hongrie':[47.16,19.50],
+  'Irlande':[53.41,-8.24],
+  'Islande':[64.96,-19.02],
+  'Italie':[41.87,12.57],
+  'Kosovo':[42.56,20.88],
+  'Lettonie':[56.88,24.60],
+  'Liechtenstein':[47.17,9.56],
+  'Lituanie':[55.17,23.88],
+  'Luxembourg':[49.82,6.13],
+  'Macédoine du Nord':[41.60,21.75],
+  'Malte':[35.94,14.38],
+  'Moldavie':[47.41,28.37],
+  'Monaco':[43.73,7.40],
+  'Monténégro':[42.71,19.37],
+  'Norvège':[60.47,8.47],
+  'Pays-Bas':[52.13,5.29],
+  'Pologne':[51.92,19.15],
+  'Portugal':[39.40,-8.22],
+  'République tchèque':[49.82,15.47],
+  'Roumanie':[45.94,24.97],
+  'Royaume-Uni':[55.38,-3.44],
+  'Russie':[61.52,105.32],
+  'Saint-Marin':[43.94,12.46],
+  'Serbie':[44.02,21.01],
+  'Slovaquie':[48.67,19.70],
+  'Slovénie':[46.15,14.99],
+  'Suède':[60.13,18.64],
+  'Suisse':[46.82,8.23],
+  'Turquie':[38.96,35.24],
+  'Ukraine':[48.38,31.17],
+  // ── Hors Europe ──
+  'Afrique du Sud':[-28.47,24.68],
+  'Algérie':[28.03,1.66],
+  'Argentine':[-38.42,-63.62],
+  'Australie':[-25.27,133.78],
+  'Brésil':[-14.24,-51.93],
+  'Canada':[56.13,-106.35],
+  'Chili':[-35.68,-71.54],
+  'Colombie':[4.57,-74.30],
+  'États-Unis':[37.09,-95.71],
+  'Japon':[36.20,138.25],
+  'Maroc':[31.79,-7.09],
+  'Mexique':[23.63,-102.55],
+  'Nouvelle-Zélande':[-40.90,174.89],
+  'Pérou':[-9.19,-75.02],
+  'Tunisie':[33.89,9.54],
+  'Uruguay':[-32.52,-55.77],
+  // ── Repli générique ──
+  'Étranger':[48.0,10.0]
+};
+
+// ── Normalisation ligue brute → région propre ──────────────────────────────
+// Table de correspondance — clés en MAJUSCULES sans accents
+// Les clés longues/spécifiques sont mises en premier pour être testées avant les courtes
+var _LIGUE_TO_REGION = {
+  // ── Nouvelles régions (post-2016) ──
+  'GRAND EST':'Grand Est',
+  'AUVERGNE-RHONE-ALPES':'Auvergne-Rhône-Alpes','AUVERGNE RHONE ALPES':'Auvergne-Rhône-Alpes',
+  'BOURGOGNE-FRANCHE-COMTE':'Bourgogne-Franche-Comté','BOURGOGNE FRANCHE COMTE':'Bourgogne-Franche-Comté',
+  'HAUTS-DE-FRANCE':'Hauts-de-France','HAUTS DE FRANCE':'Hauts-de-France',
+  'ILE-DE-FRANCE':'Île-de-France','ILE DE FRANCE':'Île-de-France',
+  'NOUVELLE-AQUITAINE':'Nouvelle-Aquitaine','NOUVELLE AQUITAINE':'Nouvelle-Aquitaine',
+  'PAYS DE LA LOIRE':'Pays de la Loire','PAYS-DE-LA-LOIRE':'Pays de la Loire',
+  'CENTRE-VAL DE LOIRE':'Centre-Val de Loire','CENTRE VAL DE LOIRE':'Centre-Val de Loire',
+  'PROVENCE-ALPES-COTE D AZUR':'Provence-Alpes-Côte d\'Azur',
+  'ALPES-MARITIMES':'Provence-Alpes-Côte d\'Azur','ALPES COTE D AZUR':'Provence-Alpes-Côte d\'Azur',
+  // ── Abréviations & codes courants ──
+  'PACA':'Provence-Alpes-Côte d\'Azur',
+  'IDF':'Île-de-France',
+  // ── Anciennes régions pré-2016 (fusionnées) ──
+  'ALSACE':'Grand Est','LORRAINE':'Grand Est','CHAMPAGNE-ARDENNE':'Grand Est','CHAMPAGNE ARDENNE':'Grand Est',
+  'AUVERGNE':'Auvergne-Rhône-Alpes','RHONE-ALPES':'Auvergne-Rhône-Alpes','RHONE ALPES':'Auvergne-Rhône-Alpes',
+  'BOURGOGNE':'Bourgogne-Franche-Comté','FRANCHE-COMTE':'Bourgogne-Franche-Comté','FRANCHE COMTE':'Bourgogne-Franche-Comté',
+  'NORD-PAS-DE-CALAIS':'Hauts-de-France','NORD PAS DE CALAIS':'Hauts-de-France','PICARDIE':'Hauts-de-France',
+  'HAUTE-NORMANDIE':'Normandie','BASSE-NORMANDIE':'Normandie','HAUTE NORMANDIE':'Normandie','BASSE NORMANDIE':'Normandie',
+  'AQUITAINE':'Nouvelle-Aquitaine','LIMOUSIN':'Nouvelle-Aquitaine','POITOU-CHARENTES':'Nouvelle-Aquitaine','POITOU CHARENTES':'Nouvelle-Aquitaine',
+  'MIDI-PYRENEES':'Occitanie','MIDI PYRENEES':'Occitanie','LANGUEDOC-ROUSSILLON':'Occitanie','LANGUEDOC ROUSSILLON':'Occitanie',
+  'PROVENCE':'Provence-Alpes-Côte d\'Azur',
+  // ── Régions simples (encore utilisées en tant que telles) ──
+  'BRETAGNE':'Bretagne',
+  'NORMANDIE':'Normandie',
+  'OCCITANIE':'Occitanie',
+  'CORSE':'Corse',
+  // ── Outre-mer ──
+  'GUADELOUPE':'Guadeloupe','GUYANE':'Guyane','REUNION':'La Réunion','LA REUNION':'La Réunion',
+  'MARTINIQUE':'Martinique','MAYOTTE':'Mayotte'
+};
+function _normRegion(r) {
+  if (!r) return '';
+  // 1. Correspondance directe
+  if (REGION_LL[r]) return r;
+  // 2. Suppression des accents pour la comparaison
+  var _na = function(s){ return s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g,'') : s; };
+  var up = _na((r||'').toUpperCase().trim());
+  // 3. Nettoyage des préfixes FFPLUM : "CR06 -", "COMITE REGIONAL", "LIGUE", "FFPLUM", "ULM"
+  var clean = up
+    .replace(/\bCR\s*\d+\b[\s\-]*/g, '')
+    .replace(/\bCOMITE\s+REGIONAL\b/g, '')
+    .replace(/\bCOMITE\b/g, '')
+    .replace(/\bLIGUE\b/g, '')
+    .replace(/\bFFPLUM\b/g, '')
+    .replace(/\bULM\b/g, '')
+    .replace(/\s{2,}/g, ' ').trim();
+  // 4. Chercher dans la table — clés triées du plus long au plus court (spécifique d'abord)
+  var keys = Object.keys(_LIGUE_TO_REGION).sort(function(a,b){ return b.length-a.length; });
+  var naKeys = keys.map(function(k){ return _na(k); });
+  // D'abord sur la version nettoyée (sans préfixes FFPLUM)
+  for (var i=0;i<keys.length;i++){ if(clean.indexOf(naKeys[i])>=0) return _LIGUE_TO_REGION[keys[i]]; }
+  // Puis sur la chaîne originale uppercased (au cas où le nettoyage aurait trop retiré)
+  for (var j=0;j<keys.length;j++){ if(up.indexOf(naKeys[j])>=0) return _LIGUE_TO_REGION[keys[j]]; }
+  return r;
+}
+
+// ── Drapeaux pays ─────────────────────────────────────────────────────────
+var _COUNTRY_FLAGS = {
+  'Albanie':'🇦🇱','Allemagne':'🇩🇪','Andorre':'🇦🇩','Autriche':'🇦🇹','Belgique':'🇧🇪',
+  'Biélorussie':'🇧🇾','Bosnie-Herzégovine':'🇧🇦','Bulgarie':'🇧🇬','Chypre':'🇨🇾',
+  'Croatie':'🇭🇷','Danemark':'🇩🇰','Espagne':'🇪🇸','Estonie':'🇪🇪','Finlande':'🇫🇮',
+  'Géorgie':'🇬🇪','Grèce':'🇬🇷','Hongrie':'🇭🇺','Irlande':'🇮🇪','Islande':'🇮🇸',
+  'Italie':'🇮🇹','Kosovo':'🇽🇰','Lettonie':'🇱🇻','Liechtenstein':'🇱🇮','Lituanie':'🇱🇹',
+  'Luxembourg':'🇱🇺','Macédoine du Nord':'🇲🇰','Malte':'🇲🇹','Moldavie':'🇲🇩',
+  'Monaco':'🇲🇨','Monténégro':'🇲🇪','Norvège':'🇳🇴','Pays-Bas':'🇳🇱','Pologne':'🇵🇱',
+  'Portugal':'🇵🇹','République tchèque':'🇨🇿','Roumanie':'🇷🇴','Royaume-Uni':'🇬🇧',
+  'Russie':'🇷🇺','Saint-Marin':'🇸🇲','Serbie':'🇷🇸','Slovaquie':'🇸🇰','Slovénie':'🇸🇮',
+  'Suède':'🇸🇪','Suisse':'🇨🇭','Turquie':'🇹🇷','Ukraine':'🇺🇦',
+  'Afrique du Sud':'🇿🇦','Algérie':'🇩🇿','Argentine':'🇦🇷','Australie':'🇦🇺',
+  'Brésil':'🇧🇷','Canada':'🇨🇦','Chili':'🇨🇱','Colombie':'🇨🇴','États-Unis':'🇺🇸',
+  'Japon':'🇯🇵','Maroc':'🇲🇦','Mexique':'🇲🇽','Nouvelle-Zélande':'🇳🇿','Pérou':'🇵🇪',
+  'Tunisie':'🇹🇳','Uruguay':'🇺🇾',
+  'Guadeloupe':'🇬🇵','Guyane':'🇬🇫','La Réunion':'🇷🇪','Martinique':'🇲🇶','Mayotte':'🇾🇹',
+  'Étranger':'🌍'
 };
 
 function initInfosMaps(cp, enrolled) {
@@ -10509,15 +10768,29 @@ function initInfosMaps(cp, enrolled) {
   // Region counts
   var regionCount = {};
   pilots.forEach(function(p){
-    var r = p.region || 'Inconnu';
+    var r = _normRegion(p.region) || 'Inconnu';
     regionCount[r] = (regionCount[r]||0) + 1;
   });
 
-  // ── MAP : bubble par région ──
+  // ── MAP : bubble par région / pays — zoom adaptatif ──
   if (divR && typeof L !== 'undefined') {
     if (_infoMapR) { try{ _infoMapR.remove(); }catch(e){} _infoMapR=null; }
     _infoMapR = L.map(divR, {zoomControl:false, attributionControl:false});
-    _infoMapR.fitBounds([[41.3,-5.2],[51.2,9.6]]);
+    // Déterminer l'étendue géographique des pilotes
+    var _overseas = ['Guadeloupe','Guyane','La Réunion','Martinique','Mayotte'];
+    var _euCountries = ['Albanie','Allemagne','Andorre','Autriche','Belgique','Biélorussie','Bosnie-Herzégovine','Bulgarie','Chypre','Croatie','Danemark','Espagne','Estonie','Finlande','Géorgie','Grèce','Hongrie','Irlande','Islande','Italie','Kosovo','Lettonie','Liechtenstein','Lituanie','Luxembourg','Macédoine du Nord','Malte','Moldavie','Monaco','Monténégro','Norvège','Pays-Bas','Pologne','Portugal','République tchèque','Roumanie','Royaume-Uni','Russie','Saint-Marin','Serbie','Slovaquie','Slovénie','Suède','Suisse','Turquie','Ukraine'];
+    var _worldCountries = ['Afrique du Sud','Algérie','Argentine','Australie','Brésil','Canada','Chili','Colombie','États-Unis','Japon','Maroc','Mexique','Nouvelle-Zélande','Pérou','Tunisie','Uruguay'];
+    var _regs = Object.keys(regionCount);
+    var hasWorld = _regs.some(function(r){ return _worldCountries.indexOf(r)>=0; });
+    var hasEurope = _regs.some(function(r){ return _euCountries.indexOf(r)>=0; });
+    var hasOverseas = _regs.some(function(r){ return _overseas.indexOf(r)>=0; });
+    if (hasWorld || hasOverseas) {
+      _infoMapR.setView([20, 15], 2);
+    } else if (hasEurope) {
+      _infoMapR.fitBounds([[34.5,-25.0],[71.5,50.0]]);
+    } else {
+      _infoMapR.fitBounds([[41.3,-5.2],[51.2,9.6]]);
+    }
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OSM'}).addTo(_infoMapR);
     var stolColor = getComputedStyle(document.documentElement).getPropertyValue('--stol').trim() || '#0057FF';
     var maxC = Math.max.apply(null, Object.values(regionCount).concat([1]));
@@ -10525,11 +10798,13 @@ function initInfosMaps(cp, enrolled) {
       var ll = REGION_LL[reg]; if(!ll) return;
       var cnt = regionCount[reg];
       var r = 12 + Math.round((cnt/maxC)*28);
+      var isCountry = _euCountries.indexOf(reg)>=0 || _worldCountries.indexOf(reg)>=0;
       L.circleMarker(ll,{
-        radius:r, fillColor:stolColor, color:'#fff', weight:2, fillOpacity:0.75
+        radius:r, fillColor:isCountry?'#f59e0b':stolColor, color:'#fff', weight:2, fillOpacity:0.8
       }).addTo(_infoMapR).bindTooltip('<b>'+reg+'</b><br>'+cnt+' compétiteur'+(cnt>1?'s':''),{permanent:false,direction:'top'});
     });
-    setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 100);
+    setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 120);
+    setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 400);
   }
 
   // ── Barres régions pleine largeur (toutes régions + Non identifiées) ──
@@ -10543,32 +10818,39 @@ function initInfosMaps(cp, enrolled) {
     var maxCount      = Math.max.apply(null, sorted.map(function(r){ return regionCount[r]; }).concat([1]));
     var isMob         = window.innerWidth < 768;
 
-    var title = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">'
-      + 'Régions <span style="font-weight:400;opacity:.6;font-size:9px">('+sorted.length+' · '+regTotal+' pilotes)</span></div>';
+    var _isCountryBar = function(r){ return _COUNTRY_FLAGS[r] && r!=='Étranger' ? true : ['Guadeloupe','Guyane','La Réunion','Martinique','Mayotte'].indexOf(r)>=0 ? false : !!_COUNTRY_FLAGS[r]; };
+    var nbForeigners = sortedKnown.filter(function(r){ return !!_COUNTRY_FLAGS[r]; }).length;
+    var sectionTitle = nbForeigners > 0 ? 'Provenance — Régions &amp; Pays' : 'Provenance — Régions';
+    var title = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">'
+      + sectionTitle+' <span style="font-weight:400;opacity:.6;font-size:9px">('+sorted.length+' · '+regTotal+' pilotes)</span></div>';
 
-    var bars = '<div style="display:flex;flex-direction:column;gap:6px">';
+    var bars = '<div style="display:flex;flex-direction:column;gap:8px">';
     sorted.forEach(function(reg, i) {
-      var cnt      = regionCount[reg];
-      var pct      = Math.round(cnt / regTotal * 100);
-      var barW     = Math.round(cnt / maxCount * 100);
+      var cnt       = regionCount[reg];
+      var pct       = Math.round(cnt / regTotal * 100);
+      var barW      = Math.round(cnt / maxCount * 100);
       var isUnknown = reg === 'Inconnu';
-      var color    = isUnknown ? 'rgba(255,255,255,.25)' : regColors[i % regColors.length];
-      var label    = isUnknown ? 'Non identifiée' : reg;
-      bars += '<div style="display:flex;align-items:center;gap:7px">';
-      bars += '<div style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:'+color+'"></div>';
-      bars += '<div style="flex:1;min-width:0">';
-      bars += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">';
-      bars += '<span style="font-size:'+(isMob?'11':'10')+'px;color:'+(isUnknown?'var(--txt3)':'var(--txt2)')+';font-style:'+(isUnknown?'italic':'normal')+'">'+label+'</span>';
-      bars += '<span style="font-size:11px;font-weight:700;color:var(--txt);flex-shrink:0;margin-left:6px">'+cnt+'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:2px">'+pct+'%</span></span>';
+      var isCountry = !!_COUNTRY_FLAGS[reg];
+      var color     = isUnknown ? 'rgba(255,255,255,.2)' : isCountry ? '#f59e0b' : regColors[i % regColors.length];
+      var label     = isUnknown ? 'Non identifiée' : reg;
+      var flag      = isCountry ? (_COUNTRY_FLAGS[reg]||'🌍') : '🇫🇷';
+      bars += '<div>';
+      bars += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">';
+      bars += '<div style="display:flex;align-items:center;gap:6px">';
+      bars += '<div style="width:3px;height:14px;border-radius:2px;background:'+color+'"></div>';
+      bars += '<span style="font-size:14px;line-height:1">'+(isUnknown?'':flag)+'</span>';
+      bars += '<span style="font-size:'+(isMob?'12':'11')+'px;font-weight:'+(isUnknown?'400':'600')+';color:'+(isUnknown?'var(--txt3)':'var(--txt)')+';font-style:'+(isUnknown?'italic':'normal')+'">'+label+'</span>';
       bars += '</div>';
-      bars += '<div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">';
-      bars += '<div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:3px;transition:width .4s"></div>';
+      bars += '<span style="font-size:13px;font-weight:800;color:'+color+';flex-shrink:0;margin-left:8px">'+cnt+'<span style="font-size:10px;font-weight:400;color:var(--txt3);margin-left:3px">'+pct+'%</span></span>';
       bars += '</div>';
-      bars += '</div></div>';
+      bars += '<div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">';
+      bars += '<div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:3px;transition:width .5s ease"></div>';
+      bars += '</div>';
+      bars += '</div>';
     });
     bars += '</div>';
 
-    divBars.innerHTML = '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px">'
+    divBars.innerHTML = '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;height:100%;box-sizing:border-box">'
       + title + bars + '</div>';
   }
 }
@@ -10669,11 +10951,11 @@ function _staffResizeEnd() {
 }
 
 // ── Redimensionnement colonnes Équipage ───────────────────────────────────
-var _EQP_LS_KEY     = 'gestappli_equipColWidths';
+var _EQP_LS_KEY     = 'gestappli_equipColWidths3';
 var _equipColWidths = (function(){
-  try { var s=localStorage.getItem(_EQP_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===13) return a; } } catch(e){}
-  return [40, 44, 145, 65, 68, 85, 85, 70, 62, 58, 68, 80, 30];
-})(); // avatar|genre|nom|lic|immat|marque|modele|pratique|classe|cat|equip|region|btn
+  try { var s=localStorage.getItem(_EQP_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===16) return a; } } catch(e){}
+  return [40, 44, 145, 65, 80, 68, 70, 62, 58, 68, 85, 85, 80, 60, 70, 30];
+})(); // avatar|genre|nom|lic|region|immat|pratique|classe|cat|equip|marque|modele|moteur|aile|helice|btn
 var _equipResizing  = null;
 function _equipGetTpl() { return _equipColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _equipApplyTpl() {
@@ -10774,299 +11056,327 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     runs.forEach(function(r){ classifiedIds[r.pilotId] = true; });
     var classified = Object.keys(classifiedIds).length;
     var unclassified = Math.max(0, pilotCount - classified);
-    var aileHaute = enrolled.filter(function(pid){ var ulms=(S.ulms||{})[pid]||[]; return ulms.some(function(u){ return u.aile==='haute'; }); }).length;
-    var aileBasse = enrolled.filter(function(pid){ var ulms=(S.ulms||{})[pid]||[]; return ulms.some(function(u){ return u.aile==='basse'; }); }).length;
     // Staff count: chercher dans les deux formats possibles
     var staffCountStat = Array.isArray((S.staff||{})[cp.id]) ? (S.staff[cp.id]||[]).length : staffList.length;
-    // ── Compute genre & âge moyen ──
+    // ── Genre & Âge ──
     var nbH = 0, nbF = 0, ageTotal = 0, ageCount = 0;
     var ageBuckets = [
-      {lbl:'<25',  min:0,  max:25,  n:0},
-      {lbl:'25-34',min:25, max:35,  n:0},
-      {lbl:'35-44',min:35, max:45,  n:0},
-      {lbl:'45-54',min:45, max:55,  n:0},
-      {lbl:'55-64',min:55, max:65,  n:0},
-      {lbl:'65+',  min:65, max:999, n:0}
+      {lbl:'<25',min:0,max:25,n:0},{lbl:'25-34',min:25,max:35,n:0},
+      {lbl:'35-44',min:35,max:45,n:0},{lbl:'45-54',min:45,max:55,n:0},
+      {lbl:'55-64',min:55,max:65,n:0},{lbl:'65+',min:65,max:999,n:0}
     ];
     enrolled.forEach(function(pid) {
-      var p = (S.pilots||[]).find(function(x){ return x.id === pid; }) || {};
-      if (p.genre === 'M.') nbH++;
-      else if (p.genre === 'Mme.') nbF++;
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
+      if (p.genre==='M.') nbH++;
+      else if (p.genre==='Mme.') nbF++;
       if (p.ddn) {
-        var bd = new Date(p.ddn);
+        var bd=new Date(p.ddn);
         if (!isNaN(bd)) {
-          var age = Math.floor((Date.now()-bd)/(365.25*24*3600*1000));
-          ageTotal += age; ageCount++;
-          for (var bi=0; bi<ageBuckets.length; bi++) {
-            if (age >= ageBuckets[bi].min && age < ageBuckets[bi].max) { ageBuckets[bi].n++; break; }
-          }
+          var age=Math.floor((Date.now()-bd)/(365.25*24*3600*1000));
+          ageTotal+=age; ageCount++;
+          for (var bi=0;bi<ageBuckets.length;bi++) { if(age>=ageBuckets[bi].min&&age<ageBuckets[bi].max){ageBuckets[bi].n++;break;} }
         }
       }
     });
-    var ageMoyen = ageCount > 0 ? Math.round(ageTotal/ageCount) : 0;
-    // ── Nb par classe ULM ──
-    var _normCls = function(c) {
-      c = (c||'').toLowerCase().trim();
-      if (c==='paramoteur') return 'paramotor';
-      if (c==='autogire')   return 'gyro';
-      return c;
-    };
-    var classCounts = {};
-    enrolled.forEach(function(pid) {
-      var ulms = (S.ulms||{})[pid] || [];
-      var cls = ulms[0] && ulms[0].classe ? _normCls(ulms[0].classe) : null;
-      if (cls) classCounts[cls] = (classCounts[cls]||0) + 1;
+    var ageMoyen = ageCount>0?Math.round(ageTotal/ageCount):0;
+    // ── Classes ULM ──
+    var _normCls = function(c){ c=(c||'').toLowerCase().trim(); if(c==='paramoteur')return'paramotor'; if(c==='autogire')return'gyro'; return c; };
+    var ulmClsCounts = {};
+    var _clsLabels = {paramotor:'Paramoteur',multiaxes:'Multiaxes (cl.3)',pendulaire:'Pendulaire (cl.2)',gyro:'Autogire (cl.5)',microlight:'Microlight',helicoptere:'Hélicoptère'};
+    var _clsColors = {paramotor:'#f59e0b',multiaxes:'#3b82f6',pendulaire:'#06b6d4',gyro:'#10b981',microlight:'#8b5cf6',helicoptere:'#ef4444'};
+    enrolled.forEach(function(pid){
+      var ulms=(S.ulms||{})[pid]||[];
+      var cls=ulms[0]&&ulms[0].classe?_normCls(ulms[0].classe):'';
+      if(cls) ulmClsCounts[cls]=(ulmClsCounts[cls]||0)+1;
     });
-    var classLabels = {
-      'paramotor':  'Paramoteur',
-      'multiaxes':  'Multiaxes',
-      'pendulaire': 'Pendulaire',
-      'gyro':       'Autogire',
-      'microlight':  'Microlight',
-      'helicoptere':'Hélicoptère'
-    };
-    var classeStats = [];
-    var nbClassesDiff = Object.keys(classCounts).length;
-    if (nbClassesDiff > 0) {
-      Object.keys(classCounts).sort().forEach(function(cls) {
-        var lbl = classLabels[cls] || (cls.charAt(0).toUpperCase()+cls.slice(1));
-        classeStats.push({lbl:lbl, val:classCounts[cls], show:nbClassesDiff>=1});
-      });
-    }
-    // ── Catégorie (PF1/PF2/PL1/PL2) ──
+    // ── Catégories compétitives ──
     var catPilCounts = {};
-    enrolled.forEach(function(pid) {
-      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
-      var cat = (p.categorie||'').trim();
-      if (cat) catPilCounts[cat] = (catPilCounts[cat]||0)+1;
+    enrolled.forEach(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var cat=(p.categorie||'').trim();
+      if(cat) catPilCounts[cat]=(catPilCounts[cat]||0)+1;
     });
-    var catOrder  = ['PF1','PF2','PL1','PL2'];
-    var catColors = {PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316'};
-    var hasCat = Object.keys(catPilCounts).length > 0;
-    // ── Équipages (Monoplace / Biplace) ──
-    var nbMono = 0, nbBi = 0;
-    enrolled.forEach(function(pid) {
-      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
-      if (p.equipage==='Monoplace') nbMono++;
-      else if (p.equipage==='Biplace') nbBi++;
+    var _catBase=['PF1','PF2','PL1','PL2','Classable','Accès'];
+    var catColors={PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316',Classable:'#10b981',Accès:'#a78bfa'};
+    var catOrder=_catBase.slice();
+    Object.keys(catPilCounts).forEach(function(c){if(catOrder.indexOf(c)===-1)catOrder.push(c);});
+    var hasCat=Object.keys(catPilCounts).length>0;
+    // ── Équipages ──
+    var nbMono=0,nbBi=0;
+    enrolled.forEach(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      if(p.equipage==='Monoplace')nbMono++;
+      else if(p.equipage==='Biplace')nbBi++;
     });
-    var hasEqui = nbMono+nbBi > 0;
-    // ── Grille de stats uniforme 2 colonnes ──
-    var mixAile  = aileHaute>0 && aileBasse>0;
-    var mixGenre = nbH>0 && nbF>0;
-    var mixClass = classified>0 && unclassified>0;
-    var allStats = [
-      {ico:'👥', lbl:'Pilotes inscrits', val:pilotCount,                      show:true,             color:'var(--stol)'},
-      {ico:'🏆', lbl:'Classés',          val:classified,                      show:mixClass,         color:'var(--green)'},
-      {ico:'⏳', lbl:'Non classés',      val:unclassified,                    show:mixClass,         color:'var(--amber)'},
-      {ico:'🧑‍✈️', lbl:'Staff',     val:staffCountStat,                  show:staffCountStat>0, color:'#a78bfa'},
-      {ico:'♂',  lbl:'Hommes',           val:nbH,                             show:mixGenre,         color:'#3b82f6'},
-      {ico:'♀',  lbl:'Femmes',           val:nbF,                             show:mixGenre,         color:'#f472b6'},
-      {ico:'🎂', lbl:'Âge moyen',        val:ageMoyen ? ageMoyen+' ans' : '', show:ageMoyen>0,       color:'var(--amber)'},
-      {ico:'🪂', lbl:'Aile haute',       val:aileHaute,                       show:mixAile,          color:'var(--txt2)'},
-      {ico:'✈️', lbl:'Aile basse',       val:aileBasse,                       show:mixAile,          color:'var(--txt2)'}
-    ].concat(classeStats.map(function(s){ return {ico:'🛩',lbl:s.lbl,val:s.val,show:s.show,color:'var(--txt2)'}; }));
-    var visStats = allStats.filter(function(s){ return s.show; });
-    var _cidEsc = (cp.id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var hasEqui=nbMono+nbBi>0;
+    var hasCls=Object.keys(ulmClsCounts).length>0;
+    // ── Clubs ──
+    var clubCounts = {};
+    enrolled.forEach(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var c=(p.club||'').trim(); if(c) clubCounts[c]=(clubCounts[c]||0)+1;
+    });
+    // ── Marques par classe (microlight = multiaxes+pendulaire / paramoteur) ──
+    var _mlClasses = ['multiaxes','pendulaire','microlight'];
+    var aileMLCounts={}, moteurMLCounts={};      // microlight / pendulaire
+    var ailePMCounts={}, moteurPMCounts={}, helicePMCounts={}; // paramoteur
+    enrolled.forEach(function(pid){
+      var ulms=(S.ulms||{})[pid]||[];
+      ulms.forEach(function(ulm){
+        var cls=_normCls(ulm.classe||'');
+        var isML=_mlClasses.indexOf(cls)>=0;
+        var isPM=(cls==='paramotor');
+        var aile=(ulm.marque||'').trim(), moteur=(ulm.moteur||'').trim(), helice=(ulm.helice||'').trim();
+        if(isML){ if(aile) aileMLCounts[aile]=(aileMLCounts[aile]||0)+1; if(moteur) moteurMLCounts[moteur]=(moteurMLCounts[moteur]||0)+1; }
+        if(isPM){ if(aile) ailePMCounts[aile]=(ailePMCounts[aile]||0)+1; if(moteur) moteurPMCounts[moteur]=(moteurPMCounts[moteur]||0)+1; if(helice) helicePMCounts[helice]=(helicePMCounts[helice]||0)+1; }
+      });
+    });
+    var pilotsWithRegion=enrolled.filter(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      return !!(p.region);
+    }).length;
+    var isMobile=window.innerWidth<768;
+    var noStats=isMobile&&pilotCount===0;
+    var _cidEsc=(cp.id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
-    var isMobile = window.innerWidth < 768;
-    var noStats  = isMobile && pilotCount === 0;
-    // Indicateurs "notables" = au moins des pilotes inscrits
-    var hasNotableStats = pilotCount > 0;
-
-    // ── Bloc affiche réutilisable (vue affiche + carte) ──
-    var _buildAfficheView = function() {
-      var h = '<div style="display:flex;flex-direction:column;align-items:center;padding:14px 16px 24px;gap:12px">';
-      if (cp.affiche) {
-        h += '<div style="width:100%;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.3)">';
-        h += '<img src="'+cp.affiche+'" style="width:100%;height:auto;display:block;object-fit:contain;max-height:calc(100vh - 220px)" onerror="this.parentNode.parentNode.style.display=\'none\'">';
-        h += '</div>';
+    // ── Bloc affiche mobile ──
+    var _buildAfficheView=function(){
+      var h='<div style="display:flex;flex-direction:column;align-items:center;padding:14px 16px 24px;gap:12px">';
+      if(cp.affiche){
+        h+='<div style="width:100%;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.3)">';
+        h+='<img src="'+cp.affiche+'" style="width:100%;height:auto;display:block;object-fit:contain;max-height:calc(100vh - 220px)" onerror="this.parentNode.parentNode.style.display=\'none\'">';
+        h+='</div>';
       }
-      if (cp.lieu || cp.oaci) {
-        h += '<div style="width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--bdr)">';
-        h += '<div id="mcd-loc-map" style="height:200px;background:var(--navy3)"></div>';
-        h += '</div>';
+      if(cp.lieu||cp.oaci){
+        h+='<div style="width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--bdr)">';
+        h+='<div id="mcd-loc-map" style="height:200px;background:var(--navy3)"></div>';
+        h+='</div>';
       }
-      if (!cp.affiche && !cp.lieu && !cp.oaci) {
-        h += '<div style="font-size:48px;text-align:center;padding:20px 0">🗓</div>';
-        h += '<div style="font-size:16px;font-weight:800;text-align:center">'+escH(cp.name)+'</div>';
+      if(!cp.affiche&&!cp.lieu&&!cp.oaci){
+        h+='<div style="font-size:48px;text-align:center;padding:20px 0">🗓</div>';
+        h+='<div style="font-size:16px;font-weight:800;text-align:center">'+escH(cp.name)+'</div>';
       }
-      h += '</div>';
+      h+='</div>';
       return h;
     };
-
-    // (toggle géré via mcd-footer — pas de bouton flottant)
-
-    // ── Mobile sans pilotes : affiche simple (pas de bouton toggle) ──
-    if (noStats && cp.affiche) {
-      return _buildAfficheView();
-    }
-    if (noStats && !cp.affiche) {
-      var html = '<div style="display:flex;flex-direction:column;align-items:center;padding:24px 16px 24px;gap:12px">';
-      html += '<div style="font-size:48px;text-align:center">🗓</div>';
-      html += '<div style="font-size:16px;font-weight:800;text-align:center">'+escH(cp.name)+'</div>';
-      if (cp.lieu || cp.oaci) {
-        html += '<div style="width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--bdr)">';
-        html += '<div id="mcd-loc-map" style="height:200px;background:var(--navy3)"></div>';
-        html += '</div>';
+    if(noStats&&cp.affiche) return _buildAfficheView();
+    if(noStats&&!cp.affiche){
+      var html='<div style="display:flex;flex-direction:column;align-items:center;padding:24px 16px 24px;gap:12px">';
+      html+='<div style="font-size:48px;text-align:center">🗓</div>';
+      html+='<div style="font-size:16px;font-weight:800;text-align:center">'+escH(cp.name)+'</div>';
+      if(cp.lieu||cp.oaci){
+        html+='<div style="width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--bdr)">';
+        html+='<div id="mcd-loc-map" style="height:200px;background:var(--navy3)"></div>';
+        html+='</div>';
       }
-      html += '<div style="font-size:12px;color:var(--txt3);line-height:1.6;text-align:center">Aucun compétiteur enregistré<br>pour cette compétition.</div>';
-      html += '</div>';
+      html+='<div style="font-size:12px;color:var(--txt3);line-height:1.6;text-align:center">Aucun compétiteur enregistré<br>pour cette compétition.</div>';
+      html+='</div>';
       return html;
     }
+    if(isMobile&&_mobileInfoViewMode==='affiche'&&cp.affiche) return _buildAfficheView();
 
-    // ── Mobile avec stats : affiche en vue par défaut, toggle vers stats ──
-    if (isMobile && _mobileInfoViewMode === 'affiche' && cp.affiche) {
-      return _buildAfficheView();
+    // ═══════════════════════════════════════════════════════════════
+    //  DASHBOARD INFO & STATS
+    // ═══════════════════════════════════════════════════════════════
+
+    // Calcul nb régions/pays distincts
+    var _regSet2 = {};
+    enrolled.forEach(function(pid){ var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{}; if(p.region) _regSet2[_normRegion(p.region)]=1; });
+    var nbRegionsTotal = Object.keys(_regSet2).length;
+
+    // Calcul nombre de jours de compétition
+    var _nbJours = 1;
+    if (cp.dateFrom && cp.dateTo && cp.dateTo > cp.dateFrom) {
+      var _d1 = new Date(cp.dateFrom), _d2 = new Date(cp.dateTo);
+      if (!isNaN(_d1) && !isNaN(_d2)) _nbJours = Math.round((_d2 - _d1) / 86400000) + 1;
     }
 
-    var html = '<div style="padding:14px 14px 0">';
-    // ── Indicateurs : largeur égale sur toute la ligne ──
-    html += '<div style="display:flex;gap:6px;margin-bottom:14px">';
-    visStats.forEach(function(s){
-      html += '<div style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--bdr);border-top:2px solid '+s.color+';border-radius:0 0 10px 10px;padding:8px 6px;text-align:center">';
-      html += '<div style="font-size:18px;font-weight:800;line-height:1;color:'+s.color+'">'+s.val+'</div>';
-      html += '<div style="font-size:9.5px;color:var(--txt3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.lbl+'</div>';
+    // Tuiles KPI
+    var _kpi = [];
+    _kpi.push({val:''+pilotCount,  lbl:'Pilotes inscrits', ico:'👥', bg:'#0891b2'});
+    if (classified    > 0) _kpi.push({val:''+classified,     lbl:'Classés',        ico:'🏆', bg:'#059669'});
+    _kpi.push({val:''+_nbJours,    lbl:_nbJours>1?'Jours de compétition':'Jour de compétition', ico:'📅', bg:'#0369a1'});
+    if (staffCountStat> 0) _kpi.push({val:''+staffCountStat, lbl:'Encadrants',     ico:'🧑', bg:'#7c3aed'});
+    if (ageMoyen      > 0) _kpi.push({val:ageMoyen+' ans',   lbl:'Âge moyen',      ico:'🎂', bg:'#db2777'});
+    if (nbRegionsTotal> 0) _kpi.push({val:''+nbRegionsTotal, lbl:'Régions / Pays', ico:'📍', bg:'#4f46e5'});
+
+    // Styles
+    var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px';
+    var _tSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:12px';
+
+    var _donut = function(segs,cols,cx,cy,r,sw){
+      var tot=segs.reduce(function(s,d){return s+d.v;},0); if(!tot)return'';
+      var C=2*Math.PI*r,cum=0,out='';
+      out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="'+sw+'"/>';
+      segs.forEach(function(d,i){ var frac=d.v/tot,dl=frac*C,off=C*(1-cum); out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+cols[i%cols.length]+'" stroke-width="'+sw+'" stroke-dasharray="'+dl+' '+(C-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+cx+' '+cy+')" stroke-linecap="round"/>'; cum+=frac; });
+      return out;
+    };
+    var _bRow = function(lbl,n,mx,tot,col){
+      var w=mx>0?Math.round(n/mx*100):0, pct=tot>0?Math.round(n/tot*100):0;
+      return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="display:flex;align-items:center;gap:7px"><div style="width:3px;height:13px;border-radius:2px;background:'+col+'"></div><span style="font-size:12px;font-weight:600;color:var(--txt)">'+escH(lbl)+'</span></div><span style="font-size:13px;font-weight:800;color:'+col+'">'+n+'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:3px">'+pct+'%</span></span></div><div style="height:7px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:4px"></div></div></div>';
+    };
+    var _leg = function(col,lbl,val,pct){
+      return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="display:flex;align-items:center;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div><span style="font-size:12px;color:var(--txt2)">'+lbl+'</span></div><b style="font-size:14px;color:'+col+'">'+val+'</b></div><div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div></div></div>';
+    };
+    var _empty = function(ico,lbl,sub){ return '<div style="'+_cSt+';display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:108px;gap:5px;text-align:center"><div style="font-size:26px;opacity:.2">'+ico+'</div><div style="font-size:11px;font-weight:600;color:var(--txt3)">'+lbl+'</div>'+(sub?'<div style="font-size:10px;color:var(--txt3);opacity:.6">'+sub+'</div>':'')+'</div>'; };
+
+    // Tout dans un flex column avec gap uniforme et padding latéral
+    var html = '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px">';
+
+    // ── 1. TUILES KPI — rangée horizontale (flex-wrap) ────────────
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    var _kpiMinW = isMobile ? '120px' : '130px';
+    _kpi.forEach(function(t){
+      html += '<div style="background:'+t.bg+';border-radius:12px;padding:13px 14px 11px;position:relative;overflow:hidden;flex:1;min-width:'+_kpiMinW+'">';
+      html += '<div style="position:absolute;right:-4px;top:50%;transform:translateY(-50%);font-size:36px;opacity:.15;pointer-events:none;line-height:1">'+t.ico+'</div>';
+      html += '<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">'+t.lbl+'</div>';
+      html += '<div style="font-size:24px;font-weight:900;color:#fff;line-height:1.1">'+t.val+'</div>';
       html += '</div>';
     });
     html += '</div>';
-    if (nbH+nbF+ageMoyen === 0 && pilotCount > 0) {
-      html += '<div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:14px;padding:10px 12px;background:var(--navy3);border-radius:10px;line-height:1.5">⏳ Genre et âge disponibles<br>après import du fichier licences FFPLUM</div>';
-    }
-    html += '</div>';
-    // ── Graphiques ──
-    html += '<div style="padding:0 14px">';
-    var _donut = function(segs, colors, cx, cy, r, sw) {
-      var tot = segs.reduce(function(s,d){return s+d.v;},0); if(!tot) return '';
-      var C = 2*Math.PI*r, cum = 0, out = '';
-      out += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="'+sw+'"/>';
-      segs.forEach(function(d,i){
-        var frac=d.v/tot, dl=frac*C, off=C*(1-cum);
-        out += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+colors[i%colors.length]+'" stroke-width="'+sw+'" stroke-dasharray="'+dl+' '+(C-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+cx+' '+cy+')" stroke-linecap="round"/>';
-        cum += frac;
-      });
-      return out;
-    };
-    // ── Graphiques : layout adaptatif mobile/desktop ──
-    var pilotsWithRegion = enrolled.filter(function(pid){
-      var p = (S.pilots||[]).find(function(x){ return x.id===pid; }) || {};
-      return !!p.region;
-    }).length;
-    var boxSt    = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;min-height:150px;justify-content:center';
-    var boxTitSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;align-self:flex-start';
-    var emptyBox = function(lbl){ return '<div style="'+boxSt+';color:var(--txt3);font-size:11px;text-align:center">'+lbl+'<br><span style="font-size:9px">Données manquantes</span></div>'; };
-    // Desktop → grille 3×2 ; Mobile → colonnes séparées
-    if (!isMobile) html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
-    else           html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'
-                         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-    // (sur mobile : 3 petits box en haut, puis âge + région + carte pleine largeur dessous)
 
-    // ── Box 1 : Genre ──
-    if (nbH+nbF > 0) {
-      var hfSegs=[{v:nbH},{v:nbF}];
-      var hfCol=['#3b82f6','#f472b6'];
-      var hfPct=Math.round(nbH/(nbH+nbF)*100);
-      html += '<div style="'+boxSt+'">';
-      html += '<div style="'+boxTitSt+'">Genre</div>';
-      html += '<svg width="88" height="88" viewBox="0 0 88 88">';
-      html += _donut(hfSegs,hfCol,44,44,33,15);
-      html += '<text x="44" y="40" text-anchor="middle" font-size="15" font-weight="800" fill="var(--txt)">'+hfPct+'%</text>';
-      html += '<text x="44" y="52" text-anchor="middle" font-size="8" fill="var(--txt3)">♂  ♀</text>';
-      html += '</svg>';
-      html += '<div style="display:flex;gap:10px;margin-top:4px">';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#3b82f6"></div><span style="font-size:10px;color:var(--txt2)">♂ '+nbH+'</span></div>';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#f472b6"></div><span style="font-size:10px;color:var(--txt2)">♀ '+nbF+'</span></div>';
-      html += '</div></div>';
-    } else { html += emptyBox('♂♀ Genre'); }
-
-    // ── Box 2 : Catégorie ──
-    if (hasCat) {
-      var maxCat = Math.max.apply(null, catOrder.map(function(k){ return catPilCounts[k]||0; }))||1;
-      html += '<div style="'+boxSt+';align-items:stretch">';
-      html += '<div style="'+boxTitSt+'">Catégorie</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:5px;width:100%;margin-top:4px">';
-      catOrder.forEach(function(cat){
-        var n = catPilCounts[cat]||0;
-        var w = Math.round(n/maxCat*100);
-        var col = catColors[cat]||'var(--stol)';
-        html += '<div style="display:flex;align-items:center;gap:6px">';
-        html += '<div style="font-size:9px;font-weight:700;color:var(--txt2);width:26px;flex-shrink:0">'+cat+'</div>';
-        html += '<div style="flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">'
-               +(n>0?'<div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div>':'')
-               +'</div>';
-        html += '<div style="font-size:10px;font-weight:700;color:var(--txt);width:18px;text-align:right;flex-shrink:0">'+n+'</div>';
-        html += '</div>';
-      });
-      html += '</div></div>';
-    } else { html += emptyBox('📋 Catégorie'); }
-
-    // ── Box 3 : Équipages ──
-    if (hasEqui) {
-      var eqSegs=[{v:nbMono},{v:nbBi}];
-      var eqCol=['#8b5cf6','#10b981'];
-      var eqPct=Math.round(nbMono/(nbMono+nbBi)*100);
-      html += '<div style="'+boxSt+'">';
-      html += '<div style="'+boxTitSt+'">Équipages</div>';
-      html += '<svg width="88" height="88" viewBox="0 0 88 88">';
-      html += _donut(eqSegs,eqCol,44,44,33,15);
-      html += '<text x="44" y="40" text-anchor="middle" font-size="15" font-weight="800" fill="var(--txt)">'+eqPct+'%</text>';
-      html += '<text x="44" y="52" text-anchor="middle" font-size="7.5" fill="var(--txt3)">Mono</text>';
-      html += '</svg>';
-      html += '<div style="display:flex;gap:8px;margin-top:4px">';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#8b5cf6"></div><span style="font-size:10px;color:var(--txt2)">Mono '+nbMono+'</span></div>';
-      html += '<div style="display:flex;align-items:center;gap:3px"><div style="width:7px;height:7px;border-radius:50%;background:#10b981"></div><span style="font-size:10px;color:var(--txt2)">Bi '+nbBi+'</span></div>';
-      html += '</div></div>';
-    } else { html += emptyBox('✈️ Équipages'); }
-
-    // ── Ligne 2 mobile : ferme les 3 cols, ouvre une colonne simple ──
-    if (isMobile) {
-      html += '</div>'; // ferme la ligne 3 cols (Genre|Catégorie|Équipages)
-      html += '<div style="display:flex;flex-direction:column;gap:8px">'; // Âge puis Régions empilés
-    }
-
-    // ── Box 4 : Tranches d'âge ──
-    var _ageBoxSt = boxSt + ';align-items:stretch';
-    if (ageCount > 0) {
-      var maxN = ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
-      html += '<div style="'+_ageBoxSt+'">';
-      html += '<div style="'+boxTitSt+'">Tranches d\'âge</div>';
-      html += '<div style="display:flex;align-items:flex-end;gap:3px;height:72px;margin-top:4px">';
-      ageBuckets.forEach(function(b){
-        var h = b.n > 0 ? Math.max(6, Math.round((b.n/maxN)*64)) : 3;
-        html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
-        html += '<div style="font-size:8px;font-weight:700;color:'+(b.n>0?'var(--txt)':'var(--txt3)')+'">'+(b.n||'')+'</div>';
-        html += '<div style="width:100%;height:'+h+'px;background:'+(b.n>0?'var(--stol)':'rgba(255,255,255,0.06)')+';border-radius:3px 3px 0 0"></div>';
-        html += '</div>';
-      });
+    // Barre classement (pleine largeur, si pertinent)
+    if (classified > 0) {
+      var _cpct = pilotCount>0 ? Math.round(classified/pilotCount*100) : 0;
+      html += '<div style="'+_cSt+';padding:10px 16px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">';
+      html += '<span style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px">Taux de classement</span>';
+      html += '<span style="font-size:13px;font-weight:800;color:#34d399">'+_cpct+'%<span style="font-size:10px;font-weight:400;color:var(--txt3);margin-left:6px">'+classified+' / '+pilotCount+' pilotes</span></span>';
       html += '</div>';
-      html += '<div style="display:flex;gap:3px;margin-top:4px">';
-      ageBuckets.forEach(function(b){
-        html += '<div style="flex:1;text-align:center;font-size:7.5px;color:var(--txt3)">'+b.lbl+'</div>';
+      html += '<div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden"><div style="width:'+_cpct+'%;height:100%;background:linear-gradient(90deg,#059669,#34d399);border-radius:4px"></div></div>';
+      html += '</div>';
+    }
+
+    // ── 2. GRAPHIQUES — grille 2 colonnes ────────────────────────
+    var _g2 = isMobile ? 'display:flex;flex-direction:column;gap:10px' : 'display:grid;grid-template-columns:1fr 1fr;gap:10px';
+
+    // ── Genre | Tranches d'âge — même ligne ──────────────────────
+    var _genreH = '';
+    if (nbH+nbF > 0) {
+      var _hp = Math.round(nbH/(nbH+nbF)*100);
+      _genreH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Genre</div><div style="display:flex;align-items:center;gap:14px"><svg width="80" height="80" viewBox="0 0 80 80" style="flex-shrink:0">'+_donut([{v:nbH},{v:nbF}],['#3b82f6','#f472b6'],40,40,29,13)+'<text x="40" y="35" text-anchor="middle" font-size="13" font-weight="900" fill="var(--txt)">'+_hp+'%</text><text x="40" y="47" text-anchor="middle" font-size="7.5" fill="var(--txt3)">hommes</text></svg><div style="flex:1">'+_leg('#3b82f6','♂ Hommes',nbH,_hp)+_leg('#f472b6','♀ Femmes',nbF,100-_hp)+'</div></div></div>';
+    }
+    var _ageH = '';
+    if (ageCount > 0) {
+      var _mxN=ageBuckets.reduce(function(m,b){return Math.max(m,b.n);},1);
+      _ageH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Tranches d\'âge <span style="font-weight:400;text-transform:none;font-size:9px;letter-spacing:0">· âge moyen '+ageMoyen+' ans</span></div>';
+      _ageH += '<div style="display:flex;align-items:flex-end;gap:4px;height:84px">';
+      ageBuckets.forEach(function(b){ var bh=b.n>0?Math.max(10,Math.round((b.n/_mxN)*74)):4,top=b.n>0&&b.n===_mxN; _ageH += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:9px;font-weight:'+(b.n>0?'700':'400')+';color:'+(b.n>0?'var(--txt)':'var(--txt3)')+'">'+(b.n||'')+'</div><div style="width:100%;height:'+bh+'px;background:'+(b.n>0?(top?'#0891b2':'rgba(8,145,178,.42)'):'rgba(255,255,255,.05)')+';border-radius:3px 3px 0 0"></div></div>'; });
+      _ageH += '</div><div style="display:flex;gap:4px;margin-top:5px;border-top:1px solid rgba(255,255,255,.05);padding-top:5px">';
+      ageBuckets.forEach(function(b){ _ageH += '<div style="flex:1;text-align:center;font-size:8.5px;color:var(--txt3)">'+b.lbl+'</div>'; });
+      _ageH += '</div></div>';
+    }
+    if (_genreH && _ageH) { html += '<div style="'+_g2+'">' + _genreH + _ageH + '</div>'; }
+    else if (_genreH) { html += _genreH; }
+    else if (_ageH)   { html += _ageH; }
+
+    // ── Catégories (seule) ────────────────────────────────────────
+    var _catH = '';
+    if (hasCat) {
+      var _cp2=catOrder.filter(function(k){return(catPilCounts[k]||0)>0;}), _cm=Math.max.apply(null,_cp2.map(function(k){return catPilCounts[k]||0;})), _ct=_cp2.reduce(function(s,k){return s+(catPilCounts[k]||0);},0);
+      _catH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Catégories compétitives</div>';
+      _cp2.forEach(function(c){ _catH += _bRow(c, catPilCounts[c]||0, _cm, _ct, catColors[c]||'#8b5cf6'); });
+      _catH += '</div>';
+      html += _catH;
+    }
+
+    // ── Classes ULM | Équipages ───────────────────────────────────
+    var _clsH = '';
+    if (hasCls) {
+      var _ck=Object.keys(ulmClsCounts).sort(function(a,b){return ulmClsCounts[b]-ulmClsCounts[a];}), _cm2=Math.max.apply(null,_ck.map(function(k){return ulmClsCounts[k];})), _ct2=_ck.reduce(function(s,k){return s+ulmClsCounts[k];},0);
+      _clsH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Classes ULM</div>';
+      _ck.forEach(function(c){ _clsH += _bRow(_clsLabels[c]||c, ulmClsCounts[c], _cm2, _ct2, _clsColors[c]||'var(--stol)'); });
+      _clsH += '</div>';
+    }
+    var _equiH = '';
+    if (hasEqui) {
+      var _ep=Math.round(nbMono/(nbMono+nbBi)*100);
+      _equiH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Équipages</div><div style="display:flex;align-items:center;gap:14px"><svg width="80" height="80" viewBox="0 0 80 80" style="flex-shrink:0">'+_donut([{v:nbMono},{v:nbBi}],['#8b5cf6','#10b981'],40,40,29,13)+'<text x="40" y="35" text-anchor="middle" font-size="13" font-weight="900" fill="var(--txt)">'+_ep+'%</text><text x="40" y="47" text-anchor="middle" font-size="7.5" fill="var(--txt3)">Mono</text></svg><div style="flex:1">'+_leg('#8b5cf6','Monoplace',nbMono,_ep)+_leg('#10b981','Biplace',nbBi,100-_ep)+'</div></div></div>';
+    }
+    if (_clsH && _equiH) { html += '<div style="'+_g2+'">' + _clsH + _equiH + '</div>'; }
+    else if (_clsH)  { html += _clsH; }
+    else if (_equiH) { html += _equiH; }
+
+    // ── Sections marques & clubs ──────────────────────────────────
+
+    // Normalisation des noms de marques : regroupe les variantes proches
+    // (casse, espaces, tirets, points) en une seule entrée.
+    // Ex : "E-props", "E-PROPS", "Eprops", "E props" → "E-props"
+    var _normBrand = function(counts) {
+      // Clé de regroupement : minuscules, sans espaces/tirets/underscores/points
+      var _key = function(s){ return (s||'').toLowerCase().replace(/[\s\-_\.]+/g,''); };
+      var grouped  = {};   // key → { total, variants: {name: count} }
+      Object.keys(counts).forEach(function(brand){
+        var k = _key(brand);
+        if (!k) return;
+        if (!grouped[k]) grouped[k] = { total:0, variants:{} };
+        grouped[k].total += counts[brand];
+        grouped[k].variants[brand] = (grouped[k].variants[brand]||0) + counts[brand];
       });
-      html += '</div></div>';
-    } else { html += emptyBox('🎂 Tranches d\'âge'); }
+      // Reconstruire : nom affiché = variante la plus fréquente
+      //   (en cas d'égalité : on préfère celle qui contient un tiret ou une majuscule interne)
+      var result = {};
+      Object.keys(grouped).forEach(function(k){
+        var vars = grouped[k].variants;
+        var best = Object.keys(vars).sort(function(a,b){
+          if (vars[b] !== vars[a]) return vars[b]-vars[a];
+          // préférer la forme avec majuscule non initiale ou tiret (ex: "E-props" > "eprops")
+          var scoreA = (/[A-Z]/.test(a.slice(1))||/-/.test(a)) ? 1 : 0;
+          var scoreB = (/[A-Z]/.test(b.slice(1))||/-/.test(b)) ? 1 : 0;
+          return scoreB - scoreA;
+        })[0];
+        result[best] = grouped[k].total;
+      });
+      return result;
+    };
 
-    // ── Box 5 : Anneau régions (rempli par initInfosMaps) ──
-    var _regMinH = isMobile ? '180px' : '150px';
-    html += '<div id="infos-region-bars" style="border-radius:12px;overflow:hidden;min-height:'+_regMinH+'"></div>';
+    // Helper : top-N barres pour une map de counts
+    var _brandSection = function(title, counts, col, maxItems) {
+      var keys=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,maxItems||8);
+      if(!keys.length) return '';
+      var mx=counts[keys[0]], tot=keys.reduce(function(s,k){return s+counts[k];},0);
+      var h='<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div>';
+      keys.forEach(function(k){ h+=_bRow(k,counts[k],mx,tot,col); });
+      h+='</div>';
+      return h;
+    };
+    var _g2b = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr;gap:10px';
+    var _g3b = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px';
 
-    // ── Ligne 3 mobile : ferme la grille 2 cols, carte pleine largeur ──
-    if (isMobile) html += '</div>'; // ferme la grille 2 cols (Âge + Régions)
+    // Clubs (pleine largeur)
+    var _clubH = _brandSection('Classement Clubs',clubCounts,'#6366f1',10);
+    if(_clubH) html += _clubH;
 
-    // ── Box 6 : Carte par région ──
-    var mapMinH = isMobile ? '220px' : '150px';
+    // Ligne 1 — Ailes ML | Moteurs ML (microlight, 2 colonnes)
+    var _aileMLH   = _brandSection('Ailes Microlight / Pendulaire',_normBrand(aileMLCounts),'#0891b2',6);
+    var _moteurMLH = _brandSection('Moteurs Microlight',_normBrand(moteurMLCounts),'#059669',6);
+    var _row1 = [_aileMLH, _moteurMLH].filter(Boolean);
+    if (_row1.length === 2) { html += '<div style="'+_g2b+'">' + _row1.join('') + '</div>'; }
+    else if (_row1.length === 1) { html += _row1[0]; }
+
+    // Ligne 2 — Ailes PM | Moteurs PM | Hélices PM (paramoteur, 3 colonnes)
+    var _ailePMH   = _brandSection('Ailes Paramoteur',_normBrand(ailePMCounts),'#f59e0b',6);
+    var _moteurPMH = _brandSection('Moteurs Paramoteur',_normBrand(moteurPMCounts),'#ef4444',6);
+    var _helicePMH = _brandSection('Hélices Paramoteur',_normBrand(helicePMCounts),'#8b5cf6',6);
+    var _row2 = [_ailePMH, _moteurPMH, _helicePMH].filter(Boolean);
+    if (_row2.length === 3) { html += '<div style="'+_g3b+'">' + _row2.join('') + '</div>'; }
+    else if (_row2.length === 2) { html += '<div style="'+_g2b+'">' + _row2.join('') + '</div>'; }
+    else if (_row2.length === 1) { html += _row2[0]; }
+
+    // ── 4. PROVENANCE + CARTE — même ligne (1/3 | 2/3), même hauteur ──
     if (pilotsWithRegion > 0) {
-      html += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--bdr);min-height:'+mapMinH+'">';
-      html += '<div id="infos-map-region" style="width:100%;height:100%;min-height:'+mapMinH+'"></div>';
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 2fr;gap:10px')+'">';
+      html += '<div id="infos-region-bars" style="display:flex;flex-direction:column"></div>';
+      html += '<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column">';
+      html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:12px 16px 8px;flex-shrink:0">Carte géographique</div>';
+      html += '<div id="infos-map-region" style="flex:1;min-height:'+(isMobile?'210':'220')+'px"></div>';
+      html += '</div>';
       html += '</div>';
     } else {
-      html += emptyBox('🗺 Carte régions');
+      html += '<div id="infos-region-bars"></div>';
     }
 
-    if (isMobile) html += '</div>'; // ferme le flex container mobile
-    else          html += '</div>'; // ferme la grille 3×2 desktop
-    html += '</div>'; // ferme padding 0 14px graphiques
-
+    html += '</div>'; // fin dashboard
     return html;
 
   } else if (tab === 'modifier') {
@@ -11181,49 +11491,62 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '</div>';
     html5 += '</div>';
     }
-    // ── En-tête fixe (desktop uniquement) ──
+    // ── Zone scrollable (x + y) avec colonnes figées ──
+    html5 += '<div style="flex:1;overflow:auto;min-height:0">';
+    html5 += _isMobEquip ? '<div>' : '<div style="min-width:1100px">';
+    // ── En-tête sticky (desktop uniquement) ──
     if (!_isMobEquip) {
     var _erh = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
     var _erl = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
     var _eqIco = function(col){ return _equipSortCol===col ? (_equipSortDir===1?' ↑':' ↓') : ''; };
-    var _eqHdrs = ['Genre','Nom','Licence','Immat.','Marque','Modèle','Pratique','Classe','Catégorie','Équipages','Région'];
-    var _eqSort  = ['','nom','','','','','pratique','','categorie','',''];
-    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    html5 += '<div></div>'; // avatar col
+    // Nouvel ordre : genre|nom|lic|region|immat|pratique|classe|cat|equip|marque|modele|moteur|aile|helice
+    var _eqHdrs = ['Genre','Nom','Licence','Région','Ident.','Pratique','Classe','Catégorie','Équipage','Marque','Modèle','Moteur','Aile','Hélice'];
+    var _eqSort  = ['','nom','','','','pratique','','categorie','','','','','',''];
+    var _stickyBg = 'var(--navy3)';
+    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 0;border-bottom:2px solid var(--bdr);align-items:center;background:'+_stickyBg+';position:sticky;top:0;z-index:10">';
+    html5 += '<div style="position:sticky;left:0;z-index:12;background:'+_stickyBg+';padding-left:12px"></div>'; // avatar col
     _eqHdrs.forEach(function(h, i) {
       var sortCol = _eqSort[i];
       var clickable = sortCol ? 'cursor:pointer;user-select:none;' : '';
       var click = sortCol ? ' onclick="_equipToggleSort(\''+sortCol+'\')"' : '';
-      html5 += '<div style="'+_hSt+';position:relative;'+clickable+'"'+click+'>'
+      var stickyExtra = i===0 ? 'position:sticky;left:43px;z-index:12;background:'+_stickyBg+';padding-left:12px;'
+                      : i===1 ? 'position:sticky;left:90px;z-index:12;background:'+_stickyBg+';border-right:2px solid rgba(255,255,255,.12);'
+                      : '';
+      html5 += '<div style="'+_hSt+';position:relative;'+clickable+stickyExtra+'"'+click+'>'
         + h + (sortCol ? '<span style="color:var(--stol)">'+_eqIco(sortCol)+'</span>' : '')
         + '<div onmousedown="_equipResizeStart(event,'+(i+1)+')" style="'+_erh+'"><div style="'+_erl+'"></div></div>'
         + '</div>';
     });
-    html5 += '<div></div>';
+    html5 += '<div style="padding-right:12px"></div>';
     html5 += '</div>';
     }
-    // ── Zone scrollable ──
-    html5 += '<div style="flex:1;overflow-y:auto;min-height:0">';
     // Ligne de saisie (desktop uniquement)
     if (!_isMobEquip) {
-    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 12px;align-items:center;'+_rowInpSt+'">';
-    html5 += '<div></div>'; // avatar placeholder
-    html5 += '<div></div>'; // genre
+    var _sBg = 'var(--navy4)';
+    html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 0;align-items:center;'+_rowInpSt+'">';
+    html5 += '<div style="position:sticky;left:0;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // avatar placeholder
+    html5 += '<div style="position:sticky;left:43px;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // genre
+    html5 += '<div style="position:sticky;left:90px;z-index:8;background:'+_sBg+';border-right:2px solid rgba(255,255,255,.12)">';
     html5 += '<div style="position:relative">';
     html5 += '<input id="hdg-c-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
     html5 += '<div id="hdg-sug-c" style="display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
-    html5 += '</div>';
-    html5 += '<div><input id="hdg-c-lic"    placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-immat"  placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-marque" placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-modele" placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '</div>'; // fin position:relative (dropdown)
+    html5 += '</div>'; // fin sticky nom cell
+    // Ordre : lic | region | immat | pratique | classe | cat | equip | marque | modele | moteur | aile | helice
+    html5 += '<div><input id="hdg-c-lic"      placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-region"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-immat"    placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-pratique" placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-classe"   placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-categorie" placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-equipage"  placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-region"    placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-categorie"placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-equipage" placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-marque"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-modele"   placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<input id="hdg-c-aile" style="display:none" readonly><input id="hdg-c-places" style="display:none" readonly>';
-    html5 += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="hdgAddComp(\''+cid+'\')" style="'+_addBtnSt+'" title="Inscrire">+</button></div>';
+    html5 += '<div><input id="hdg-c-moteur"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-aile2"    placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div><input id="hdg-c-helice"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div style="display:flex;align-items:center;justify-content:center;padding-right:12px"><button onclick="hdgAddComp(\''+cid+'\')" style="'+_addBtnSt+'" title="Inscrire">+</button></div>';
     html5 += '</div>';
     }
     // Lignes inscrites
@@ -11248,7 +11571,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     _eqpList.forEach(function(pid, i){
       var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
       var ulm = ((S.ulms||{})[pid]||[])[0]||{};
-      var bg  = i%2===1 ? 'background:var(--navy3)' : '';
+      var bg  = i%2===1 ? 'background:var(--navy3)' : 'background:var(--navy4)';
       var pidE = escG(pid);
       // Couleurs Catégorie
       var catColMap = {PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316'};
@@ -11280,34 +11603,42 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         // Desktop grid layout
         // Inline select styles
         var _sISt = 'width:100%;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:10px;padding:1px 0;outline:none;cursor:pointer';
+        var _iStE = 'width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--txt2);font-family:inherit;font-size:10px;padding:1px 2px;outline:none;box-sizing:border-box';
         // Highlight row if key fields missing
         var _missing = !p.genre || !p.pratique || !(p.classe||ulm.classe);
         var _rowBdr  = _missing ? 'border-left:2px solid #f59e0b;' : '';
-        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 12px;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer;'+_rowBdr+'" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2===1?'var(--navy3)':'transparent')+'\'" title="Voir / modifier le profil">';
+        var _rowBg   = i%2===1 ? 'var(--navy3)' : 'var(--navy4)';
+        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 0;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer;'+_rowBdr+'" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\'var(--navy3)\'})" onmouseout="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\''+_rowBg+'\'})" title="Voir / modifier le profil">';
         var _avCol2 = catColMap[catVal]||'#6b7280';
         var _ini2   = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase()||'?';
         var _photo2 = p.photo||'';
+        // Avatar — sticky left:0
+        html5 += '<div data-sc style="position:sticky;left:0;z-index:5;background:'+_rowBg+';padding-left:12px;display:flex;align-items:center">';
         html5 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:'+_avCol2+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid '+_avCol2+'">';
         html5 += _photo2 ? '<img src="'+_photo2+'" style="width:100%;height:100%;object-fit:cover">' : _ini2;
-        html5 += '</div>';
-        // Genre inline select
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'genre\',this.value,\''+cid+'\')" style="'+_sISt+(p.genre?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
+        html5 += '</div></div>';
+        // Genre — sticky left:43px + padding-left pour aérer
+        html5 += '<div data-sc onclick="event.stopPropagation()" style="position:sticky;left:43px;z-index:5;background:'+_rowBg+';padding-left:12px"><select onchange="eqpInlineSave(\''+pidE+'\',\'genre\',this.value,\''+cid+'\')" style="'+_sISt+(p.genre?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
           +'<option value="">—</option>'
           +['M.','Mme.'].map(function(g){ return '<option value="'+g+'"'+(p.genre===g?' selected':'')+'>'+g+'</option>'; }).join('')
           +'</select></div>';
-        html5 += '<div style="'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(p.licence||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.immat||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.marque||'—')+'</div>';
-        html5 += '<div style="'+_dSt+';color:var(--txt2)">'+(ulm.modele||'—')+'</div>';
-        // Pratique inline select
+        // Nom — sticky left:90px + separator
+        html5 += '<div data-sc style="position:sticky;left:90px;z-index:5;background:'+_rowBg+';border-right:2px solid rgba(255,255,255,.12);'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
+        // Licence — éditable
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(p.licence||'')+'" placeholder="—" title="Licence" style="'+_iStE+(p.licence?';color:var(--txt)':'')+'" onchange="eqpInlineSave(\''+pidE+'\',\'licence\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        // Région — select
+        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'region\',this.value,\''+cid+'\')" style="'+_sISt+(p.region?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
+          +_mkRegionOpts(p.region)
+          +'</select></div>';
+        // Immat — éditable
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(ulm.immat||'')+'" placeholder="—" title="Immat." style="'+_iStE+(ulm.immat?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'immat\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        // Pratique — select
         var _pratVal = p.pratique||'';
-        var _pratLbls = {microlight:'Micro',paramoteur:'Para',multi:'Multi'};
         html5 += '<div onclick="event.stopPropagation()"><select id="eq-prat-'+pidE+'" onchange="eqpInlineSave(\''+pidE+'\',\'pratique\',this.value,\''+cid+'\');eqpUpdateClasse(\''+pidE+'\',this.value)" style="'+_sISt+(_pratVal?';color:var(--stol);font-weight:700':';color:#f59e0b;font-weight:600')+'">'
           +'<option value="">—</option>'
           +[{v:'microlight',l:'Micro'},{v:'paramoteur',l:'Para'},{v:'multi',l:'Multi'}].map(function(o){ return '<option value="'+o.v+'"'+(_pratVal===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')
           +'</select></div>';
-        // Classe inline select (options depend on pratique)
+        // Classe — select (dépend de pratique)
         var _clsMap  = {multiaxes:'Multi.',pendulaire:'Pend.',gyro:'Gyro',paramotor:'Para.'};
         var _clsAll  = ['multiaxes','pendulaire','gyro','paramotor'];
         var _clsFilt = _pratVal==='paramoteur' ? ['paramotor'] : _pratVal==='microlight' ? ['multiaxes','pendulaire','gyro'] : _clsAll;
@@ -11316,22 +11647,31 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           +'<option value="">—</option>'
           +_clsFilt.map(function(c){ return '<option value="'+c+'"'+(_clsCur===c?' selected':'')+'>'+(_clsMap[c]||c)+'</option>'; }).join('')
           +'</select></div>';
-        // Catégorie inline select
+        // Catégorie — select
         html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'categorie\',this.value,\''+cid+'\')" style="'+_sISt+';'+catStyle+'">'
           +'<option value="">—</option>'
           +['PF1','PF2','PL1','PL2','Classable','Accès'].map(function(c){ return '<option value="'+c+'"'+(catVal===c?' selected':'')+'>'+c+'</option>'; }).join('')
           +'</select></div>';
-        html5 += '<div style="'+_dSt+';'+equStyle+'">'+(equVal||'—')+'</div>';
-        var _regList = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Guadeloupe','Guyane','La Réunion','Martinique','Mayotte','Étranger'];
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'region\',this.value,\''+cid+'\')" style="'+_sISt+(p.region?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
-          +'<option value="">— Région —</option>'
-          +_regList.map(function(r){ return '<option value="'+r+'"'+(p.region===r?' selected':'')+'>'+r+'</option>'; }).join('')
+        // Équipage — select
+        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'equipage\',this.value,\''+cid+'\')" style="'+_sISt+';'+equStyle+'">'
+          +'<option value="">—</option>'
+          +['Monoplace','Biplace'].map(function(e){ return '<option value="'+e+'"'+(equVal===e?' selected':'')+'>'+e+'</option>'; }).join('')
           +'</select></div>';
-        html5 += '<div style="display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Supprimer">×</button></div>';
+        // Marque — éditable
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(ulm.marque||'')+'" placeholder="—" title="Marque" style="'+_iStE+(ulm.marque?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'marque\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        // Modèle — éditable
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(ulm.modele||'')+'" placeholder="—" title="Modèle" style="'+_iStE+(ulm.modele?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'modele\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        // Moteur / Aile / Hélice
+        var _moteurVal = ulm.moteur||''; var _aileVal = ulm.aile||''; var _heliceVal = ulm.helice||'';
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_moteurVal)+'" placeholder="—" title="Moteur" style="'+_iStE+(_moteurVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'moteur\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_aileVal)+'" placeholder="—" title="Aile" style="'+_iStE+(_aileVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'aile\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_heliceVal)+'" placeholder="—" title="Hélice" style="'+_iStE+(_heliceVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'helice\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
+        html5 += '<div style="display:flex;align-items:center;justify-content:center;padding-right:12px" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Supprimer">×</button></div>';
         html5 += '</div>';
       }
     });
-    html5 += '</div>';
+    html5 += '</div>'; // fin min-width wrapper (1100px)
+    html5 += '</div>'; // fin scroll container (overflow:auto)
     return html5;
 
   } else if (tab === 'installation') {
@@ -19812,7 +20152,8 @@ function openAddPilotManual() {
   document.getElementById('pm-classe').value = 'multiaxes';
   document.getElementById('pm-aile').value = 'haute';
   document.getElementById('pm-places').value = 'mono';
-  document.getElementById('pm-categorie').value = 'classable';
+  document.getElementById('pm-categorie').value = '';
+  var _pmRoleReset = document.getElementById('pm-role'); if (_pmRoleReset) _pmRoleReset.value = 'Pilote';
   // Reset photo
   var pmImg  = document.getElementById('pm-photo-img');
   var pmIcon = document.getElementById('pm-photo-icon');
@@ -19821,6 +20162,7 @@ function openAddPilotManual() {
   if (pmIcon) pmIcon.style.display = '';
   if (pmInp)  { pmInp._data = null; pmInp.value = ''; }
   updatePMClasse();
+  pmToggleULM();
   // Remplir la liste des compétitions
   var sel = document.getElementById('pm-comp-enroll');
   sel.innerHTML = '<option value="">— Aucune —</option>';
@@ -19877,6 +20219,7 @@ function savePilotManual() {
     region: document.getElementById('pm-region').value.trim(),
     adresse: (document.getElementById('pm-adresse')||{value:''}).value.trim(),
     maillot: document.getElementById('pm-maillot').value,
+    role: (document.getElementById('pm-role')||{value:'Pilote'}).value || 'Pilote',
     statut: 'pilote',
     photo: pmPhotoData || (existingPilot ? existingPilot.photo : null)
   };
@@ -19949,6 +20292,7 @@ function editPilotManual(pilotId) {
   document.getElementById('pm-region').value  = p.region  || '';
   document.getElementById('pm-adresse').value = p.adresse || '';
   document.getElementById('pm-maillot').value = p.maillot || '';
+  var _pmRole = document.getElementById('pm-role'); if (_pmRole) _pmRole.value = p.role || 'Pilote';
   var ulms = S.ulms[pilotId] || [];
   var u = ulms[0] || {};
   document.getElementById('pm-classe').value    = u.classe    || 'multiaxes';
@@ -19958,8 +20302,9 @@ function editPilotManual(pilotId) {
   document.getElementById('pm-modele').value    = u.modele    || '';
   document.getElementById('pm-moteur').value    = u.moteur    || '';
   document.getElementById('pm-immat').value     = u.immat     || '';
-  document.getElementById('pm-categorie').value = u.categorie || 'classable';
+  document.getElementById('pm-categorie').value = u.categorie || '';
   updatePMClasse();
+  pmToggleULM();
   // Remplir compétitions
   var sel = document.getElementById('pm-comp-enroll');
   sel.innerHTML = '<option value="">— Aucune —</option>';
@@ -19977,14 +20322,23 @@ function editPilotManual(pilotId) {
 
 // ─── Remplir formulaire pm-* depuis licenceDB ───
 function fillPilotManualFromLicence() {
+  var licVal = ((document.getElementById('pm-licence')||{}).value||'').trim();
   var prenom = (document.getElementById('pm-prenom')||{}).value || '';
   var nom    = (document.getElementById('pm-nom')||{}).value    || '';
-  if (!prenom && !nom) { toast('Saisissez d\'abord le prénom et le nom', 'err'); return; }
+  if (!licVal && !prenom && !nom) { toast('Saisissez d\'abord le prénom et le nom ou la licence', 'err'); return; }
   function _apply(db) {
-    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
-    var key  = norm(nom) + '|' + norm(prenom);
-    var rec  = db[key] || db[norm(prenom) + '|' + norm(nom)];
-    if (!rec) { toast('«'+prenom+' '+nom+'» non trouvé dans le fichier licences', 'err'); return; }
+    var rec;
+    if (licVal) {
+      // Recherche par index secondaire '_lic_' (construit à l'import)
+      rec = db['_lic_' + licVal] || null;
+      if (!rec) { toast('Licence «'+licVal+'» non trouvée dans le fichier licences', 'err'); return; }
+    } else {
+      // Recherche par prénom + nom
+      var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+      var key  = norm(nom) + '|' + norm(prenom);
+      rec = db[key] || db[norm(prenom) + '|' + norm(nom)];
+      if (!rec) { toast('«'+prenom+' '+nom+'» non trouvé dans le fichier licences', 'err'); return; }
+    }
     var force = function(id, val){ var el=document.getElementById(id); if(el && val !== undefined && val !== null) el.value = val; };
     force('pm-genre',   rec.genre);
     force('pm-prenom',  rec.prenom);
@@ -19996,7 +20350,7 @@ function fillPilotManualFromLicence() {
     force('pm-club',    rec.club);
     force('pm-adresse', rec.adresse);
     // Région normalisée
-    var frRegList = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
+    var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
     var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matched = frRegList.find(function(r){ return _nr(r)===_nr(rawReg); }) || '';
@@ -20030,6 +20384,25 @@ function pmAutoRegion(val) {
   if (!region) return;
   var sel = document.getElementById('pm-region');
   if (sel) sel.value = region;
+}
+
+// ─── Auto-set Classe → Paramoteur quand Catégorie est renseignée ───
+function pmAutoSetClasse() {
+  var cat = (document.getElementById('pm-categorie')||{}).value || '';
+  if (cat) {
+    var cls = document.getElementById('pm-classe');
+    if (cls) { cls.value = 'paramotor'; updatePMClasse(); }
+  }
+}
+
+// ─── Afficher/masquer section ULM selon le rôle ───
+function pmToggleULM() {
+  var roleEl = document.getElementById('pm-role');
+  var role = roleEl ? roleEl.value : 'Pilote';
+  var isPilot = !role || role === 'Pilote';
+  var bloc = document.getElementById('pm-ulm-pilot-only');
+  if (bloc) bloc.style.display = isPilot ? '' : 'none';
+  if (isPilot) updatePMClasse(); // restaure l'affichage de pm-aile-row selon la classe
 }
 
 // ═══════════════════════════════════
@@ -22454,8 +22827,16 @@ function fillPilotFromLicence(pilotId) {
   if (!pilot) return;
   function _applyLicence(db) {
     var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
-    var key = norm(pilot.nom) + '|' + norm(pilot.prenom);
-    var rec = db[key] || db[norm(pilot.prenom) + '|' + norm(pilot.nom)];
+    var rec = null;
+    // 1. Priorité : numéro de licence (champ saisie ou valeur stockée)
+    var licField = document.getElementById('pd-licence');
+    var licVal = (licField ? licField.value : '').trim() || (pilot.licence||'').trim();
+    if (licVal) rec = db['_lic_' + licVal] || null;
+    // 2. Repli : nom + prénom
+    if (!rec) {
+      var key = norm(pilot.nom) + '|' + norm(pilot.prenom);
+      rec = db[key] || db[norm(pilot.prenom) + '|' + norm(pilot.nom)];
+    }
     if (!rec) {
       toast('«' + pilot.prenom + ' ' + pilot.nom + '» non trouvé dans le fichier licences', 'err');
       return;
@@ -22478,7 +22859,7 @@ function fillPilotFromLicence(pilotId) {
     set('pd-club',       rec.club);
     force('pd-adresse',  rec.adresse);
     // Région : correspondance normalisée sur les valeurs exactes du <select>
-    var frRegList = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
+    var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
     var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matchedReg = frRegList.find(function(r){ return _nr(r)===_nr(rawReg); }) || '';
@@ -22675,10 +23056,8 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<div><div style="'+lSt+'">Club</div><input id="pd-club" value="'+e2(pilot.club)+'" style="'+iSt+'"></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    var frRegions = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
-    html += '<div><div style="'+lSt+'">Région</div><select id="pd-region" style="'+iSt+'">';
-    html += '<option value="">— Choisir —</option>';
-    frRegions.forEach(function(r){ html += '<option value="'+r+'"'+(pilot.region===r?' selected':'')+'>'+r+'</option>'; });
+    html += '<div><div style="'+lSt+'">Région / Pays</div><select id="pd-region" style="'+iSt+'">';
+    html += _mkRegionOpts(pilot.region);
     html += '</select></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
@@ -22718,29 +23097,33 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     ['Monoplace','Biplace'].forEach(function(o){ html += '<option value="'+o+'"'+(_equipageVal===o?' selected':'')+'>'+o+'</option>'; });
     html += '</select></div>';
     // Rôle
-    html += '<div><div style="'+lSt+'">Rôle</div><select id="pd-role" style="'+iSt+'"'+(_isMono?' disabled':'')+' title="'+(_isMono?'Monoplace : Pilote automatiquement':'')+'">';
+    var _roleVal = _isMono ? 'Pilote' : (pilot.role || '');
+    html += '<div><div style="'+lSt+'">Rôle</div><select id="pd-role" style="'+iSt+'" onchange="pdToggleULM()"'+(_isMono?' disabled':'')+' title="'+(_isMono?'Monoplace : Pilote automatiquement':'')+'">';
     html += '<option value="">— Non précisé —</option>';
     ['Pilote','Navigateur'].forEach(function(o){
-      var sel = (_isMono ? 'Pilote' : pilot.role) === o ? ' selected' : '';
-      html += '<option value="'+o+'"'+sel+'>'+o+'</option>';
+      html += '<option value="'+o+'"'+(_roleVal===o?' selected':'')+'>'+o+'</option>';
     });
     html += '</select></div>';
     html += '</div>';
     html += '</div></div>';
 
     // ── Section ULM / Machine ──
+    var _isPilotRole = !_roleVal || _roleVal === 'Pilote';
     html += '<div><div style="'+secSt+'">ULM / Machine</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px">';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    html += '<div><div style="'+lSt+'">Marque</div><input id="pd-ulm-marque" value="'+e2(ulm0.marque)+'" placeholder="—" style="'+iSt+'"></div>';
-    html += '<div><div style="'+lSt+'">Modèle</div><input id="pd-ulm-modele" value="'+e2(ulm0.modele)+'" placeholder="—" style="'+iSt+'"></div>';
-    html += '</div>';
+    // Identification + Classe : toujours visibles
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     html += '<div><div style="'+lSt+'">Identification</div><input id="pd-ulm-immat" value="'+e2(ulm0.immat)+'" placeholder="F-JXXX" style="'+iSt+';text-transform:uppercase"></div>';
     var clsOpts = [{v:'paramotor',l:'Paramoteur'},{v:'pendulaire',l:'Pendulaire'},{v:'multiaxes',l:'Multiaxes'},{v:'gyro',l:'Autogire'}];
-    html += '<div><div style="'+lSt+'">Classe</div><select id="pd-ulm-classe" style="'+iSt+'" onchange="var ar=document.getElementById(\'pd-aile-row\');if(ar)ar.style.display=(this.value===\'pendulaire\'||this.value===\'multiaxes\')?\'\':\' none\'">';
+    html += '<div><div style="'+lSt+'">Classe</div><select id="pd-ulm-classe" style="'+iSt+'" onchange="pdOnClasseChange(this)">';
     clsOpts.forEach(function(o){ html += '<option value="'+o.v+'"'+(ulm0.classe===o.v?' selected':'')+'>'+o.l+'</option>'; });
     html += '</select></div>';
+    html += '</div>';
+    // Bloc masqué si rôle ≠ Pilote
+    html += '<div id="pd-ulm-pilot-only" style="display:'+(_isPilotRole?'flex':'none')+';flex-direction:column;gap:8px">';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html += '<div><div style="'+lSt+'">Marque</div><input id="pd-ulm-marque" value="'+e2(ulm0.marque)+'" placeholder="—" style="'+iSt+'"></div>';
+    html += '<div><div style="'+lSt+'">Modèle</div><input id="pd-ulm-modele" value="'+e2(ulm0.modele)+'" placeholder="—" style="'+iSt+'"></div>';
     html += '</div>';
     html += '<div id="pd-aile-row" style="display:'+((ulm0.classe==='pendulaire'||ulm0.classe==='multiaxes')?'':'none')+'">';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
@@ -22759,6 +23142,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '<div><div style="'+lSt+'">Hélice</div><input id="pd-ulm-helice" value="'+e2(ulm0.helice)+'" placeholder="—" style="'+iSt+'"></div>';
     html += '</div>';
     html += '<div><div style="'+lSt+'">Voile 1</div><input id="pd-ulm-voile" value="'+e2(ulm0.voile||(ulm0.aile&&ulm0.aile!=='haute'&&ulm0.aile!=='basse'?ulm0.aile:''))+'" placeholder="Marque / modèle de voile" style="'+iSt+'"></div>';
+    html += '</div>'; // fin pd-ulm-pilot-only
     html += '</div></div>';
 
     // ── Section Inscription ──
@@ -22931,6 +23315,21 @@ function showPilotDetailModal(pilotId, compId, editMode) {
 }
 
 // Gestion dynamique Équipages → Rôle + Copilote
+// ─── Masque/affiche les champs ULM réservés au Pilote ───
+function pdToggleULM() {
+  var roleEl = document.getElementById('pd-role');
+  var role = roleEl ? roleEl.value : 'Pilote';
+  var isPilot = !role || role === 'Pilote';
+  var bloc = document.getElementById('pd-ulm-pilot-only');
+  if (bloc) { bloc.style.display = isPilot ? 'flex' : 'none'; bloc.style.flexDirection = 'column'; }
+}
+
+// ─── Changement de classe : gère pd-aile-row et garde la cohérence ───
+function pdOnClasseChange(sel) {
+  var ar = document.getElementById('pd-aile-row');
+  if (ar) ar.style.display = (sel.value === 'pendulaire' || sel.value === 'multiaxes') ? '' : 'none';
+}
+
 function pdUpdateEquipageRole() {
   var eq = document.getElementById('pd-equipage');
   var roleEl = document.getElementById('pd-role');
@@ -22948,6 +23347,7 @@ function pdUpdateEquipageRole() {
     }
   }
   if (copRow) copRow.style.display = (val === 'Biplace') ? '' : 'none';
+  pdToggleULM(); // cascade : rôle → visibilité ULM
 }
 
 // PL1 / PF1 → Monoplace figé ; PL2 / PF2 → Équipages libre
@@ -23186,12 +23586,10 @@ function showStaffDetailModal(compId, idx, editMode) {
     // Club seul
     html += '<div><div style="'+lSt+'">Club</div><input id="sdm-club" value="'+_esc(club)+'" placeholder="Nom du club" style="'+iSt+'"></div>';
     // Adresse + Région côte à côte
-    var frReg = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     html += '<div><div style="'+lSt+'">Adresse</div><input id="sdm-adresse" value="'+_esc(adresse)+'" placeholder="Rue, CP Ville…" oninput="sdmAdresseInput(this.value)" style="'+iSt+'"></div>';
-    html += '<div><div style="'+lSt+'">Région</div><select id="sdm-region" style="'+iSt+'">';
-    html += '<option value="">— Choisir —</option>';
-    frReg.forEach(function(r){ html += '<option value="'+r+'"'+(region===r?' selected':'')+'>'+r+'</option>'; });
+    html += '<div><div style="'+lSt+'">Région / Pays</div><select id="sdm-region" style="'+iSt+'">';
+    html += _mkRegionOpts(region);
     html += '</select></div>';
     html += '</div>';
 
@@ -23922,7 +24320,7 @@ function fillStaffDetailFromLicence() {
     force('sdm-email',   rec.email);
     force('sdm-adresse', rec.adresse);
     // Région : normaliser pour matcher les valeurs exactes du <select>
-    var frReg = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
+    var frReg = _FR_REGIONS.concat(_PAYS_ETRANGERS);
     var normStr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matchedReg = frReg.find(function(r){ return normStr(r) === normStr(rawReg); }) || '';
@@ -25487,9 +25885,7 @@ function importLicenceFfplum(inp) {
       };
 
       // Normaliser la région FFPLUM vers les valeurs canoniques françaises
-      var _frRegList = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire',
-        'Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine',
-        'Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
+      var _frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
       var _nreg = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
       var matchRegion = function(raw) {
         if (!raw) return '';
@@ -25619,9 +26015,7 @@ function hdgRefreshFromLicence(compId) {
   var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
 
   // Même logique de normalisation région que fillPilotFromLicence (individuel)
-  var frRegList = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire',
-    'Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine',
-    'Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur','Étranger'];
+  var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
   var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
   var matchRegion = function(raw) {
     if (!raw) return '';
