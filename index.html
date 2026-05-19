@@ -12727,6 +12727,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           if (a.avance) avanceLinesD.push({ parentLib: l.libelle||'—', parentDom: 'NDF', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: _st });
         });
       });
+      avanceLinesD = _sortAvanceLines(avanceLinesD);
       var totAvD = avanceLinesD.reduce(function(s,a){ return s+a.st; }, 0);
       var _cpIdD = cp.id.replace(/'/g,"\\'");
       var _ndfCmtD = bEsc((bdata.commentairesNdf)||'');
@@ -12742,13 +12743,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         htmlB += '<div style="text-align:center;padding:32px 0;color:var(--txt3);font-size:13px">Aucune avance enregistrée — cochez "Avances" dans les lignes de type Achats</div>';
       } else {
         htmlB += '<table style="width:100%;border-collapse:collapse">';
+        var _avSortIco = function(col, align) {
+          var isActive = _avanceSortCol === col;
+          var ico = isActive ? (_avanceSortDir === 1 ? ' ▲' : ' ▼') : ' ⇅';
+          var col2 = col === 'st' ? '#f59e0b' : 'var(--txt3)';
+          var baseStyle = hStyleAv+';padding:4px 8px;cursor:pointer;user-select:none;text-align:'+align+';color:'+(isActive?'var(--acc)':col2)+';';
+          return baseStyle + (isActive ? 'border-bottom:2px solid var(--acc);' : '');
+        };
         htmlB += '<thead><tr style="border-bottom:2px solid var(--bdr)">';
-        htmlB += '<th style="'+hStyleAv+';text-align:left;padding:4px 8px">Date</th>';
-        htmlB += '<th style="'+hStyleAv+';text-align:left;padding:4px 8px">Libellé achat</th>';
-        htmlB += '<th style="'+hStyleAv+';text-align:left;padding:4px 8px">Ligne budgétaire</th>';
-        htmlB += '<th style="'+hStyleAv+';text-align:right;padding:4px 8px">Tarif</th>';
-        htmlB += '<th style="'+hStyleAv+';text-align:center;padding:4px 8px">Qté</th>';
-        htmlB += '<th style="'+hStyleAv+';text-align:right;padding:4px 8px;color:#f59e0b">Sous-total</th>';
+        htmlB += '<th style="'+_avSortIco('date','left')+'" onclick="_avanceSortBy(\'date\')" title="Trier par date">Date'+(_avanceSortCol==='date'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
+        htmlB += '<th style="'+_avSortIco('lib','left')+'" onclick="_avanceSortBy(\'lib\')" title="Trier par libellé">Libellé achat'+(_avanceSortCol==='lib'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
+        htmlB += '<th style="'+_avSortIco('dom','left')+'" onclick="_avanceSortBy(\'dom\')" title="Trier par ligne budgétaire">Ligne budgétaire'+(_avanceSortCol==='dom'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
+        htmlB += '<th style="'+_avSortIco('tarif','right')+'" onclick="_avanceSortBy(\'tarif\')" title="Trier par tarif">Tarif'+(_avanceSortCol==='tarif'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
+        htmlB += '<th style="'+_avSortIco('qt','center')+'" onclick="_avanceSortBy(\'qt\')" title="Trier par quantité">Qté'+(_avanceSortCol==='qt'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
+        htmlB += '<th style="'+_avSortIco('st','right')+'" onclick="_avanceSortBy(\'st\')" title="Trier par sous-total">Sous-total'+(_avanceSortCol==='st'?(_avanceSortDir===1?' ▲':' ▼'):' ⇅')+'</th>';
         htmlB += '</tr></thead><tbody>';
         avanceLinesD.forEach(function(a, i) {
           var bgAv = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
@@ -18668,9 +18676,12 @@ async function loadFromSupabaseFirst() {
     var cloudPart     = _countPartenaires(cloudData);
     var localMat      = _countMaterielNamed(S);
     var cloudMat      = _countMaterielNamed(cloudData);
+    var localPilots   = (S.pilots||[]).filter(function(p){ return !String(p.id||'').startsWith('tp-'); }).length;
+    var cloudPilots   = ((cloudData.pilots||[])).filter(function(p){ return !String(p.id||'').startsWith('tp-'); }).length;
 
     // Sauvegarder les champs locaux si le cloud en a moins (perte détectée)
     var keepLocalStaff      = (localStaff > 0 && cloudStaff < localStaff);
+    var keepLocalPilots     = localPilots > 0 && cloudPilots < localPilots;
     var keepLocalPart       = (localPart  > 0 && cloudPart  < localPart);
     var keepLocalMat        = (localMat   > 0 && cloudMat   < localMat);
     var keepLocalBudgets    = false;
@@ -18699,6 +18710,7 @@ async function loadFromSupabaseFirst() {
     if (keepLocalMat)     console.warn('[GestSTOL] ⚠️ GARDE: matériel local ('+localMat+') > cloud ('+cloudMat+') — local conservé');
     if (keepLocalBudgets) console.warn('[GestSTOL] ⚠️ GARDE: budgets local ('+localBudgetLines+') > cloud ('+cloudBudgetLines+') — local conservé');
     if (keepLocalTodos)   console.warn('[GestSTOL] ⚠️ GARDE: todos local ('+localTodoCount+') > cloud ('+cloudTodoCount+') — local conservé');
+    if (keepLocalPilots)  console.warn('[GestSTOL] ⚠️ GARDE pilots: local('+localPilots+') > cloud('+cloudPilots+') — pilotes locaux conservés');
     if (Object.keys(_savedEnrollByComp).length) console.warn('[GestSTOL] ⚠️ GARDE: compEnroll local > cloud pour', Object.keys(_savedEnrollByComp).join(', '), '— local conservé');
 
     var savedStaff   = keepLocalStaff   ? S.staff            : null;
@@ -18706,6 +18718,7 @@ async function loadFromSupabaseFirst() {
     var savedMat     = keepLocalMat     ? S.materiel         : null;
     var savedBudgets = keepLocalBudgets ? S.budgets          : null;
     var savedTodos   = keepLocalTodos   ? S.homeTodosByComp  : null;
+    var savedPilots  = keepLocalPilots  ? (S.pilots||[]).slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -18715,6 +18728,7 @@ async function loadFromSupabaseFirst() {
     if (savedMat)     S.materiel        = savedMat;
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
+    if (savedPilots)  S.pilots = savedPilots;
     // Restaurer les listes d'équipage locales plus complètes que le cloud
     if (Object.keys(_savedEnrollByComp).length) {
       if (!S.compEnroll) S.compEnroll = {};
@@ -27516,6 +27530,28 @@ function updateInstOACI(compId) {
 // ═══════════════════════════════════════════════════
 var _budgetSubTab = 'engagement';
 var _bgtOpenDomains = {}; // {compId_section_domain: true/false}
+var _avanceSortCol = 'date'; // colonne de tri courante
+var _avanceSortDir = 1;      // 1 = croissant, -1 = décroissant
+function _avanceSortBy(col) {
+  if (_avanceSortCol === col) { _avanceSortDir *= -1; } else { _avanceSortCol = col; _avanceSortDir = 1; }
+  _refreshBudgetView();
+}
+function _sortAvanceLines(arr) {
+  var col = _avanceSortCol, dir = _avanceSortDir;
+  return arr.slice().sort(function(a, b) {
+    var va, vb;
+    if (col === 'date')    { va = a.date||'';       vb = b.date||''; }
+    else if (col === 'lib')  { va = (a.libelle||'').toLowerCase(); vb = (b.libelle||'').toLowerCase(); }
+    else if (col === 'dom')  { va = (a.parentDom+a.parentLib).toLowerCase(); vb = (b.parentDom+b.parentLib).toLowerCase(); }
+    else if (col === 'tarif'){ va = a.tarif; vb = b.tarif; }
+    else if (col === 'qt')   { va = a.qt;    vb = b.qt; }
+    else if (col === 'st')   { va = a.st;    vb = b.st; }
+    else { va = ''; vb = ''; }
+    if (va < vb) return -dir;
+    if (va > vb) return dir;
+    return 0;
+  });
+}
 function saveNdfComment(compId, val) {
   if (!S.budgets) S.budgets = {};
   if (!S.budgets[compId]) S.budgets[compId] = {engagement:[], ressources:[]};
@@ -27556,6 +27592,24 @@ function printNoteAvance(compId) {
     });
   });
   items.forEach(function(a){ if (a.st === undefined) a.st = a.tarif * a.qt; });
+
+  // ── Appliquer le tri choisi dans le tableau avances ──
+  (function(){
+    var col = _avanceSortCol, dir = _avanceSortDir;
+    items.sort(function(a, b){
+      var va, vb;
+      if      (col === 'date')  { va = a.date||'';           vb = b.date||''; }
+      else if (col === 'lib')   { va = (a.objet||'').toLowerCase();  vb = (b.objet||'').toLowerCase(); }
+      else if (col === 'dom')   { va = (a.domaine||'').toLowerCase(); vb = (b.domaine||'').toLowerCase(); }
+      else if (col === 'tarif') { va = a.tarif; vb = b.tarif; }
+      else if (col === 'qt')    { va = a.qt;    vb = b.qt; }
+      else if (col === 'st')    { va = a.st;    vb = b.st; }
+      else                      { va = '';       vb = ''; }
+      if (va < vb) return -dir;
+      if (va > vb) return  dir;
+      return 0;
+    });
+  })();
 
   // Taux km : premier barème NDF trouvé parmi les lignes
   var _tauxKm = _ndfRefBareme();
