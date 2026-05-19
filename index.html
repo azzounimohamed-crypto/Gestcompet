@@ -10719,7 +10719,11 @@ function _staffToggleSort(col) {
 }
 
 // ── Redimensionnement colonnes Encadrants ──────────────────────────────────
-var _staffColWidths = [40, 170, 130, 68, 92, 150, 130]; // avatar|nom|fonction|licence|tel|email|odm-ndf
+var _STF_LS_KEY     = 'gestappli_staffColWidths';
+var _staffColWidths = (function(){
+  try { var s=localStorage.getItem(_STF_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===7) return a; } } catch(e){}
+  return [40, 170, 130, 68, 92, 150, 130];
+})(); // avatar|nom|fonction|licence|tel|email|odm-ndf
 var _staffResizing  = null;
 function _staffGetTpl() { return _staffColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _staffApplyTpl() {
@@ -10745,10 +10749,15 @@ function _staffResizeEnd() {
   document.removeEventListener('mousemove', _staffResizeMove);
   document.removeEventListener('mouseup',   _staffResizeEnd);
   document.body.style.cursor = document.body.style.userSelect = '';
+  try { localStorage.setItem(_STF_LS_KEY, JSON.stringify(_staffColWidths)); } catch(e){}
 }
 
 // ── Redimensionnement colonnes Équipage ───────────────────────────────────
-var _equipColWidths = [40, 44, 145, 65, 68, 85, 85, 70, 62, 58, 68, 80, 30]; // avatar|genre|nom|lic|immat|marque|modele|pratique|classe|cat|equip|region|btn
+var _EQP_LS_KEY     = 'gestappli_equipColWidths';
+var _equipColWidths = (function(){
+  try { var s=localStorage.getItem(_EQP_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===13) return a; } } catch(e){}
+  return [40, 44, 145, 65, 68, 85, 85, 70, 62, 58, 68, 80, 30];
+})(); // avatar|genre|nom|lic|immat|marque|modele|pratique|classe|cat|equip|region|btn
 var _equipResizing  = null;
 function _equipGetTpl() { return _equipColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _equipApplyTpl() {
@@ -10773,6 +10782,7 @@ function _equipResizeEnd() {
   document.removeEventListener('mousemove', _equipResizeMove);
   document.removeEventListener('mouseup',   _equipResizeEnd);
   document.body.style.cursor = document.body.style.userSelect = '';
+  try { localStorage.setItem(_EQP_LS_KEY, JSON.stringify(_equipColWidths)); } catch(e){}
 }
 
 // ── Redimensionnement colonnes Budget ────────────────────────────────────
