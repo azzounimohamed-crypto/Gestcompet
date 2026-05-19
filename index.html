@@ -401,13 +401,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   body{overflow:hidden;background:#0d1117;display:flex;justify-content:center;width:100%;height:100vh}
   body.theme-light{background:#e8edf3}
 
-  /* ── App : bloc centré avec sidebar gauche ── */
+  /* ── App : bloc centré avec rail nav gauche (volets externes) ── */
   #app{
-    width:calc(100vw - 80px);
+    width:calc(100vw - 120px);
     max-width:1240px;
     margin:0 auto;
     display:grid;
-    grid-template-columns:68px 1fr;
+    grid-template-columns:1fr;
     grid-template-rows:60px 1fr;
     height:100vh;
     box-shadow:0 0 60px rgba(0,0,0,.5);
@@ -415,52 +415,42 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     border-right:1px solid var(--bdr);
     overflow:visible;
     flex-shrink:0;
+    position:relative;
   }
 
-  /* ── Header : pleine largeur sur les 2 colonnes ── */
-  #header{grid-column:1 / -1;grid-row:1;height:60px;padding:0 20px;justify-content:space-between}
+  /* ── Header ── */
+  #header{grid-column:1;grid-row:1;height:60px;padding:0 20px;justify-content:space-between}
   #header-desktop-brand{display:flex!important}
   #dtn-base-btn{display:none!important}
   #header-mobile-title{display:none!important}
   #header-desktop-center{display:block!important}
   #header-logo-wrap{display:flex!important}
 
-  /* ── Nav : sidebar verticale gauche ── */
-  #nav{
-    grid-column:1;grid-row:2;
-    position:relative;bottom:auto;left:auto;transform:none;
-    width:68px;max-width:68px;height:100%;
-    flex-direction:column;align-items:center;justify-content:flex-start;
-    padding:8px 0;gap:2px;
-    border-top:none;border-bottom:none;border-right:1px solid var(--bdr);
-    backdrop-filter:none;-webkit-backdrop-filter:none;
-    background:var(--navy2);
-    overflow-y:auto;overflow-x:hidden;
-    scrollbar-width:none
-  }
-  #nav::-webkit-scrollbar{display:none}
-  body.theme-light #nav{background:#fff;border-right-color:#e2e8f0}
+  /* ── Nav bottom : caché sur desktop (remplacé par le rail externe) ── */
+  #nav{display:none!important}
 
-  /* ── Boutons nav : icône + label vertical, sans couleur ── */
-  .nav-btn{
-    flex:none;width:56px;flex-direction:column;
-    align-items:center;justify-content:center;
-    padding:10px 4px 8px;gap:4px;
-    height:auto;border-radius:10px;
-    border-bottom:none;border-left:none;
-    min-width:0;transition:background .15s
+  /* ── Rail nav vertical gauche (volets agenda) ── */
+  #desktop-nav-rail{
+    position:absolute;left:-52px;top:68px;
+    width:44px;display:flex;flex-direction:column;gap:6px;z-index:50;
   }
-  .nav-btn .nav-pip{display:none}
-  .nav-btn .nav-lbl{font-size:9.5px;font-weight:600;text-align:center;line-height:1.2;white-space:normal;word-break:break-word;max-width:52px}
-  .nav-btn .nav-ico svg{width:20px;height:20px}
-  .nav-btn:hover{background:rgba(255,255,255,.07)}
-  .nav-btn.active{background:rgba(255,255,255,.1);color:var(--txt)}
-  .nav-btn.active .nav-ico{transform:none}
-  body.theme-light .nav-btn:hover{background:rgba(0,0,0,.05)}
-  body.theme-light .nav-btn.active{background:rgba(0,0,0,.07);color:var(--txt)}
+  #desktop-nav-rail .dnr-btn{
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    display:flex;align-items:center;justify-content:center;
+    min-height:88px;padding:10px 8px;border-radius:12px;
+    border:1px solid var(--bdr);background:var(--navy3);
+    color:var(--txt2);font-size:11px;font-weight:600;
+    cursor:pointer;font-family:inherit;white-space:nowrap;
+    letter-spacing:.3px;transition:background .15s,color .15s;
+  }
+  #desktop-nav-rail .dnr-btn:hover{background:var(--navy4);color:var(--txt)}
+  #desktop-nav-rail .dnr-btn.active{background:var(--stol);color:#fff;border-color:var(--stol)}
+  body.theme-light #desktop-nav-rail .dnr-btn{background:#fff;color:var(--txt2);border-color:#e2e8f0}
+  body.theme-light #desktop-nav-rail .dnr-btn:hover{background:#f0f4f8;color:var(--txt)}
+  body.theme-light #desktop-nav-rail .dnr-btn.active{background:var(--stol);color:#fff;border-color:var(--stol)}
 
   /* ── Zone contenu ── */
-  #main{grid-column:2;grid-row:2;overflow:visible;height:calc(100vh - 60px);padding-bottom:0}
+  #main{grid-column:1;grid-row:2;overflow:visible;height:calc(100vh - 60px);padding-bottom:0}
 
   /* ── Toast ── */
   #toast{bottom:24px}
@@ -1911,6 +1901,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </button>
 
   </nav>
+
+  <!-- ══ RAIL NAV DESKTOP – volets verticaux gauche ══ -->
+  <div id="desktop-nav-rail">
+    <button class="dnr-btn active" id="dnr-competitions" onclick="_deskNav('page-competitions','dnr-competitions')">Compétitions</button>
+    <button class="dnr-btn" id="dnr-base" onclick="_deskNav('page-home','dnr-base')">Stats</button>
+    <button class="dnr-btn" id="dnr-pilots" onclick="_deskNav('page-pilots','dnr-pilots')">Compétiteurs</button>
+    <button class="dnr-btn" id="dnr-staff" onclick="_deskNav('page-staff','dnr-staff')">Staff</button>
+    <button class="dnr-btn" id="dnr-moyens" onclick="_deskNav('page-moyens','dnr-moyens')">Moyens</button>
+    <button class="dnr-btn" id="dnr-acteurs" onclick="_deskNav('page-acteurs','dnr-acteurs')">Acteurs</button>
+    <button class="dnr-btn" id="dnr-sites" onclick="_deskNav('page-sites','dnr-sites')">Sites</button>
+    <button class="dnr-btn" id="dnr-settings" onclick="_deskNav('page-settings','dnr-settings')">Gestion</button>
+  </div>
 
 </div><!-- /app -->
 
@@ -3642,6 +3644,13 @@ function warmupSecondaryPages() {
   else setTimeout(run, 600);
 }
 
+function _deskNav(page, btnId) {
+  document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('active');
+  showPage(page);
+}
+
 function showPage(id) {
   // Toujours mettre à jour la visibilité des onglets Réglages (droits peuvent avoir changé)
   // ET toujours recharger les valeurs Documents officiels (évite les valeurs par défaut après warmup)
@@ -3675,6 +3684,19 @@ function showPage(id) {
   }
   var nb = document.getElementById(navMap[id]);
   if (nb) nb.classList.add('active');
+  // Sync rail nav desktop
+  if (window.innerWidth >= 768) {
+    var _deskMap = {
+      'page-base':'dnr-base','page-home':'dnr-base',
+      'page-competitions':'dnr-competitions','page-pilots':'dnr-pilots',
+      'page-ranking':'dnr-base','page-staff':'dnr-staff',
+      'page-moyens':'dnr-moyens','page-acteurs':'dnr-acteurs',
+      'page-sites':'dnr-sites','page-settings':'dnr-settings'
+    };
+    document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){ b.classList.remove('active'); });
+    var deskBtn = document.getElementById(_deskMap[id]);
+    if (deskBtn) deskBtn.classList.add('active');
+  }
   if (_pendingPageRender) clearTimeout(_pendingPageRender);
   _pendingPageRender = setTimeout(function(){
     requestAnimationFrame(function(){ _renderPageById(id); });
