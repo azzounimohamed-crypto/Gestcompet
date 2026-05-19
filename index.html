@@ -10287,6 +10287,7 @@ function _ndfGenPdf(omId) {
     + '<div class="header-band">'
     + '<span class="org">🪂 FFPLUM</span>'
     + '<span class="doc">NOTE DE FRAIS</span>'
+    + '<span style="font-size:9pt;font-weight:700;opacity:.9;text-align:right;line-height:1.4">Barème : '+taux.toFixed(3)+' €/km<br><span style="font-size:8pt;font-weight:500;opacity:.85">'+_esc(barLabel)+'</span></span>'
     + '</div>'
     /* Titre */
     + '<h1>Note de Frais de Déplacement</h1>'
@@ -11647,15 +11648,30 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           +'<option value="">—</option>'
           +_clsFilt.map(function(c){ return '<option value="'+c+'"'+(_clsCur===c?' selected':'')+'>'+(_clsMap[c]||c)+'</option>'; }).join('')
           +'</select></div>';
-        // Catégorie — select
+        // Catégorie — select adapté à la pratique
+        var _catPMOpts = [{v:'PF1',l:'PF1'},{v:'PF2',l:'PF2'},{v:'PL1',l:'PL1'},{v:'PL2',l:'PL2'}];
+        var _catMLOpts = [{v:'AW1',l:'AW1'},{v:'AW2',l:'AW2'},{v:'WL1',l:'WL1'},{v:'WL2',l:'WL2'},{v:'GP1',l:'GP1'},{v:'GP2',l:'GP2'}];
+        var _catInlineOpts = _pratVal==='paramoteur' ? _catPMOpts : _pratVal==='microlight' ? _catMLOpts
+          : _catPMOpts.concat(_catMLOpts); // multi ou non précisé : tout afficher
         html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'categorie\',this.value,\''+cid+'\')" style="'+_sISt+';'+catStyle+'">'
           +'<option value="">—</option>'
-          +['PF1','PF2','PL1','PL2','Classable','Accès'].map(function(c){ return '<option value="'+c+'"'+(catVal===c?' selected':'')+'>'+c+'</option>'; }).join('')
+          +_catInlineOpts.map(function(o){ return '<option value="'+o.v+'"'+(catVal===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')
           +'</select></div>';
-        // Équipage — select
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'equipage\',this.value,\''+cid+'\')" style="'+_sISt+';'+equStyle+'">'
+        // Équipage — select adapté à la pratique
+        // *1 categories → Monoplace figé ; *2 → Biplace suggéré
+        var _catMonoInline = ['PL1','PF1','AW1','WL1','GP1'].indexOf(catVal) >= 0;
+        var _catBiInline   = ['PL2','PF2','AW2','WL2','GP2'].indexOf(catVal) >= 0;
+        var _equOpts = _pratVal==='paramoteur'
+          ? [{v:'Monoplace',l:'Mono'},{v:'Biplace',l:'Bi'}]
+          : _pratVal==='microlight'
+            ? [{v:'Monoplace',l:'Mono'},{v:'Biplace',l:'Bi'}]
+            : [{v:'Monoplace',l:'Mono'},{v:'Biplace',l:'Bi'}];
+        var _equCurVal = _catMonoInline ? 'Monoplace' : _catBiInline ? 'Biplace' : equVal;
+        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'equipage\',this.value,\''+cid+'\')"'
+          +(_catMonoInline?' disabled title="'+catVal+' : Monoplace uniquement"':'')
+          +' style="'+_sISt+';'+equStyle+'">'
           +'<option value="">—</option>'
-          +['Monoplace','Biplace'].map(function(e){ return '<option value="'+e+'"'+(equVal===e?' selected':'')+'>'+e+'</option>'; }).join('')
+          +_equOpts.map(function(e){ return '<option value="'+e.v+'"'+(_equCurVal===e.v?' selected':'')+'>'+e.l+'</option>'; }).join('')
           +'</select></div>';
         // Marque — éditable
         html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(ulm.marque||'')+'" placeholder="—" title="Marque" style="'+_iStE+(ulm.marque?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'marque\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
@@ -12444,8 +12460,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
             if (a.avance) avanceLinesM.push({ parentLib: l.libelle||'—', parentDom: l.domaine||'—', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1) });
           });
           var ndfR = (l.ndf && l.ndf.reelle) || [];
+          var _ndfCoeffM = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
           ndfR.forEach(function(a) {
-            if (a.avance) avanceLinesM.push({ parentLib: l.libelle||'—', parentDom: 'NDF', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1) });
+            var _dist = parseFloat(a.distance)||0;
+            var _st   = _dist > 0 ? _dist * _ndfCoeffM : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+            if (a.avance) avanceLinesM.push({ parentLib: l.libelle||'—', parentDom: 'NDF', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: _st });
           });
         });
         var totAvM = avanceLinesM.reduce(function(s,a){ return s+a.st; }, 0);
@@ -12701,8 +12720,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           if (a.avance) avanceLinesD.push({ parentLib: l.libelle||'—', parentDom: l.domaine||'—', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1) });
         });
         var ndfR = (l.ndf && l.ndf.reelle) || [];
+        var _ndfCoeffD = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
         ndfR.forEach(function(a) {
-          if (a.avance) avanceLinesD.push({ parentLib: l.libelle||'—', parentDom: 'NDF', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1) });
+          var _dist = parseFloat(a.distance)||0;
+          var _st   = _dist > 0 ? _dist * _ndfCoeffD : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+          if (a.avance) avanceLinesD.push({ parentLib: l.libelle||'—', parentDom: 'NDF', date: a.date||'', libelle: a.libelle||'—', tarif: parseFloat(a.tarif)||0, qt: parseInt(a.qt)||1, st: _st });
         });
       });
       var totAvD = avanceLinesD.reduce(function(s,a){ return s+a.st; }, 0);
@@ -23075,21 +23097,28 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     html += '</select></div>';
     html += '</div>';
     // ── Ligne Catégorie / Équipages / Rôle ──
-    // PL1/PF1 forcent Monoplace indépendamment de ce qui est stocké
-    var _catForceMono = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    var _isPM   = (pilot.pratique === 'paramoteur');
+    var _isML   = (pilot.pratique === 'microlight');
+    var _showCat = _isPM || _isML;
+    // Tables des catégories
+    var _CAT_PM_OPTS = [{v:'PF1',l:'Paramoteur PF1'},{v:'PF2',l:'Paramoteur PF2'},{v:'PL1',l:'Paramoteur PL1'},{v:'PL2',l:'Paramoteur PL2'}];
+    var _CAT_ML_OPTS = [{v:'AW1',l:'Pendulaire AW1'},{v:'AW2',l:'Pendulaire AW2'},{v:'WL1',l:'Multiaxes WL1'},{v:'WL2',l:'Multiaxes WL2'},{v:'GP1',l:'Autogire GP1'},{v:'GP2',l:'Autogire GP2'}];
+    var _catOpts = _isPM ? _CAT_PM_OPTS : _isML ? _CAT_ML_OPTS : [];
+    // *1 categories → Monoplace uniquement
+    var _CAT_MONO_LIST = ['PL1','PF1','AW1','WL1','GP1'];
+    var _catForceMono = _CAT_MONO_LIST.indexOf(pilot.categorie) >= 0;
     var _isMono = _catForceMono || (pilot.equipage === 'Monoplace');
     var _isBi   = !_catForceMono && (pilot.equipage === 'Biplace');
-    var _isPM   = (pilot.pratique === 'paramoteur');
     html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-    // Catégorie (visible uniquement si Paramoteur)
-    html += '<div id="pd-categorie-row" style="display:'+(_isPM?'':'none')+'">';
+    // Catégorie (visible si Paramoteur ou Microlight)
+    html += '<div id="pd-categorie-row" style="display:'+(_showCat?'':'none')+'">';
     html += '<div style="'+lSt+'">Catégorie</div><select id="pd-categorie" style="'+iSt+'" onchange="pdUpdateCategorie()">';
     html += '<option value="">— Non précisé —</option>';
-    ['PF1','PF2','PL1','PL2'].forEach(function(o){ html += '<option value="'+o+'"'+(pilot.categorie===o?' selected':'')+'>'+o+'</option>'; });
+    _catOpts.forEach(function(o){ html += '<option value="'+o.v+'"'+(pilot.categorie===o.v?' selected':'')+'>'+o.l+'</option>'; });
     html += '</select></div>';
     // Équipages
-    // Catégorie PL1/PF1 → Monoplace figé dès l'ouverture
-    var _catMonoOnly = (pilot.categorie === 'PL1' || pilot.categorie === 'PF1');
+    // *1 categories → Monoplace figé dès l'ouverture
+    var _catMonoOnly = _CAT_MONO_LIST.indexOf(pilot.categorie) >= 0;
     // Si catégorie force Monoplace, écraser la valeur stockée
     var _equipageVal = _catMonoOnly ? 'Monoplace' : (pilot.equipage || '');
     html += '<div><div style="'+lSt+'">Équipages</div><select id="pd-equipage" style="'+iSt+'" onchange="pdUpdateEquipageRole()"'+(_catMonoOnly?' disabled title="'+pilot.categorie+' : Monoplace uniquement"':'')+' >';
@@ -23350,29 +23379,62 @@ function pdUpdateEquipageRole() {
   pdToggleULM(); // cascade : rôle → visibilité ULM
 }
 
-// PL1 / PF1 → Monoplace figé ; PL2 / PF2 → Équipages libre
+// Catégorie → Classe automatique + Monoplace/Biplace
+var _CAT_TO_CLASSE = {
+  'PF1':'paramotor','PF2':'paramotor','PL1':'paramotor','PL2':'paramotor',
+  'AW1':'pendulaire','AW2':'pendulaire',
+  'WL1':'multiaxes','WL2':'multiaxes',
+  'GP1':'gyro','GP2':'gyro'
+};
+var _CAT_MONO_SET = {'PL1':1,'PF1':1,'AW1':1,'WL1':1,'GP1':1};
+
 function pdUpdateCategorie() {
   var cat = document.getElementById('pd-categorie');
   var eq  = document.getElementById('pd-equipage');
-  if (!cat || !eq) return;
-  var monoOnly = (cat.value === 'PL1' || cat.value === 'PF1');
+  if (!cat) return;
+  var v = cat.value;
+  // ── Auto-Classe ──
+  var cls = _CAT_TO_CLASSE[v];
+  if (cls) {
+    var clsEl = document.getElementById('pd-ulm-classe');
+    if (clsEl) { clsEl.value = cls; pdOnClasseChange(clsEl); }
+  }
+  // ── Monoplace ou Biplace ──
+  if (!eq) return;
+  var monoOnly = !!_CAT_MONO_SET[v];
   if (monoOnly) {
     eq.value    = 'Monoplace';
     eq.disabled = true;
-    eq.title    = cat.value + ' : Monoplace uniquement';
+    eq.title    = v + ' : Monoplace uniquement';
   } else {
     eq.disabled = false;
     eq.title    = '';
+    if (v && v.slice(-1) === '2') { eq.value = 'Biplace'; }
   }
   pdUpdateEquipageRole(); // cascade Rôle + Copilote
 }
 
-// Affichage conditionnel Catégorie selon Pratique
+// Affichage conditionnel Catégorie selon Pratique + rechargement des options
 function pdUpdatePratique() {
   var prat   = document.getElementById('pd-pratique');
   var catRow = document.getElementById('pd-categorie-row');
-  if (!prat || !catRow) return;
-  catRow.style.display = (prat.value === 'paramoteur') ? '' : 'none';
+  var catSel = document.getElementById('pd-categorie');
+  if (!prat || !catRow || !catSel) return;
+  var pv      = prat.value;
+  var prevCat = catSel.value;
+  var _CAT_PM = [{v:'PF1',l:'Paramoteur PF1'},{v:'PF2',l:'Paramoteur PF2'},{v:'PL1',l:'Paramoteur PL1'},{v:'PL2',l:'Paramoteur PL2'}];
+  var _CAT_ML = [{v:'AW1',l:'Pendulaire AW1'},{v:'AW2',l:'Pendulaire AW2'},{v:'WL1',l:'Multiaxes WL1'},{v:'WL2',l:'Multiaxes WL2'},{v:'GP1',l:'Autogire GP1'},{v:'GP2',l:'Autogire GP2'}];
+  var opts = pv === 'paramoteur' ? _CAT_PM : pv === 'microlight' ? _CAT_ML : [];
+  if (opts.length) {
+    catRow.style.display = '';
+    catSel.innerHTML = '<option value="">— Non précisé —</option>' +
+      opts.map(function(o){ return '<option value="'+o.v+'">'+o.l+'</option>'; }).join('');
+    // Conserver la valeur si toujours valide dans le nouveau menu
+    if (opts.some(function(o){ return o.v === prevCat; })) catSel.value = prevCat;
+  } else {
+    catRow.style.display = 'none';
+    catSel.innerHTML = '<option value="">— Non précisé —</option>';
+  }
 }
 
 function savePilotDetail(pilotId, compId) {
@@ -24213,8 +24275,10 @@ function exportBudgetXLSX(compId) {
       var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rowsE.push(['', '  └ '+(a.libelle||''), '', '', '', '', 'Achat', a.date||'', a.tarif||0, a.qt||1, st, a.avance?'Oui':'']);
     });
+    var _xlCoeff = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
     ((l.ndf&&l.ndf.reelle)||[]).forEach(function(a){
-      var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+      var _d = parseFloat(a.distance)||0;
+      var st = _d > 0 ? _d * _xlCoeff : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rowsE.push(['', '  └ '+(a.libelle||''), '', '', '', '', 'NDF Réelle', a.date||'', a.tarif||0, a.qt||1, st, a.avance?'Oui':'']);
     });
   });
@@ -27474,12 +27538,29 @@ function printNoteAvance(compId) {
       if (!a.avance) return;
       items.push({ date:a.date||'', objet:a.libelle||l.libelle||'', domaine:l.domaine||'Achats', tarif:parseFloat(a.tarif)||0, qt:parseInt(a.qt)||1 });
     });
+    var _pnaCoeff = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
+    // Lieux : véhicule → adressePerso/lieuRef ; train/avion → depart/arrivee
+    // Fallbacks : adresse du pilote depuis S.pilots, lieu de la compétition depuis cp.lieu
+    var _pnaPersonne = (l.ndf && l.ndf.personne) || '';
+    var _pnaPilot = _pnaPersonne ? (S.pilots||[]).find(function(p){
+      var fn = ((p.prenom||'')+' '+(p.nom||'')).trim().toLowerCase();
+      return fn === _pnaPersonne.toLowerCase();
+    }) : null;
+    var _lieuDe = (l.ndf && (l.ndf.adressePerso || l.ndf.depart)) || (_pnaPilot && _pnaPilot.adresse) || '';
+    var _lieuA  = (l.ndf && (l.ndf.lieuRef      || l.ndf.arrivee)) || cp.lieu || '';
     ((l.ndf&&l.ndf.reelle)||[]).forEach(function(a) {
       if (!a.avance) return;
-      items.push({ date:a.date||'', objet:a.libelle||l.libelle||'', domaine:'NDF', tarif:parseFloat(a.tarif)||0, qt:parseInt(a.qt)||1 });
+      var _d  = parseFloat(a.distance)||0;
+      var _st = _d > 0 ? _d * _pnaCoeff : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+      items.push({ date:a.date||'', objet:a.libelle||l.libelle||'', domaine:'NDF', tarif:parseFloat(a.tarif)||0, qt:parseInt(a.qt)||1, st:_st, distance:_d, lieuDe:_lieuDe, lieuA:_lieuA, coeff:_pnaCoeff });
     });
   });
-  items.forEach(function(a){ a.st = a.tarif * a.qt; });
+  items.forEach(function(a){ if (a.st === undefined) a.st = a.tarif * a.qt; });
+
+  // Taux km : premier barème NDF trouvé parmi les lignes
+  var _tauxKm = _ndfRefBareme();
+  items.forEach(function(a){ if (a.coeff) _tauxKm = a.coeff; });
+  var _tauxKmFmt = _tauxKm.toFixed(3).replace('.', ',');
   var totalGeneral = items.reduce(function(s,a){ return s+a.st; }, 0);
 
   // ── Infos utilisateur & compétition ──
@@ -27498,7 +27579,7 @@ function printNoteAvance(compId) {
   // ── Lignes du tableau (minimum 12 rangées) ──
   var NROWS = Math.max(items.length, 12);
   var rows = '';
-  var totalRepas = 0, totalDivers = 0;
+  var totalRepas = 0, totalDivers = 0, totalKm = 0;
   var _isRepas = function(s){ return s ? s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf('repas') >= 0 : false; };
   var _fmtFR = function(s){
     if(!s) return '';
@@ -27513,19 +27594,24 @@ function printNoteAvance(compId) {
     var st  = it ? it.st : 0;
     var bg  = i % 2 === 1 ? 'background:#f0f5ff' : '';
     var _colRepas = it && st && _isRepas(it.objet);
-    if (_colRepas) totalRepas += st; else if (it && st) totalDivers += st;
+    var _colKm    = it && (it.distance > 0);
+    if (_colRepas)      { totalRepas += st; }
+    else if (_colKm)    { totalKm += it.distance; }
+    else if (it && st)  { totalDivers += st; }
     rows += '<tr style="height:18px;'+bg+'">';
     rows += '<td style="text-align:center;color:#777;font-size:6.5pt">'+(it ? (i+1) : '')+'</td>';
     rows += '<td style="text-align:center;white-space:nowrap;font-size:6pt">'+(it ? _fmtFR(it.date) : '')+'</td>';
     rows += '<td style="text-align:left;padding-left:3px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it ? esc(it.objet) : '')+'</td>';
-    rows += '<td></td><td></td><td></td>'; // CBF* / lieux de / à
-    rows += '<td style="text-align:right"></td>'; // km
+    rows += '<td></td>'; // CBF*
+    rows += '<td style="text-align:left;font-size:6pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it && it.distance > 0 && it.lieuDe ? esc(it.lieuDe) : '')+'</td>'; // lieu de
+    rows += '<td style="text-align:left;font-size:6pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it && it.distance > 0 && it.lieuA  ? esc(it.lieuA)  : '')+'</td>'; // lieu à
+    rows += '<td style="text-align:right;font-weight:bold;color:#003875">'+(_colKm ? it.distance : '')+'</td>'; // km
     rows += '<td style="text-align:right"></td>'; // taxi
     rows += '<td style="text-align:right"></td>'; // sncf
-    rows += '<td style="text-align:right;color:#10b981;font-weight:bold">'+(_colRepas && st ? st.toFixed(2)+' €' : '')+'</td>'; // repas
+    rows += '<td style="text-align:right;color:#003875;font-weight:bold">'+(_colRepas && st ? st.toFixed(2)+' €' : '')+'</td>'; // repas
     rows += '<td style="text-align:center"></td>'; // nb inv
     rows += '<td style="text-align:right"></td>'; // hotel+pdéj
-    rows += '<td style="text-align:right;color:#003875;font-weight:bold">'+(!_colRepas && it && st ? st.toFixed(2)+' €' : '')+'</td>'; // divers
+    rows += '<td style="text-align:right;color:#003875;font-weight:bold">'+(!_colRepas && !_colKm && it && st ? st.toFixed(2)+' €' : '')+'</td>'; // divers
     rows += '<td style="text-align:right;font-weight:bold;background:#fffae0">'+(it && st ? st.toFixed(2)+' €' : '')+'</td>'; // total
     rows += '<td></td>'; // code analytique
     rows += '</tr>';
@@ -27555,54 +27641,49 @@ function printNoteAvance(compId) {
   html += 'body{font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:#111}';
   html += '.print-btn{position:fixed;top:10px;right:10px;padding:8px 20px;background:#003875;color:#fff;border:none;border-radius:7px;font-size:11pt;font-weight:bold;cursor:pointer;font-family:inherit;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:999}';
   html += '@media print{.print-btn{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-  html += 'table.main{width:100%;border-collapse:collapse;font-size:7pt;margin-top:5px}';
+  html += '.tbl-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:5px}';
+  html += 'table.main{width:100%;border-collapse:collapse;font-size:7pt}';
   html += 'table.main th,table.main td{border:1px solid #7f9fc8;padding:1px 2px}';
   html += 'table.main th{background:#c5d9f1;font-weight:bold;text-align:center;font-size:6.5pt}';
-  html += '.sig-table{width:100%;border-collapse:collapse;margin-top:8px}';
-  html += '.sig-table td{border:1.5px solid #003875;padding:5px;width:25%;vertical-align:top;height:100px}';
+  html += '.sig-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:2mm}';
+  html += '.sig-table{width:100%;border-collapse:collapse}';
+  html += '.sig-table td{border:1px solid #003875;padding:4px 5px;width:25%;vertical-align:top;height:50px}';
   html += '.sig-title{font-size:6.5pt;font-weight:bold;text-align:center;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:2px}';
   html += '.sig-sub{font-size:5.5pt;color:#555;font-style:italic;text-align:center;display:block}';
   html += '</style></head><body>';
-
   html += '<button class="print-btn" onclick="window.print()">🖨 Imprimer</button>';
 
   // ── Barre de titre ──
   html += '<div style="background:#003875;color:#fff;text-align:center;font-size:13pt;font-weight:bold;padding:5px;letter-spacing:2px;text-transform:uppercase">NOTE DE FRAIS</div>';
 
-  // ── En-tête ──
-  html += '<table style="width:100%;border:1.5px solid #003875;border-top:none;border-collapse:collapse">';
+  // ── En-tête : [LOGO] | [Infos centre 4 col] | [Taux km] ──
+  html += '<table style="width:100%;border:1px solid #003875;border-top:none;border-collapse:collapse">';
   html += '<tr>';
-  // Colonne logo
-  html += '<td style="width:110px;border-right:1.5px solid #003875;padding:6px 8px;vertical-align:middle;text-align:center">';
+  // Logo à gauche
+  html += '<td style="width:90px;border-right:1px solid #003875;padding:4px;vertical-align:middle;text-align:center">';
   html += logoHtml;
   html += '</td>';
-  // Colonne infos
+  // Infos centre : 4 colonnes équilibrées
   html += '<td style="padding:0;vertical-align:top">';
   html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
-  html += '<colgroup><col style="width:72px"><col style="width:32%"><col style="width:72px"><col></colgroup>';
-  // Nom / Prénom avec cellules réduites
-  html += '<tr>';
-  html += '<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:7pt">Nom :</td>';
-  html += '<td style="padding:2px 5px;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:7.5pt">'+nom+'</td>';
-  html += '<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:7pt">Prénom :</td>';
-  html += '<td style="padding:2px 5px;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:7.5pt">'+prenom+'</td>';
-  html += '</tr>';
-  html += iRow('Pôle', 'Pôle sport', 'Adresse', '');
-  html += iRow('Missionné par', 'Le bureau directeur', '', '');
-  html += iRow('Objet', compNom+(compDates?' — '+esc(compDates):''), 'Email', email);
-  html += iRow('Lieu', compLieu, 'Date', dateToday);
-  html += '</table></td>';
-  // Badge taux km
-  html += '<td style="width:90px;border-left:1.5px solid #003875;padding:6px;text-align:center;vertical-align:middle">';
-  html += '<div style="font-size:6pt;font-weight:bold;color:#003875;margin-bottom:3px">Taux km (5CV)</div>';
-  html += '<div style="font-size:16pt;font-weight:900;color:#003875;border:2px solid #003875;border-radius:4px;padding:3px 6px">0,332</div>';
+  html += '<colgroup><col style="width:80px"><col><col style="width:72px"><col style="width:33%"></colgroup>';
+  html += iRow('Nom / Prénom', (prenom+' '+nom).trim(), 'Adresse', '');
+  html += iRow('Pôle', 'Pôle sport', 'Email', email);
+  html += iRow('Missionné par', 'Le bureau directeur', 'Lieu', compLieu);
+  html += iRow('Objet', compNom+(compDates?' — '+esc(compDates):''), 'Date', dateToday);
+  html += '</table>';
+  html += '</td>';
+  // Badge taux km à droite
+  html += '<td style="width:90px;border-left:1px solid #003875;padding:6px;text-align:center;vertical-align:middle">';
+  html += '<div style="font-size:6pt;font-weight:bold;color:#003875;margin-bottom:3px">Taux km</div>';
+  html += '<div style="font-size:16pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:4px;padding:3px 6px">'+_tauxKmFmt+'</div>';
   html += '<div style="font-size:6pt;color:#555;margin-top:3px">€ / km</div>';
   html += '</td>';
   html += '</tr></table>';
 
   // ── Tableau principal ──
+  html += '<div class="tbl-wrap">';
   html += '<table class="main">';
-  html += '<thead>';
   html += '<tr>';
   html += '<th rowspan="2" style="width:14px">N°</th>';
   html += '<th rowspan="2" style="width:86px">DATE</th>';
@@ -27629,40 +27710,40 @@ function printNoteAvance(compId) {
   // Ligne totaux colonnes
   html += '<tr style="font-weight:bold;background:#dce6f1">';
   html += '<td colspan="6" style="text-align:right;padding-right:6px;font-size:6.5pt;color:#555">Totaux →</td>';
-  html += '<td style="text-align:right">0 km</td>';
-  html += '<td style="text-align:right">0,00 €</td>';
-  html += '<td style="text-align:right">0,00 €</td>';
-  html += '<td style="text-align:right;color:#10b981;font-weight:bold">'+(totalRepas>0?totalRepas.toFixed(2)+'  €':'')+'</td>';
+  html += '<td style="text-align:center;font-size:6pt;font-weight:bold;color:#003875">'+(totalKm > 0 ? totalKm+' km' : '0 km')+'</td>';
+  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  html += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalRepas>0?totalRepas.toFixed(2)+' €':'')+'</td>';
   html += '<td></td>';
-  html += '<td style="text-align:right">0,00 €</td>';
-  html += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers>0?totalDivers.toFixed(2)+'  €':'')+'</td>';
+  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  html += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers>0?totalDivers.toFixed(2)+' €':'')+'</td>';
   html += '<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+'  €</td>';
   html += '<td></td>';
   html += '</tr>';
-  // TOTAL À PAYER aligné sous la colonne TOTAL (col 15 sur 16)
+  // TOTAL À PAYER + Commentaires sur la même ligne
   html += '<tr>';
-  html += '<td colspan="13" style="border:none;background:transparent;padding:3px 0"></td>';
-  html += '<td style="background:#fffae0;border:2.5px solid #003875;border-radius:4px;text-align:center;padding:5px 4px">';
-  html += '<div style="font-size:6pt;font-weight:bold;text-transform:uppercase;color:#003875;letter-spacing:.5px">TOTAL À PAYER</div>';
-  html += '<div style="font-size:13pt;font-weight:900;color:#003875;line-height:1.2;margin-top:2px">'+totalGeneral.toFixed(2)+' €</div>';
+  html += '<td colspan="13" style="border:none;background:transparent;padding:4px 6px 2px 0;vertical-align:bottom">';
+  html += '<span style="font-size:7pt;font-weight:bold">Commentaires ou précisions :</span>';
+  html += '<div style="min-height:30px;padding:3px;font-size:7pt;white-space:pre-wrap;margin-top:2px">'+commentairesNdf+'</div>';
+  html += '</td>';
+  html += '<td style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">';
+  html += '<div style="font-size:13pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:4px 2px;background:#fffae0;display:block;width:100%;text-align:center;box-sizing:border-box">';
+  html += '<div style="font-size:6pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">TOTAL À PAYER</div>';
+  html += '<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>';
+  html += '</div>';
   html += '</td>';
   html += '<td style="border:none;background:transparent"></td>';
   html += '</tr>';
   html += '</tfoot>';
   html += '</table>';
-
-  // ── Bas de page : commentaires ──
-  html += '<div style="font-size:7pt;margin-top:5px;margin-bottom:5px">';
-  html += '<div style="font-weight:bold;margin-bottom:3px">Commentaires ou précisions :</div>';
-  html += '<div style="border:1px solid #aaa;min-height:36px;padding:3px;border-radius:3px;font-size:7pt;white-space:pre-wrap">'+commentairesNdf+'</div>';
   html += '</div>';
-    // ── Signatures ──
-  html += '<table class="sig-table"><tr>';
-  html += '<td><div class="sig-title">Signature du demandeur<span class="sig-sub">(certifiée sincère et véritable)</span></div>'+(sigImg?'<div style="padding:4px;text-align:center"><img src="'+sigImg+'" style="max-height:55px;max-width:100%;object-fit:contain"></div>':'')+'</td>';
+  // ── Signatures pleine largeur juste en dessous ──
+  html += '<div class="sig-wrap"><table class="sig-table"><tr>';
+  html += '<td><div class="sig-title">Signature du demandeur<span class="sig-sub">(certifiée sincère et véritable)</span></div>'+(sigImg?'<div style="padding:4px;text-align:center"><img src="'+sigImg+'" style="max-height:55px;max-width:100%;object-fit:contain"></div>':'')+' </td>';
   html += '<td><div class="sig-title">Signature du responsable du pôle</div></td>';
-  html += '<td><div class="sig-title">Signature de la trésorière</div></td>';
-  html += '<td><div class="sig-title">Signature du président</div></td>';
-  html += '</tr></table>';
+  html += '<td><div class="sig-title">Signature du trésorier</div></td>';
+  html += '<td><div class="sig-title">Signature de la Présidente</div></td>';
+  html += '</tr></table></div>';
 
     html += '</body></html>';
 
@@ -28339,8 +28420,10 @@ function exportBudgetExcel(compId) {
       var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rows.push([q(''),q(l.domaine),q('  \u2514 '+(a.libelle||'')),q(''),q(''),q(''),q(''),q('Achat'),q(a.date||''),q(a.tarif||0),q(a.qt||1),q(st.toFixed(2)),q(a.avance?'Oui':'')].join(';'));
     });
+    var _csvCoeff1 = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
     ((l.ndf&&l.ndf.reelle)||[]).forEach(function(a){
-      var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+      var _d = parseFloat(a.distance)||0;
+      var st = _d > 0 ? _d * _csvCoeff1 : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rows.push([q(''),q('NDF'),q('  \u2514 '+(a.libelle||'')),q(''),q(''),q(''),q(''),q('NDF Réelle'),q(a.date||''),q(a.tarif||0),q(a.qt||1),q(st.toFixed(2)),q(a.avance?'Oui':'')].join(';'));
     });
   });
@@ -28358,9 +28441,11 @@ function exportBudgetExcel(compId) {
       var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rows.push([q('Avance'),q(l.domaine),q(a.libelle||l.libelle||''),q(''),q(''),q(''),q(''),q('Achat'),q(a.date||''),q(a.tarif||0),q(a.qt||1),q(st.toFixed(2)),q('Oui')].join(';'));
     });
+    var _csvCoeff2 = parseFloat((l.ndf && l.ndf.coeff) || _ndfRefBareme());
     ((l.ndf&&l.ndf.reelle)||[]).forEach(function(a){
       if(!a.avance) return;
-      var st=(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+      var _d = parseFloat(a.distance)||0;
+      var st = _d > 0 ? _d * _csvCoeff2 : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
       rows.push([q('Avance'),q('NDF'),q(a.libelle||l.libelle||''),q(''),q(''),q(''),q(''),q('NDF Réelle'),q(a.date||''),q(a.tarif||0),q(a.qt||1),q(st.toFixed(2)),q('Oui')].join(';'));
     });
   });
@@ -29028,6 +29113,12 @@ var _bdmCompId = null, _bdmSection = null, _bdmLineId = null;
 var _bdmAchats  = [];
 var _bdmNDFTab  = 'estimation'; // 'estimation' | 'reelle'
 var _bdmNDFReelle = [];
+var _bdmNDFBareme = 0.408;     // barème kilométrique copié depuis l'onglet Estimation
+var _bdmNDFCachedAdresse = ''; // adresse perso cachée (pour sauvegarde depuis onglet Réelle)
+var _bdmNDFCachedLieuRef = ''; // lieu de référence caché
+var _bdmNDFCachedDepart  = ''; // gare départ cachée
+var _bdmNDFCachedArrivee = ''; // gare arrivée cachée
+function _ndfRefBareme(){ return parseFloat((S.odmConfig && S.odmConfig.bareme1Taux)||0.408); }
 
 // ══════════════════════════════════════════════════════════════
 // SCAN QR — RELAY SMARTPHONE → ORDINATEUR
@@ -30197,33 +30288,59 @@ function _scanConfirm() {
 
 function bdmNDFTabSwitch(tab) {
   bdmNDFReelleCollect();
+  // Sauvegarder les valeurs de l'onglet Estimation avant de changer
+  if (_bdmNDFTab === 'estimation') {
+    var _adEl  = document.getElementById('bdm-ndf-adresse');
+    var _liuEl = document.getElementById('bdm-ndf-lieu');
+    var _depEl = document.getElementById('bdm-ndf-depart');
+    var _arrEl = document.getElementById('bdm-ndf-arrivee');
+    if (_adEl)  _bdmNDFCachedAdresse = _adEl.value.trim();
+    if (_liuEl) _bdmNDFCachedLieuRef = _liuEl.value.trim();
+    if (_depEl) _bdmNDFCachedDepart  = _depEl.value.trim();
+    if (_arrEl) _bdmNDFCachedArrivee = _arrEl.value.trim();
+  }
   _bdmNDFTab = tab;
   renderBudgetDetailContent();
 }
 function bdmNDFReelleInit(line) {
+  var _savedCoeff = line.ndf && parseFloat(line.ndf.coeff);
+  _bdmNDFBareme = (!_savedCoeff || _savedCoeff===0.332) ? _ndfRefBareme() : _savedCoeff;
+  // Initialiser le cache lieux depuis les données sauvegardées
+  // Fallback : lieu de la compétition pour le lieu de référence / arrivée
+  var _initCpLieu = ((S.comps||[]).find(function(c){ return c.id === _bdmCompId; }) || {}).lieu || '';
+  _bdmNDFCachedAdresse = (line.ndf && line.ndf.adressePerso) || '';
+  _bdmNDFCachedLieuRef = (line.ndf && line.ndf.lieuRef)      || _initCpLieu;
+  _bdmNDFCachedDepart  = (line.ndf && line.ndf.depart)       || '';
+  _bdmNDFCachedArrivee = (line.ndf && line.ndf.arrivee)      || _initCpLieu;
   var existing = (line.ndf && line.ndf.reelle) || [];
   _bdmNDFReelle = existing.map(function(a){ return Object.assign({}, a); });
-  if (!_bdmNDFReelle.length) _bdmNDFReelle = [{ id:'r'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false }];
+  if (!_bdmNDFReelle.length) _bdmNDFReelle = [{ id:'r'+Date.now(), date:'', libelle:'', distance:0, tarif:0, qt:1, avance:false }];
   // Si des lignes réelles sont complétées → ouvrir en priorité l'onglet Réelle
-  var hasData = _bdmNDFReelle.some(function(a){ return (a.libelle && a.libelle.trim()) || (parseFloat(a.tarif) > 0); });
+  var hasData = _bdmNDFReelle.some(function(a){ return (a.libelle && a.libelle.trim()) || (parseFloat(a.tarif) > 0) || (parseFloat(a.distance) > 0); });
   _bdmNDFTab = hasData ? 'reelle' : 'estimation';
 }
 function bdmNDFReelleCollect() {
   _bdmNDFReelle.forEach(function(a, i) {
     var dateEl = document.getElementById('bnr-date-'+i);
     var libEl  = document.getElementById('bnr-lib-'+i);
+    var distEl = document.getElementById('bnr-dist-'+i);
     var tarEl  = document.getElementById('bnr-tar-'+i);
     var qtEl   = document.getElementById('bnr-qt-'+i);
     var avEl   = document.getElementById('bnr-av-'+i);
-    if (dateEl) a.date    = dateEl.value;
-    if (libEl)  a.libelle = libEl.value;
-    if (tarEl)  a.tarif   = parseFloat(tarEl.value)||0;
-    if (qtEl)   a.qt      = parseInt(qtEl.value)||1;
-    if (avEl)   a.avance  = avEl.checked;
+    if (dateEl) a.date     = dateEl.value;
+    if (libEl)  a.libelle  = libEl.value;
+    if (distEl) a.distance = parseFloat(distEl.value)||0;
+    if (tarEl)  a.tarif    = parseFloat(tarEl.value)||0;
+    if (qtEl)   a.qt       = parseInt(qtEl.value)||1;
+    if (avEl)   a.avance   = avEl.checked;
   });
 }
 function bdmNDFReelleCalcTotal() {
-  return _bdmNDFReelle.reduce(function(s,a){ return s+(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1); }, 0);
+  return _bdmNDFReelle.reduce(function(s,a){
+    var dist = parseFloat(a.distance)||0;
+    var st   = dist > 0 ? dist * _bdmNDFBareme : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+    return s + st;
+  }, 0);
 }
 function _renderNDFReelleRows() {
   var container = document.getElementById('bdm-ndf-reelle-rows');
@@ -30231,13 +30348,16 @@ function _renderNDFReelleRows() {
   var iS = 'box-sizing:border-box;background:#fff;border:1.5px solid #bdd4f7;border-radius:6px;color:#1a2235;font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%';
   var html = '';
   _bdmNDFReelle.forEach(function(a, i) {
-    var st = (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+    var dist = parseFloat(a.distance)||0;
+    var st   = dist > 0 ? dist * _bdmNDFBareme : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
+    var stLabel = dist > 0 ? st.toFixed(2)+' €<span style="font-size:9px;color:#6b7280;display:block;font-weight:400">'+dist+' km × '+_bdmNDFBareme.toFixed(3)+'</span>' : st.toFixed(2)+' €';
     html += '<tr style="border-bottom:1px solid #dce8fb">';
     html += '<td style="padding:4px 3px"><input id="bnr-date-'+i+'" type="date" style="'+iS+'" value="'+(a.date||'')+'"></td>';
     html += '<td style="padding:4px 3px"><input id="bnr-lib-'+i+'" style="'+iS+'" placeholder="Libellé…" value="'+(a.libelle||'').replace(/"/g,'&quot;')+'"></td>';
+    html += '<td style="padding:4px 3px"><input id="bnr-dist-'+i+'" type="number" min="0" step="1" style="'+iS+';text-align:right;max-width:80px" placeholder="0" value="'+(a.distance||0)+'" oninput="bdmNDFReelleSt('+i+')" title="Distance en km — si renseigné, remplace Tarif × Qté"></td>';
     html += '<td style="padding:4px 3px"><input id="bnr-tar-'+i+'" type="number" min="0" step="0.01" style="'+iS+';text-align:right" value="'+(a.tarif||0)+'" oninput="bdmNDFReelleSt('+i+')"></td>';
     html += '<td style="padding:4px 3px"><input id="bnr-qt-'+i+'" type="number" min="1" step="1" style="'+iS+';text-align:center;max-width:60px" value="'+(a.qt||1)+'" oninput="bdmNDFReelleSt('+i+')"></td>';
-    html += '<td id="bnr-st-'+i+'" style="padding:4px 8px;font-size:12px;font-weight:700;color:#2563eb;text-align:right;white-space:nowrap">'+st.toFixed(2)+' €</td>';
+    html += '<td id="bnr-st-'+i+'" style="padding:4px 8px;font-size:12px;font-weight:700;color:'+(dist>0?'#059669':'#2563eb')+';text-align:right;white-space:nowrap">'+stLabel+'</td>';
     html += '<td style="padding:4px 3px;text-align:center"><input id="bnr-av-'+i+'" type="checkbox"'+(a.avance?' checked':'')+' style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b"></td>';
     // ── Colonne photo ──────────────────────────────────────────────────────────
     html += '<td style="padding:4px 3px;text-align:center">';
@@ -30348,22 +30468,30 @@ function bdmNDFPhotoView(idx) {
   document.body.appendChild(ov);
 }
 function bdmNDFReelleAdd() {
-  _bdmNDFReelle.push({ id:'r'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false });
+  _bdmNDFReelle.push({ id:'r'+Date.now(), date:'', libelle:'', distance:0, tarif:0, qt:1, avance:false });
   _renderNDFReelleRows();
 }
 function bdmNDFReelleRemove(idx) {
   _bdmNDFReelle.splice(idx, 1);
-  if (!_bdmNDFReelle.length) _bdmNDFReelle = [{ id:'r'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false }];
+  if (!_bdmNDFReelle.length) _bdmNDFReelle = [{ id:'r'+Date.now(), date:'', libelle:'', distance:0, tarif:0, qt:1, avance:false }];
   _renderNDFReelleRows();
 }
 function bdmNDFReelleSt(idx) {
-  var tarEl = document.getElementById('bnr-tar-'+idx);
-  var qtEl  = document.getElementById('bnr-qt-'+idx);
-  var stEl  = document.getElementById('bnr-st-'+idx);
-  var tar = parseFloat((tarEl||{}).value)||0;
-  var qt  = parseInt((qtEl||{}).value)||1;
-  if (stEl) stEl.textContent = (tar*qt).toFixed(2)+' €';
-  _bdmNDFReelle.forEach(function(a,i){ if(i===idx){ a.tarif=tar; a.qt=qt; } });
+  var distEl = document.getElementById('bnr-dist-'+idx);
+  var tarEl  = document.getElementById('bnr-tar-'+idx);
+  var qtEl   = document.getElementById('bnr-qt-'+idx);
+  var stEl   = document.getElementById('bnr-st-'+idx);
+  var dist = parseFloat((distEl||{}).value)||0;
+  var tar  = parseFloat((tarEl||{}).value)||0;
+  var qt   = parseInt((qtEl||{}).value)||1;
+  var st   = dist > 0 ? dist * _bdmNDFBareme : tar * qt;
+  if (stEl) {
+    stEl.style.color = dist > 0 ? '#059669' : '#2563eb';
+    stEl.innerHTML = dist > 0
+      ? st.toFixed(2)+' €<span style="font-size:9px;color:#6b7280;display:block;font-weight:400">'+dist+' km × '+_bdmNDFBareme.toFixed(3)+'</span>'
+      : st.toFixed(2)+' €';
+  }
+  _bdmNDFReelle.forEach(function(a,i){ if(i===idx){ a.distance=dist; a.tarif=tar; a.qt=qt; } });
   _updateNDFReelleTotal();
 }
 function _updateNDFReelleTotal() {
@@ -30724,8 +30852,8 @@ function renderBudgetDetailContent(overrideDomaine) {
         html += '<input id="bdm-ndf-autoroute" type="number" min="0" step="0.1" style="'+iSlight+';text-align:right" value="'+(ndf.autoroute||'')+'" placeholder="0" oninput="bdmNDFCalc()">';
         html += '<div style="font-size:10px;color:#6b7280;margin-top:2px">Estimé auto. lors du calcul</div></div>';
         html += '<div>'+lb('Barème kilométrique (€/km)');
-        html += '<input id="bdm-ndf-coeff" type="number" min="0" step="0.001" style="'+iSlight+';text-align:right" value="'+(ndf.coeff||0.332)+'" oninput="bdmNDFCalc()" placeholder="0.332">';
-        html += '<div style="font-size:10px;color:#6b7280;margin-top:2px">0.332 (5CV) · 0.368 (6-7CV) · 0.407 (≥8CV)</div></div>';
+        html += '<input id="bdm-ndf-coeff" type="number" min="0" step="0.001" style="'+iSlight+';text-align:right" value="'+((!ndf.coeff || parseFloat(ndf.coeff)===0.332) ? _ndfRefBareme() : parseFloat(ndf.coeff))+'"   oninput="bdmNDFCalc()" placeholder="'+_ndfRefBareme()+'">';
+        html += '<div style="font-size:10px;color:#6b7280;margin-top:2px">Par défaut : taux encadrants (<b>'+_ndfRefBareme().toFixed(3)+'</b> €/km) · modifiable dans Réglages → OM</div></div>';
         html += '<div>'+lb('Péage A/R (€/km autoroute)');
         html += '<input id="bdm-ndf-peage" type="number" min="0" step="0.001" style="'+iSlight+';text-align:right" value="'+(ndf.peage!==undefined?ndf.peage:0.18)+'" oninput="bdmNDFCalc()" placeholder="0.18">';
         html += '<div style="font-size:10px;color:#6b7280;margin-top:2px">~0.18 €/km (estimation)</div></div>';
@@ -30734,7 +30862,7 @@ function renderBudgetDetailContent(overrideDomaine) {
         // ── Résultat véhicule ──
         var dist    = parseFloat(ndf.distance)||0;
         var autoKm  = parseFloat(ndf.autoroute)||0;
-        var coeff   = parseFloat(ndf.coeff)||0.332;
+        var coeff   = (!ndf.coeff || parseFloat(ndf.coeff)===0.332) ? _ndfRefBareme() : parseFloat(ndf.coeff);
         var peage   = ndf.peage!==undefined ? parseFloat(ndf.peage) : 0.18;
         var montant = dist*2*coeff + autoKm*2*peage;
         html += '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px solid #bdd4f7;border-radius:10px;padding:12px 16px">';
@@ -30778,11 +30906,16 @@ function renderBudgetDetailContent(overrideDomaine) {
       bdmNDFReelleInit(line);
       var totR = bdmNDFReelleCalcTotal();
       var thRl = 'padding:7px 4px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #d0d5e0;white-space:nowrap';
+      // Badge barème kilométrique affiché en haut à droite du volet
+      html += '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">';
+      html += '<span style="font-size:10px;color:#059669;font-weight:700;background:#ecfdf5;border:1.5px solid #6ee7b7;padding:3px 10px;border-radius:6px">📐 Barème kilométrique : '+_bdmNDFBareme.toFixed(3)+' €/km</span>';
+      html += '</div>';
       html += '<div style="overflow-x:auto;border-radius:10px;border:1.5px solid #bdd4f7">';
-      html += '<table style="width:100%;border-collapse:collapse;min-width:540px">';
+      html += '<table style="width:100%;border-collapse:collapse;min-width:620px">';
       html += '<thead><tr style="background:#ebf2ff">';
       html += '<th style="'+thRl+';text-align:left">Date</th>';
       html += '<th style="'+thRl+';text-align:left">Libellé</th>';
+      html += '<th style="'+thRl+';text-align:right" title="Distance en km — si renseigné, remplace Tarif × Qté">Distance (km)</th>';
       html += '<th style="'+thRl+';text-align:right">Tarif (€)</th>';
       html += '<th style="'+thRl+';text-align:center">Qté</th>';
       html += '<th style="'+thRl+';text-align:right">Sous-total</th>';
@@ -30950,7 +31083,13 @@ function bdmNDFCalc() {
   if (_bdmTransport === 'vehicule') {
     var dist    = parseFloat((document.getElementById('bdm-ndf-distance')||{}).value) || 0;
     var autoKm  = parseFloat((document.getElementById('bdm-ndf-autoroute')||{}).value) || 0;
-    var coeff   = parseFloat((document.getElementById('bdm-ndf-coeff')||{}).value) || 0.332;
+    var coeff   = parseFloat((document.getElementById('bdm-ndf-coeff')||{}).value) || _ndfRefBareme();
+    _bdmNDFBareme = coeff; // ← synchroniser le barème runtime à chaque changement
+    // Synchroniser le cache lieux depuis les champs visibles
+    var _adEl2 = document.getElementById('bdm-ndf-adresse');
+    var _liEl2 = document.getElementById('bdm-ndf-lieu');
+    if (_adEl2) _bdmNDFCachedAdresse = _adEl2.value.trim();
+    if (_liEl2) _bdmNDFCachedLieuRef = _liEl2.value.trim();
     var peage   = parseFloat((document.getElementById('bdm-ndf-peage')||{}).value);
     if (isNaN(peage)) peage = 0.18;
     montant = dist * 2 * coeff + autoKm * 2 * peage;
@@ -30962,6 +31101,11 @@ function bdmNDFCalc() {
     var icon = _bdmTransport === 'train' ? '🚆' : '✈️';
     if (resEl) resEl.textContent = montant.toFixed(2) + ' €';
     if (subEl) subEl.textContent = coutT.toFixed(2) + ' € × 2 (aller/retour)';
+    // Synchroniser le cache lieux train/avion
+    var _depEl2 = document.getElementById('bdm-ndf-depart');
+    var _arrEl2 = document.getElementById('bdm-ndf-arrivee');
+    if (_depEl2) _bdmNDFCachedDepart  = _depEl2.value.trim();
+    if (_arrEl2) _bdmNDFCachedArrivee = _arrEl2.value.trim();
   }
   if (valEl) valEl.value = montant.toFixed(2);
 }
@@ -31003,6 +31147,7 @@ function bdmLieuSearch(val) {
 function bdmSelectLieu(lieu) {
   var el = document.getElementById('bdm-ndf-lieu');
   if (el) el.value = lieu;
+  _bdmNDFCachedLieuRef = lieu; // mettre à jour le cache immédiatement
   var drop = document.getElementById('bdm-lieu-drop');
   if (drop) drop.style.display = 'none';
   var found = document.getElementById('bdm-lieu-found');
@@ -31136,22 +31281,26 @@ function saveBudgetDetailModal() {
     var montant  = parseFloat((document.getElementById('bdm-valeur')||{}).value) || 0;
     var ndfSave  = { transport: _bdmTransport, vehiculeType: _bdmVehiculeType, personne: personne };
     if (_bdmTransport === 'vehicule') {
-      ndfSave.adressePerso = ((document.getElementById('bdm-ndf-adresse')||{}).value||'').trim();
-      ndfSave.lieuRef      = bdmGetLieu();
+      ndfSave.adressePerso = ((document.getElementById('bdm-ndf-adresse')||{}).value||'').trim() || _bdmNDFCachedAdresse;
+      ndfSave.lieuRef      = bdmGetLieu() || _bdmNDFCachedLieuRef;
       ndfSave.distance     = parseFloat((document.getElementById('bdm-ndf-distance')||{}).value) || 0;
       ndfSave.autoroute    = parseFloat((document.getElementById('bdm-ndf-autoroute')||{}).value) || 0;
-      ndfSave.coeff        = parseFloat((document.getElementById('bdm-ndf-coeff')||{}).value) || 0.332;
+      ndfSave.coeff        = parseFloat((document.getElementById('bdm-ndf-coeff')||{}).value) || _bdmNDFBareme || _ndfRefBareme();
       ndfSave.peage        = parseFloat((document.getElementById('bdm-ndf-peage')||{}).value);
       if (isNaN(ndfSave.peage)) ndfSave.peage = 0.18;
     } else {
-      ndfSave.depart      = ((document.getElementById('bdm-ndf-depart')||{}).value||'').trim();
-      ndfSave.arrivee     = ((document.getElementById('bdm-ndf-arrivee')||{}).value||'').trim();
+      ndfSave.depart      = ((document.getElementById('bdm-ndf-depart')||{}).value||'').trim()  || _bdmNDFCachedDepart;
+      ndfSave.arrivee     = ((document.getElementById('bdm-ndf-arrivee')||{}).value||'').trim() || _bdmNDFCachedArrivee;
       ndfSave.coutTrajet  = parseFloat((document.getElementById('bdm-ndf-cout-trajet')||{}).value) || 0;
     }
     // ── Réelle : prioritaire sur le montant estimé ──
     bdmNDFReelleCollect();
     ndfSave.reelle = _bdmNDFReelle.filter(function(a){ return a.libelle||a.tarif; });
-    var reelleTotal = ndfSave.reelle.reduce(function(s,a){ return s+(parseFloat(a.tarif)||0)*(parseInt(a.qt)||1); }, 0);
+    var _reelleCoeff = parseFloat(ndfSave.coeff || _ndfRefBareme());
+    var reelleTotal = ndfSave.reelle.reduce(function(s,a){
+      var _d = parseFloat(a.distance)||0;
+      return s + (_d > 0 ? _d * _reelleCoeff : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1));
+    }, 0);
     line.ndf     = ndfSave;
     line.valeur  = reelleTotal > 0 ? reelleTotal : montant;
     line.nbjours = 1;
