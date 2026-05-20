@@ -2888,7 +2888,11 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <span id="pm-photo-icon" style="font-size:32px">📷</span>
       </div>
       <input type="file" id="pm-photo-inp" accept="image/*" style="display:none" onchange="handlePMPhoto(this)">
-      <div style="font-size:12px;color:var(--txt2)">Photo du compétiteur<br><span style="font-size:11px;color:var(--txt3)">Appuyer sur le cercle</span></div>
+      <div style="font-size:12px;color:var(--txt2)">
+        Photo du compétiteur<br>
+        <span style="font-size:11px;color:var(--txt3)">Appuyer sur le cercle pour changer</span><br>
+        <button type="button" id="pm-photo-del" onclick="pmDeletePhoto()" style="display:none;margin-top:6px;padding:3px 10px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;font-size:11px;cursor:pointer;font-family:inherit">✕ Supprimer la photo</button>
+      </div>
     </div>
     <!-- ── Identité ── -->
     <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">Identité</div>
@@ -3331,36 +3335,31 @@ var S = {
   ordresMission: []
 };
 
-var BASE44_APP_ID  = '699889ffedef688bae3506c8'; // Production app ID
-var BASE44_BEARER  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtYXp6b3VuaUBmZnBsdW0ub3JnIiwiZXhwIjoxNzc5NzA0NDMzLCJpYXQiOjE3NzE5Mjg0MzN9.veOdFHyflGb6sVPxPLqDlToM2kooiFsUxSEU_EJNP2o';
-var BASE44_ORIGIN  = 'https://ffplum-sport-hub.base44.app/api/apps/' + BASE44_APP_ID + '/entities';
+var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
+var BASE44_API_KEY = 'ecbf0aece16b406f9c6389bff60f4a81';
+var BASE44_ORIGIN  = 'https://app.base44.com/api/apps/' + BASE44_APP_ID + '/entities';
 async function b44Fetch(path) {
   var target = BASE44_ORIGIN + path;
-  // Essai 1 : corsproxy avec x-cors-headers pour transmettre l'Authorization
-  var url = 'https://corsproxy.io/?url=' + encodeURIComponent(target);
+  // Essai 1 : direct (CORS supporté par base44)
   try {
-    var resp = await fetch(url, {
-      headers: {
-        'x-cors-headers': JSON.stringify({ 'Authorization': 'Bearer ' + BASE44_BEARER, 'Content-Type': 'application/json' })
-      }
-    });
+    var resp = await fetch(target, { headers: { 'api_key': BASE44_API_KEY } });
     var text = await resp.text();
     console.log('[b44Fetch]', path, '→ status:', resp.status, '| body:', text.substring(0, 200));
-    if (text && text.trim() !== '' && text.trim() !== '[]' && text.trim() !== 'null') {
+    if (resp.ok && text && text.trim() !== '' && text.trim() !== '[]' && text.trim() !== 'null') {
       return new Response(text, { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-  } catch(e) { console.warn('[b44Fetch proxy1 failed]', e.message); }
-  // Essai 2 : allorigins (autre proxy CORS)
+  } catch(e) { console.warn('[b44Fetch direct failed]', e.message); }
+  // Essai 2 : corsproxy fallback
   try {
-    var url2 = 'https://api.allorigins.win/get?url=' + encodeURIComponent(target + (target.indexOf('?') === -1 ? '?' : '&') + 'Authorization=Bearer%20' + BASE44_BEARER);
-    var r2 = await fetch(url2);
-    var j2 = await r2.json();
-    var t2 = j2.contents || '[]';
-    console.log('[b44Fetch allorigins]', '→ body:', t2.substring(0, 200));
+    var url2 = 'https://corsproxy.io/?url=' + encodeURIComponent(target);
+    var r2 = await fetch(url2, {
+      headers: { 'x-cors-headers': JSON.stringify({ 'api_key': BASE44_API_KEY }) }
+    });
+    var t2 = await r2.text();
     if (t2 && t2.trim() !== '' && t2.trim() !== '[]') {
       return new Response(t2, { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-  } catch(e) { console.warn('[b44Fetch proxy2 failed]', e.message); }
+  } catch(e) { console.warn('[b44Fetch proxy failed]', e.message); }
   return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -11488,6 +11487,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += _eqpMI(_eqpDl,'Exporter JSON',      'exportEquipageFmt(\'json\',\''+cid+'\')');
     html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
     html5 += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_eqpUl+'<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importEquipageAuto(this,\''+cid+'\');_eqpActClose()"></label>';
+    html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    var _b44Ico = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 2H3v16h5v4l4-4h5l4-4V2zm-10 9V7m5 4V7"/></svg>';
+    html5 += _eqpMI(_b44Ico, 'Sync base44', 'openBase44Picker(\''+cid+'\');_eqpActClose()');
     html5 += '</div>';
     html5 += '</div>';
     html5 += '</div>';
@@ -20171,10 +20173,23 @@ function handlePMPhoto(inp) {
     inp._data = e.target.result;
     var img  = document.getElementById('pm-photo-img');
     var icon = document.getElementById('pm-photo-icon');
+    var del  = document.getElementById('pm-photo-del');
     if (img)  { img.src = e.target.result; img.style.display = ''; }
     if (icon) icon.style.display = 'none';
+    if (del)  del.style.display = '';
   };
   reader.readAsDataURL(inp.files[0]);
+}
+
+function pmDeletePhoto() {
+  var img  = document.getElementById('pm-photo-img');
+  var icon = document.getElementById('pm-photo-icon');
+  var del  = document.getElementById('pm-photo-del');
+  var inp  = document.getElementById('pm-photo-inp');
+  if (img)  { img.src = ''; img.style.display = 'none'; }
+  if (icon) icon.style.display = '';
+  if (del)  del.style.display = 'none';
+  if (inp)  { inp._data = '__deleted__'; inp.value = ''; }
 }
 
 function openAddPilotManual() {
@@ -20194,9 +20209,11 @@ function openAddPilotManual() {
   var pmImg  = document.getElementById('pm-photo-img');
   var pmIcon = document.getElementById('pm-photo-icon');
   var pmInp  = document.getElementById('pm-photo-inp');
+  var pmDel  = document.getElementById('pm-photo-del');
   if (pmImg)  { pmImg.src = ''; pmImg.style.display = 'none'; }
   if (pmIcon) pmIcon.style.display = '';
   if (pmInp)  { pmInp._data = null; pmInp.value = ''; }
+  if (pmDel)  pmDel.style.display = 'none';
   updatePMClasse();
   pmToggleULM();
   // Remplir la liste des compétitions
@@ -20257,7 +20274,8 @@ function savePilotManual() {
     maillot: document.getElementById('pm-maillot').value,
     role: (document.getElementById('pm-role')||{value:'Pilote'}).value || 'Pilote',
     statut: 'pilote',
-    photo: pmPhotoData || (existingPilot ? existingPilot.photo : null)
+    photo: pmPhotoData === '__deleted__' ? null
+         : pmPhotoData || (existingPilot ? existingPilot.photo : null)
   };
   var ulm = {
     classe: document.getElementById('pm-classe').value,
@@ -20339,6 +20357,21 @@ function editPilotManual(pilotId) {
   document.getElementById('pm-moteur').value    = u.moteur    || '';
   document.getElementById('pm-immat').value     = u.immat     || '';
   document.getElementById('pm-categorie').value = u.categorie || '';
+  // ── Photo ──
+  var pmImg  = document.getElementById('pm-photo-img');
+  var pmIcon = document.getElementById('pm-photo-icon');
+  var pmInp  = document.getElementById('pm-photo-inp');
+  var pmDel  = document.getElementById('pm-photo-del');
+  if (pmInp) { pmInp._data = null; pmInp.value = ''; }
+  if (p.photo) {
+    if (pmImg)  { pmImg.src = p.photo; pmImg.style.display = ''; }
+    if (pmIcon) pmIcon.style.display = 'none';
+    if (pmDel)  pmDel.style.display = '';
+  } else {
+    if (pmImg)  { pmImg.src = ''; pmImg.style.display = 'none'; }
+    if (pmIcon) pmIcon.style.display = '';
+    if (pmDel)  pmDel.style.display = 'none';
+  }
   updatePMClasse();
   pmToggleULM();
   // Remplir compétitions
@@ -21883,20 +21916,44 @@ async function syncBase44Competitions() {
 async function syncBase44Registrations(geststolCompId) {
   var comp = S.comps.find(function(c){ return c.id === geststolCompId; });
   if (!comp) throw new Error('Compétition introuvable');
-  if (!comp._base44Id) { toast('Cette compétition n\'est pas liée à Base44', 'err'); return { added:0, updated:0, skipped:0 }; }
 
-  // Récupérer TOUTES les pages d'inscriptions
-  var regs = [];
-  var lim2 = 100, off2 = 0, more = true;
-  while (more) {
-    var resp = await b44Fetch('/Registration?event_id=' + encodeURIComponent(comp._base44Id) + '&limit=' + lim2 + '&offset=' + off2);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    var json2 = await resp.json();
-    var page2 = Array.isArray(json2) ? json2 : (json2.data || json2.registrations || json2.items || []);
-    regs = regs.concat(page2);
-    if (page2.length < lim2) more = false;
-    else off2 += lim2;
+  // Résoudre les event IDs liés : _base44Ids[] prioritaire, sinon _base44Id seul
+  var eventIds = comp._base44Ids && comp._base44Ids.length ? comp._base44Ids
+               : comp._base44Id ? [comp._base44Id] : [];
+
+  // Si aucun lien → afficher le picker (premier paramétrage)
+  if (!eventIds.length) {
+    try {
+      toast('Chargement des événements base44…', 'info');
+      var allResp = await b44Fetch('/Registration');
+      if (!allResp.ok) throw new Error('HTTP ' + allResp.status);
+      var allRegs = await allResp.json();
+      if (!Array.isArray(allRegs) || !allRegs.length) { toast('Aucun inscrit trouvé dans base44', 'err'); return { added:0, updated:0, skipped:0 }; }
+      _base44ShowEventPicker(allRegs, geststolCompId);
+    } catch(e) {
+      toast('Erreur base44 : ' + e.message, 'err');
+    }
+    return { added:0, updated:0, skipped:0 };
   }
+
+  // Récupérer les inscriptions de TOUS les event IDs liés (avec pagination)
+  var regs = [];
+  for (var ei = 0; ei < eventIds.length; ei++) {
+    var eid = eventIds[ei];
+    var lim2 = 100, off2 = 0, more = true;
+    while (more) {
+      var resp = await b44Fetch('/Registration?event_id=' + encodeURIComponent(eid) + '&limit=' + lim2 + '&offset=' + off2);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var json2 = await resp.json();
+      var page2 = Array.isArray(json2) ? json2 : (json2.data || json2.registrations || json2.items || []);
+      regs = regs.concat(page2);
+      if (page2.length < lim2) more = false;
+      else off2 += lim2;
+    }
+  }
+  // Dédupliquer par id (un pilote inscrit sur 2 compètes ne compte qu'une fois)
+  var seen = {};
+  regs = regs.filter(function(r){ if (seen[r.id]) return false; seen[r.id]=1; return true; });
 
   // Filtrer : seulement submitted ou validated
   regs = regs.filter(function(r){ return r.status === 'submitted' || r.status === 'validated'; });
@@ -21908,6 +21965,13 @@ async function syncBase44Registrations(geststolCompId) {
 
   var AIRCRAFT_CLASS_MAP = { classe_2:'pendulaire', classe_3:'multiaxes', classe_4:'autogire', classe_6:'microlight' };
 
+  // Convertit l'URL base44 privée en URL media.base44.com publique (CORS *)
+  var _b44ToMediaUrl = function(url) {
+    if (!url) return '';
+    var m = url.match(/\/public\/(.+)$/);
+    return m ? 'https://media.base44.com/images/public/' + m[1] : url;
+  };
+
   regs.forEach(function(reg) {
     // a. Chercher pilote existant
     var normName = function(s){ return (s||'').toLowerCase().trim(); };
@@ -21917,41 +21981,66 @@ async function syncBase44Registrations(geststolCompId) {
     });
 
     var pilotId;
+    var _b44Genre = reg.gender === 'male' ? 'M.' : reg.gender === 'female' ? 'Mme.' : '';
+    var _b44Pays  = reg.country || '';
+    var _b44Type  = reg.pilot_type === 'foreign' ? 'Étranger' : reg.pilot_type === 'french' ? 'Français' : '';
     if (pilot) {
       pilotId = pilot.id;
       // b. Mettre à jour les champs vides uniquement
-      if (!pilot.ddn   && reg.date_of_birth)  pilot.ddn    = reg.date_of_birth;
-      if (!pilot.email && reg.email)           pilot.email  = reg.email;
-      if (!pilot.tel   && reg.phone)           pilot.tel    = reg.phone;
-      if (!pilot.adresse && reg.address)       pilot.adresse = reg.address;
-      if (!pilot.region  && reg.region)        pilot.region  = reg.region;
-      if (!pilot.licence && reg.licence_number) pilot.licence = reg.licence_number;
-      if (!pilot.licenceFai && reg.fai_license_number) pilot.licenceFai = reg.fai_license_number;
-      if (!pilot.club  && reg.club_name)       pilot.club   = reg.club_name;
-      if (!pilot.clubNum && reg.club_number)   pilot.clubNum = reg.club_number;
-      if (!pilot.genre && reg.gender) pilot.genre = reg.gender === 'male' ? 'M.' : reg.gender === 'female' ? 'Mme.' : '';
-      pilot._base44RegId = reg.id;
+      if (!pilot.ddn        && reg.date_of_birth)        pilot.ddn         = reg.date_of_birth;
+      if (!pilot.email      && reg.email)                pilot.email       = reg.email;
+      if (!pilot.tel        && reg.phone)                pilot.tel         = reg.phone;
+      if (!pilot.adresse    && reg.address)              pilot.adresse     = reg.address;
+      if (!pilot.region     && reg.region)               pilot.region      = (reg.region||'').trim();
+      if (!pilot.pays       && _b44Pays)                 pilot.pays        = _b44Pays;
+      if (!pilot.pilotType  && _b44Type)                 pilot.pilotType   = _b44Type;
+      if (!pilot.licence    && reg.licence_number)       pilot.licence     = reg.licence_number;
+      if (!pilot.licence    && reg.license_number)       pilot.licence     = reg.license_number;
+      if (!pilot.licenceFai && reg.fai_license_number)   pilot.licenceFai  = reg.fai_license_number;
+      if (!pilot.club       && reg.club_name)            pilot.club        = reg.club_name;
+      if (!pilot.clubNum    && reg.club_number)          pilot.clubNum     = reg.club_number;
+      if (!pilot.genre      && _b44Genre)                pilot.genre       = _b44Genre;
+      if (!pilot.urgenceNom && reg.emergency_contact_name)  pilot.urgenceNom = (reg.emergency_contact_name||'').trim();
+      if (!pilot.urgenceTel && reg.emergency_contact_phone) pilot.urgenceTel = reg.emergency_contact_phone;
+      if (!pilot.numeroDossier && reg.pilot_folder_id)   pilot.numeroDossier = reg.pilot_folder_id;
+      if (!pilot.photo      && reg.photo_portrait)       pilot.photo = _b44ToMediaUrl(reg.photo_portrait);
+      // Champs toujours mis à jour (état base44)
+      pilot.droitsRegles           = reg.droits_regles || false;
+      pilot.participationConfirmee = reg.participation_confirmed || false;
+      pilot.b44Statut              = reg.status || '';
+      pilot.b44ValidatedAt         = reg.validated_at || '';
+      pilot._base44RegId           = reg.id;
       updated++;
     } else {
       // c. Créer nouveau pilote
       pilotId = 'b44p-' + reg.id;
       var newPilot = {
-        id:          pilotId,
-        _base44RegId: reg.id,
-        prenom:      reg.first_name || '',
-        nom:         reg.last_name  || '',
-        ddn:         reg.date_of_birth || '',
-        email:       reg.email || '',
-        tel:         reg.phone || '',
-        adresse:     reg.address || '',
-        region:      reg.region || '',
-        licence:     reg.licence_number || reg.license_number || '',
-        licenceFai:  reg.fai_license_number || '',
-        club:        reg.club_name || '',
-        clubNum:     reg.club_number || '',
-        genre:       reg.gender === 'male' ? 'M.' : reg.gender === 'female' ? 'Mme.' : '',
-        statut:      'pilote',
-        _fromBase44: true
+        id:                   pilotId,
+        _base44RegId:         reg.id,
+        prenom:               reg.first_name || '',
+        nom:                  reg.last_name  || '',
+        ddn:                  reg.date_of_birth || '',
+        email:                reg.email || '',
+        tel:                  reg.phone || '',
+        adresse:              (reg.address||'').trim(),
+        region:               (reg.region||'').trim(),
+        pays:                 _b44Pays,
+        pilotType:            _b44Type,
+        licence:              reg.licence_number || reg.license_number || '',
+        licenceFai:           reg.fai_license_number || '',
+        club:                 reg.club_name || '',
+        clubNum:              reg.club_number || '',
+        genre:                _b44Genre,
+        urgenceNom:           (reg.emergency_contact_name||'').trim(),
+        urgenceTel:           reg.emergency_contact_phone || '',
+        numeroDossier:        reg.pilot_folder_id || '',
+        photo:                _b44ToMediaUrl(reg.photo_portrait),
+        droitsRegles:         reg.droits_regles || false,
+        participationConfirmee: reg.participation_confirmed || false,
+        b44Statut:            reg.status || '',
+        b44ValidatedAt:       reg.validated_at || '',
+        statut:               'pilote',
+        _fromBase44:          true
       };
       if (!S.pilots) S.pilots = [];
       S.pilots.push(newPilot);
@@ -21982,6 +22071,7 @@ async function syncBase44Registrations(geststolCompId) {
   });
 
   saveState(); silentPush();
+
   return { added: added, updated: updated, skipped: skipped };
 }
 
@@ -23998,6 +24088,329 @@ function exportEquipageJSON(compId) {
   a.download = 'Equipage_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.json'; a.click(); URL.revokeObjectURL(a.href);
   toast('Export JSON téléchargé ✓','ok');
 }
+// ── BASE44 SYNC — sélecteur d'événement + import ─────────────────────────────
+
+/* Ouverture manuelle du picker (bouton Actions) — toujours afficher le sélecteur */
+async function openBase44Picker(compId) {
+  // Indicateur visuel de chargement
+  var btn = document.getElementById('b44-import-btn');
+  toast('Connexion à base44…', 'info');
+
+  var regs = null;
+
+  // Essai 1 : fetch direct (CORS)
+  try {
+    var r1 = await fetch(BASE44_ORIGIN + '/Registration', { headers: { 'api_key': BASE44_API_KEY } });
+    if (r1.ok) regs = await r1.json();
+  } catch(e) { console.warn('[base44 direct]', e.message); }
+
+  // Essai 2 : proxy corsproxy.io
+  if (!regs || !regs.length) {
+    try {
+      var url2 = 'https://corsproxy.io/?url=' + encodeURIComponent(BASE44_ORIGIN + '/Registration');
+      var r2 = await fetch(url2, { headers: { 'x-cors-headers': JSON.stringify({ 'api_key': BASE44_API_KEY }) } });
+      if (r2.ok) regs = await r2.json();
+    } catch(e) { console.warn('[base44 proxy]', e.message); }
+  }
+
+  // Essai 3 : allorigins
+  if (!regs || !regs.length) {
+    try {
+      var url3 = 'https://api.allorigins.win/get?url=' + encodeURIComponent(BASE44_ORIGIN + '/Registration?api_key=' + BASE44_API_KEY);
+      var r3 = await fetch(url3);
+      var j3 = await r3.json();
+      if (j3.contents) regs = JSON.parse(j3.contents);
+    } catch(e) { console.warn('[base44 allorigins]', e.message); }
+  }
+
+  if (!regs || !Array.isArray(regs) || !regs.length) {
+    toast('Impossible de joindre base44. Vérifiez votre connexion.', 'err');
+    return;
+  }
+
+  _base44ShowEventPicker(regs, compId);
+}
+
+function _base44ShowEventPicker(regs, compId) {
+  // ── Grouper par événement ──
+  var events = {};
+  regs.forEach(function(r) {
+    var eid = r.event_id || r.event_title || '?';
+    if (!events[eid]) events[eid] = { title: r.event_title || eid, id: eid, total: 0, validated: 0, cancelled: 0 };
+    events[eid].total++;
+    if (r.status === 'validated') events[eid].validated++;
+    if (r.cancelled_at) events[eid].cancelled++;
+  });
+  var evList = Object.values(events).sort(function(a,b){ return b.total - a.total; });
+
+  // ── Pré-sélection : IDs déjà liés à cette compétition ──
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; }) || {};
+  var linkedIds = cp._base44Ids && cp._base44Ids.length ? cp._base44Ids
+                : cp._base44Id ? [cp._base44Id]
+                : cp.base44EventId ? [cp.base44EventId]
+                : [evList[0] && evList[0].id].filter(Boolean);
+
+  // ── Modal HTML ──
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+
+  var html = '';
+  html += '<div onclick="if(event.target.id===\'b44-overlay\')_b44Close()" id="b44-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto">';
+  html += '<div style="background:#1a2744;border:1px solid #2d3f6b;border-radius:16px;width:100%;max-width:540px;box-shadow:0 20px 60px rgba(0,0,0,.6)">';
+  // Header
+  html += '<div style="padding:16px 20px 12px;border-bottom:1px solid #2d3f6b;display:flex;align-items:center;justify-content:space-between">';
+  html += '<div style="font-size:14px;font-weight:700;color:#e2e8f0">Sync base44 — sélectionner les événements</div>';
+  html += '<button onclick="_b44Close()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px">✕</button>';
+  html += '</div>';
+  html += '<div style="padding:8px 20px;font-size:11px;color:#64748b;border-bottom:1px solid #2d3f6b">'+regs.length+' inscrits · '+evList.length+' événements — cochez un ou plusieurs à fusionner</div>';
+  // Liste avec CASES À COCHER (multi-sélection)
+  html += '<div id="b44-ev-list" style="padding:10px 12px">';
+  evList.forEach(function(ev) {
+    var isSel = linkedIds.indexOf(ev.id) !== -1;
+    html += '<label id="b44-lbl-'+esc(ev.id)+'" style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;border:1.5px solid '+(isSel?'#3b82f6':'#2d3f6b')+';background:'+(isSel?'rgba(59,130,246,.12)':'transparent')+'">';
+    html += '<input type="checkbox" class="b44-chk" value="'+esc(ev.id)+'" '+(isSel?'checked':'')+' onchange="_b44SelectEvent(this)" style="margin-top:3px;accent-color:#3b82f6;flex-shrink:0;width:15px;height:15px">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:4px">'+esc(ev.title)+'</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    html += '<span style="font-size:10px;color:#64748b">'+ev.total+' inscrits</span>';
+    if (ev.validated) html += '<span style="font-size:10px;color:#34d399">✓ '+ev.validated+' validés</span>';
+    if (ev.cancelled) html += '<span style="font-size:10px;color:#f87171">✕ '+ev.cancelled+' annulés</span>';
+    html += '</div></div>';
+    html += '</label>';
+  });
+  html += '</div>';
+  // Footer
+  html += '<div style="padding:14px 20px;border-top:1px solid #2d3f6b;display:flex;align-items:center;gap:10px;background:#1a2744;border-radius:0 0 16px 16px">';
+  html += '<span id="b44-sel-count" style="flex:1;font-size:11px;color:#64748b">'+linkedIds.length+' sélectionné'+(linkedIds.length>1?'s':'')+'</span>';
+  html += '<button onclick="_b44Close()" style="padding:9px 18px;border-radius:8px;border:1px solid #2d3f6b;background:transparent;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>';
+  html += '<button id="b44-import-btn" onclick="_b44ConfirmImport()" style="padding:9px 22px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Importer ↓</button>';
+  html += '</div>';
+  html += '</div></div>';
+
+  // Créer l'élément racine qui stocke les données
+  var el = document.createElement('div');
+  el.id = 'b44-root';
+  el.setAttribute('data-compid', compId);
+  el.setAttribute('data-regs', JSON.stringify(regs));
+  el.innerHTML = html;
+  document.body.appendChild(el);
+}
+
+function _b44SelectEvent(chk) {
+  // Mettre à jour le style du label parent
+  var lbl = chk.closest('label');
+  if (lbl) {
+    lbl.style.border     = chk.checked ? '1.5px solid #3b82f6' : '1.5px solid #2d3f6b';
+    lbl.style.background = chk.checked ? 'rgba(59,130,246,.12)' : 'transparent';
+  }
+  // Mettre à jour le compteur
+  var n = document.querySelectorAll('.b44-chk:checked').length;
+  var cnt = document.getElementById('b44-sel-count');
+  if (cnt) cnt.textContent = n + ' sélectionné' + (n > 1 ? 's' : '');
+}
+
+function _b44ConfirmImport() {
+  var root = document.getElementById('b44-root');
+  if (!root) return;
+  var compId  = root.getAttribute('data-compid') || '';
+  var regs    = JSON.parse(root.getAttribute('data-regs') || '[]');
+  var checked = Array.from(document.querySelectorAll('.b44-chk:checked'));
+  if (!checked.length) { toast('Cochez au moins un événement', 'err'); return; }
+  var eventIds = checked.map(function(c){ return c.value; });
+  _b44Close();
+  _base44DoImportMulti(regs, eventIds, compId);
+}
+
+function _b44Close() {
+  var el = document.getElementById('b44-root');
+  if (el) el.remove();
+}
+
+async function _base44DoImportMulti(regs, eventIds, compId) {
+  // Filtrer par tous les événements sélectionnés, exclure annulés
+  var filtered = regs.filter(function(r) {
+    return eventIds.indexOf(r.event_id) !== -1 && !r.cancelled_at;
+  });
+  // Dédupliquer par id d'inscription (un pilote dans 2 events ne compte qu'une fois)
+  var seen = {};
+  filtered = filtered.filter(function(r){ if (seen[r.id]) return false; seen[r.id]=1; return true; });
+  if (!filtered.length) { toast('Aucun inscrit pour cet événement', 'err'); return; }
+
+  if (!S.pilots)     S.pilots = [];
+  if (!S.compEnroll) S.compEnroll = {};
+  if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+  if (!S.ulms)       S.ulms = {};
+
+  var normN = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); };
+
+  // Mappers base44 → Gest'Appli
+  var _b44Classe = function(r) {
+    var ac = (r.aircraft_class||'').toLowerCase();
+    if (ac==='classe_1') return 'pendulaire';
+    if (ac==='classe_2') return 'pendulaire';
+    if (ac==='classe_3') return 'multiaxes';
+    if (ac==='classe_4') return 'gyro';
+    // fallback via discipline
+    var disc = (r.discipline||'').toLowerCase();
+    if (disc==='stol' || disc==='classic') return 'multiaxes'; // microlight par défaut
+    return '';
+  };
+  var _b44Pratique = function(r) {
+    var p = (r.practice||'').toLowerCase();
+    if (p==='paramotor' || p.indexOf('param')!==-1) return 'paramoteur';
+    if (p==='microlight' || p.indexOf('micro')!==-1) return 'microlight';
+    return '';
+  };
+  var _b44Genre = function(g) {
+    if (!g) return '';
+    g = g.toLowerCase();
+    if (g==='male'||g==='m'||g==='homme') return 'M.';
+    if (g==='female'||g==='f'||g==='femme') return 'Mme.';
+    return '';
+  };
+  var _b44Equip = function(s) {
+    s = (s||'').toLowerCase();
+    if (s==='monoplace'||s==='solo'||s==='mono'||s==='1') return 'Monoplace';
+    if (s==='biplace'||s==='duo'||s==='bi'||s==='2') return 'Biplace';
+    return s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
+  };
+  var _b44Role = function(r) {
+    var s = (r||'').toLowerCase();
+    if (s==='pilot') return 'Pilote';
+    if (s==='navigator'||s==='copilot') return 'Navigateur';
+    return s ? s.charAt(0).toUpperCase()+s.slice(1) : 'Pilote';
+  };
+
+  // Convertit l'URL base44 privée en URL media.base44.com publique (CORS *)
+  var _b44ToMediaUrl = function(url) {
+    if (!url) return '';
+    var m = url.match(/\/public\/(.+)$/);
+    return m ? 'https://media.base44.com/images/public/' + m[1] : url;
+  };
+
+  var nbCreated=0, nbUpdated=0, nbEnrolled=0;
+
+  filtered.forEach(function(r) {
+    var nom    = (r.last_name||'').trim().toUpperCase();
+    var prenom = (r.first_name||'').trim();
+    var lic    = (r.license_number||r.licence_number||'').trim();
+    if (!nom && !prenom && !lic) return;
+
+    var classe  = _b44Classe(r);
+    var pratique= _b44Pratique(r);
+
+    // ── Trouver pilote existant : licence prioritaire, puis nom+prénom ──
+    var existing = null;
+    if (lic) existing = S.pilots.find(function(p){ return p.licence===lic; });
+    if (!existing && nom) existing = S.pilots.find(function(p){
+      return normN(p.nom)===normN(nom) && normN(p.prenom)===normN(prenom);
+    });
+
+    var pid = existing ? existing.id : ('b44-' + r.id);
+
+    var pilot = {
+      id:                   pid,
+      nom:                  nom,
+      prenom:               prenom,
+      licence:              lic,
+      licenceFai:           r.fai_license_number||'',
+      email:                r.email||'',
+      tel:                  r.phone||'',
+      club:                 (r.club_name||'').trim(),
+      clubNum:              r.club_number||'',
+      region:               (r.region||'').trim(),
+      pays:                 r.country||'',
+      pilotType:            r.pilot_type==='foreign' ? 'Étranger' : r.pilot_type==='french' ? 'Français' : '',
+      ddn:                  r.date_of_birth||'',
+      genre:                _b44Genre(r.gender),
+      adresse:              (r.address||'').trim(),
+      urgenceNom:           (r.emergency_contact_name||'').trim(),
+      urgenceTel:           r.emergency_contact_phone||'',
+      numeroDossier:        r.pilot_folder_id||'',
+      photo:                _b44ToMediaUrl(r.photo_portrait),
+      pratique:             pratique,
+      classe:               classe,
+      discipline:           r.discipline||'',
+      equipage:             _b44Equip(r.seat_config),
+      role:                 _b44Role(r.role),
+      categorie:            r.category||'',
+      droitsRegles:         r.droits_regles||false,
+      participationConfirmee: r.participation_confirmed||false,
+      b44Statut:            r.status||'',
+      b44ValidatedAt:       r.validated_at||'',
+      statut:               'pilote',
+      _base44RegId:         r.id,
+      _updatedAt:           Date.now()
+    };
+
+    if (existing) {
+      Object.assign(existing, pilot);
+      existing.id = pid; // garder l'id original
+      nbUpdated++;
+    } else {
+      S.pilots.push(pilot);
+      nbCreated++;
+    }
+
+    // ── Inscription à la compétition ──
+    if (!S.compEnroll[compId].includes(pid)) {
+      S.compEnroll[compId].push(pid);
+      nbEnrolled++;
+    }
+
+    // ── ULM / matériel ──
+    var immat = (r.aircraft_registration || r.wing_registration_1 || '').trim();
+    var moteur = (r.engine_brand||'') + (r.engine_model ? ' '+r.engine_model : '') || (r.aircraft_engine||'') || (r.aircraft_engine_brand_model||'');
+    if (immat || r.aircraft_brand || r.aircraft_model || r.wing_registration_1) {
+      _mergeImportUlm(pid,
+        immat,
+        (r.aircraft_brand || r.chassis_brand || '').trim(),
+        (r.aircraft_model||'').trim(),
+        classe || (pratique==='paramoteur' ? 'paramotor' : 'multiaxes'),
+        r.discipline||'',
+        moteur.trim(),
+        r.propeller_model||'',
+        (r.wing_registration_1||'').trim()
+      );
+    }
+  });
+
+  // ── Mémoriser les event IDs liés (pour auto-sync futur) ──
+  var cpIdx = (S.comps||[]).findIndex(function(c){ return c.id===compId; });
+  if (cpIdx>=0) {
+    S.comps[cpIdx]._base44Ids    = eventIds;                   // tableau (multi-event)
+    S.comps[cpIdx]._base44Id     = eventIds[0] || '';          // compat. ancienne logique
+    S.comps[cpIdx].base44EventId = eventIds[0] || '';
+    S.comps[cpIdx]._base44LastSync = new Date().toISOString(); // horodatage
+  }
+
+  if (!S._enrollResetAt) S._enrollResetAt = {};
+  S._enrollResetAt[compId] = Date.now();
+
+  saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
+  var _evLabel = eventIds.length > 1 ? eventIds.length+' événements fusionnés' : '1 événement';
+  toast(nbEnrolled+' inscrit'+(nbEnrolled>1?'s':'')+' importé'+(nbEnrolled>1?'s':'')+' ('+_evLabel+')'+(nbUpdated?' · '+nbUpdated+' mis à jour':''), 'ok');
+  console.log('[base44] créés:'+nbCreated+' mis à jour:'+nbUpdated+' inscrits:'+nbEnrolled+' events:'+eventIds.join(','));
+
+}
+// ── Auto-sync base44 toutes les 5 minutes sur la compétition active ──────────
+(function() {
+  var _b44AutoTimer = null;
+  function _b44AutoSync() {
+    if (!navigator.onLine) return;
+    var comp = (S.comps||[]).find(function(c){ return c.id === _currentCompId; });
+    if (!comp) return;
+    var hasLink = (comp._base44Ids && comp._base44Ids.length) || comp._base44Id;
+    if (!hasLink) return;
+    syncBase44Registrations(comp.id).catch(function(){});
+  }
+  // Démarrer après 30s (laisser l'app s'initialiser) puis toutes les 5 min
+  setTimeout(function() {
+    _b44AutoSync();
+    _b44AutoTimer = setInterval(_b44AutoSync, 5 * 60 * 1000);
+  }, 30000);
+})();
+// ── Fin BASE44 SYNC ───────────────────────────────────────────────────────────
+
 function importEquipageAuto(inp, compId) {
   var file = inp.files && inp.files[0]; if (!file) return;
   var ext = file.name.split('.').pop().toLowerCase(); inp.value = '';
