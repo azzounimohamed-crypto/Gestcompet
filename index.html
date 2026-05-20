@@ -4336,7 +4336,7 @@ function renderCompetitions() {
     var card = document.createElement('div');
     card.className = 'comp-card';
     card.style.cssText = 'padding:0;overflow:hidden;display:flex;align-items:stretch';
-    card.onclick = (function(id){ return function(){ if(window.innerWidth>=768){_homeDetailTab='infos';showPage('page-home');document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){b.classList.remove('active');});var _dnrC=document.getElementById('dnr-competitions');if(_dnrC)_dnrC.classList.add('active');setTimeout(function(){showHomeCompDetail(id);},60);}else{openCompMobileDetail(id);} }; })(cp.id);
+    card.onclick = (function(id){ return function(){ if(window.innerWidth>=768){if(_currentCompId!==id)_homeDetailTab='infos';showPage('page-home');document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){b.classList.remove('active');});var _dnrC=document.getElementById('dnr-competitions');if(_dnrC)_dnrC.classList.add('active');setTimeout(function(){showHomeCompDetail(id);},60);}else{openCompMobileDetail(id);} }; })(cp.id);
     // Affiche à gauche
     if (cp.affiche) {
       var aWrap = document.createElement('div');
@@ -4370,11 +4370,37 @@ function renderCompetitions() {
       oaci.textContent = '✈️ ' + cp.oaci + (cp.region ? ' · ' + cp.region : '');
       info.appendChild(oaci);
     }
-    var runs = document.createElement('div');
-    runs.style.cssText = 'font-size:11px;color:var(--txt3);margin-top:4px';
-    runs.textContent = runCount + ' résultat(s)';
-    info.appendChild(runs);
     card.appendChild(info);
+    // ── Colonne stats (entre info et bouton Modifier) ──
+    var enrolled = (S.compEnroll || {})[cp.id] || [];
+    var nbInsc = enrolled.length;
+    var nbH = 0, nbF = 0;
+    enrolled.forEach(function(pid) {
+      var p = (S.pilots||[]).find(function(x){ return x.id === pid; });
+      if (p) { if (p.genre === 'M.') nbH++; else if (p.genre === 'Mme.') nbF++; }
+    });
+    var staffArr = Array.isArray((S.staff||{})[cp.id]) ? (S.staff[cp.id]||[]) : [];
+    var nbStaff = staffArr.filter(function(s){ return s && (s.role||'').toUpperCase() !== 'NDF'; }).length;
+    var bdata = (S.budgets||{})[cp.id] || {};
+    var _cc = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
+    var totEng = (bdata.engagement||[]).reduce(function(s,l){ return s + _cc(l); }, 0);
+    var _statLine = function(val, lbl, col) {
+      return '<div style="display:flex;align-items:baseline;gap:4px;white-space:nowrap">'
+        + '<span style="font-size:14px;font-weight:800;color:'+col+'">'+val+'</span>'
+        + '<span style="font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">'+lbl+'</span>'
+        + '</div>';
+    };
+    var statsCol = document.createElement('div');
+    statsCol.style.cssText = 'flex-shrink:0;display:flex;flex-direction:row;align-items:center;gap:16px;padding:0 16px;border-left:1px solid var(--bdr)';
+    var sHtml = '';
+    sHtml += _statLine(nbInsc, 'Inscrits', '#3b82f6');
+    if (nbH > 0 || nbF > 0) {
+      sHtml += _statLine(nbH + 'H / ' + nbF + 'F', 'Genre', '#a78bfa');
+    }
+    sHtml += _statLine(nbStaff, 'Staff', '#10b981');
+    if (totEng > 0) sHtml += _statLine(Math.round(totEng).toLocaleString('fr-FR') + ' €', 'Dépenses', '#f59e0b');
+    statsCol.innerHTML = sHtml;
+    card.appendChild(statsCol);
     // Bouton Modifier (à droite)
     var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
     if (canEdit) {
@@ -18722,13 +18748,16 @@ async function loadFromSupabaseFirst() {
     var cloudTodoCount = Object.values(cloudData.homeTodosByComp||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
     if (localTodoCount > 0 && cloudTodoCount < localTodoCount) keepLocalTodos = true;
 
-    // CompEnroll : par compétition, conserver la liste locale si elle est plus longue que le cloud
+    // CompEnroll : toujours sauvegarder TOUTES les listes locales pour fusion (union) avec le cloud
+    // On ne supprime jamais un équipage local même si le cloud en a autant ou plus
     var _savedEnrollByComp = {};
     Object.keys(S.compEnroll||{}).forEach(function(cid) {
-      var localLen = (S.compEnroll[cid]||[]).length;
-      var cloudLen = ((cloudData.compEnroll||{})[cid]||[]).length;
-      if (localLen > cloudLen) _savedEnrollByComp[cid] = (S.compEnroll[cid]||[]).slice();
+      if ((S.compEnroll[cid]||[]).length > 0) {
+        _savedEnrollByComp[cid] = (S.compEnroll[cid]||[]).slice();
+      }
     });
+    // Sauvegarder aussi _enrollResetAt local (timestamps des imports récents)
+    var _savedEnrollResetAt = S._enrollResetAt ? Object.assign({}, S._enrollResetAt) : {};
 
     if (keepLocalStaff)   console.warn('[GestSTOL] ⚠️ GARDE: staff local ('+localStaff+') > cloud ('+cloudStaff+') — local conservé');
     if (keepLocalPart)    console.warn('[GestSTOL] ⚠️ GARDE: partenaires local ('+localPart+') > cloud ('+cloudPart+') — local conservé');
@@ -18736,7 +18765,7 @@ async function loadFromSupabaseFirst() {
     if (keepLocalBudgets) console.warn('[GestSTOL] ⚠️ GARDE: budgets local ('+localBudgetLines+') > cloud ('+cloudBudgetLines+') — local conservé');
     if (keepLocalTodos)   console.warn('[GestSTOL] ⚠️ GARDE: todos local ('+localTodoCount+') > cloud ('+cloudTodoCount+') — local conservé');
     if (keepLocalPilots)  console.warn('[GestSTOL] ⚠️ GARDE pilots: local('+localPilots+') > cloud('+cloudPilots+') — pilotes locaux conservés');
-    if (Object.keys(_savedEnrollByComp).length) console.warn('[GestSTOL] ⚠️ GARDE: compEnroll local > cloud pour', Object.keys(_savedEnrollByComp).join(', '), '— local conservé');
+    if (Object.keys(_savedEnrollByComp).length) console.warn('[GestSTOL] ⚠️ FUSION compEnroll: équipages locaux conservés et fusionnés avec cloud pour', Object.keys(_savedEnrollByComp).join(', '));
 
     var savedStaff   = keepLocalStaff   ? S.staff            : null;
     var savedPart    = keepLocalPart    ? S.partenaires      : null;
@@ -18754,13 +18783,26 @@ async function loadFromSupabaseFirst() {
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
     if (savedPilots)  S.pilots = savedPilots;
-    // Restaurer les listes d'équipage locales plus complètes que le cloud
-    if (Object.keys(_savedEnrollByComp).length) {
-      if (!S.compEnroll) S.compEnroll = {};
-      Object.keys(_savedEnrollByComp).forEach(function(cid) {
-        S.compEnroll[cid] = _savedEnrollByComp[cid];
-      });
-    }
+    // Fusionner (union) les équipages locaux et cloud — on ne supprime JAMAIS un pilote local
+    if (!S.compEnroll) S.compEnroll = {};
+    Object.keys(_savedEnrollByComp).forEach(function(cid) {
+      var cloudList = S.compEnroll[cid] || [];
+      var localList = _savedEnrollByComp[cid] || [];
+      // Union : tous les IDs présents dans l'un ou l'autre
+      var union = cloudList.slice();
+      localList.forEach(function(pid) { if (union.indexOf(pid) === -1) union.push(pid); });
+      S.compEnroll[cid] = union;
+      if (union.length !== cloudList.length) {
+        console.warn('[GestSTOL] ✅ compEnroll fusionné pour', cid, ': cloud='+cloudList.length+' local='+localList.length+' → union='+union.length);
+      }
+    });
+    // Fusionner _enrollResetAt : prendre le max par compId pour que pullFromCloud respecte les imports récents
+    if (!S._enrollResetAt) S._enrollResetAt = {};
+    Object.keys(_savedEnrollResetAt).forEach(function(cid) {
+      if (!S._enrollResetAt[cid] || _savedEnrollResetAt[cid] > S._enrollResetAt[cid]) {
+        S._enrollResetAt[cid] = _savedEnrollResetAt[cid];
+      }
+    });
 
     if (localUser)     S.user      = localUser;
     if (localLicences) S.licenceDB = localLicences;
@@ -18993,12 +19035,9 @@ async function pullFromCloud() {
   var _lERA = S._enrollResetAt || {};
   var _rERA = r._enrollResetAt || {};
   S.compEnroll         = _mergeObjOfArrays(S.compEnroll,         r.compEnroll);
-  // Si le dernier import local est plus récent que le cloud → la liste locale fait autorité
-  Object.keys(_lERA).forEach(function(cid) {
-    if ((_lERA[cid]||0) > (_rERA[cid]||0) && _localEnroll[cid] !== undefined) {
-      S.compEnroll[cid] = _localEnroll[cid];
-    }
-  });
+  // L'enrollment ne fait que croître (pas de "vider et réimporter") — l'union est toujours la bonne réponse.
+  // Les suppressions explicites passent par les tombstones (_deletedEnroll).
+  // On ne remplace JAMAIS l'union par une version locale seule.
   // Fusionner les timestamps (conserver le max par compId)
   var _mERA = {};
   Object.keys(Object.assign({}, _lERA, _rERA)).forEach(function(cid) {
@@ -19242,6 +19281,8 @@ async function pullFromCloud() {
 
   updateNationalRanking();
   saveState();
+  // Mettre à jour le backup dédié compEnroll (filet de sécurité — synchronisé après chaque pull)
+  try { if (S.compEnroll) localStorage.setItem(LS_ENROLL, JSON.stringify(S.compEnroll)); } catch(e) {}
   console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
 }
 
