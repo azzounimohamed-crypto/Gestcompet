@@ -4500,8 +4500,13 @@ function renderCompetitions() {
     info.style.cssText = 'flex:1;padding:12px 14px;min-width:0;display:flex;flex-direction:column;justify-content:center';
     var row1 = document.createElement('div');
     row1.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px';
+    var _pratBadge = '';
+    if (cp.pratique === 'paramoteur') _pratBadge = '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:rgba(139,92,246,.2);color:#a78bfa">🪂 Paramoteur</span>';
+    else if (cp.pratique === 'microlight') _pratBadge = '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:rgba(59,130,246,.2);color:#60a5fa">✈️ Microlight</span>';
+    else if (cp.pratique === 'stol') _pratBadge = '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,.2);color:#34d399">🛬 STOL</span>';
     row1.innerHTML = '<span class="comp-badge ' + status + '" style="font-size:10px">' + statusLabel + '</span>'
-      + '<span style="font-size:11px;color:var(--txt3)">' + typeLabel + '</span>';
+      + (typeLabel ? '<span style="font-size:11px;color:var(--txt3)">' + typeLabel + '</span>' : '')
+      + _pratBadge;
     var title = document.createElement('div');
     title.style.cssText = 'font-size:15px;font-weight:700;margin-bottom:3px;line-height:1.3';
     title.textContent = cp.name;
@@ -4518,7 +4523,7 @@ function renderCompetitions() {
       info.appendChild(oaci);
     }
     card.appendChild(info);
-    // ── Colonne stats (entre info et bouton Modifier) ──
+    // ── Stats ──
     var enrolled = (S.compEnroll || {})[cp.id] || [];
     var nbInsc = enrolled.length;
     var nbH = 0, nbF = 0;
@@ -4531,26 +4536,41 @@ function renderCompetitions() {
     var bdata = (S.budgets||{})[cp.id] || {};
     var _cc = function(l){ return (parseFloat(l.valeur)||0) * (parseFloat(l.nbjours)||1) * (parseFloat(l.qt)||1); };
     var totEng = (bdata.engagement||[]).reduce(function(s,l){ return s + _cc(l); }, 0);
-    var _kv = function(lbl, val, col) {
-      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:1.5px 0">'
-        + '<span style="font-size:10.5px;color:var(--txt3);white-space:nowrap">'+lbl+'</span>'
-        + '<span style="font-size:10.5px;font-weight:700;color:'+col+';white-space:nowrap">'+val+'</span>'
-        + '</div>';
-    };
-    var statsCol = document.createElement('div');
-    statsCol.style.cssText = 'flex-shrink:0;display:flex;flex-direction:column;justify-content:center;min-width:130px;padding:0 14px;border-left:1px solid var(--bdr)';
-    var sHtml = '';
-    sHtml += _kv('Inscrits', nbInsc, '#3b82f6');
-    if (nbH > 0 || nbF > 0)
-      sHtml += _kv('Genre', nbH + 'H · ' + nbF + 'F', '#a78bfa');
-    sHtml += _kv('Staff', nbStaff, '#10b981');
-    if (totEng > 0)
-      sHtml += _kv('Dépenses', Math.round(totEng).toLocaleString('fr-FR') + ' €', '#f59e0b');
-    statsCol.innerHTML = sHtml;
-    card.appendChild(statsCol);
-    // Bouton Modifier (à droite)
+
+    if (window.innerWidth >= 768) {
+      // ── Desktop : colonne verticale à droite ──
+      var _kv = function(lbl, val, col) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:1.5px 0">'
+          + '<span style="font-size:10.5px;color:var(--txt3);white-space:nowrap">'+lbl+'</span>'
+          + '<span style="font-size:10.5px;font-weight:700;color:'+col+';white-space:nowrap">'+val+'</span>'
+          + '</div>';
+      };
+      var statsCol = document.createElement('div');
+      statsCol.style.cssText = 'flex-shrink:0;display:flex;flex-direction:column;justify-content:center;min-width:130px;padding:0 14px;border-left:1px solid var(--bdr)';
+      var sHtml = '';
+      sHtml += _kv('Inscrits', nbInsc, '#3b82f6');
+      if (nbH > 0 || nbF > 0) sHtml += _kv('Genre', nbH + 'H · ' + nbF + 'F', '#a78bfa');
+      sHtml += _kv('Staff', nbStaff, '#10b981');
+      if (totEng > 0) sHtml += _kv('Dépenses', Math.round(totEng).toLocaleString('fr-FR') + ' €', '#f59e0b');
+      statsCol.innerHTML = sHtml;
+      card.appendChild(statsCol);
+    } else {
+      // ── Mobile : ligne compacte intégrée dans le bloc info ──
+      var parts = [];
+      if (nbInsc > 0) parts.push('<span style="color:#3b82f6;font-weight:700">'+nbInsc+' inscrits</span>');
+      if (nbH > 0 || nbF > 0) parts.push('<span style="color:#a78bfa">'+nbH+'H·'+nbF+'F</span>');
+      if (nbStaff > 0) parts.push('<span style="color:#10b981">'+nbStaff+' staff</span>');
+      if (totEng > 0) parts.push('<span style="color:#f59e0b">'+Math.round(totEng).toLocaleString('fr-FR')+'€</span>');
+      if (parts.length) {
+        var statsRow = document.createElement('div');
+        statsRow.style.cssText = 'font-size:11px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center';
+        statsRow.innerHTML = parts.join('<span style="color:var(--bdr)">·</span>');
+        info.appendChild(statsRow);
+      }
+    }
+    // Bouton Modifier (desktop uniquement)
     var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
-    if (canEdit) {
+    if (canEdit && window.innerWidth >= 768) {
       var editBtn = document.createElement('button');
       editBtn.title = 'Modifier la compétition';
       editBtn.style.cssText = 'align-self:center;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap';
@@ -5033,7 +5053,14 @@ function renderMobileCompDetail() {
     } else if (sec.id === 'gestion') {
       var canEditCrew = canModify();
       if (canEditCrew) {
-        var fCrew = '<div style="border-top:1px solid var(--bdr)"><button data-cpid="'+cp.id.replace(/'/g,"\\'")+'" onclick="openCrewAddSheet(this.dataset.cpid)" style="width:100%;padding:16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter un compétiteur</button></div>';
+        var _cpIdEscMob = cp.id.replace(/'/g,"\\'");
+        var _b44BtnMob = canDelete()
+          ? '<button id="cd-b44-push-btn" onclick="openBase44Picker(\''+_cpIdEscMob+'\')" style="flex:1;padding:16px;background:rgba(59,130,246,.15);border:none;border-right:1px solid var(--bdr);color:#60a5fa;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">☁️ Site Pôle Sport</button>'
+          : '';
+        var fCrew = '<div style="border-top:1px solid var(--bdr);display:flex">'
+          + _b44BtnMob
+          + '<button data-cpid="'+_cpIdEscMob+'" onclick="openCrewAddSheet(this.dataset.cpid)" style="flex:2;padding:16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">＋ Ajouter un compétiteur</button>'
+          + '</div>';
         footerEl.innerHTML = fCrew; footerEl.style.display = '';
       } else { footerEl.innerHTML = ''; footerEl.style.display = 'none'; }
 
@@ -9461,6 +9488,11 @@ function _hdgConfirmEquipImport() {
       _applyCompToAllEnrolled(compId);
       if (!S._enrollResetAt) S._enrollResetAt = {};
       S._enrollResetAt[compId] = Date.now();
+      // Effacer les tombstones des pilotes ré-importés — un import récent prime sur une suppression antérieure
+      if (S._deletedEnroll && S._deletedEnroll[compId]) {
+        (S.compEnroll[compId] || []).forEach(function(pid) { delete S._deletedEnroll[compId][pid]; });
+        if (!Object.keys(S._deletedEnroll[compId]).length) delete S._deletedEnroll[compId];
+      }
       saveState();
       silentPush();
       if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
@@ -11666,6 +11698,29 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _eqpTpl = _equipGetTpl();
     var _isMobEquip = window.innerWidth < 768;
     var html5 = '';
+    // ── Bannière : compétition(s) co-localisée(s) au même aérodrome + même date ──
+    if (cp.oaci && cp.dateFrom) {
+      var _sisterComps = (S.comps||[]).filter(function(sc){
+        return sc.id !== cp.id && sc.oaci === cp.oaci && sc.dateFrom === cp.dateFrom;
+      });
+      if (_sisterComps.length > 0) {
+        html5 += '<div style="margin:8px 12px 0;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);display:flex;align-items:flex-start;gap:10px">';
+        html5 += '<span style="font-size:20px;flex-shrink:0">📋</span>';
+        html5 += '<div style="flex:1;min-width:0">';
+        html5 += '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:4px">Compétition co-localisée au même aérodrome</div>';
+        _sisterComps.forEach(function(sc) {
+          var sEnrolled = ((S.compEnroll||{})[sc.id]||[]).length;
+          var sName = sc.name||sc.nom||sc.id;
+          var sPrat = sc.pratique === 'paramoteur' ? '🪂 ' : sc.pratique === 'microlight' ? '✈️ ' : '';
+          html5 += '<div style="font-size:11px;color:var(--txt2);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+          html5 += '<span>' + sPrat + sName + '</span>';
+          html5 += '<span style="color:#f59e0b;font-weight:700">' + sEnrolled + ' inscrits</span>';
+          html5 += '<button onclick="if(window.innerWidth<768){openCompMobileDetail(\''+sc.id+'\');}else{if(typeof _currentCompId!==\'undefined\'&&_currentCompId!==\''+sc.id+'\')_homeDetailTab=\'gestion\';showHomeCompDetail(\''+sc.id+'\');}" style="font-size:10px;padding:2px 9px;border-radius:5px;background:rgba(245,158,11,.25);border:1px solid rgba(245,158,11,.4);color:#f59e0b;cursor:pointer;font-family:inherit">Voir son équipage →</button>';
+          html5 += '</div>';
+        });
+        html5 += '</div></div>';
+      }
+    }
     // ── Barre d'actions (desktop uniquement) ──
     if (!_isMobEquip) {
     var _eqpGlass = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s';
@@ -18705,8 +18760,45 @@ function _mergeObjOfArrays(local, remote) {
   return result;
 }
 
+// ── Helper pour la fusion b44→calendrier ─────────────────────────────────────
+// Trouve la comp calendrier (non-b44) correspondant à un comp b44-*
+// Stratégie 1 : OACI + dateFrom (correspondance exacte)
+// Stratégie 2 : seule comp à cette date → correspondance directe
+// Stratégie 3 : dateFrom + similarité lieu ou nom (min 4 caractères communs)
+function _findCalMatchForB44(b44Comp, calComps) {
+  if (!b44Comp.dateFrom) return null;
+  // S1: OACI + date
+  if (b44Comp.oaci) {
+    var m1 = calComps.find(function(c) {
+      return c.oaci === b44Comp.oaci && c.dateFrom === b44Comp.dateFrom;
+    });
+    if (m1) return m1;
+  }
+  // S2/S3: par date puis nom/lieu
+  var sameDateComps = calComps.filter(function(c) { return c.dateFrom === b44Comp.dateFrom; });
+  if (!sameDateComps.length) return null;
+  if (sameDateComps.length === 1) return sameDateComps[0]; // seule comp ce jour → match
+  // Plusieurs comps ce jour : comparer nom et lieu
+  var b44Lieu = _normStr(b44Comp.lieu || '');
+  var b44Name = _normStr(b44Comp.nom || b44Comp.name || '');
+  return sameDateComps.find(function(c) {
+    var cLieu = _normStr(c.lieu || '');
+    var cName = _normStr(c.nom || c.name || '');
+    if (b44Lieu.length >= 4) {
+      if (cLieu.includes(b44Lieu) || cName.includes(b44Lieu)) return true;
+      if (b44Lieu.includes(cLieu) && cLieu.length >= 4)       return true;
+    }
+    if (b44Name.length >= 4) {
+      if (cLieu.includes(b44Name.substring(0,4)))  return true;
+      if (cName.length >= 4 && (cName.includes(b44Name.substring(0,4)) || b44Name.includes(cName.substring(0,4)))) return true;
+    }
+    return false;
+  }) || null;
+}
+
 // ── NETTOYAGE COMPLET : supprime tous les doublons sur toutes les entités ──
 function _cleanupAllDuplicates() {
+  _cleanupAllDuplicates._pendingSave = false;
   // 1. Compétitions : tombstones + dédup par id + dédup par nom+date
   var deletedCompIds = {};
   (S._deletedComps||[]).forEach(function(t){ deletedCompIds[t.id] = true; });
@@ -18739,23 +18831,16 @@ function _cleanupAllDuplicates() {
       return true;
     });
 
-    // ── Fusion ciblée b44-* → calendrier (même OACI + même date) ──────────────
-    // Cas typique : Base44 a 1 événement "Paramoteur & Microlight Classic - Feurs"
-    // alors que le calendrier a 2 entrées séparées. Le nom ne matchant pas,
-    // syncBase44Competitions crée un 3e card b44-* qui reste vide côté calendrier.
-    // → On fusionne les b44-* dans la première entrée calendrier au même aérodrome.
-    var _oaciDateToCalId = {};
-    S.comps.forEach(function(c) {
-      if (c.oaci && c.dateFrom && !String(c.id).startsWith('b44-')) {
-        var ok = c.oaci + '|' + c.dateFrom;
-        if (!_oaciDateToCalId[ok]) _oaciDateToCalId[ok] = c.id;
-      }
-    });
+    // ── Fusion ciblée b44-* → calendrier (OACI+date ou lieu/nom+date) ─────────
+    // Utilise _findCalMatchForB44 : OACI exact, puis seule comp à cette date,
+    // puis similarité nom/lieu. Couvre le cas où la comp cal n'a pas de champ oaci.
+    var _calComps4b44 = S.comps.filter(function(c) { return !String(c.id).startsWith('b44-'); });
+    var _b44MergeCount = 0;
     S.comps = S.comps.filter(function(c) {
-      if (!String(c.id).startsWith('b44-') || !c.oaci || !c.dateFrom) return true;
-      var ok = c.oaci + '|' + c.dateFrom;
-      var keepId = _oaciDateToCalId[ok];
-      if (!keepId) return true; // pas d'entrée calendrier à ce terrain/date → garder
+      if (!String(c.id).startsWith('b44-')) return true;
+      var matchComp = _findCalMatchForB44(c, _calComps4b44);
+      if (!matchComp) return true; // aucune correspondance → garder
+      var keepId = matchComp.id;
       // Transférer enrollment et encadrants
       if (S.compEnroll && S.compEnroll[c.id] && S.compEnroll[c.id].length) {
         if (!S.compEnroll[keepId]) S.compEnroll[keepId] = [];
@@ -18772,18 +18857,21 @@ function _cleanupAllDuplicates() {
         });
       }
       // Transférer _base44Id / _base44Ids vers la comp calendrier conservée
-      var keepComp = S.comps.find(function(x){ return x.id === keepId; });
-      if (keepComp) {
-        if (c._base44Id && !keepComp._base44Id) keepComp._base44Id = c._base44Id;
-        if (c._base44Ids && c._base44Ids.length) {
-          if (!keepComp._base44Ids) keepComp._base44Ids = [];
-          c._base44Ids.forEach(function(bid){ if (keepComp._base44Ids.indexOf(bid) < 0) keepComp._base44Ids.push(bid); });
-        }
+      if (c._base44Id && !matchComp._base44Id) matchComp._base44Id = c._base44Id;
+      if (c._base44Ids && c._base44Ids.length) {
+        if (!matchComp._base44Ids) matchComp._base44Ids = [];
+        c._base44Ids.forEach(function(bid){ if (matchComp._base44Ids.indexOf(bid) < 0) matchComp._base44Ids.push(bid); });
       }
+      // Nettoyer l'enrollment orphelin du b44 fusionné
+      if (S.compEnroll) { delete S.compEnroll[c.id]; }
+      if (S.staff)      { delete S.staff[c.id]; }
       console.log('[GestSTOL] Fusion b44→cal: '+c.id+' ('+c.name+') → '+keepId);
+      _b44MergeCount++;
       return false;
     });
+    if (_b44MergeCount > 0) { _cleanupAllDuplicates._pendingSave = true; }
   }
+  return !!_cleanupAllDuplicates._pendingSave;
 
   // 2. Documents : tombstones + dédup par id
   if (Array.isArray(S.documents) && S._deletedDocuments) {
@@ -19053,6 +19141,58 @@ async function loadFromSupabaseFirst() {
     // odmConfig : préserver la version locale si le cloud n'en a pas
     if (!S.odmConfig || !Object.keys(S.odmConfig).length) {
       try { var _crit=JSON.parse(localStorage.getItem('geststol_critical')||'{}'); if(_crit.odmConfig) S.odmConfig=_crit.odmConfig; } catch(e){}
+    }
+
+    // ── Fusion b44→cal dans _applyCloudData ──────────────────────────────────
+    // Garantit que même si loadFromSupabaseFirst termine en arrière-plan
+    // après le cleanup du démarrage, le merge est TOUJOURS appliqué.
+    // Utilise _findCalMatchForB44 : OACI exact, seule comp à cette date, ou similarité nom/lieu.
+    if (Array.isArray(S.comps)) {
+      var _acd_calComps = S.comps.filter(function(c) { return !String(c.id).startsWith('b44-'); });
+      var _acd_merged = false;
+      S.comps = S.comps.filter(function(c) {
+        if (!String(c.id).startsWith('b44-')) return true;
+        var _acd_match = _findCalMatchForB44(c, _acd_calComps);
+        if (!_acd_match) return true;
+        var keepId = _acd_match.id;
+        // Transférer enrollment
+        if (S.compEnroll && S.compEnroll[c.id] && S.compEnroll[c.id].length) {
+          if (!S.compEnroll[keepId]) S.compEnroll[keepId] = [];
+          S.compEnroll[c.id].forEach(function(pid) {
+            if (S.compEnroll[keepId].indexOf(pid) === -1) S.compEnroll[keepId].push(pid);
+          });
+        }
+        // Transférer staff
+        if (S.staff && S.staff[c.id] && S.staff[c.id].length) {
+          if (!S.staff[keepId]) S.staff[keepId] = [];
+          S.staff[c.id].forEach(function(s) {
+            var sid = s.id || s.pilotId || JSON.stringify(s);
+            var already = S.staff[keepId].some(function(x){ return (x.id||x.pilotId||JSON.stringify(x)) === sid; });
+            if (!already) S.staff[keepId].push(s);
+          });
+        }
+        // Transférer _base44Id/_base44Ids
+        if (c._base44Id && !_acd_match._base44Id) _acd_match._base44Id = c._base44Id;
+        if (c._base44Ids && c._base44Ids.length) {
+          if (!_acd_match._base44Ids) _acd_match._base44Ids = [];
+          c._base44Ids.forEach(function(bid){ if (_acd_match._base44Ids.indexOf(bid) < 0) _acd_match._base44Ids.push(bid); });
+        }
+        // Nettoyer l'enrollment orphelin du b44 fusionné
+        if (S.compEnroll) { delete S.compEnroll[c.id]; }
+        if (S.staff)      { delete S.staff[c.id]; }
+        console.log('[GestSTOL] _applyCloudData Fusion b44→cal: '+c.id+' ('+c.name+') → '+keepId);
+        _acd_merged = true;
+        return false;
+      });
+      if (_acd_merged) {
+        // Persister immédiatement sans attendre le debounce de silentPush
+        try { saveState(); } catch(e) {}
+        try {
+          if (typeof pushToCloud === 'function') {
+            pushToCloud().catch(function(e){ console.warn('[b44merge] push failed', e); });
+          }
+        } catch(e) {}
+      }
     }
   }
 
@@ -19480,10 +19620,18 @@ async function pullFromCloud() {
   }
 
   // ── Appliquer tombstones compEnroll ──
+  // Si _enrollResetAt[cid] (timestamp du dernier import) est plus récent que le tombstone,
+  // le pilote est gardé — un re-import prime sur une suppression antérieure.
   if (S.compEnroll && typeof S.compEnroll === 'object') {
     Object.keys(S.compEnroll).forEach(function(cid) {
       var tombs = (S._deletedEnroll && S._deletedEnroll[cid]) ? S._deletedEnroll[cid] : {};
-      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid){ return !tombs[pid]; });
+      var era   = (_mERA && _mERA[cid]) || 0;
+      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(pid) {
+        var tombTs = tombs[pid];
+        if (!tombTs) return true;          // pas tombstoné → garder
+        if (era > tombTs) return true;     // import plus récent que la suppression → garder
+        return false;                      // tombstone valide → retirer
+      });
     });
   }
 
@@ -19504,8 +19652,10 @@ async function pullFromCloud() {
     Object.keys(_localEnroll).forEach(function(cid) {
       if (!S.compEnroll[cid]) return; // compétition tombstoned — ne pas restaurer
       var tombs = (S._deletedEnroll && S._deletedEnroll[cid]) || {};
+      var _eraForCid = (_mERA && _mERA[cid]) || 0;
       _localEnroll[cid].forEach(function(pid) {
-        if (tombs[pid]) return;            // retiré intentionnellement
+        var tombTs = tombs[pid];
+        if (tombTs && _eraForCid <= tombTs) return; // tombstone valide et plus récent que l'import
         if (!_pilotIdSet[pid]) return;     // pilote supprimé du merge — ne pas restaurer
         if (S.compEnroll[cid].indexOf(pid) === -1) {
           S.compEnroll[cid].push(pid);
@@ -22148,13 +22298,12 @@ async function syncBase44Competitions() {
       return c._base44Id === ev.id ||
         ((c.nom||c.name||'').toLowerCase() === (ev.title||'').toLowerCase() && c.dateFrom === ev.start_date);
     });
-    // Fallback : même OACI + même date → lier à la compétition calendrier existante
-    // (Base44 regroupe parfois Paramoteur + Microlight en 1 seul événement dont le titre ne matche pas)
-    if (!existing && ev.icao_code && ev.start_date) {
-      existing = S.comps.find(function(c) {
-        return c.oaci === ev.icao_code && c.dateFrom === ev.start_date && !String(c.id).startsWith('b44-');
-      });
-      if (existing) console.log('[Base44] OACI match:', ev.title, '→', existing.nom||existing.name);
+    // Fallback fuzzy : OACI+date, seule comp à cette date, ou similarité nom/lieu
+    if (!existing && ev.start_date) {
+      var _b44CalCandidates = S.comps.filter(function(c) { return !String(c.id).startsWith('b44-'); });
+      var _b44FakeComp = { oaci: ev.icao_code || '', dateFrom: ev.start_date, lieu: ev.location_name || '', nom: ev.title || '', name: ev.title || '' };
+      var _b44FuzzyMatch = _findCalMatchForB44(_b44FakeComp, _b44CalCandidates);
+      if (_b44FuzzyMatch) { existing = _b44FuzzyMatch; console.log('[Base44] Fuzzy match:', ev.title, '→', existing.nom||existing.name); }
     }
     if (existing) {
       // Mise à jour sans écraser les données locales non vides
@@ -32816,7 +32965,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   // injectMaisoncelles2026() supprimé — la compétition vit dans Supabase
   injectCalendrier2026();
   injectCalendrierFull();
-  _cleanupAllDuplicates();
+  var _dedupChanged = _cleanupAllDuplicates();
+  // Si une fusion b44→calendrier a eu lieu, persister immédiatement
+  // (sinon le prochain chargement Supabase réécrirait l'ancien état)
+  if (_dedupChanged) {
+    saveState();
+    if (typeof silentPush === 'function') silentPush();
+    console.log('[GestSTOL] Fusion b44→cal persistée (saveState + silentPush)');
+  }
   initTheme();
 
   // ─── Données de test : CdF STOL 2025 + compétiteurs réels ───
