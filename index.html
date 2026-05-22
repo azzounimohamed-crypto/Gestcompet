@@ -28512,7 +28512,7 @@ function printNoteAvance(compId) {
       if (!a.avance) return;
       var _d  = parseFloat(a.distance)||0;
       var _st = _d > 0 ? _d * _pnaCoeff : (parseFloat(a.tarif)||0)*(parseInt(a.qt)||1);
-      items.push({ date:a.date||'', objet:a.libelle||l.libelle||'', domaine:'NDF', tarif:parseFloat(a.tarif)||0, qt:parseInt(a.qt)||1, st:_st, distance:_d, lieuDe:_lieuDe, lieuA:_lieuA, coeff:_pnaCoeff });
+      items.push({ date:a.date||'', objet:a.libelle||l.libelle||'', domaine:'NDF', tarif:parseFloat(a.tarif)||0, qt:parseInt(a.qt)||1, st:_st, distance:_d, lieuDe:_lieuDe, lieuA:_lieuA, coeff:_pnaCoeff, photo:a.photo||null });
     });
   });
   items.forEach(function(a){ if (a.st === undefined) a.st = a.tarif * a.qt; });
@@ -28552,6 +28552,10 @@ function printNoteAvance(compId) {
   items.forEach(function(a){ if (a.coeff) _tauxKm = a.coeff; });
   var _tauxKmFmt = _tauxKm.toFixed(3).replace('.', ',');
   var totalGeneral = items.reduce(function(s,a){ return s+a.st; }, 0);
+
+  // ── Diagnostic photos (retiré après validation) ──
+  var _nbPhotos = items.filter(function(i){ return i.photo; }).length;
+  console.log('[NoteAvance] items:', items.length, '| avec photo:', _nbPhotos, items.map(function(i){ return {obj:i.objet, hasPhoto:!!i.photo}; }));
 
   // ── Lignes du tableau ──
   var rows = '';
