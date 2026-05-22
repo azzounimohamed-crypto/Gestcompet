@@ -19065,9 +19065,26 @@ async function loadFromSupabaseFirst() {
     var keepLocalBudgets    = false;
     var keepLocalTodos      = false;
 
-    // Budgets : comparer lignes totales
-    var localBudgetLines = Object.values(S.budgets||{}).reduce(function(t,b){ return t + (typeof b==='object'?Object.values(b).reduce(function(t2,a){ return t2+(Array.isArray(a)?a.length:0); }, 0):0); }, 0);
-    var cloudBudgetLines = Object.values(cloudData.budgets||{}).reduce(function(t,b){ return t + (typeof b==='object'?Object.values(b).reduce(function(t2,a){ return t2+(Array.isArray(a)?a.length:0); }, 0):0); }, 0);
+    // Budgets : comparer le contenu total (lignes + sous-items achats/NDF)
+    // ⚠️ Compter uniquement les lignes est insuffisant : l'import ajoute des sous-items
+    // (line.achats[], line.ndf.reelle[]) dans une ligne existante → le nombre de lignes
+    // ne change pas → la garde ne se déclenchait pas → cloud écrasait les sous-items locaux.
+    function _countBudgetContent(d) {
+      return Object.values(d.budgets||{}).reduce(function(t,b){
+        if (typeof b !== 'object') return t;
+        return t + Object.values(b).reduce(function(t2,arr){
+          if (!Array.isArray(arr)) return t2;
+          return t2 + arr.reduce(function(t3, line) {
+            if (!line) return t3;
+            var achats = Array.isArray(line.achats) ? line.achats.filter(function(a){ return a&&(a.libelle||a.tarif); }).length : 0;
+            var reelle = (line.ndf && Array.isArray(line.ndf.reelle)) ? line.ndf.reelle.filter(function(r){ return r&&(r.libelle||r.tarif||r.distance); }).length : 0;
+            return t3 + 1 + achats + reelle;
+          }, 0);
+        }, 0);
+      }, 0);
+    }
+    var localBudgetLines = _countBudgetContent(S);
+    var cloudBudgetLines = _countBudgetContent(cloudData);
     if (localBudgetLines > 0 && cloudBudgetLines < localBudgetLines) keepLocalBudgets = true;
 
     // Todos
