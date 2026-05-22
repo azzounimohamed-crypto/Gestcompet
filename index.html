@@ -3616,6 +3616,38 @@ async function loadState() {
         if (idbData.docSettings && idbData.docSettings.signatureImage && S.docSettings && !S.docSettings.signatureImage) {
           S.docSettings.signatureImage = idbData.docSettings.signatureImage;
         }
+        // Restaurer les photos de justificatifs (achats + NDF réelles) depuis IDB
+        // Elles sont strippées de localStorage pour ne pas saturer le quota
+        if (idbData.budgets && S.budgets) {
+          Object.keys(idbData.budgets).forEach(function(cid) {
+            if (!S.budgets[cid] || !idbData.budgets[cid]) return;
+            Object.keys(idbData.budgets[cid]).forEach(function(section) {
+              var idbLines = idbData.budgets[cid][section];
+              var sLines   = S.budgets[cid][section];
+              if (!Array.isArray(idbLines) || !Array.isArray(sLines)) return;
+              idbLines.forEach(function(idbL) {
+                var sL = sLines.find(function(l){ return l.id === idbL.id; });
+                if (!sL) return;
+                // Restaurer photos des achats
+                if (idbL.achats && sL.achats) {
+                  idbL.achats.forEach(function(ia) {
+                    if (!ia.photo) return;
+                    var sa = sL.achats.find(function(a){ return a.id === ia.id; });
+                    if (sa && !sa.photo) sa.photo = ia.photo;
+                  });
+                }
+                // Restaurer photos des NDF réelles
+                if (idbL.ndf && idbL.ndf.reelle && sL.ndf && sL.ndf.reelle) {
+                  idbL.ndf.reelle.forEach(function(ia, idx) {
+                    if (!ia.photo) return;
+                    var sa = sL.ndf.reelle[idx];
+                    if (sa && !sa.photo) sa.photo = ia.photo;
+                  });
+                }
+              });
+            });
+          });
+        }
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
         Object.assign(S, idbData);
@@ -3667,6 +3699,42 @@ function clearLocalStorageQuota() {
   } catch(e) { console.warn('clearLocalStorageQuota', e); }
 }
 
+// Retire les photos base64 des achats et lignes NDF réelles d'un budget
+// pour ne pas saturer localStorage — les photos restent en IndexedDB (source de vérité)
+function _stripBudgetPhotos(budgets) {
+  if (!budgets) return budgets;
+  var result = {};
+  Object.keys(budgets).forEach(function(cid) {
+    var bcomp = budgets[cid];
+    if (!bcomp) { result[cid] = bcomp; return; }
+    var stripped = {};
+    Object.keys(bcomp).forEach(function(section) {
+      var lines = bcomp[section];
+      if (!Array.isArray(lines)) { stripped[section] = lines; return; }
+      stripped[section] = lines.map(function(l) {
+        var hasAchatPhoto = l.achats && l.achats.some(function(a){ return a.photo; });
+        var hasNdfPhoto   = l.ndf && l.ndf.reelle && l.ndf.reelle.some(function(a){ return a.photo; });
+        if (!hasAchatPhoto && !hasNdfPhoto) return l;
+        var lc = Object.assign({}, l);
+        if (hasAchatPhoto) lc.achats = l.achats.map(function(a){
+          if (!a.photo) return a;
+          var ac = Object.assign({}, a); delete ac.photo; return ac;
+        });
+        if (hasNdfPhoto) {
+          lc.ndf = Object.assign({}, l.ndf);
+          lc.ndf.reelle = l.ndf.reelle.map(function(a){
+            if (!a.photo) return a;
+            var ac = Object.assign({}, a); delete ac.photo; return ac;
+          });
+        }
+        return lc;
+      });
+    });
+    result[cid] = stripped;
+  });
+  return result;
+}
+
 function _stripBigData(obj) {
   // Copie shallow ciblée — SANS JSON.parse/JSON.stringify global (trop coûteux)
   var o = Object.assign({}, obj);
@@ -3686,6 +3754,8 @@ function _stripBigData(obj) {
   }
   if (o.settings && o.settings.logo) { o.settings = Object.assign({}, o.settings); delete o.settings.logo; }
   if (o.docSettings && o.docSettings.signatureImage) { o.docSettings = Object.assign({}, o.docSettings); delete o.docSettings.signatureImage; }
+  // Photos de justificatifs dans les budgets : stockées uniquement en IndexedDB
+  if (o.budgets) o.budgets = _stripBudgetPhotos(o.budgets);
   delete o.licenceDB;
   return o;
 }
@@ -3727,7 +3797,7 @@ function _flushSaveState() {
   }
   // 3. Clé critique + clés dédiées
   _saveCritical();
-  try { if (S.budgets) localStorage.setItem(LS_BUDGETS, JSON.stringify(S.budgets)); } catch(e) {}
+  try { if (S.budgets) localStorage.setItem(LS_BUDGETS, JSON.stringify(_stripBudgetPhotos(S.budgets))); } catch(e) {}
   try { if (S.homeTodosByComp) localStorage.setItem(LS_TODOS, JSON.stringify(S.homeTodosByComp)); } catch(e) {}
   try { if (S.compEnroll) localStorage.setItem(LS_ENROLL, JSON.stringify(S.compEnroll)); } catch(e) {} // filet anti-perte
 }
@@ -28553,10 +28623,6 @@ function printNoteAvance(compId) {
   var _tauxKmFmt = _tauxKm.toFixed(3).replace('.', ',');
   var totalGeneral = items.reduce(function(s,a){ return s+a.st; }, 0);
 
-  // ── Diagnostic photos (retiré après validation) ──
-  var _nbPhotos = items.filter(function(i){ return i.photo; }).length;
-  console.log('[NoteAvance] items:', items.length, '| avec photo:', _nbPhotos, items.map(function(i){ return {obj:i.objet, hasPhoto:!!i.photo}; }));
-
   // ── Lignes du tableau ──
   var rows = '';
   var totalRepas = 0, totalDivers = 0, totalKm = 0;
@@ -28706,10 +28772,11 @@ function printNoteAvance(compId) {
   _totalsRows += '<td style="text-align:right;color:#003875">0,00 €</td>';
   _totalsRows += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers>0?totalDivers.toFixed(2)+' €':'')+'</td>';
   _totalsRows += '<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+' €</td>';
-  _totalsRows += '<td></td>';
+  _totalsRows += '<td style="background:#dce6f1"></td>';
+  _totalsRows += '<td style="background:#dce6f1"></td>';
   _totalsRows += '</tr>';
   _totalsRows += '<tr>';
-  _totalsRows += '<td colspan="14" style="border:none;background:transparent;padding:4px 6px 2px 0;vertical-align:bottom">';
+  _totalsRows += '<td colspan="13" style="border:none;background:transparent;padding:4px 6px 2px 0;vertical-align:bottom">';
   _totalsRows += '<span style="font-size:8.5pt;font-weight:bold">Commentaires ou précisions :</span>';
   _totalsRows += '<div style="min-height:30px;padding:3px;font-size:8.5pt;white-space:pre-wrap;margin-top:2px">'+commentairesNdf+'</div>';
   _totalsRows += '</td>';
@@ -28719,6 +28786,7 @@ function printNoteAvance(compId) {
   _totalsRows += '<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>';
   _totalsRows += '</div>';
   _totalsRows += '</td>';
+  _totalsRows += '<td style="border:none;background:transparent"></td>';
   _totalsRows += '<td style="border:none;background:transparent"></td>';
   _totalsRows += '</tr>';
 
