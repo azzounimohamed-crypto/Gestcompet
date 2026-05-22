@@ -31573,6 +31573,123 @@ function bdmAchatRemove(idx) {
   if (!_bdmAchats.length) _bdmAchats = [{ id:'a'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false }];
   _renderAchatRows();
 }
+
+// ─── Import Excel / CSV dans le détail de ligne budget ────────────────────────
+function importBdmLignes(inp, mode) {
+  var file = inp.files && inp.files[0];
+  inp.value = '';
+  if (!file) return;
+  var ext = (file.name.split('.').pop()||'').toLowerCase();
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb;
+      if (ext === 'csv') {
+        wb = XLSX.read(e.target.result, { type:'string', cellDates:true });
+      } else {
+        wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      }
+      var ws   = wb.Sheets[wb.SheetNames[0]];
+      // header:1 + defval:'' pour avoir les valeurs texte/nombre ; on accédera aux cellules directement pour les dates
+      var rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      if (!rows || rows.length < 2) { toast('Fichier vide ou sans données', 'err'); return; }
+
+      // ── Détection des colonnes ────────────────────────────────────────────
+      var hdrs = rows[0].map(function(h){ return (h||'').toString().trim().toLowerCase(); });
+      var ci = function(kws) {
+        var idx = -1;
+        hdrs.forEach(function(h, j) {
+          if (idx < 0 && kws.some(function(k){ return h.indexOf(k) >= 0; })) idx = j;
+        });
+        return idx;
+      };
+      var cDate = ci(['date']);
+      var cLib  = ci(['libellé','libelle','description','objet','désignation','designation','motif']);
+      var cTar  = ci(['tarif','montant','prix','coût','cout','amount','total','valeur']);
+      var cQt   = ci(['qté','qt','quantité','quantite','qty','nb']);
+      var cDist = ci(['distance','km','kilomètre','kilometre','kilométrage','kilometrage']);
+
+      // ── Lecture de date directement depuis la cellule du worksheet ────────
+      // sheet_to_json formate les dates selon la locale → peu fiable.
+      // On accède à ws[adresse] qui expose : .t (type), .v (valeur brute), .w (texte formaté Excel).
+      var pad2 = function(n){ return n < 10 ? '0'+n : ''+n; };
+      var parseAnyDate = function(raw, formatted) {
+        // 1. Objet Date natif (cellDates:true a fonctionné)
+        if (raw instanceof Date && !isNaN(raw)) {
+          return raw.getUTCFullYear() + '-' + pad2(raw.getUTCMonth()+1) + '-' + pad2(raw.getUTCDate());
+        }
+        // 2. Nombre de série Excel (ex. 45678)
+        if (typeof raw === 'number' && raw > 1000) {
+          var d0 = new Date(Math.round((raw - 25569) * 86400 * 1000));
+          return d0.getUTCFullYear() + '-' + pad2(d0.getUTCMonth()+1) + '-' + pad2(d0.getUTCDate());
+        }
+        // 3. Texte formaté Excel (.w) ou chaîne brute
+        var s = (formatted || (raw != null ? raw.toString() : '')).trim();
+        if (!s) return '';
+        // ISO YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY (format français courant)
+        var m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+        if (m) {
+          var dd=parseInt(m[1],10), mo=parseInt(m[2],10), yy=parseInt(m[3],10);
+          if (dd > 12 || mo <= 12) return yy+'-'+pad2(mo)+'-'+pad2(dd); // DD/MM/YYYY
+          return yy+'-'+pad2(dd)+'-'+pad2(mo); // si ambigu et dd<=12, traiter comme MM/DD
+        }
+        return '';
+      };
+      var getCellDate = function(rowIdx, colIdx) {
+        if (colIdx < 0) return '';
+        var addr = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+        var cell = ws[addr];
+        if (!cell) return '';
+        return parseAnyDate(cell.v, cell.w);
+      };
+
+      var added = 0;
+      if (mode === 'achat') {
+        // ── Collecte des lignes actuellement à l'écran ───────────────────
+        bdmAchatCollect();
+        // Supprimer la ligne vide de démarrage si elle est vraiment vide
+        if (_bdmAchats.length === 1 && !_bdmAchats[0].libelle && !_bdmAchats[0].tarif) _bdmAchats = [];
+        rows.slice(1).forEach(function(r, i) {
+          var lib = cLib >= 0 ? (r[cLib]||'').toString().trim() : '';
+          var tar = cTar >= 0 ? parseFloat((r[cTar]||'').toString().replace(',','.')) || 0 : 0;
+          var qt  = cQt  >= 0 ? parseInt((r[cQt]||'').toString())  || 1 : 1;
+          var dt  = getCellDate(i + 1, cDate);
+          if (!lib && !tar) return; // ligne vide → ignorer
+          _bdmAchats.push({ id:'a'+Date.now()+Math.random().toString(36).slice(2,5), date:dt, libelle:lib, tarif:tar, qt:qt, avance:false });
+          added++;
+        });
+        if (!_bdmAchats.length) _bdmAchats = [{ id:'a'+Date.now(), date:'', libelle:'', tarif:0, qt:1, avance:false }];
+        _renderAchatRows();
+      } else {
+        // ── NDF Réelle ───────────────────────────────────────────────────
+        bdmNDFReelleCollect();
+        if (_bdmNDFReelle.length === 1 && !_bdmNDFReelle[0].libelle && !_bdmNDFReelle[0].tarif && !_bdmNDFReelle[0].distance) _bdmNDFReelle = [];
+        rows.slice(1).forEach(function(r, i) {
+          var lib  = cLib  >= 0 ? (r[cLib]||'').toString().trim() : '';
+          var tar  = cTar  >= 0 ? parseFloat((r[cTar]||'').toString().replace(',','.')) || 0 : 0;
+          var qt   = cQt   >= 0 ? parseInt((r[cQt]||'').toString()) || 1 : 1;
+          var dist = cDist >= 0 ? parseFloat((r[cDist]||'').toString().replace(',','.')) || 0 : 0;
+          var dt   = getCellDate(i + 1, cDate);
+          if (!lib && !tar && !dist) return;
+          _bdmNDFReelle.push({ id:'r'+Date.now()+Math.random().toString(36).slice(2,5), date:dt, libelle:lib, distance:dist, tarif:tar, qt:qt, avance:false });
+          added++;
+        });
+        if (!_bdmNDFReelle.length) _bdmNDFReelle = [{ id:'r'+Date.now(), date:'', libelle:'', distance:0, tarif:0, qt:1, avance:false }];
+        _renderNDFReelleRows();
+      }
+      toast(added + ' ligne' + (added>1?'s':'') + ' importée' + (added>1?'s':''), 'ok');
+    } catch(err) {
+      toast('Erreur lecture fichier : ' + err.message, 'err');
+    }
+  };
+  if (ext === 'csv') {
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+}
 function bdmAchatSt(idx) {
   var tarEl = document.getElementById('ba-tar-'+idx);
   var qtEl  = document.getElementById('ba-qt-'+idx);
@@ -31676,6 +31793,7 @@ function renderBudgetDetailContent(overrideDomaine) {
 
     html += '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">';
     html += '<button onclick="achatScanTicket()" style="padding:7px 14px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">📷 Scanner un ticket</button>';
+    html += '<label title="Importer depuis un fichier Excel ou CSV" style="padding:7px 14px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">📥 Importer<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBdmLignes(this,\'achat\')"></label>';
     html += '<button onclick="bdmAchatCollect();bdmAchatAdd()" style="padding:7px 16px;border:none;border-radius:8px;background:#0055cc;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter une ligne</button>';
     html += '</div>';
 
@@ -31871,6 +31989,7 @@ function renderBudgetDetailContent(overrideDomaine) {
       html += '</div>';
       html += '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">';
       html += '<button onclick="ndfScanTicket()" style="padding:7px 14px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">📷 Scanner un ticket</button>';
+      html += '<label title="Importer depuis un fichier Excel ou CSV" style="padding:7px 14px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">📥 Importer<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importBdmLignes(this,\'ndf\')"></label>';
       html += '<button onclick="bdmNDFReelleCollect();bdmNDFReelleAdd()" style="padding:7px 16px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter une dépense</button>';
       html += '</div>';
     }
@@ -32195,6 +32314,10 @@ function saveBudgetDetailModal() {
   if (!S.budgets || !S.budgets[_bdmCompId]) return closeBudgetDetailModal();
   var line = (S.budgets[_bdmCompId][_bdmSection]||[]).find(function(l){ return l.id === _bdmLineId; });
   if (!line) return closeBudgetDetailModal();
+
+  // ← Horodatage obligatoire : garantit que la version locale gagne au merge pullFromCloud
+  // Sans ça, _mergeBgtLines compare 0 vs timestamp_cloud → le cloud écrase les saisies locales.
+  line._updatedAt = Date.now();
 
   var domEl = document.getElementById('bdm-domaine');
   var libEl = document.getElementById('bdm-libelle');
