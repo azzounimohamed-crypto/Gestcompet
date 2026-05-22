@@ -4568,16 +4568,7 @@ function renderCompetitions() {
         info.appendChild(statsRow);
       }
     }
-    // Bouton Modifier (desktop uniquement)
-    var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
-    if (canEdit && window.innerWidth >= 768) {
-      var editBtn = document.createElement('button');
-      editBtn.title = 'Modifier la compétition';
-      editBtn.style.cssText = 'align-self:center;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap';
-      editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Modifier';
-      editBtn.onclick = (function(id){ return function(e){ e.stopPropagation(); editComp(id); }; })(cp.id);
-      card.appendChild(editBtn);
-    }
+    // Bouton Modifier supprimé de la liste des compétitions
     c.appendChild(card);
   });
   // Bouton ajouter
@@ -11358,18 +11349,25 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
       var c=(p.club||'').trim(); if(c) clubCounts[c]=(clubCounts[c]||0)+1;
     });
-    // ── Marques par classe (microlight = multiaxes+pendulaire / paramoteur) ──
-    var _mlClasses = ['multiaxes','pendulaire','microlight'];
-    var aileMLCounts={}, moteurMLCounts={};      // microlight / pendulaire
-    var ailePMCounts={}, moteurPMCounts={}, helicePMCounts={}; // paramoteur
+    // ── Marques par classe ──
+    // Microlight pur : multiaxes + microlight  |  Pendulaire : classe 2 (séparé)
+    var _mlPureClasses  = ['multiaxes','microlight'];
+    var _pendClasses    = ['pendulaire'];
+    var _mlAllClasses   = ['multiaxes','pendulaire','microlight']; // pour les moteurs
+    var aileMLCounts={}, ailePendCounts={}, moteurMLCounts={};    // microlight / pendulaire
+    var ailePMCounts={}, moteurPMCounts={}, helicePMCounts={};    // paramoteur
     enrolled.forEach(function(pid){
       var ulms=(S.ulms||{})[pid]||[];
       ulms.forEach(function(ulm){
         var cls=_normCls(ulm.classe||'');
-        var isML=_mlClasses.indexOf(cls)>=0;
-        var isPM=(cls==='paramotor');
+        var isMLPure = _mlPureClasses.indexOf(cls)>=0;
+        var isPend   = _pendClasses.indexOf(cls)>=0;
+        var isMLAll  = _mlAllClasses.indexOf(cls)>=0;
+        var isPM     = (cls==='paramotor');
         var aile=(ulm.marque||'').trim(), moteur=(ulm.moteur||'').trim(), helice=(ulm.helice||'').trim();
-        if(isML){ if(aile) aileMLCounts[aile]=(aileMLCounts[aile]||0)+1; if(moteur) moteurMLCounts[moteur]=(moteurMLCounts[moteur]||0)+1; }
+        if(isMLPure){ if(aile) aileMLCounts[aile]=(aileMLCounts[aile]||0)+1; }
+        if(isPend)  { if(aile) ailePendCounts[aile]=(ailePendCounts[aile]||0)+1; }
+        if(isMLAll) { if(moteur) moteurMLCounts[moteur]=(moteurMLCounts[moteur]||0)+1; }
         if(isPM){ if(aile) ailePMCounts[aile]=(ailePMCounts[aile]||0)+1; if(moteur) moteurPMCounts[moteur]=(moteurPMCounts[moteur]||0)+1; if(helice) helicePMCounts[helice]=(helicePMCounts[helice]||0)+1; }
       });
     });
@@ -11512,17 +11510,14 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     else if (_genreH) { html += _genreH; }
     else if (_ageH)   { html += _ageH; }
 
-    // ── Catégories (seule) ────────────────────────────────────────
+    // ── Catégories compétitives | Classes ULM | Équipages — même ligne ──
     var _catH = '';
     if (hasCat) {
       var _cp2=catOrder.filter(function(k){return(catPilCounts[k]||0)>0;}), _cm=Math.max.apply(null,_cp2.map(function(k){return catPilCounts[k]||0;})), _ct=_cp2.reduce(function(s,k){return s+(catPilCounts[k]||0);},0);
       _catH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Catégories compétitives</div>';
       _cp2.forEach(function(c){ _catH += _bRow(c, catPilCounts[c]||0, _cm, _ct, catColors[c]||'#8b5cf6'); });
       _catH += '</div>';
-      html += _catH;
     }
-
-    // ── Classes ULM | Équipages ───────────────────────────────────
     var _clsH = '';
     if (hasCls) {
       var _ck=Object.keys(ulmClsCounts).sort(function(a,b){return ulmClsCounts[b]-ulmClsCounts[a];}), _cm2=Math.max.apply(null,_ck.map(function(k){return ulmClsCounts[k];})), _ct2=_ck.reduce(function(s,k){return s+ulmClsCounts[k];},0);
@@ -11535,9 +11530,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var _ep=Math.round(nbMono/(nbMono+nbBi)*100);
       _equiH = '<div style="'+_cSt+'"><div style="'+_tSt+'">Équipages</div><div style="display:flex;align-items:center;gap:14px"><svg width="80" height="80" viewBox="0 0 80 80" style="flex-shrink:0">'+_donut([{v:nbMono},{v:nbBi}],['#8b5cf6','#10b981'],40,40,29,13)+'<text x="40" y="35" text-anchor="middle" font-size="13" font-weight="900" fill="var(--txt)">'+_ep+'%</text><text x="40" y="47" text-anchor="middle" font-size="7.5" fill="var(--txt3)">Mono</text></svg><div style="flex:1">'+_leg('#8b5cf6','Monoplace',nbMono,_ep)+_leg('#10b981','Biplace',nbBi,100-_ep)+'</div></div></div>';
     }
-    if (_clsH && _equiH) { html += '<div style="'+_g2+'">' + _clsH + _equiH + '</div>'; }
-    else if (_clsH)  { html += _clsH; }
-    else if (_equiH) { html += _equiH; }
+    // Grille adaptative : jusqu'à 3 colonnes sur desktop, 1 colonne sur mobile
+    var _rowCatClsEq = [_catH, _clsH, _equiH].filter(Boolean);
+    if (_rowCatClsEq.length > 0) {
+      var _cols = isMobile ? 1 : _rowCatClsEq.length;
+      var _gCCE = 'display:grid;grid-template-columns:repeat('+_cols+',1fr);gap:10px';
+      html += '<div style="'+_gCCE+'">' + _rowCatClsEq.join('') + '</div>';
+    }
 
     // ── Sections marques & clubs ──────────────────────────────────
 
@@ -11585,15 +11584,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _g2b = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr;gap:10px';
     var _g3b = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px';
 
-    // Clubs (pleine largeur)
-    var _clubH = _brandSection('Classement Clubs',clubCounts,'#6366f1',10);
-    if(_clubH) html += _clubH;
-
-    // Ligne 1 — Ailes ML | Moteurs ML (microlight, 2 colonnes)
-    var _aileMLH   = _brandSection('Ailes Microlight / Pendulaire',_normBrand(aileMLCounts),'#0891b2',6);
+    // Ligne 1 — Ailes Microlight | Ailes Pendulaire | Moteurs Microlight (3 colonnes)
+    var _aileMLH   = _brandSection('Ailes Microlight',_normBrand(aileMLCounts),'#0891b2',6);
+    var _ailePendH = _brandSection('Ailes Pendulaire',_normBrand(ailePendCounts),'#06b6d4',6);
     var _moteurMLH = _brandSection('Moteurs Microlight',_normBrand(moteurMLCounts),'#059669',6);
-    var _row1 = [_aileMLH, _moteurMLH].filter(Boolean);
-    if (_row1.length === 2) { html += '<div style="'+_g2b+'">' + _row1.join('') + '</div>'; }
+    var _row1 = [_aileMLH, _ailePendH, _moteurMLH].filter(Boolean);
+    if (_row1.length === 3) { html += '<div style="'+_g3b+'">' + _row1.join('') + '</div>'; }
+    else if (_row1.length === 2) { html += '<div style="'+_g2b+'">' + _row1.join('') + '</div>'; }
     else if (_row1.length === 1) { html += _row1[0]; }
 
     // Ligne 2 — Ailes PM | Moteurs PM | Hélices PM (paramoteur, 3 colonnes)
@@ -11604,6 +11601,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (_row2.length === 3) { html += '<div style="'+_g3b+'">' + _row2.join('') + '</div>'; }
     else if (_row2.length === 2) { html += '<div style="'+_g2b+'">' + _row2.join('') + '</div>'; }
     else if (_row2.length === 1) { html += _row2[0]; }
+
+    // Clubs (pleine largeur) — après les stats Microlight et Paramoteur
+    var _clubH = _brandSection('Classement Clubs',clubCounts,'#6366f1',10);
+    if(_clubH) html += _clubH;
 
     // ── 4. PROVENANCE + CARTE — même ligne (1/3 | 2/3), même hauteur ──
     if (pilotsWithRegion > 0) {
@@ -12853,8 +12854,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += '<div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:24px;padding:3px">';
     htmlB += _segBtn('engagement','💸 Dépenses','#2563eb');
     htmlB += _segBtn('ressources','💰 Recettes','#10b981');
-    htmlB += _segBtn('avance','💵 Avances','#f59e0b');
     htmlB += _segBtn('synthese','📊 Synthèse','var(--stol)');
+    htmlB += _segBtn('avance','💵 Avances','#f59e0b');
     htmlB += '</div>';
     // Spacer
     htmlB += '<div style="flex:1"></div>';
@@ -12890,7 +12891,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlB += '</div>';
 
     // ── 3. Contenu scrollable ───────────────────────────────────────────────
-    htmlB += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:12px 12px 20px">';
+    htmlB += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:0 12px 20px">';
 
     if (bSub === 'engagement' || bSub === 'ressources') {
       var section  = bSub;
@@ -12901,11 +12902,12 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var nInp     = 'type="number" min="0" step="0.01"';
       var nInpInt  = 'type="number" min="1" step="1"';
       var calcEvt  = function(lid){ return 'recalcBudgetCout(\''+cp.id+'\',\''+section+'\',\''+lid+'\')'; };
-      // ── En-tête colonnes ──
+      // ── En-tête colonnes + ligne de saisie : bloc sticky ──
       var _bRH = 'position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;display:flex;align-items:center;justify-content:center';
       var _bRL = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
       var _dl = _bgtNomLieDatalist(cp.id);
       htmlB += _dl.html;
+      htmlB += '<div style="position:sticky;top:0;z-index:20;background:var(--navy4);padding-top:8px">';
       htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px;border-bottom:2px solid var(--bdr);min-width:min(540px,100%);flex-shrink:0">';
       htmlB += '<div style="'+hStyle+';position:relative">Domaine<div onmousedown="_bgtResizeStart(event,0)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
       htmlB += '<div style="'+hStyle+';position:relative">Libellé<div onmousedown="_bgtResizeStart(event,1)" style="'+_bRH+'"><div style="'+_bRL+'"></div></div></div>';
@@ -12927,6 +12929,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlB += '<div></div><div></div><div></div><div></div><div></div>';
       htmlB += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="bgtAddLineFromRow(\''+cp.id+'\',\''+section+'\')" style="'+addBtnSt+'" title="Ajouter">+</button></div>';
       htmlB += '</div>';
+      htmlB += '</div>'; // fin bloc sticky (en-tête + saisie)
       // ── Lignes groupées par domaine ──
       if (lines.length === 0) {
         htmlB += '<div style="text-align:center;padding:24px 0;color:var(--txt3);font-size:13px">Aucune ligne — saisissez un domaine ci-dessus</div>';
@@ -12958,9 +12961,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
               var bg = i%2===1 ? 'background:rgba(255,255,255,0.02);' : '';
               var coutCalc = computeCout(l);
               htmlB += '<div data-bgt-row style="display:grid;'+BGRID+';gap:4px;padding:4px 6px 4px 20px;align-items:center;'+bg+';min-width:min(540px,100%);border-bottom:1px solid rgba(255,255,255,0.04)">';
-              htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
-              htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
-              htmlB += '<input id="bl-nom-'+l.id+'" list="'+_dl.id+'" autocomplete="off" style="'+iStyle+';font-size:11px;border-color:rgba(99,102,241,.4)" value="'+((l.nomLie||'').replace(/"/g,'&quot;'))+'" placeholder="Nom lié…" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nomLie\',this.value)">';
+              htmlB += '<input id="bl-dom-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.domaine||'').replace(/"/g,'&quot;'))+'" placeholder="Domaine" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)" onblur="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'domaine\',this.value)">';
+              htmlB += '<input id="bl-lib-'+l.id+'" style="'+iStyle+';font-size:11px" value="'+((l.libelle||'').replace(/"/g,'&quot;'))+'" placeholder="Libellé" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)" onblur="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'libelle\',this.value)">';
+              htmlB += '<input id="bl-nom-'+l.id+'" list="'+_dl.id+'" autocomplete="off" style="'+iStyle+';font-size:11px;border-color:rgba(99,102,241,.4)" value="'+((l.nomLie||'').replace(/"/g,'&quot;'))+'" placeholder="Nom lié…" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nomLie\',this.value)" onchange="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nomLie\',this.value)" onblur="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nomLie\',this.value)">';
               htmlB += '<input id="bl-val-'+l.id+'" '+nInp+' style="'+iStyle+';text-align:right;font-size:11px" value="'+(l.valeur||'')+'" placeholder="0" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'valeur\',this.value);'+calcEvt(l.id)+'">';
               htmlB += '<input id="bl-nbj-'+l.id+'" '+nInpInt+' style="'+iStyle+';text-align:center;font-size:11px" value="'+(l.nbjours||1)+'" placeholder="1" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'nbjours\',this.value);'+calcEvt(l.id)+'">';
               htmlB += '<input id="bl-qt-'+l.id+'" '+nInpInt+' style="'+iStyle+';text-align:center;font-size:11px" value="'+(l.qt||1)+'" placeholder="1" oninput="budgetLineInput(\''+cp.id+'\',\''+section+'\',\''+l.id+'\',\'qt\',this.value);'+calcEvt(l.id)+'">';
@@ -15697,6 +15700,9 @@ function _sigPadClear() {
   if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
   if (!S.user) S.user = {};
   S.user.signatureImage = null;
+  // Effacer aussi la copie cloud-syncée
+  if (!S.docSettings) S.docSettings = {};
+  S.docSettings.userSignatureImage = null;
   var prev = document.getElementById('sig-pad-preview');
   if (prev) prev.style.display = 'none';
   saveState();
@@ -15710,6 +15716,9 @@ function _sigPadSave() {
   var dataUrl = canvas.toDataURL('image/png');
   if (!S.user) S.user = {};
   S.user.signatureImage = dataUrl;
+  // Copie cloud-syncée (S.docSettings est inclus dans pushToCloud)
+  if (!S.docSettings) S.docSettings = {};
+  S.docSettings.userSignatureImage = dataUrl;
   var prev = document.getElementById('sig-pad-preview');
   var imgEl = document.getElementById('sig-pad-img');
   if (prev && imgEl) { imgEl.src = dataUrl; prev.style.display = 'block'; }
@@ -19149,6 +19158,10 @@ async function loadFromSupabaseFirst() {
     });
 
     if (localUser)     S.user      = localUser;
+    // Restaurer la signature depuis la copie cloud si l'utilisateur ne l'a pas localement
+    if (S.user && !S.user.signatureImage && S.docSettings && S.docSettings.userSignatureImage) {
+      S.user.signatureImage = S.docSettings.userSignatureImage;
+    }
     if (localLicences) S.licenceDB = localLicences;
     (S.comps   || []).forEach(function(c){ if (localAffiches[c.id]) c.affiche = localAffiches[c.id]; });
     (S.pilots  || []).forEach(function(p){ if (localPhotos[p.id])   p.photo   = localPhotos[p.id];   });
@@ -19595,6 +19608,10 @@ async function pullFromCloud() {
 
   // Restaurer l'utilisateur courant (ne jamais écraser l'identité locale)
   if (localUser) S.user = localUser;
+  // Restaurer la signature depuis la copie cloud si l'utilisateur ne l'a pas localement
+  if (S.user && !S.user.signatureImage && S.docSettings && S.docSettings.userSignatureImage) {
+    S.user.signatureImage = S.docSettings.userSignatureImage;
+  }
 
   // ── Nettoyer les données liées aux compétitions tombstoned (après fusion cloud) ──
   if (Object.keys(allDeletedIds).length > 0) {
@@ -23933,6 +23950,8 @@ function showPilotDetailModal(pilotId, compId, editMode) {
   var div = document.createElement('div');
   div.innerHTML = html;
   document.body.appendChild(div.firstElementChild);
+  // Synchronise Classe depuis Catégorie au premier affichage
+  setTimeout(pdUpdateCategorie, 0);
   if (_isMobPilotModal) setTimeout(_initPilotSheetDrag, 50);
 }
 
@@ -24028,6 +24047,8 @@ function pdUpdatePratique() {
     catRow.style.display = 'none';
     catSel.innerHTML = '<option value="">— Non précisé —</option>';
   }
+  // Cascade : recalculer la Classe dès que les options de catégorie changent
+  pdUpdateCategorie();
 }
 
 function savePilotDetail(pilotId, compId) {
@@ -28496,18 +28517,30 @@ function printNoteAvance(compId) {
   });
   items.forEach(function(a){ if (a.st === undefined) a.st = a.tarif * a.qt; });
 
-  // ── Appliquer le tri choisi dans le tableau avances ──
+  // ── Infos utilisateur & compétition ──
+  var prenom    = esc(user.prenom||'');
+  var nom       = esc(user.nom||'');
+  var email     = esc(user.email||'');
+  var compNom   = esc(cp.nom||'');
+  var compLieu  = esc(cp.lieu||'');
+  var compDates = '';
+  if (cp.dateFrom) compDates = cp.dateFrom;
+  if (cp.dateTo && cp.dateTo !== cp.dateFrom) compDates += ' au ' + cp.dateTo;
+  var commentairesNdf = esc(bdata.commentairesNdf||'');
+  var sigImg = (S.user && S.user.signatureImage) ? S.user.signatureImage : (S.docSettings && S.docSettings.userSignatureImage) ? S.docSettings.userSignatureImage : null;
+  var dateToday = new Date().toLocaleDateString('fr-FR');
+
+  // ── Tri courant (par colonne sélectionnée dans l'onglet Avances) ──
   (function(){
     var col = _avanceSortCol, dir = _avanceSortDir;
     items.sort(function(a, b){
       var va, vb;
-      if      (col === 'date')  { va = a.date||'';           vb = b.date||''; }
-      else if (col === 'lib')   { va = (a.objet||'').toLowerCase();  vb = (b.objet||'').toLowerCase(); }
-      else if (col === 'dom')   { va = (a.domaine||'').toLowerCase(); vb = (b.domaine||'').toLowerCase(); }
+      if      (col === 'date')  { va = a.date||'';                  vb = b.date||''; }
+      else if (col === 'lib')   { va = (a.objet||'').toLowerCase(); vb = (b.objet||'').toLowerCase(); }
       else if (col === 'tarif') { va = a.tarif; vb = b.tarif; }
       else if (col === 'qt')    { va = a.qt;    vb = b.qt; }
       else if (col === 'st')    { va = a.st;    vb = b.st; }
-      else                      { va = '';       vb = ''; }
+      else                      { va = a.date||''; vb = b.date||''; }
       if (va < vb) return -dir;
       if (va > vb) return  dir;
       return 0;
@@ -28520,21 +28553,7 @@ function printNoteAvance(compId) {
   var _tauxKmFmt = _tauxKm.toFixed(3).replace('.', ',');
   var totalGeneral = items.reduce(function(s,a){ return s+a.st; }, 0);
 
-  // ── Infos utilisateur & compétition ──
-  var prenom    = esc(user.prenom||'');
-  var nom       = esc(user.nom||'');
-  var email     = esc(user.email||'');
-  var compNom   = esc(cp.nom||'');
-  var compLieu  = esc(cp.lieu||'');
-  var compDates = '';
-  if (cp.dateFrom) compDates = cp.dateFrom;
-  if (cp.dateTo && cp.dateTo !== cp.dateFrom) compDates += ' au ' + cp.dateTo;
-  var commentairesNdf = esc(bdata.commentairesNdf||'');
-  var sigImg = (S.user && S.user.signatureImage) ? S.user.signatureImage : null;
-  var dateToday = new Date().toLocaleDateString('fr-FR');
-
-  // ── Lignes du tableau (minimum 12 rangées) ──
-  var NROWS = Math.max(items.length, 12);
+  // ── Lignes du tableau ──
   var rows = '';
   var totalRepas = 0, totalDivers = 0, totalKm = 0;
   var _isRepas = function(s){ return s ? s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf('repas') >= 0 : false; };
@@ -28543,47 +28562,57 @@ function printNoteAvance(compId) {
     var d = new Date(s+'T12:00:00');
     if(isNaN(d)) return s;
     var J=['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'];
-    var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    return J[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+    var M=['janvier','f\xe9vrier','mars','avril','mai','juin','juillet','ao\xfbt','septembre','octobre','novembre','d\xe9cembre'];
+    return J[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
   };
-  for (var i = 0; i < NROWS; i++) {
-    var it  = items[i] || null;
-    var st  = it ? it.st : 0;
-    var bg  = i % 2 === 1 ? 'background:#f0f5ff' : '';
-    var _colRepas = it && st && _isRepas(it.objet);
-    var _colKm    = it && (it.distance > 0);
-    if (_colRepas)      { totalRepas += st; }
-    else if (_colKm)    { totalKm += it.distance; }
-    else if (it && st)  { totalDivers += st; }
-    rows += '<tr style="height:18px;'+bg+'">';
-    rows += '<td style="text-align:center;color:#777;font-size:6.5pt">'+(it ? (i+1) : '')+'</td>';
-    rows += '<td style="text-align:center;white-space:nowrap;font-size:6pt">'+(it ? _fmtFR(it.date) : '')+'</td>';
-    rows += '<td style="text-align:left;padding-left:3px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it ? esc(it.objet) : '')+'</td>';
-    rows += '<td></td>'; // CBF*
-    rows += '<td style="text-align:left;font-size:6pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it && it.distance > 0 && it.lieuDe ? esc(it.lieuDe) : '')+'</td>'; // lieu de
-    rows += '<td style="text-align:left;font-size:6pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(it && it.distance > 0 && it.lieuA  ? esc(it.lieuA)  : '')+'</td>'; // lieu à
-    rows += '<td style="text-align:right;font-weight:bold;color:#003875">'+(_colKm ? it.distance : '')+'</td>'; // km
-    rows += '<td style="text-align:right"></td>'; // taxi
-    rows += '<td style="text-align:right"></td>'; // sncf
-    rows += '<td style="text-align:right;color:#003875;font-weight:bold">'+(_colRepas && st ? st.toFixed(2)+' €' : '')+'</td>'; // repas
-    rows += '<td style="text-align:center"></td>'; // nb inv
-    rows += '<td style="text-align:right"></td>'; // hotel+pdéj
-    rows += '<td style="text-align:right;color:#003875;font-weight:bold">'+(!_colRepas && !_colKm && it && st ? st.toFixed(2)+' €' : '')+'</td>'; // divers
-    rows += '<td style="text-align:right;font-weight:bold;background:#fffae0">'+(it && st ? st.toFixed(2)+' €' : '')+'</td>'; // total
-    rows += '<td></td>'; // code analytique
-    rows += '</tr>';
+
+  if (items.length === 0) {
+    for (var ei = 0; ei < 8; ei++) {
+      rows += '<tr style="height:24px"><td colspan="15" style="border:1px solid #7f9fc8"></td></tr>';
+    }
+  } else {
+    items.forEach(function(it, _ri){
+      var rowIndex = _ri + 1;
+      var st = it.st || 0;
+      var bg = rowIndex % 2 === 1 ? '' : 'background:#f0f5ff';
+      var _colRepas = st && _isRepas(it.objet);
+      var _colKm    = it.distance > 0;
+      if (_colRepas)   { totalRepas += st; }
+      else if (_colKm) { totalKm += it.distance; }
+      else if (st)     { totalDivers += st; }
+      rows += '<tr style="height:24px;' + bg + '">';
+      rows += '<td style="text-align:center;color:#777;font-size:8pt">' + rowIndex + '</td>';
+      rows += '<td style="text-align:center;white-space:nowrap;font-size:8pt">' + _fmtFR(it.date) + '</td>';
+      rows += '<td style="text-align:left;padding-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9pt">' + esc(it.objet) + '</td>';
+      rows += '<td></td>';
+      rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (_colKm && it.lieuDe ? esc(it.lieuDe) : '') + '</td>';
+      rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (_colKm && it.lieuA  ? esc(it.lieuA)  : '') + '</td>';
+      rows += '<td style="text-align:right;font-weight:bold;color:#003875;font-size:9pt">' + (_colKm ? it.distance : '') + '</td>';
+      rows += '<td style="text-align:right"></td>';
+      rows += '<td style="text-align:right"></td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">' + (_colRepas && st ? st.toFixed(2) + ' \u20ac' : '') + '</td>';
+      rows += '<td style="text-align:center"></td>';
+      rows += '<td style="text-align:right"></td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">' + (!_colRepas && !_colKm && st ? st.toFixed(2) + ' \u20ac' : '') + '</td>';
+      rows += '<td style="text-align:right;font-weight:bold;background:#fffae0;font-size:9pt">' + (st ? st.toFixed(2) + ' \u20ac' : '') + '</td>';
+      rows += '<td></td>';
+      rows += '</tr>';
+    });
   }
+
+  var _colgroup = '<colgroup><col style="width:14px"><col style="width:86px"><col style="width:180px"><col style="width:22px"><col style="width:62px"><col style="width:62px"><col style="width:28px"><col style="width:34px"><col style="width:38px"><col style="width:34px"><col style="width:22px"><col style="width:58px"><col style="width:44px"><col style="width:52px"><col style="width:48px"></colgroup>';
+
     var logoHtml = logo
     ? '<img src="'+logo+'" style="max-width:100px;max-height:70px;object-fit:contain;display:block">'
     : '<div style="width:80px;height:55px;display:flex;align-items:center;justify-content:center;background:#003875;color:#fff;font-size:7pt;font-weight:bold;border-radius:3px;text-align:center;padding:2px">LOGO</div>';
 
   var iRow = function(l1,v1,l2,v2){
     var r='<tr>';
-    r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:7pt">'+l1+' :</td>';
-    r+='<td style="padding:2px 5px;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:7.5pt;overflow:hidden;text-overflow:ellipsis">'+v1+'</td>';
+    r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:8.5pt">'+l1+' :</td>';
+    r+='<td style="padding:2px 5px;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:9pt;overflow:hidden;text-overflow:ellipsis">'+v1+'</td>';
     if(l2!==undefined){
-      r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:7pt">'+l2+' :</td>';
-      r+='<td style="padding:2px 5px;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:7.5pt;overflow:hidden;text-overflow:ellipsis">'+v2+'</td>';
+      r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:8.5pt">'+l2+' :</td>';
+      r+='<td style="padding:2px 5px;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:9pt;overflow:hidden;text-overflow:ellipsis">'+v2+'</td>';
     }else{
       r+='<td colspan="2" style="border-bottom:1px solid #c9d6e8"></td>';
     }
@@ -28595,18 +28624,19 @@ function printNoteAvance(compId) {
   html += '<style>';
   html += '@page{size:A4 landscape;margin:8mm 10mm}';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:#111}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111}';
   html += '.print-btn{position:fixed;top:10px;right:10px;padding:8px 20px;background:#003875;color:#fff;border:none;border-radius:7px;font-size:11pt;font-weight:bold;cursor:pointer;font-family:inherit;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:999}';
   html += '@media print{.print-btn{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '.tbl-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:5px}';
-  html += 'table.main{width:100%;border-collapse:collapse;font-size:7pt}';
+  html += 'table.main{width:100%;border-collapse:collapse;font-size:8.5pt}';
   html += 'table.main th,table.main td{border:1px solid #7f9fc8;padding:1px 2px}';
-  html += 'table.main th{background:#c5d9f1;font-weight:bold;text-align:center;font-size:6.5pt}';
-  html += '.sig-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:2mm}';
+  html += 'table.main th{background:#c5d9f1;font-weight:bold;text-align:center;font-size:8pt}';
+  html += '.sig-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:2mm;page-break-inside:avoid;page-break-before:avoid}';
   html += '.sig-table{width:100%;border-collapse:collapse}';
-  html += '.sig-table td{border:1px solid #003875;padding:4px 5px;width:25%;vertical-align:top;height:50px}';
-  html += '.sig-title{font-size:6.5pt;font-weight:bold;text-align:center;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:2px}';
-  html += '.sig-sub{font-size:5.5pt;color:#555;font-style:italic;text-align:center;display:block}';
+  html += '.sig-table td{border:1px solid #003875;padding:4px 5px;width:25%;vertical-align:top;height:100px}';
+  html += '.sig-title{font-size:8pt;font-weight:bold;text-align:center;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:2px}';
+  html += '.sig-sub{font-size:7pt;color:#555;font-style:italic;text-align:center;display:block}';
+  html += '.tbl-wrap-cont{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:0;border-top:none}';
   html += '</style></head><body>';
   html += '<button class="print-btn" onclick="window.print()">🖨 Imprimer</button>';
 
@@ -28638,69 +28668,78 @@ function printNoteAvance(compId) {
   html += '</td>';
   html += '</tr></table>';
 
-  // ── Tableau principal ──
+  // ── Tableau principal (lignes hors ancre de pagination) ──
+  var _thead = '<thead><tr>'
+    +'<th rowspan="2" style="width:14px">N°</th>'
+    +'<th rowspan="2" style="width:86px">DATE</th>'
+    +'<th rowspan="2" style="width:180px">OBJET</th>'
+    +'<th rowspan="2" style="width:22px">CBF*</th>'
+    +'<th colspan="3" style="border-bottom:1px solid #7f9fc8">LIEUX</th>'
+    +'<th rowspan="2" style="width:34px">Taxi</th>'
+    +'<th rowspan="2" style="width:38px">SNCF<br>2<sup>e</sup> cl.</th>'
+    +'<th rowspan="2" style="width:34px">Repas</th>'
+    +'<th rowspan="2" style="width:22px">Nb.<br>Inv.</th>'
+    +'<th rowspan="2" style="width:58px">Hôtel<br>+pd\xe9j.</th>'
+    +'<th rowspan="2" style="width:44px">Divers</th>'
+    +'<th rowspan="2" style="width:52px;background:#fffae0">TOTAL</th>'
+    +'<th rowspan="2" style="width:48px">CODE<br>analytique</th>'
+    +'</tr><tr>'
+    +'<th style="width:62px">de</th>'
+    +'<th style="width:62px">à</th>'
+    +'<th style="width:28px">Km</th>'
+    +'</tr></thead>';
+  // Lignes de totaux dans le tbody (pas de <tfoot>) — évite la répétition sur chaque page imprimée
+  var _totalsRows = '';
+  _totalsRows += '<tr style="font-weight:bold;background:#dce6f1">';
+  _totalsRows += '<td colspan="6" style="text-align:right;padding-right:6px;font-size:8pt;color:#555">Totaux →</td>';
+  _totalsRows += '<td style="text-align:center;font-size:7.5pt;font-weight:bold;color:#003875">'+(totalKm > 0 ? totalKm+' km' : '0 km')+'</td>';
+  _totalsRows += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  _totalsRows += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  _totalsRows += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalRepas>0?totalRepas.toFixed(2)+' €':'')+'</td>';
+  _totalsRows += '<td></td>';
+  _totalsRows += '<td style="text-align:right;color:#003875">0,00 €</td>';
+  _totalsRows += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers>0?totalDivers.toFixed(2)+' €':'')+'</td>';
+  _totalsRows += '<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+' €</td>';
+  _totalsRows += '<td></td>';
+  _totalsRows += '</tr>';
+  _totalsRows += '<tr>';
+  _totalsRows += '<td colspan="13" style="border:none;background:transparent;padding:4px 6px 2px 0;vertical-align:bottom">';
+  _totalsRows += '<span style="font-size:8.5pt;font-weight:bold">Commentaires ou précisions :</span>';
+  _totalsRows += '<div style="min-height:30px;padding:3px;font-size:8.5pt;white-space:pre-wrap;margin-top:2px">'+commentairesNdf+'</div>';
+  _totalsRows += '</td>';
+  _totalsRows += '<td style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">';
+  _totalsRows += '<div style="font-size:13pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:4px 2px;background:#fffae0;display:block;width:100%;text-align:center;box-sizing:border-box">';
+  _totalsRows += '<div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">TOTAL À PAYER</div>';
+  _totalsRows += '<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>';
+  _totalsRows += '</div>';
+  _totalsRows += '</td>';
+  _totalsRows += '<td style="border:none;background:transparent"></td>';
+  _totalsRows += '</tr>';
+
+  // Bloc signature
+  var _sigBlock = '<div class="sig-wrap"><table class="sig-table"><tr>';
+  _sigBlock += '<td><div class="sig-title">Signature du demandeur<span class="sig-sub">(certifi\xe9e sinc\xe8re et v\xe9ritable)</span></div>'+(sigImg?'<div style="padding:4px;text-align:center"><img src="'+sigImg+'" style="max-height:80px;max-width:100%;object-fit:contain"></div>':'')+' </td>';
+  _sigBlock += '<td><div class="sig-title">Signature du responsable du pôle</div></td>';
+  _sigBlock += '<td><div class="sig-title">Signature du tr\xe9sorier</div></td>';
+  _sigBlock += '<td><div class="sig-title">Signature de la Pr\xe9sidente</div></td>';
+  _sigBlock += '</tr></table></div>';
+
+  // ── Table unique — alignement garanti des colonnes ──
   html += '<div class="tbl-wrap">';
-  html += '<table class="main">';
-  html += '<tr>';
-  html += '<th rowspan="2" style="width:14px">N°</th>';
-  html += '<th rowspan="2" style="width:86px">DATE</th>';
-  html += '<th rowspan="2" style="width:180px">OBJET</th>';
-  html += '<th rowspan="2" style="width:22px">CBF*</th>';
-  html += '<th colspan="3" style="border-bottom:1px solid #7f9fc8">LIEUX</th>';
-  html += '<th rowspan="2" style="width:34px">Taxi</th>';
-  html += '<th rowspan="2" style="width:38px">SNCF<br>2<sup>e</sup> cl.</th>';
-  html += '<th rowspan="2" style="width:34px">Repas</th>';
-  html += '<th rowspan="2" style="width:22px">Nb.<br>Inv.</th>';
-  html += '<th rowspan="2" style="width:58px">Hôtel<br>+pdéj.</th>';
-  html += '<th rowspan="2" style="width:44px">Divers</th>';
-  html += '<th rowspan="2" style="width:52px;background:#fffae0">TOTAL</th>';
-  html += '<th rowspan="2" style="width:48px">CODE<br>analytique</th>';
-  html += '</tr>';
-  html += '<tr>';
-  html += '<th style="width:62px">de</th>';
-  html += '<th style="width:62px">à</th>';
-  html += '<th style="width:28px">Km</th>';
-  html += '</tr>';
-  html += '</thead>';
-  html += '<tbody>'+rows+'</tbody>';
-  html += '<tfoot>';
-  // Ligne totaux colonnes
-  html += '<tr style="font-weight:bold;background:#dce6f1">';
-  html += '<td colspan="6" style="text-align:right;padding-right:6px;font-size:6.5pt;color:#555">Totaux →</td>';
-  html += '<td style="text-align:center;font-size:6pt;font-weight:bold;color:#003875">'+(totalKm > 0 ? totalKm+' km' : '0 km')+'</td>';
-  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
-  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
-  html += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalRepas>0?totalRepas.toFixed(2)+' €':'')+'</td>';
-  html += '<td></td>';
-  html += '<td style="text-align:right;color:#003875">0,00 €</td>';
-  html += '<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers>0?totalDivers.toFixed(2)+' €':'')+'</td>';
-  html += '<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+'  €</td>';
-  html += '<td></td>';
-  html += '</tr>';
-  // TOTAL À PAYER + Commentaires sur la même ligne
-  html += '<tr>';
-  html += '<td colspan="13" style="border:none;background:transparent;padding:4px 6px 2px 0;vertical-align:bottom">';
-  html += '<span style="font-size:7pt;font-weight:bold">Commentaires ou précisions :</span>';
-  html += '<div style="min-height:30px;padding:3px;font-size:7pt;white-space:pre-wrap;margin-top:2px">'+commentairesNdf+'</div>';
-  html += '</td>';
-  html += '<td style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">';
-  html += '<div style="font-size:13pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:4px 2px;background:#fffae0;display:block;width:100%;text-align:center;box-sizing:border-box">';
-  html += '<div style="font-size:6pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">TOTAL À PAYER</div>';
-  html += '<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>';
+  html += '<table class="main">'+_colgroup+_thead+'<tbody>'+rows+_totalsRows+'</tbody></table>';
   html += '</div>';
-  html += '</td>';
-  html += '<td style="border:none;background:transparent"></td>';
-  html += '</tr>';
-  html += '</tfoot>';
-  html += '</table>';
-  html += '</div>';
-  // ── Signatures pleine largeur juste en dessous ──
-  html += '<div class="sig-wrap"><table class="sig-table"><tr>';
-  html += '<td><div class="sig-title">Signature du demandeur<span class="sig-sub">(certifiée sincère et véritable)</span></div>'+(sigImg?'<div style="padding:4px;text-align:center"><img src="'+sigImg+'" style="max-height:55px;max-width:100%;object-fit:contain"></div>':'')+' </td>';
-  html += '<td><div class="sig-title">Signature du responsable du pôle</div></td>';
-  html += '<td><div class="sig-title">Signature du trésorier</div></td>';
-  html += '<td><div class="sig-title">Signature de la Présidente</div></td>';
-  html += '</tr></table></div>';
+  html += _sigBlock;
+
+  // ── Script de positionnement : cartouche en bas si une seule page ──
+  // A4 paysage : 210mm - 2×8mm marges = 194mm ≈ 733px à 96dpi
+  html += '<script>window.addEventListener("load",function(){';
+  html += 'var sig=document.querySelector(".sig-wrap");if(!sig)return;';
+  html += 'var ph=Math.round((210-16)/25.4*96);';
+  html += 'if(document.body.scrollHeight<=ph){';
+  html += 'sig.style.position="fixed";sig.style.bottom="0";';
+  html += 'sig.style.left="0";sig.style.right="0";sig.style.margin="0";';
+  html += '}';
+  html += '});<\/script>';
 
     html += '</body></html>';
 
