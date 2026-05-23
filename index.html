@@ -11707,7 +11707,7 @@ function _bgtResizeEnd() {
 }
 
 // ── Tri Équipage ──────────────────────────────────────────────────────────
-var _equipSortCol = ''; var _equipSortDir = 1;
+var _equipSortCol = 'nom'; var _equipSortDir = 1;
 function _equipToggleSort(col) {
   if (_equipSortCol===col) _equipSortDir=-_equipSortDir; else { _equipSortCol=col; _equipSortDir=1; }
   renderHomeDetailPanel(null);
@@ -12120,9 +12120,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       // Donuts dépenses & recettes — même hauteur fixe, grille 1fr 1fr toujours
       var _hasBdep = _icd.budgetDep && _icd.budgetDep.series.length>0;
       var _hasBres = _icd.budgetRes && _icd.budgetRes.series.length>0;
-      var _BH = 300; // hauteur identique pour les deux donuts
+      var _isMobBgt = window.innerWidth < 768;
+      var _BH = _isMobBgt ? 260 : 300; // hauteur réduite sur mobile
       if (_hasBdep || _hasBres) {
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+        html += '<div style="display:grid;grid-template-columns:'+(_isMobBgt ? '1fr' : '1fr 1fr')+';gap:10px">';
         html += _hasBdep
           ? _aCard('apex-budget-dep', 'Dépenses par domaine', _BH)
           : '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:'+_BH+'px"><span style="font-size:11px;color:var(--txt3)">Aucune donnée</span></div>';
@@ -12371,8 +12372,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var avCol = catColMap[catVal]||'#6b7280';
         var _podMob = (((S.enrollMeta||{})[cid]||{})[pid]||{}).podium||'';
         html5 += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'+bg+';border-bottom:1px solid var(--bdr);min-height:64px;position:relative;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
+        var _photoMob = p.photo||'';
         html5 += '<div style="position:relative;width:40px;height:40px;flex-shrink:0">';
-        html5 += '<div style="width:40px;height:40px;border-radius:50%;background:'+avCol+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff">'+ini2+'</div>';
+        html5 += '<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:'+avCol+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;border:2px solid '+avCol+'">';
+        html5 += _photoMob ? '<img src="'+_photoMob+'" style="width:100%;height:100%;object-fit:cover">' : ini2;
+        html5 += '</div>';
         if (_podMob==='1') html5 += '<div style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;border:2px solid var(--navy4)">1</div>';
         html5 += '</div>';
         html5 += '<div style="flex:1;min-width:0">';
@@ -12644,8 +12648,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           if (!navPid) { navPid = pid2; navPilot = _pp2; }
         });
       }
-      var key = prat+'|'+cls+'|'+(isBi?'bi':'mono')+'|'+niv;
-      if (!_champGroups[key]) _champGroups[key] = {prat:prat,cls:cls,isBi:isBi,niv:niv,places:{}};
+      var key = prat+'|'+cls+'|'+(isBi?'bi':'mono')+'|'+niv+'|'+cat;
+      if (!_champGroups[key]) _champGroups[key] = {prat:prat,cls:cls,isBi:isBi,niv:niv,cat:cat,places:{}};
       _champGroups[key].places[pod] = {pid:pid, pilot:_pp, navPid:navPid, navPilot:navPilot};
     });
     var _ckeys = Object.keys(_champGroups).sort();
@@ -12671,8 +12675,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var pratLabel = _pratLbl[g.prat] || g.prat || '—';
         var clsLabel  = _clsLbl[g.cls]  || g.cls  || '—';
         var nivLabel  = _nivLbl[g.niv]  || g.niv  || '';
+        var catLabel  = g.cat || '';
         var pratC = _pratCol[g.prat] || '#64748b';
         var nivC  = g.niv ? (_nivCol[g.niv]||'#64748b') : null;
+        var _catColChamp = {PF1:'#3b82f6',PF2:'#06b6d4',PL1:'#f59e0b',PL2:'#f97316',AW1:'#8b5cf6',AW2:'#a78bfa',WL1:'#10b981',WL2:'#34d399',GP1:'#ef4444',GP2:'#f87171'};
+        var catC  = catLabel ? (_catColChamp[catLabel]||'#64748b') : null;
         // ── Entête groupe ──
         htmlR += '<div style="background:var(--navy3);border-radius:10px;overflow:hidden;border:1px solid var(--bdr)">';
         htmlR += '<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--bdr);flex-wrap:wrap">';
@@ -12686,6 +12693,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         if (nivLabel) {
           htmlR += '<span style="color:var(--txt3);font-size:10px">·</span>';
           htmlR += '<span style="font-size:11px;font-weight:700;color:'+(nivC||'var(--txt2)')+'">'+nivLabel+'</span>';
+        }
+        if (catLabel) {
+          htmlR += '<span style="color:var(--txt3);font-size:10px">·</span>';
+          htmlR += '<span style="font-size:11px;font-weight:800;color:'+(catC||'var(--txt2)')+';background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px">'+catLabel+'</span>';
         }
         htmlR += '</div>';
         // ── Les 3 places ──
@@ -12981,8 +12992,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       if (_isMobStaff) {
         // Mobile card layout
         var iniS = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
+        var _photoMobS = pilot.photo || s.photo || '';
         html3 += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);min-height:72px;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')">';
-        html3 += '<div style="width:40px;height:40px;border-radius:50%;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;margin-top:2px">'+iniS+'</div>';
+        html3 += '<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;margin-top:2px;border:2px solid #0891b2">';
+        html3 += _photoMobS ? '<img src="'+_photoMobS+'" style="width:100%;height:100%;object-fit:cover">' : iniS;
+        html3 += '</div>';
         html3 += '<div style="flex:1;min-width:0">';
         html3 += '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">';
         html3 += '<div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nom+'</div>';
