@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test · Budget Info &amp; Stats</title>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.0/dist/apexcharts.min.js"></script>
+<style>
+:root{
+  --navy:#0a0f1e;--navy2:#111827;--navy3:#1c2333;--navy4:#252d3d;
+  --txt:#f1f5f9;--txt2:#94a3b8;--txt3:#475569;
+  --bdr:#1e293b;--stol:#0057FF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--navy);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Inter',Arial,sans-serif;padding:24px;min-height:100vh}
+.label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--txt3);margin-bottom:16px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
+</style>
+</head>
+<body>
+
+<p class="label">Info &amp; Stats · Section Budget — maquette test</p>
+
+<div id="budget-section"></div>
+
+<script>
+/* ── Données de test ── */
+var DEP = [
+  { domaine:'Hébergement',    montant: 4200 },
+  { domaine:'Restauration',   montant: 3100 },
+  { domaine:'Location terrain',montant:2800 },
+  { domaine:'Communication',  montant: 950  },
+  { domaine:'Matériel',       montant: 1600 },
+  { domaine:'Divers',         montant:  480 },
+];
+var RES = [
+  { domaine:'Inscriptions',   montant: 6500 },
+  { domaine:'Subventions',    montant: 3000 },
+  { domaine:'Sponsors',       montant: 2200 },
+  { domaine:'Billetterie',    montant:  850 },
+  { domaine:'Buvette',        montant:  400 },
+];
+
+var bgtEng = DEP.reduce(function(s,l){ return s+l.montant; }, 0);
+var bgtRes = RES.reduce(function(s,l){ return s+l.montant; }, 0);
+var bSolde = bgtRes - bgtEng;
+var bSoldeCol = bSolde >= 0 ? '#10b981' : '#f43f5e';
+
+function fmtE(v){ return v.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+
+/* ── Palettes ── */
+var PAL_DEP = ['#f43f5e','#fb7185','#f97316','#fbbf24','#a78bfa','#818cf8'];
+var PAL_RES = ['#10b981','#0d9488','#0891b2','#6366f1','#8b5cf6','#f59e0b'];
+
+/* ── Rendu HTML ── */
+var cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:14px';
+
+var html = '';
+
+/* Bande synthèse */
+html += '<div style="'+cSt+';padding:14px 18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:12px">';
+html += kv('Dépenses', fmtE(bgtEng), '#f43f5e');
+html += kv('Recettes',  fmtE(bgtRes),  '#10b981');
+html += kv('Solde',    (bSolde>=0?'+':'')+fmtE(bSolde), bSoldeCol);
+html += '</div>';
+
+/* Jauge d'engagement */
+html += gauge();
+
+/* Deux donuts */
+html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+html += aCard('dep', 'Dépenses par domaine',  300);
+html += aCard('res', 'Recettes par domaine',  300);
+html += '</div>';
+
+document.getElementById('budget-section').innerHTML = html;
+
+/* Initialiser les charts */
+donut('dep', DEP, PAL_DEP, 300);
+donut('res', RES, PAL_RES, 300);
+
+/* ── Helpers ── */
+function kv(label, val, col) {
+  return '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid '+col+'">'
+    + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>'
+    + '<div style="font-size:22px;font-weight:900;color:'+col+';letter-spacing:-.4px">'+val+'</div>'
+    + '</div>';
+}
+
+function aCard(id, title, h) {
+  return '<div style="'+cSt+';padding:14px 14px 8px">'
+    + '<div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">'+title+'</div>'
+    + '<div id="apex-bgt-'+id+'" style="min-height:'+h+'px"></div>'
+    + '</div>';
+}
+
+function gauge() {
+  var pct = bgtEng / bgtRes; // ratio dépenses / recettes
+  var pctCapped = Math.min(pct, 1);
+  var over = pct > 1;
+  var pctLabel = (pct * 100).toFixed(1) + ' %';
+
+  /* Couleur de la jauge selon le taux */
+  var barCol = pct < 0.75 ? '#10b981' : pct < 0.95 ? '#f59e0b' : '#f43f5e';
+
+  /* Segments de dépenses proportionnels */
+  var segments = '';
+  var cumul = 0;
+  DEP.forEach(function(d, i) {
+    var w = (d.montant / bgtEng) * pctCapped * 100;
+    segments += '<div title="' + d.domaine + ' · ' + fmtE(d.montant) + '"'
+      + ' style="height:100%;width:' + w.toFixed(2) + '%;background:' + PAL_DEP[i] + ';transition:width .6s ease;flex-shrink:0"></div>';
+    cumul += w;
+  });
+
+  /* Zone de dépassement (si > 100 %) */
+  var overPct = over ? Math.min((pct - 1) * 100, 15) : 0; // plafonné visuellement à +15 %
+  var overZone = over
+    ? '<div style="height:100%;width:' + overPct.toFixed(2) + '%;background:repeating-linear-gradient(45deg,#f43f5e 0,#f43f5e 4px,rgba(244,63,94,.2) 4px,rgba(244,63,94,.2) 8px);flex-shrink:0"></div>'
+    : '';
+
+  /* Zone disponible restante */
+  var restPct = over ? 0 : (1 - pctCapped) * 100;
+  var restZone = restPct > 0
+    ? '<div style="height:100%;flex:1;background:rgba(255,255,255,.06);border-radius:0 6px 6px 0"></div>'
+    : '';
+
+  /* Position du marqueur de seuil (recettes) = 100 / (100 + overPct) de la barre totale */
+  var markerPos = over ? (100 / (100 + overPct)).toFixed(2) : '100';
+
+  /* Légende catégories */
+  var legend = '<div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px">';
+  DEP.forEach(function(d, i) {
+    var p = (d.montant / bgtEng * 100).toFixed(0);
+    legend += '<div style="display:flex;align-items:center;gap:5px">'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + PAL_DEP[i] + ';flex-shrink:0"></div>'
+      + '<span style="font-size:10px;color:var(--txt2)">' + d.domaine + '</span>'
+      + '<span style="font-size:10px;color:var(--txt3)">(' + p + ' %)</span>'
+      + '</div>';
+  });
+  legend += '</div>';
+
+  var statusLabel = over
+    ? '<span style="color:#f43f5e;font-weight:800">Dépassement de ' + fmtE(Math.abs(bSolde)) + '</span>'
+    : '<span style="color:#10b981;font-weight:800">Disponible : ' + fmtE(bSolde) + '</span>';
+
+  return '<div style="' + cSt + ';padding:14px 18px;margin-bottom:12px">'
+    /* Titre + stat */
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px">'
+    +   '<div style="font-size:10px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px">Taux d\'engagement budgétaire</div>'
+    +   '<div style="display:flex;align-items:center;gap:12px">'
+    +     '<span style="font-size:11px;color:var(--txt3)">Engagé : <strong style="color:var(--txt)">' + fmtE(bgtEng) + '</strong></span>'
+    +     '<span style="font-size:11px;color:var(--txt3)">Budget : <strong style="color:var(--txt)">' + fmtE(bgtRes) + '</strong></span>'
+    +     '<span style="font-size:13px;font-weight:800;color:' + barCol + '">' + pctLabel + '</span>'
+    +   '</div>'
+    + '</div>'
+    /* Barre */
+    + '<div style="position:relative">'
+    +   '<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.06)">'
+    +     segments + overZone + restZone
+    +   '</div>'
+    /* Marqueur seuil budget */
+    +   (over
+        ? '<div style="position:absolute;top:-4px;bottom:-4px;left:' + markerPos + '%;width:2px;background:#fff;border-radius:1px;box-shadow:0 0 6px rgba(255,255,255,.6)" title="Budget disponible : ' + fmtE(bgtRes) + '">'
+          + '<div style="position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:#fff;background:rgba(0,0,0,.7);padding:2px 5px;border-radius:4px">' + fmtE(bgtRes) + '</div>'
+          + '</div>'
+        : '')
+    + '</div>'
+    /* Status + légende */
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:6px">'
+    +   '<div style="font-size:11px">' + statusLabel + '</div>'
+    + '</div>'
+    + legend
+    + '</div>';
+}
+
+function donut(id, data, palette, h) {
+  var series = data.map(function(d){ return d.montant; });
+  var labels = data.map(function(d){ return d.domaine; });
+  var total  = series.reduce(function(s,v){ return s+v; }, 0);
+  new ApexCharts(document.getElementById('apex-bgt-'+id), {
+    chart: { type:'donut', height:h, background:'transparent',
+             animations:{ enabled:true, speed:600 },
+             toolbar:{ show:false } },
+    series: series,
+    labels: labels,
+    colors: palette,
+    dataLabels: { enabled:false },
+    plotOptions: {
+      pie: {
+        donut: {
+          size:'62%',
+          labels: {
+            show:true,
+            total: {
+              show:true, label:'Total',
+              color:'var(--txt2)', fontSize:'11px', fontWeight:700,
+              formatter: function(){ return fmtE(total); }
+            },
+            value: {
+              show:true, color:'var(--txt)', fontSize:'15px', fontWeight:800,
+              formatter: function(v){ return fmtE(parseInt(v)); }
+            }
+          }
+        }
+      }
+    },
+    legend: {
+      position:'bottom', fontSize:'11px',
+      labels:{ colors:'#94a3b8' },
+      markers:{ width:8, height:8, radius:4 }
+    },
+    tooltip: {
+      theme:'dark',
+      y:{ formatter: function(v){ return fmtE(v); } }
+    },
+    theme:{ mode:'dark' }
+  }).render();
+}
+</script>
+</body>
+</html>
