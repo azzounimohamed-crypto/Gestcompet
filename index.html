@@ -10844,7 +10844,7 @@ function renderHomeDetailPanel(cp) {
     html += '</div>';
     html += '</div>';
     // ── Contenu onglet ──
-    var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires');
+    var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires' || _homeDetailTab === 'resultats');
     var _isInfosTab = (_homeDetailTab === 'infos');
     html += '<div style="flex:1;background:var(--navy4);' + (_isFullH ? 'overflow:hidden;display:flex;flex-direction:column' : ('overflow-y:auto' + (_isInfosTab ? '' : ';padding:16px'))) + '" id="hdp-tab-content"' + (_isFullH ? ' class="hdp-full-h"' : '') + '>';
     html += renderHDPTabContent(cp, _homeDetailTab, runs, enrolled, staffList);
@@ -12103,18 +12103,18 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var _bSoldeCol2 = _bSolde2 >= 0 ? '#10b981' : '#f43f5e';
       html += _sep('Budget détaillé');
       // Résumé solde (bande synthèse)
-      html += '<div style="'+_cSt+';padding:11px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:2px solid #f43f5e">';
-      html += '<div style="font-size:8.5px;color:var(--txt3)">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>';
-      html += '<div style="font-size:19px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>';
+      html += '<div style="'+_cSt+';padding:14px 18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">';
+      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid #f43f5e">';
+      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>';
+      html += '<div style="font-size:22px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>';
       html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:2px solid #10b981">';
-      html += '<div style="font-size:8.5px;color:var(--txt3)">Recettes</div>';
-      html += '<div style="font-size:19px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>';
+      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid #10b981">';
+      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Recettes</div>';
+      html += '<div style="font-size:22px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>';
       html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:2px solid '+_bSoldeCol2+'">';
-      html += '<div style="font-size:8.5px;color:var(--txt3)">Solde</div>';
-      html += '<div style="font-size:19px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>';
+      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid '+_bSoldeCol2+'">';
+      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Solde</div>';
+      html += '<div style="font-size:22px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>';
       html += '</div>';
       html += '</div>';
       // Donuts dépenses & recettes — même hauteur fixe, grille 1fr 1fr toujours
@@ -12605,6 +12605,34 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var htmlR = '';
     var _cid = cp.id;
     var _metaR = (S.enrollMeta || {})[_cid] || {};
+    var _canEditR = canModify();
+    // ── Barre d'actions Résultats ──
+    var _resGlass = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s';
+    var _resDl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var _resUl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+    var _resPr = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    var _resMI = function(ico,lbl,oc){ return '<button onclick="'+oc+';_resActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+ico+'<span>'+lbl+'</span></button>'; };
+    var _resSep = '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    htmlR += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:6px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+    htmlR += '<div style="position:relative" id="res-act-wrap">';
+    htmlR += '<div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 8px">';
+    htmlR += '<button onclick="_resActMenu()" style="'+_resGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
+    htmlR += '</div>';
+    htmlR += '<div id="res-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    htmlR += _resMI(_resPr,'Imprimer',                   'printCompResults(\''+_cid+'\')');
+    htmlR += _resSep;
+    htmlR += _resMI(_resDl,'Exporter CSV',              'exportRunsFmt(\'csv\',\''+_cid+'\')');
+    htmlR += _resMI(_resDl,'Exporter Excel',            'exportRunsFmt(\'excel\',\''+_cid+'\')');
+    htmlR += _resMI(_resDl,'Exporter JSON',             'exportRunsFmt(\'json\',\''+_cid+'\')');
+    if (_canEditR) {
+      htmlR += _resSep;
+      htmlR += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_resUl+'<span>Importer résultats…</span><input type="file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importRunsAuto(this,\''+_cid+'\');_resActClose()"></label>';
+    }
+    htmlR += '</div>';
+    htmlR += '</div>';
+    htmlR += '</div>';
+    // Contenu scrollable sous la barre d'actions
+    htmlR += '<div style="flex:1;overflow-y:auto;padding:16px">';
 
     // ── Champions (podiums manuels via enrollMeta) ──
     var _pratLbl  = {microlight:'Microlight', paramoteur:'Paramoteur', multi:'Multi-axes'};
@@ -12658,8 +12686,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Helpers rendu avatar ──
     var _avtr = function(pilot, sz, col) {
       if (!pilot) return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--navy2);border:2px dashed var(--bdr);opacity:.35"></div>';
-      if (pilot.photo) return '<img src="'+pilot.photo+'" style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;object-fit:cover;border:2px solid '+col+'" onerror="this.style.display=\'none\'">';
-      return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--navy2);border:2px solid '+col+';display:flex;align-items:center;justify-content:center;font-size:'+(sz*0.42|0)+'px">👤</div>';
+      if (pilot.photo) return '<img src="'+pilot.photo+'" style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;object-fit:cover;border:3px solid #fff" onerror="this.style.display=\'none\'">';
+      return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--navy2);border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:'+(sz*0.42|0)+'px">👤</div>';
     };
     var _pname = function(pilot){ return pilot ? ((pilot.prenom||'')+' '+(pilot.nom||'')).trim()||'—' : '—'; };
 
@@ -12705,30 +12733,44 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           var entry = g.places[rank];
           var col   = _podColC[ri];
           var emo   = _podEmoji[ri];
-          htmlR += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 4px">';
+          htmlR += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 4px">';
           if (entry) {
             if (g.isBi) {
-              // ── Biplace : deux avatars côte à côte, même taille ──
-              htmlR += '<div style="display:flex;gap:4px;justify-content:center;align-items:center">';
-              htmlR += _avtr(entry.pilot,    40, col);
-              htmlR += _avtr(entry.navPilot, 40, col);
+              // ── Biplace : deux grands avatars côte à côte ──
+              htmlR += '<div style="display:flex;gap:6px;justify-content:center;align-items:center">';
+              htmlR += _avtr(entry.pilot,    76, col);
+              htmlR += _avtr(entry.navPilot, 76, col);
               htmlR += '</div>';
+              // Médaille + nom pilote sur la même ligne
+              htmlR += '<div style="display:flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap">';
+              htmlR += '<span style="font-size:18px;line-height:1;flex-shrink:0">'+emo+'</span>';
+              htmlR += '<span style="font-size:11px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word">'+_pname(entry.pilot)+'</span>';
+              htmlR += '</div>';
+              var licP = (entry.pilot||{}).licence||'';
+              if (licP) htmlR += '<div style="font-size:9px;color:var(--txt3);text-align:center;margin-top:-2px">Lic. '+licP+'</div>';
+              // Navigateur — sans ligne de séparation
+              htmlR += '<div style="display:flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap">';
+              htmlR += '<span style="font-size:11px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word">'+(entry.navPilot ? _pname(entry.navPilot) : '—')+'</span>';
+              htmlR += '</div>';
+              var licN = (entry.navPilot||{}).licence||'';
+              if (licN) htmlR += '<div style="font-size:9px;color:var(--txt3);text-align:center;margin-top:-2px">Lic. '+licN+'</div>';
             } else {
-              htmlR += _avtr(entry.pilot, 44, col);
+              // ── Mono : grand avatar ──
+              htmlR += _avtr(entry.pilot, 86, col);
+              // Médaille + nom sur la même ligne
+              htmlR += '<div style="display:flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap">';
+              htmlR += '<span style="font-size:20px;line-height:1;flex-shrink:0">'+emo+'</span>';
+              htmlR += '<span style="font-size:11px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word">'+_pname(entry.pilot)+'</span>';
+              htmlR += '</div>';
+              var lic = (entry.pilot||{}).licence||'';
+              if (lic) htmlR += '<div style="font-size:9px;color:var(--txt3);text-align:center;margin-top:-2px">Lic. '+lic+'</div>';
             }
-            htmlR += '<div style="font-size:17px;line-height:1;margin-top:2px">'+emo+'</div>';
-            // Pilote
-            htmlR += '<div style="font-size:11px;font-weight:700;color:var(--txt);text-align:center;line-height:1.3;word-break:break-word">'+_pname(entry.pilot)+'</div>';
-            // Navigateur — même style que le pilote
-            if (g.isBi) {
-              htmlR += '<div style="font-size:11px;font-weight:700;color:var(--txt);text-align:center;line-height:1.3;word-break:break-word">'+(entry.navPilot ? _pname(entry.navPilot) : '—')+'</div>';
-            }
-            var lic = (entry.pilot||{}).licence||'';
-            if (lic) htmlR += '<div style="font-size:9px;color:var(--txt3);text-align:center">Lic. '+lic+'</div>';
           } else {
-            htmlR += _avtr(null, 44, col);
-            htmlR += '<div style="font-size:16px;line-height:1;opacity:.3">'+emo+'</div>';
-            htmlR += '<div style="font-size:10px;color:var(--txt3);text-align:center;opacity:.5">—</div>';
+            htmlR += _avtr(null, 86, col);
+            htmlR += '<div style="display:flex;align-items:center;gap:5px;justify-content:center">';
+            htmlR += '<span style="font-size:20px;line-height:1;opacity:.3">'+emo+'</span>';
+            htmlR += '<span style="font-size:10px;color:var(--txt3);opacity:.5">—</span>';
+            htmlR += '</div>';
           }
           htmlR += '</div>';
         });
@@ -12739,8 +12781,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
 
     if (!runs.length) {
-      if (!_hasChampions) return '<div style="text-align:center;padding:32px;color:var(--txt3);font-size:13px">Aucun résultat enregistré</div>';
-      return htmlR;
+      if (!_hasChampions) { htmlR += '<div style="text-align:center;padding:32px;color:var(--txt3);font-size:13px">Aucun résultat enregistré</div>'; htmlR += '</div>'; return htmlR; }
+      htmlR += '</div>'; return htmlR;
     }
 
     // ── Podium ──
@@ -12808,9 +12850,6 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlR += '<span class="rcla" style="color:var(--txt3);font-size:14px">▼</span>';
     htmlR += '</button>';
     htmlR += '<div id="res-cls-body" style="padding-top:10px">';
-    htmlR += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
-      +'<button class="btn btn-secondary btn-sm" onclick="printCompResults(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px">📄 Exporter PDF</button>'
-      +'</div>';
 
     var CLSR = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
     var byClassPilot = {};
@@ -12869,6 +12908,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlR += '</div></div>';
     });
     htmlR += '</div></div>'; // close res-cls-body + collapsible wrapper
+    htmlR += '</div>'; // close scrollable content wrapper
     return htmlR;
 
   } else if (tab === 'staff') {
@@ -25336,6 +25376,66 @@ function exportEquipageJSON(compId) {
   a.download = 'Equipage_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.json'; a.click(); URL.revokeObjectURL(a.href);
   toast('Export JSON téléchargé ✓','ok');
 }
+// ── EXPORT / IMPORT RÉSULTATS (runs) ─────────────────────────────────────────
+function exportRunsFmt(fmt, compId) {
+  var cp   = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var runs = (S.runs||{})[compId]||[];
+  var cpName = (cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_');
+  var clsLbl = {multiaxes:'Multiaxes',pendulaire:'Pendulaire',gyro:'Autogire',paramotor:'Paramotor'};
+  var phLbl  = {essais:'Essais',qualif:'Qualifs',finale:'Finale'};
+  if (!runs.length) { toast('Aucun résultat à exporter',''); return; }
+  if (fmt === 'json') {
+    var data = runs.map(function(r){
+      var p = (S.pilots||[]).find(function(x){return x.id===r.pilotId;})||{};
+      return Object.assign({},r,{nom:p.nom||'',prenom:p.prenom||'',licence:p.licence||''});
+    });
+    var blob = new Blob([JSON.stringify({_type:'runs',compId:compId,compName:cp.name||compId,exportDate:new Date().toISOString(),runs:data},null,2)],{type:'application/json'});
+    var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Resultats_'+cpName+'.json'; a.click(); URL.revokeObjectURL(a.href);
+    toast('Export JSON téléchargé ✓','ok'); return;
+  }
+  // CSV & Excel (SYLK-free CSV lisible par Excel)
+  var rows = [['Nom','Prénom','Licence','Phase','Poule','Classe','Catégorie','V1 Décollage','V1 Atterrissage','V2 Décollage','V2 Atterrissage','Score (s)','Date']];
+  runs.forEach(function(r){
+    var p = (S.pilots||[]).find(function(x){return x.id===r.pilotId;})||{};
+    var d = r.ts ? new Date(r.ts).toLocaleDateString('fr-FR') : '';
+    rows.push([p.nom||'',p.prenom||'',p.licence||'',phLbl[(r.phase||'').toLowerCase()]||r.phase||'',r.poule||'',clsLbl[r.classe]||r.classe||'',r.categorie||'',r.v1dec||'',r.v1att||'',r.v2dec||'',r.v2att||'',r.score||'',d]);
+  });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(String(c||'').replace(/"/g,'""'))+'"'; }).join(';'); }).join('\n');
+  var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var ext  = fmt==='excel' ? 'csv' : 'csv';
+  var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Resultats_'+cpName+'.'+ext; a.click(); URL.revokeObjectURL(a.href);
+  toast('Export CSV téléchargé ✓','ok');
+}
+function importRunsAuto(input, compId) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var text = e.target.result;
+      var parsed = JSON.parse(text);
+      var arr = Array.isArray(parsed) ? parsed : (parsed.runs && Array.isArray(parsed.runs) ? parsed.runs : null);
+      if (!arr) { toast('Format non reconnu — seul le JSON exporté par Gest\'Appli est supporté','err'); return; }
+      if (!S.runs) S.runs = {};
+      if (!S.runs[compId]) S.runs[compId] = [];
+      var added = 0;
+      arr.forEach(function(r) {
+        if (!r.pilotId || r.score === undefined) return;
+        // Éviter les doublons exacts (même pilote, phase, score, timestamp)
+        var exists = S.runs[compId].some(function(x){ return x.pilotId===r.pilotId && x.phase===r.phase && String(x.score)===String(r.score) && x.ts===r.ts; });
+        if (!exists) { S.runs[compId].push(r); added++; }
+      });
+      saveState();
+      if (typeof silentPush === 'function') silentPush();
+      if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+      toast(added+' résultat(s) importé(s) ✓','ok');
+    } catch(err) {
+      toast('Erreur lecture fichier : '+err.message,'err');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
 // ── BASE44 SYNC — sélecteur d'événement + import ─────────────────────────────
 
 /* Ouverture manuelle du picker (bouton Actions) — toujours afficher le sélecteur */
@@ -29511,6 +29611,8 @@ function _stfActMenu()    { _makeActMenu('stf-act-menu','stf-act-wrap'); }
 function _stfActClose()   { var m=document.getElementById('stf-act-menu'); if(m) m.style.display='none'; }
 function _eqpActMenu()    { _makeActMenu('eqp-act-menu','eqp-act-wrap'); }
 function _eqpActClose()   { var m=document.getElementById('eqp-act-menu'); if(m) m.style.display='none'; }
+function _resActMenu()    { _makeActMenu('res-act-menu','res-act-wrap'); }
+function _resActClose()   { var m=document.getElementById('res-act-menu'); if(m) m.style.display='none'; }
 function _compsActMenu()  { _makeActMenu('comps-act-menu','comps-act-wrap'); }
 function _compsActClose() { var m=document.getElementById('comps-act-menu'); if(m) m.style.display='none'; }
 function _pilotsActMenu() { _makeActMenu('pilots-act-menu','pilots-act-wrap'); }
