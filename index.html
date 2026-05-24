@@ -664,8 +664,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 </div>
 
 <!-- ═══════════════ MODALE AGENDA SAISONNIER ═══════════════ -->
-<div id="agenda-overlay" onclick="if(event.target===this)closeAgenda()" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">
-  <div id="agenda-modal" style="position:absolute;inset:14px;border-radius:18px;background:var(--navy);border:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.65)">
+<div id="agenda-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--navy);overflow:hidden">
+  <div id="agenda-modal" style="position:absolute;inset:0;background:var(--navy);display:flex;flex-direction:column;overflow:hidden">
 
     <!-- ═══ HEADER ═══ -->
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap">
@@ -704,8 +704,24 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         Filtres
       </button>
 
+      <!-- Fenêtre horaire (visible en vues Semaine & Jour) -->
+      <div id="ag-window-ctrl" style="display:none;align-items:center;gap:5px;flex-shrink:0;padding:0 4px;border-left:1px solid var(--bdr);margin-left:2px;padding-left:10px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="color:var(--txt3);flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span style="font-size:11px;color:var(--txt3);white-space:nowrap;font-weight:600">Fenêtre</span>
+        <select id="ag-win-start" title="Heure de début de la journée"
+          onchange="_agendaDayStart=+this.value;_agendaSaveDayWindow();_agendaRender()"
+          style="background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt2);font-size:11px;font-family:inherit;cursor:pointer;padding:2px 4px;height:26px;outline:none"></select>
+        <span style="font-size:11px;color:var(--txt3)">–</span>
+        <select id="ag-win-end" title="Heure de fin de la journée"
+          onchange="_agendaDayEnd=+this.value;_agendaSaveDayWindow();_agendaRender()"
+          style="background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt2);font-size:11px;font-family:inherit;cursor:pointer;padding:2px 4px;height:26px;outline:none"></select>
+      </div>
+
       <!-- Fermer -->
-      <button onclick="closeAgenda()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;transition:background .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background='transparent'">×</button>
+      <button onclick="closeAgenda()" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;flex-shrink:0;transition:background .15s,color .15s" onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt3)'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Fermer
+      </button>
     </div>
 
     <!-- ═══ BARRE FILTRES (masquée par défaut) ═══ -->
@@ -746,14 +762,21 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
     </div><!-- /corps -->
 
-    <!-- ═══ LÉGENDE ═══ -->
-    <div id="ag-legend" style="display:flex;align-items:center;gap:16px;padding:7px 16px;background:var(--navy2);border-top:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#0057FF;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Nationale</span></div>
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#7c3aed;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Internationale</span></div>
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#3b82f6;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Régionale</span></div>
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#d97706;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Entraînement</span></div>
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#059669;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Stage</span></div>
-      <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#64748b;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Autre</span></div>
+    <!-- ═══ LÉGENDE + COULEURS ═══ -->
+    <div id="ag-legend" style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:var(--navy2);border-top:1px solid var(--bdr);flex-shrink:0;flex-wrap:wrap;min-height:36px">
+      <!-- rempli par _agendaRenderLegend() -->
+    </div>
+
+    <!-- Popup personnalisation couleurs (position absolue dans #agenda-modal) -->
+    <div id="ag-color-popup" onclick="event.stopPropagation()" style="display:none;position:absolute;bottom:44px;left:14px;z-index:50;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:220px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        🎨 Couleurs des types
+        <button onclick="document.getElementById('ag-color-popup').style.display='none'" style="background:transparent;border:none;color:var(--txt3);font-size:17px;cursor:pointer;line-height:1;padding:0 3px">×</button>
+      </div>
+      <div id="ag-color-popup-rows"></div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);display:flex;justify-content:flex-end">
+        <button onclick="_agendaResetColors()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background='transparent'">↺ Réinitialiser</button>
+      </div>
     </div>
 
   </div>
@@ -2044,135 +2067,180 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 </div>
 
 <!-- ═══════════════ PORTAIL GEST'DTN ═══════════════ -->
-
-<!-- Page portail principale (desktop/tablette) -->
 <div id="page-dtn" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column;overflow:hidden">
 
-  <!-- ── DTN Header ── -->
+  <!-- ── Header ── -->
   <div style="display:flex;align-items:center;padding:10px 20px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:12px">
-    <!-- Gauche : logo -->
     <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-      <div style="width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.15)">
+      <div style="width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.2)">
         <img id="dtn-logo-img" src="" style="width:36px;height:36px;object-fit:contain;display:none" onerror="this.style.display='none';document.getElementById('dtn-logo-fb').style.display='flex'">
         <div id="dtn-logo-fb" style="display:flex;align-items:center;justify-content:center">
           <img src="https://ffplum.fr/templates/ffplum/images/logo.png" style="width:32px;height:32px;object-fit:contain" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:8px;font-weight:800;color:#003399;text-align:center;line-height:1.1\'>FF<br>PLUM</span>'">
         </div>
       </div>
       <div>
-        <div style="font-size:9px;font-weight:600;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase">FFPLUM · Fédération Française d'ULM</div>
-        <div style="font-size:15px;font-weight:900;color:var(--txt);line-height:1.1">Gest'<span style="color:var(--stol)">DTN</span></div>
+        <div style="font-size:9px;font-weight:600;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase">FFPLUM · Fédération Française d'ULM</div>
+        <div style="font-size:16px;font-weight:900;color:var(--txt);line-height:1.1;letter-spacing:-.3px">Gest'<span style="color:var(--stol)">DTN</span></div>
       </div>
     </div>
-    <!-- Droite : Plein écran + avatar -->
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <!-- Bouton Plein écran / Réduire -->
       <button id="dtn-fs-btn" onclick="toggleFullscreen()" title="Plein écran"
         style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.05);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s"
-        onmouseover="this.style.borderColor='rgba(255,255,255,.25)';this.style.background='rgba(255,255,255,.09)'"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.28)';this.style.background='rgba(255,255,255,.1)'"
         onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.background='rgba(255,255,255,.05)'">
         <svg id="dtn-fs-icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         <svg id="dtn-fs-icon-reduce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
         <span id="dtn-fs-label">Plein écran</span>
       </button>
-      <!-- Avatar -->
       <div onclick="openUserAccountPopup()" style="display:flex;align-items:center;gap:7px;cursor:pointer;border-radius:24px;padding:3px 9px 3px 3px;transition:background .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background=''">
         <div class="avatar" id="dtn-avatar" style="width:34px;height:34px;font-size:12px;font-weight:900;overflow:hidden;border:2px solid var(--stol);background:var(--navy3);color:var(--stol);flex-shrink:0">?</div>
-        <span id="dtn-user-name" style="font-size:12px;font-weight:700;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)"></span>
+        <span id="dtn-user-name" style="font-size:12px;font-weight:700;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt)"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="color:var(--txt3)"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
     </div>
   </div>
 
-  <!-- ── Corps : bloc centré ── -->
-  <div style="flex:1;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:32px 20px 40px">
-    <div style="width:100%;max-width:860px;display:flex;flex-direction:column;gap:28px">
+  <!-- ── Corps scrollable ── -->
+  <div style="flex:1;overflow-y:auto;background:var(--bg)">
 
-      <!-- Titre de section -->
-      <div style="text-align:center">
-        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3)">Direction Technique Nationale</div>
-        <div style="font-size:22px;font-weight:900;color:var(--txt);margin-top:4px">Choisissez un module</div>
+    <!-- ══ MODULES ══ -->
+    <div style="max-width:920px;margin:0 auto;padding:32px 20px 52px">
+
+      <!-- ─ Section 1 : Compétitions & Planning ─ -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:3px;height:16px;border-radius:2px;background:var(--stol);flex-shrink:0"></div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--txt3)">Compétitions &amp; Planning</div>
       </div>
 
-      <!-- Grille modules -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
+      <!-- Ligne 1 : carte large + Collectif + Agenda + Planning -->
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:28px">
 
-        <!-- Compétitions -->
+        <!-- ★ FEATURED : Compétitions ★ -->
         <button onclick="openDTNModule('competitions')"
-          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
-          onmouseover="this.style.borderColor='var(--stol)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(0,87,255,.18)'"
-          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-          <div style="width:56px;height:56px;border-radius:14px;background:rgba(0,87,255,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--stol)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><circle cx="12" cy="8" r="2" fill="var(--stol)" stroke="none"/><path d="M6 17l2 2 4-4"/></svg>
+          style="display:flex;align-items:center;gap:22px;padding:24px 26px;border:1px solid rgba(0,87,255,.2);border-top:3px solid #0057FF;border-radius:16px;background:linear-gradient(145deg,rgba(0,87,255,.1) 0%,rgba(0,87,255,.02) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(0,87,255,.2)';this.style.borderColor='rgba(0,87,255,.45)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(0,87,255,.2)'">
+          <div style="width:72px;height:72px;border-radius:18px;background:rgba(0,87,255,.16);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 1px rgba(0,87,255,.2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0057FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="36" height="36"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
           </div>
-          <div>
-            <div style="font-size:14px;font-weight:800;color:var(--txt)">Compétitions</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Gestion des compétitions<br>et classements</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:17px;font-weight:900;color:var(--txt);letter-spacing:-.3px;line-height:1.2">Compétitions</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:5px;line-height:1.6">Équipages, résultats,<br>classements &amp; documents</div>
           </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="color:rgba(0,87,255,.5);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
 
-        <!-- Sécurité des pratiques -->
-        <button onclick="openDTNModule('securite')"
-          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
-          onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(16,185,129,.16)'"
-          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-          <div style="width:56px;height:56px;border-radius:14px;background:rgba(16,185,129,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        <!-- Collectif Nationaux / SHN -->
+        <button onclick="openCollectifFrance()"
+          style="display:flex;flex-direction:column;align-items:flex-start;padding:22px 20px;border:1px solid rgba(37,99,235,.18);border-top:3px solid #2563eb;border-radius:16px;background:linear-gradient(145deg,rgba(37,99,235,.09) 0%,rgba(37,99,235,.02) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(37,99,235,.2)';this.style.borderColor='rgba(37,99,235,.42)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(37,99,235,.18)'">
+          <div style="width:54px;height:54px;border-radius:14px;background:rgba(37,99,235,.16);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M17 11c1.657 0 3 1.343 3 3v7"/></svg>
           </div>
           <div>
-            <div style="font-size:14px;font-weight:800;color:var(--txt)">Sécurité<br>des pratiques</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Prévention et gestion<br>de la sécurité</div>
-          </div>
-        </button>
-
-        <!-- Accès aux pratiques -->
-        <button onclick="openDTNModule('acces')"
-          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
-          onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(245,158,11,.16)'"
-          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-          <div style="width:56px;height:56px;border-radius:14px;background:rgba(245,158,11,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg>
-          </div>
-          <div>
-            <div style="font-size:14px;font-weight:800;color:var(--txt)">Accès<br>aux pratiques</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Infrastructures et<br>terrains de pratique</div>
-          </div>
-        </button>
-
-        <!-- Territoires -->
-        <button onclick="openDTNModule('territoires')"
-          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
-          onmouseover="this.style.borderColor='#8b5cf6';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(139,92,246,.16)'"
-          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-          <div style="width:56px;height:56px;border-radius:14px;background:rgba(139,92,246,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          </div>
-          <div>
-            <div style="font-size:14px;font-weight:800;color:var(--txt)">Territoires</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Cartographie et<br>données territoriales</div>
+            <div style="font-size:15px;font-weight:800;color:var(--txt);letter-spacing:-.2px">Collectifs<br>Nationaux &amp; SHN</div>
           </div>
         </button>
 
         <!-- Agenda -->
         <button onclick="openAgenda()"
-          style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 16px;border:1.5px solid var(--bdr);border-radius:18px;background:var(--navy2);cursor:pointer;font-family:inherit;transition:border-color .2s,transform .15s,box-shadow .2s;text-align:center"
-          onmouseover="this.style.borderColor='#0891b2';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(8,145,178,.16)'"
-          onmouseout="this.style.borderColor='var(--bdr)';this.style.transform='';this.style.boxShadow=''">
-          <div style="width:56px;height:56px;border-radius:14px;background:rgba(8,145,178,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+          style="display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:0;padding:22px 20px;border:1px solid rgba(8,145,178,.18);border-top:3px solid #0891b2;border-radius:16px;background:linear-gradient(145deg,rgba(8,145,178,.09) 0%,rgba(8,145,178,.02) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(8,145,178,.18)';this.style.borderColor='rgba(8,145,178,.4)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(8,145,178,.18)'">
+          <div style="width:54px;height:54px;border-radius:14px;background:rgba(8,145,178,.16);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:800;color:var(--txt);letter-spacing:-.2px">Agenda général</div>
+        </button>
+
+        <!-- Planning général -->
+        <button onclick="openGlobalGantt()"
+          style="display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:0;padding:22px 20px;border:1px solid rgba(245,158,11,.18);border-top:3px solid #f59e0b;border-radius:16px;background:linear-gradient(145deg,rgba(245,158,11,.09) 0%,rgba(245,158,11,.02) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(245,158,11,.18)';this.style.borderColor='rgba(245,158,11,.4)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(245,158,11,.18)'">
+          <div style="width:54px;height:54px;border-radius:14px;background:rgba(245,158,11,.16);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="10" width="12" height="3" rx="1"/><rect x="3" y="16" width="15" height="3" rx="1"/><line x1="17" y1="11.5" x2="21" y2="11.5"/><line x1="20" y1="17.5" x2="21" y2="17.5"/></svg>
           </div>
           <div>
-            <div style="font-size:14px;font-weight:800;color:var(--txt)">Agenda</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.5">Calendrier saisonnier<br>des compétitions</div>
+            <div style="font-size:15px;font-weight:800;color:var(--txt);letter-spacing:-.2px">Planning général</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:4px;line-height:1.5">Gantt toutes<br>compétitions de la saison</div>
           </div>
         </button>
 
-      </div><!-- /grille -->
+      </div><!-- /ligne 1 -->
 
-      <div style="text-align:center;font-size:11px;color:var(--txt3);opacity:.5">Gest'DTN · FFPLUM · 2026</div>
-    </div><!-- /max-width -->
-  </div><!-- /corps -->
+      <!-- ─ Section 2 : Performance & Développement ─ -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:3px;height:16px;border-radius:2px;background:#10b981;flex-shrink:0"></div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--txt3)">Performance &amp; Développement</div>
+      </div>
 
-</div>
+      <!-- Ligne 2 : 4 cartes égales -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+
+        <!-- Accès aux pratiques -->
+        <button onclick="openDTNModule('acces')"
+          style="display:flex;flex-direction:column;align-items:flex-start;padding:20px 18px;border:1px solid rgba(245,158,11,.18);border-top:3px solid #f59e0b;border-radius:16px;background:linear-gradient(145deg,rgba(245,158,11,.08) 0%,rgba(245,158,11,.01) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(245,158,11,.16)';this.style.borderColor='rgba(245,158,11,.42)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(245,158,11,.18)'">
+          <div style="width:50px;height:50px;border-radius:13px;background:rgba(245,158,11,.16);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg>
+          </div>
+          <div style="font-size:14px;font-weight:800;color:var(--txt);line-height:1.3;letter-spacing:-.2px">Accès<br>aux pratiques</div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:6px;line-height:1.4">Infrastructures &amp;<br>terrains de pratique</div>
+        </button>
+
+        <!-- Formations -->
+        <button onclick="openDTNModule('formations')"
+          style="display:flex;flex-direction:column;align-items:flex-start;padding:20px 18px;border:1px solid rgba(6,182,212,.18);border-top:3px solid #06b6d4;border-radius:16px;background:linear-gradient(145deg,rgba(6,182,212,.08) 0%,rgba(6,182,212,.01) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(6,182,212,.18)';this.style.borderColor='rgba(6,182,212,.42)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(6,182,212,.18)'">
+          <div style="width:50px;height:50px;border-radius:13px;background:rgba(6,182,212,.16);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+          </div>
+          <div style="font-size:14px;font-weight:800;color:var(--txt);line-height:1.3;letter-spacing:-.2px">Formations</div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:6px;line-height:1.4">Cursus &amp;<br>qualifications</div>
+        </button>
+
+        <!-- Sécurité des pratiques -->
+        <button onclick="openDTNModule('securite')"
+          style="display:flex;flex-direction:column;align-items:flex-start;padding:20px 18px;border:1px solid rgba(16,185,129,.18);border-top:3px solid #10b981;border-radius:16px;background:linear-gradient(145deg,rgba(16,185,129,.08) 0%,rgba(16,185,129,.01) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(16,185,129,.18)';this.style.borderColor='rgba(16,185,129,.42)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(16,185,129,.18)'">
+          <div style="width:50px;height:50px;border-radius:13px;background:rgba(16,185,129,.16);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div style="font-size:14px;font-weight:800;color:var(--txt);line-height:1.3;letter-spacing:-.2px">Sécurité<br>des pratiques</div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:6px;line-height:1.4">Prévention &amp;<br>gestion des risques</div>
+        </button>
+
+        <!-- Territoires -->
+        <button onclick="openDTNModule('territoires')"
+          style="display:flex;flex-direction:column;align-items:flex-start;padding:20px 18px;border:1px solid rgba(139,92,246,.18);border-top:3px solid #8b5cf6;border-radius:16px;background:linear-gradient(145deg,rgba(139,92,246,.08) 0%,rgba(139,92,246,.01) 100%);cursor:pointer;font-family:inherit;text-align:left;transition:transform .18s,box-shadow .2s,border-color .18s"
+          onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 20px 56px rgba(139,92,246,.18)';this.style.borderColor='rgba(139,92,246,.42)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='rgba(139,92,246,.18)'">
+          <div style="width:50px;height:50px;border-radius:13px;background:rgba(139,92,246,.16);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          </div>
+          <div style="font-size:14px;font-weight:800;color:var(--txt);line-height:1.3;letter-spacing:-.2px">Territoires</div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:6px;line-height:1.4">Cartographie &amp;<br>données territoriales</div>
+        </button>
+
+      </div><!-- /ligne 2 -->
+
+      <!-- Pied de page -->
+      <div style="margin-top:36px;display:flex;align-items:center;gap:14px">
+        <div style="height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--bdr))"></div>
+        <div style="font-size:10px;color:var(--txt3);opacity:.35;letter-spacing:.5px;white-space:nowrap">Gest'DTN · FFPLUM · 2026</div>
+        <div style="height:1px;flex:1;background:linear-gradient(90deg,var(--bdr),transparent)"></div>
+      </div>
+
+    </div><!-- /modules -->
+
+  </div><!-- /corps scrollable -->
+
+</div><!-- /page-dtn -->
 
 <!-- Module Sécurité des pratiques -->
 <div id="page-securite" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column">
@@ -2188,6 +2256,23 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="64" height="64" style="opacity:.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     <div style="font-size:15px;font-weight:700;color:var(--txt)">Sécurité des pratiques</div>
     <div style="font-size:13px;text-align:center;line-height:1.7;max-width:320px">Module en cours de développement.<br>Ce volet traitera de la prévention et<br>de la gestion de la sécurité des pratiques ULM.</div>
+  </div>
+</div>
+
+<!-- Module Formations -->
+<div id="page-formations" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 20px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:12px">
+    <button onclick="showDTNPortal()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Base
+    </button>
+    <div style="flex:1;text-align:center;font-size:20px;font-weight:900;color:var(--txt)">🎓 Formations</div>
+    <div style="min-width:80px"></div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--txt3)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="64" height="64" style="opacity:.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+    <div style="font-size:15px;font-weight:700;color:var(--txt)">Formations</div>
+    <div style="font-size:13px;text-align:center;line-height:1.7;max-width:320px">Module en cours de développement.<br>Ce volet traitera des cursus de formation<br>et des qualifications des pratiquants ULM.</div>
   </div>
 </div>
 
@@ -2723,38 +2808,23 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- ── Colonne gauche desktop : Résultats + Gestion ── -->
       <div id="cd-col-left">
 
-        <!-- Section : Résultats -->
+        <!-- Section : Résultats (nouvelle forme — contenu injecté dynamiquement) -->
         <div style="border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:8px;overflow:hidden">
           <div onclick="toggleCDSection('results')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:var(--navy3)">
             <div style="font-size:13px;font-weight:700">🏅 Résultats</div>
             <span id="cd-sec-ico-results" style="font-size:11px;color:var(--txt3);display:inline-block;transition:transform .15s;transform:rotate(90deg)">▶</span>
           </div>
-          <div id="cd-sec-results" style="padding:12px">
-            <div class="class-tabs" style="margin:0 0 10px">
-              <button class="class-tab active" onclick="setCDClass('multiaxes',this)">Multiaxes</button>
-              <button class="class-tab" onclick="setCDClass('gyro',this)">Gyro</button>
-              <button class="class-tab" onclick="setCDClass('pendulaire',this)">Pendulaire</button>
-            </div>
-            <div id="cd-results-table"></div>
-            <button class="btn btn-secondary btn-full btn-sm" style="margin-top:10px" onclick="exportResultsPDF()">📄 Fiche résultats PDF</button>
+          <div id="cd-sec-results">
+            <div id="cd-results-inner"></div>
           </div>
         </div>
+        <!-- Compat anciens IDs -->
+        <div id="cd-results-table" style="display:none"></div>
 
-        <!-- Section : Gestion (staff/gestionnaire) -->
-        <div id="cd-section-gestion" style="border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:8px;overflow:hidden;display:none">
-          <div onclick="toggleCDSection('gestion')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:var(--navy3)">
-            <div style="font-size:13px;font-weight:700">⚙️ Gestion</div>
-            <span id="cd-sec-ico-gestion" style="font-size:11px;color:var(--txt3);display:inline-block;transition:transform .15s;transform:rotate(0deg)">▶</span>
-          </div>
-          <div id="cd-sec-gestion" style="display:none;padding:12px">
-            <div style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Pilotes inscrits</div>
-            <div id="cd-pilots-enrolled" style="margin-bottom:12px"></div>
-            <button class="btn btn-secondary btn-full btn-sm" style="margin-bottom:14px" onclick="openEnrollPilot()">+ Inscrire un pilote</button>
-            <div style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Résultats saisis</div>
-            <div id="cd-runs-list"></div>
-            <button class="btn btn-primary btn-full btn-sm" style="margin-top:8px" onclick="openNewRun()">+ Saisir un résultat</button>
-          </div>
-        </div>
+        <!-- Section Gestion supprimée — contenu fusionné dans Résultats -->
+        <div id="cd-section-gestion" style="display:none"></div>
+        <div id="cd-pilots-enrolled" style="display:none"></div>
+        <div id="cd-runs-list" style="display:none"></div>
 
       </div><!-- /cd-col-left -->
 
@@ -4014,8 +4084,15 @@ function closeSheet(id) {
   if (id === 'sheet-comp-detail' && _cdMap) {
     try { _cdMap.off(); _cdMap.remove(); } catch(e){} _cdMap = null;
   }
+  var wasOpen = el.classList.contains('open');
   el.classList.remove('open');
   _syncFsBtn();
+  // Retour agenda si la fiche compétition a été ouverte depuis l'agenda
+  if (wasOpen && (id === 'sheet-comp-detail' || id === 'sheet-comp') && _compFromAgenda) {
+    _compFromAgenda = false;
+    var _agOv = document.getElementById('agenda-overlay');
+    if (_agOv) _agOv.style.display = 'flex';
+  }
 }
 function closeOnBg(e, id) { if (e.target === document.getElementById(id)) closeSheet(id); }
 
@@ -4921,6 +4998,23 @@ function printComps() {
   win.print();
 }
 
+// Injecte la nouvelle forme Résultats (renderHDPTabContent) dans cd-results-inner
+function renderCDResultsNew(compId) {
+  var cont = document.getElementById('cd-results-inner');
+  if (!cont) return;
+  var cp = S.comps.find(function(c){ return c.id === compId; });
+  if (!cp) return;
+  var runs     = (S.runs || {})[compId] || [];
+  var enrolled = (S.compEnroll || {})[compId] || [];
+  var staffList = [];
+  if (S.staff && !Array.isArray(S.staff)) {
+    staffList = S.staff[compId] || S.staff[String(compId)] || [];
+  } else if (Array.isArray(S.staff)) {
+    staffList = S.staff.filter(function(x){ return x && (x.compId===compId||x.competitionId===compId); });
+  }
+  cont.innerHTML = renderHDPTabContent(cp, 'resultats', runs, enrolled, staffList);
+}
+
 function openCompDetail(compId) {
   var cp = S.comps.find(function(c){ return c.id === compId; });
   if (!cp) return;
@@ -4995,32 +5089,26 @@ function openCompDetail(compId) {
   var oaciBlock = document.getElementById('cd-oaci-block');
   if (oaciBlock) { oaciBlock.style.display = 'none'; oaciBlock.innerHTML = ''; }
 
-  // ── Section Gestion (gestionnaire/staff) ──
-  var gestSection = document.getElementById('cd-section-gestion');
-  if (gestSection) gestSection.style.display = canEditComp() ? '' : 'none';
-
-  // Ouvrir Résultats par défaut
+  // Ouvrir Résultats par défaut (section dépliée)
   var resPanel = document.getElementById('cd-sec-results');
   var resIco   = document.getElementById('cd-sec-ico-results');
   if (resPanel) { resPanel.style.display = ''; _cdSections['results'] = true; }
   if (resIco)   resIco.style.transform = 'rotate(90deg)';
-  setCDClass('multiaxes', document.querySelector('#cd-sec-results .class-tabs .class-tab'));
 
   openSheet('sheet-comp-detail');
 
-  // ── Desktop : ouvrir toutes les sections + peupler compétiteurs ──
+  // Injecter la nouvelle forme Résultats
+  renderCDResultsNew(compId);
+
+  // ── Desktop : ouvrir les sections Compétiteurs + Encadrement ──
   if (window.innerWidth >= 768) {
-    ['gestion','encadrement','competiteurs'].forEach(function(name) {
+    ['encadrement','competiteurs'].forEach(function(name) {
       var p   = document.getElementById('cd-sec-' + name);
       var ico = document.getElementById('cd-sec-ico-' + name);
       if (p) { p.style.display = ''; _cdSections[name] = true; }
       if (ico) ico.style.transform = 'rotate(90deg)';
     });
-    // S'assurer que section gestion est visible si droits ok
-    var gestSection = document.getElementById('cd-section-gestion');
-    if (gestSection && canEditComp()) gestSection.style.display = '';
     renderCDCompetiteurs();
-    renderManagePanel();
   }
   // Sync Base44 silencieuse en arrière-plan
   if (cp._base44Id) { syncBase44Registrations(cp.id).catch(function(){}); }
@@ -5580,7 +5668,12 @@ function editComp(id) {
   }
   var delBtn = document.getElementById('comp-delete-btn');
   if (delBtn) { delBtn.style.display = 'flex'; }
+  // Préserver _compFromAgenda : closeSheet('sheet-comp-detail') ne doit pas
+  // déclencher le retour agenda — ce sera closeSheet('sheet-comp') qui le fera
+  var _savedCFA = _compFromAgenda;
+  _compFromAgenda = false;
   closeSheet('sheet-comp-detail');
+  _compFromAgenda = _savedCFA;
   openSheet('sheet-comp');
 }
 
@@ -5688,6 +5781,7 @@ function saveRun() {
   closeSheet('sheet-run');
   renderManagePanel();
   renderCDResults();
+  renderCDResultsNew(compId);
   updateNationalRanking();
   silentPush();
 }
@@ -5714,7 +5808,7 @@ function editRun(idx) {
 function deleteRun(idx) {
   if (!confirm('Supprimer ce résultat ?')) return;
   S.runs[_currentCompId].splice(idx, 1);
-  saveState(); renderManagePanel(); renderCDResults(); updateNationalRanking();
+  saveState(); renderManagePanel(); renderCDResults(); renderCDResultsNew(_currentCompId); updateNationalRanking();
   toast('Résultat supprimé', '');
 }
 
@@ -6382,6 +6476,7 @@ function _baseCard(title, content, extra) {
 // ═══════════════════════════════════════════════════════════════════════════
 var _agendaYear       = null;
 var _agendaMonth      = 0;
+var _compFromAgenda   = false;   // retour agenda après fermeture sheet-comp / sheet-comp-detail
 var _agendaSelDate    = null;
 var _agendaCompsByDate = {};
 var _agendaView       = 'month';   // 'month' | 'week' | 'day' | 'list'
@@ -6406,6 +6501,161 @@ var _agendaTypeLabel = {
   'entrainement':'Entraînement','entrainement-national':'Entr. national',
   'stage':'Stage'
 };
+
+/* ── Fenêtre horaire (vue Semaine & Jour) ────────────────────────────── */
+var _agendaDayStart = 8;   // heure de début de la fenêtre visible
+var _agendaDayEnd   = 20;  // heure de fin de la fenêtre visible
+
+function _agendaLoadDayWindow() {
+  try {
+    var s = localStorage.getItem('geststol_agenda_window');
+    if (s) { var p = JSON.parse(s);
+      if (p.start !== undefined) _agendaDayStart = +p.start;
+      if (p.end   !== undefined) _agendaDayEnd   = +p.end;
+    }
+  } catch(e) {}
+}
+function _agendaSaveDayWindow() {
+  try { localStorage.setItem('geststol_agenda_window', JSON.stringify({start:_agendaDayStart, end:_agendaDayEnd})); } catch(e) {}
+}
+function _agendaFillWindowSelects() {
+  // Peuple les <select> de l'en-tête avec les 24 heures et sélectionne les valeurs courantes
+  var selS = document.getElementById('ag-win-start');
+  var selE = document.getElementById('ag-win-end');
+  if (!selS || !selE) return;
+  var optsS = '', optsE = '';
+  for (var h = 0; h < 24; h++) {
+    var lbl = (h < 10 ? '0' : '') + h + 'h';
+    optsS += '<option value="'+h+'"'+(h===_agendaDayStart?' selected':'')+'>'+lbl+'</option>';
+    optsE += '<option value="'+h+'"'+(h===_agendaDayEnd?  ' selected':'')+'>'+lbl+'</option>';
+  }
+  selS.innerHTML = optsS;
+  selE.innerHTML = optsE;
+}
+
+/* ── Couleurs agenda : persistance & customisation ────────────────────── */
+var _agendaDefaultColors = {
+  'cdf':'#0057FF','comp-internationale':'#7c3aed',
+  'regional':'#3b82f6','comp-regionale':'#3b82f6',
+  'entrainement':'#d97706','entrainement-national':'#d97706',
+  'stage':'#059669'
+};
+
+function _agendaLoadColors() {
+  try {
+    var saved = localStorage.getItem('geststol_agenda_colors');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      Object.keys(parsed).forEach(function(k) {
+        if (_agendaTypeColor.hasOwnProperty(k)) _agendaTypeColor[k] = parsed[k];
+      });
+    }
+  } catch(e) {}
+}
+
+function _agendaSaveColors() {
+  try { localStorage.setItem('geststol_agenda_colors', JSON.stringify(_agendaTypeColor)); } catch(e) {}
+}
+
+function _agendaResetColors() {
+  Object.keys(_agendaDefaultColors).forEach(function(k) {
+    _agendaTypeColor[k] = _agendaDefaultColors[k];
+  });
+  _agendaSaveColors();
+  _agendaRenderLegend();
+  _agendaRender();
+  _agendaFillColorPopup(); // actualise les pickers si popup ouverte
+}
+
+function _agendaRenderLegend() {
+  var el = document.getElementById('ag-legend');
+  if (!el) return;
+  var displayTypes = [
+    {key:'cdf',                 label:'Nationale'},
+    {key:'comp-internationale', label:'Internationale'},
+    {key:'regional',            label:'Régionale'},
+    {key:'entrainement',        label:'Entraînement'},
+    {key:'stage',               label:'Stage'}
+  ];
+  var html = '';
+  displayTypes.forEach(function(t) {
+    var col = _agendaTypeColor[t.key] || '#6b7280';
+    html += '<div onclick="_agendaOpenColorPopup()" title="Personnaliser les couleurs" style="display:flex;align-items:center;gap:5px;cursor:pointer;border-radius:5px;padding:2px 4px;transition:background .15s" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'transparent\'">';
+    html += '<div id="ag-leg-dot-'+t.key+'" style="width:10px;height:10px;border-radius:3px;background:'+col+';flex-shrink:0;transition:background .2s"></div>';
+    html += '<span style="font-size:10px;color:var(--txt3)">'+t.label+'</span>';
+    html += '</div>';
+  });
+  // Type "Autre" (non personnalisable)
+  html += '<div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:3px;background:#64748b;flex-shrink:0"></div><span style="font-size:10px;color:var(--txt3)">Autre</span></div>';
+  // Spacer + bouton palette
+  html += '<div style="flex:1"></div>';
+  html += '<button onclick="_agendaOpenColorPopup()" title="Personnaliser les couleurs" style="display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-family:inherit;cursor:pointer;transition:all .15s;flex-shrink:0" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'transparent\'">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M2 13.5A10 10 0 1 0 13.5 2"/><path d="M2 13.5a10 10 0 0 0 7.5 9.3"/><circle cx="5" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="3" r="1.5" fill="currentColor"/><circle cx="19" cy="8" r="1.5" fill="currentColor"/><circle cx="19" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="21" r="1.5" fill="currentColor"/></svg>';
+  html += ' Couleurs</button>';
+
+  el.innerHTML = html;
+}
+
+function _agendaFillColorPopup() {
+  var rows = document.getElementById('ag-color-popup-rows');
+  if (!rows) return;
+  var allTypes = [
+    {key:'cdf',                 label:'Nationale',       linked:[]},
+    {key:'comp-internationale', label:'Internationale',  linked:[]},
+    {key:'regional',            label:'Régionale',       linked:['comp-regionale']},
+    {key:'entrainement',        label:'Entraînement',    linked:['entrainement-national']},
+    {key:'stage',               label:'Stage',           linked:[]}
+  ];
+  var html = '';
+  allTypes.forEach(function(t) {
+    var col = _agendaTypeColor[t.key] || '#6b7280';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">';
+    html += '<input type="color" value="'+col+'" oninput="_agendaSetTypeColor(\''+t.key+'\',this.value)" style="width:32px;height:24px;border:1px solid var(--bdr);border-radius:6px;background:none;cursor:pointer;padding:1px 2px;flex-shrink:0">';
+    html += '<span style="font-size:11px;color:var(--txt2);flex:1">'+t.label+'</span>';
+    if (t.linked.length) html += '<span style="font-size:9px;color:var(--txt3)">+'+t.linked.length+'</span>';
+    html += '</div>';
+  });
+  rows.innerHTML = html;
+}
+
+function _agendaOpenColorPopup() {
+  var pop = document.getElementById('ag-color-popup');
+  if (!pop) return;
+  if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+  _agendaFillColorPopup();
+  pop.style.display = 'block';
+}
+
+function _agendaSetTypeColor(typeKey, color) {
+  _agendaTypeColor[typeKey] = color;
+  // Synchroniser les types liés
+  if (typeKey === 'regional')     _agendaTypeColor['comp-regionale']       = color;
+  if (typeKey === 'entrainement') _agendaTypeColor['entrainement-national'] = color;
+  _agendaSaveColors();
+  // Mettre à jour le dot de la légende sans re-rendre tout
+  var dot = document.getElementById('ag-leg-dot-'+typeKey);
+  if (dot) dot.style.background = color;
+  _agendaRender();
+}
+
+/* ── Abréviation des noms de compétition pour les blocs compacts ─────── */
+function _agendaAbbrev(name) {
+  if (!name) return '';
+  return name
+    .replace(/Championnat\s+du\s+Monde/gi,     'CdM')
+    .replace(/Championnat\s+d[e']Europe/gi,     'CdE')
+    .replace(/Championnat\s+de\s+France/gi,     'CdF')
+    .replace(/Championnat\s+de\s+la\s+Ligue/gi, 'CdL')
+    .replace(/Championnat\s+National/gi,        'CN')
+    .replace(/Coupe\s+du\s+Monde/gi,            'CM')
+    .replace(/Coupe\s+d[e']Europe/gi,           'CE')
+    .replace(/Coupe\s+de\s+France/gi,           'CF')
+    .replace(/Entra[iî]nement\s+National/gi,    'Entr. Nat.')
+    .replace(/Entra[iî]nement/gi,               'Entr.')
+    .replace(/Paramoteur/gi,                    'Para.')
+    .replace(/Microlight/gi,                    'ML')
+    .replace(/R[eé]gionale/gi,                  'Rég.');
+}
 
 /* Formate une Date en 'YYYY-MM-DD' heure locale (évite le décalage UTC) */
 function _agendaFmtDate(d) {
@@ -6434,10 +6684,14 @@ function openAgenda() {
   _agendaDayDate   = todayStr;
   _agendaView = 'month';
   _agendaTypeFilter = [];
+  _agendaLoadColors();
+  _agendaLoadDayWindow();
   var ov = document.getElementById('agenda-overlay');
   if (ov) ov.style.display = 'flex';
   _agendaSetView('month', true);
   _agendaRender();
+  _agendaRenderLegend();
+  _agendaFillWindowSelects();
   _agendaSideEmpty();
 }
 
@@ -6468,16 +6722,18 @@ function _agendaGetComps() {
           if (!match) return;
           // Les sous-tâches sont toujours incluses (indépendamment du filtre type)
           all.push({
-            _ganttSt  : true,
-            id        : 'gst-'+st.id,
-            name      : st.titre || 'Sous-tâche',
-            dateFrom  : st.dateDebut,
-            dateTo    : st.dateFin || st.dateDebut,
-            type      : '_gantt',
-            _taskTitre: task.titre  || '',
-            _compNom  : comp ? (comp.name||comp.nom||'') : '',
-            _compId   : compId,
-            _taskId   : task.id
+            _ganttSt   : true,
+            id         : 'gst-'+st.id,
+            name       : st.titre || 'Sous-tâche',
+            dateFrom   : st.dateDebut,
+            dateTo     : st.dateFin || st.dateDebut,
+            type       : '_gantt',
+            heureDebut : st.heureDebut || '',
+            heureFin   : st.heureFin   || '',
+            _taskTitre : task.titre  || '',
+            _compNom   : comp ? (comp.name||comp.nom||'') : '',
+            _compId    : compId,
+            _taskId    : task.id
           });
         });
       });
@@ -6538,6 +6794,9 @@ function _agendaSetView(v, skipRender) {
   if (wdhRow) wdhRow.style.display = (v==='month') ? 'grid' : 'none';
   var main = document.getElementById('ag-main');
   if (main) main.style.flexDirection = (v==='month'||v==='week') ? 'column' : '';
+  // Contrôle Fenêtre horaire : visible seulement en Semaine et Jour
+  var wctrl = document.getElementById('ag-window-ctrl');
+  if (wctrl) wctrl.style.display = (v==='week'||v==='day') ? 'flex' : 'none';
   if (!skipRender) _agendaRender();
 }
 
@@ -6657,53 +6916,188 @@ function _agendaBuildByDate() {
 var _AG_HOURS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23];
 var _AG_HOUR_H = 44; // px par heure
 
-function _agendaBuildTimeLayout(colCount) {
-  var TIME_W = 52;
+// ── Menu de création rapide (double-clic sur créneau horaire) ──
+function _agendaCreateMenu(date, hour, minute) {
+  // Nettoyer un menu précédent
+  var old = document.getElementById('ag-create-menu');
+  if (old) old.remove();
 
-  // Conteneur principal (flex-column, prend flex:1)
+  var hh  = String(hour).padStart(2,'0');
+  var mm  = String(minute).padStart(2,'0');
+  var JOURS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  var MOIS  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var d     = new Date(date+'T00:00:00');
+  var dlbl  = JOURS[d.getDay()]+' '+d.getDate()+' '+MOIS[d.getMonth()]+' '+d.getFullYear();
+
+  // Compétitions disponibles pour tâche planning (toutes celles qui ont un planning ou toutes)
+  var comps = (S.comps||[]).filter(function(c){ return c.dateFrom; })
+    .sort(function(a,b){ return (a.dateFrom||'').localeCompare(b.dateFrom||''); });
+
+  var ov = document.createElement('div');
+  ov.id = 'ag-create-menu';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:850;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
+  var panel = document.createElement('div');
+  panel.style.cssText = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.55);width:100%;max-width:360px;overflow:hidden;animation:agMenuIn .15s ease';
+  panel.onclick = function(e){ e.stopPropagation(); };
+
+  // ── CSS animation ──
+  if (!document.getElementById('ag-menu-style')) {
+    var st = document.createElement('style');
+    st.id  = 'ag-menu-style';
+    st.textContent = '@keyframes agMenuIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}';
+    document.head.appendChild(st);
+  }
+
+  // ── En-tête ──
+  var hdrEl = document.createElement('div');
+  hdrEl.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--bdr)';
+  hdrEl.innerHTML = '<div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--txt)">🕐 Créer à '+hh+'h'+mm+'</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dlbl+'</div>'
+    +'</div>'
+    +'<button onclick="document.getElementById(\'ag-create-menu\').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">×</button>';
+  panel.appendChild(hdrEl);
+
+  // ── Corps ──
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px';
+
+  // Bouton Compétition
+  var btnComp = document.createElement('button');
+  btnComp.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1px solid rgba(0,87,255,.3);background:rgba(0,87,255,.08);color:var(--txt);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;transition:background .14s';
+  btnComp.innerHTML = '<span style="font-size:22px;line-height:1">📅</span><div><div>Nouvelle compétition</div><div style="font-size:11px;color:var(--txt3);font-weight:500;margin-top:2px">Ajouter une compétition à cette date</div></div>';
+  btnComp.onmouseover = function(){ this.style.background='rgba(0,87,255,.16)'; };
+  btnComp.onmouseout  = function(){ this.style.background='rgba(0,87,255,.08)'; };
+  btnComp.onclick = function() {
+    ov.remove();
+    _agendaAddComp(date);
+  };
+  body.appendChild(btnComp);
+
+  // Bouton Tâche Planning
+  var btnTask = document.createElement('button');
+  btnTask.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);color:var(--txt);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;transition:background .14s';
+  btnTask.innerHTML = '<span style="font-size:22px;line-height:1">📋</span><div><div>Nouvelle tâche Planning</div><div style="font-size:11px;color:var(--txt3);font-weight:500;margin-top:2px">Ajouter une tâche dans le Gantt d\'une compétition</div></div>';
+  btnTask.onmouseover = function(){ this.style.background='rgba(16,185,129,.15)'; };
+  btnTask.onmouseout  = function(){ this.style.background='rgba(16,185,129,.07)'; };
+  btnTask.onclick = function() {
+    // Remplacer le bouton par un sélecteur de compétition
+    body.innerHTML = '';
+    var titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px';
+    titleEl.textContent = 'Choisir la compétition';
+    body.appendChild(titleEl);
+    if (!comps.length) {
+      body.innerHTML += '<div style="color:var(--txt3);font-size:12px;text-align:center;padding:12px 0">Aucune compétition disponible</div>';
+      return;
+    }
+    var list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto';
+    comps.forEach(function(cp) {
+      var row = document.createElement('button');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;transition:background .12s';
+      row.innerHTML = '<span style="font-size:15px">🏆</span><div style="min-width:0">'
+        +'<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_gE2(cp.name)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3)">'+cp.dateFrom+'</div>'
+        +'</div>';
+      row.onmouseover = function(){ this.style.background='var(--navy4)'; };
+      row.onmouseout  = function(){ this.style.background='var(--navy3)'; };
+      (function(compId, compDate) {
+        row.onclick = function() {
+          ov.remove();
+          closeAgenda();
+          openGanttModal(compId);
+          _ganttState.fromAgenda = true;
+          // Ouvrir le dialog nouvelle tâche avec date et heure pré-remplis
+          setTimeout(function() {
+            openGanttTaskDialog(compId, null);
+            setTimeout(function() {
+              var ddEl = document.getElementById('gt-date-deb');
+              var dfEl = document.getElementById('gt-date-fin');
+              if (ddEl) ddEl.value = date;
+              if (dfEl) dfEl.value = date;
+            }, 80);
+          }, 200);
+        };
+      })(cp.id, cp.dateFrom);
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+    // Bouton retour
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = 'margin-top:10px;width:100%;padding:8px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer';
+    backBtn.textContent = '← Retour';
+    backBtn.onclick = function() { ov.remove(); _agendaCreateMenu(date, hour, minute); };
+    body.appendChild(backBtn);
+  };
+  body.appendChild(btnTask);
+
+  panel.appendChild(body);
+  ov.appendChild(panel);
+  document.body.appendChild(ov);
+}
+
+function _agendaBuildTimeLayout(colCount) {
+  var TIME_W   = 52;
+  var _winSt   = Math.max(0, Math.min(23, _agendaDayStart));
+  var _winEd   = Math.max(_winSt + 1, Math.min(24, _agendaDayEnd));
+  var _span    = _winEd - _winSt;
+  function _hP(h)  { return ((h - _winSt) / _span * 100).toFixed(4) + '%'; }
+  function _dhP(dh){ return (dh / _span * 100).toFixed(4) + '%'; }
+
   var wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden';
 
   // ─ Ligne all-day ─
   var adRow = document.createElement('div');
   adRow.style.cssText = 'display:flex;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.09);min-height:32px';
-  // coin heure
   var adCorner = document.createElement('div');
   adCorner.style.cssText = 'width:'+TIME_W+'px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:flex-end;padding:0 8px';
   adCorner.innerHTML = '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Tout le jour</span>';
   adRow.appendChild(adCorner);
-  // zone events all-day
   var adArea = document.createElement('div');
   adArea.style.cssText = 'flex:1;position:relative;min-height:28px;padding:3px 0';
   adRow.appendChild(adArea);
   wrap.appendChild(adRow);
 
-  // ─ Corps scrollable ─
+  // ─ Corps (pas de scroll — la grille s'étale sur toute la hauteur) ─
   var body = document.createElement('div');
-  body.style.cssText = 'flex:1;overflow-y:auto;display:flex;min-height:0';
+  body.style.cssText = 'flex:1;overflow:hidden;display:flex;min-height:0';
 
-  // Colonne heures (sticky left)
+  // Colonne heures
   var timeCol = document.createElement('div');
-  timeCol.style.cssText = 'width:'+TIME_W+'px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.09);position:relative';
-  timeCol.style.height = (_AG_HOUR_H * 24) + 'px';
-  _AG_HOURS.forEach(function(h) {
+  timeCol.style.cssText = 'width:'+TIME_W+'px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.09);position:relative;height:100%';
+  for (var _th = _winSt; _th <= _winEd; _th++) {
     var lbl = document.createElement('div');
-    lbl.style.cssText = 'position:absolute;right:8px;font-size:10px;font-weight:600;color:var(--txt3);line-height:1;top:'+(h*_AG_HOUR_H - 6)+'px';
-    if (h > 0) lbl.textContent = String(h).padStart(2,'0')+'h';
+    lbl.style.cssText = 'position:absolute;right:8px;font-size:10px;font-weight:600;color:var(--txt3);line-height:1;top:'+_hP(_th)+';transform:translateY(-50%)';
+    if (_th > _winSt && _th <= _winEd) lbl.textContent = (_th < 10 ? '0' : '') + _th + 'h';
     timeCol.appendChild(lbl);
-  });
+  }
   body.appendChild(timeCol);
 
   // Zone événements + lignes horizontales
   var evArea = document.createElement('div');
-  evArea.style.cssText = 'flex:1;position:relative;height:'+(_AG_HOUR_H*24)+'px';
-  // Lignes horaires
-  _AG_HOURS.forEach(function(h) {
-    var line = document.createElement('div');
-    line.style.cssText = 'position:absolute;left:0;right:0;top:'+(h*_AG_HOUR_H)+'px;border-top:1px solid rgba(255,255,255,'+(h%6===0?'.12':'.05')+')';
-    evArea.appendChild(line);
+  evArea.style.cssText = 'flex:1;position:relative;height:100%;cursor:default';
+  // Double-clic — heure calculée via fraction de hauteur
+  evArea.addEventListener('dblclick', function(e) {
+    if (e.target !== evArea) return;
+    var offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY - evArea.getBoundingClientRect().top);
+    var frac   = offsetY / evArea.getBoundingClientRect().height;
+    var hourF  = _winSt + frac * _span;
+    var hour   = Math.min(23, Math.max(0, Math.floor(hourF)));
+    var minute = Math.round((hourF - Math.floor(hourF)) * 60 / 15) * 15;
+    if (minute >= 60) { hour = Math.min(23, hour + 1); minute = 0; }
+    _agendaCreateMenu(_agendaDayDate, hour, minute);
   });
-  // Ligne now (si aujourd'hui dans la vue)
+  // Lignes horaires en pourcentage
+  for (var _lh = _winSt; _lh < _winEd; _lh++) {
+    var line = document.createElement('div');
+    line.style.cssText = 'position:absolute;left:0;right:0;top:'+_hP(_lh)+';border-top:1px solid rgba(255,255,255,'+(_lh===_winSt?'0':_lh%6===0?'.12':'.05')+')';
+    evArea.appendChild(line);
+  }
+  // Ligne now
   var nowLine = document.createElement('div');
   nowLine.id = 'ag-now-line';
   nowLine.style.cssText = 'display:none;position:absolute;left:0;right:0;z-index:3;pointer-events:none';
@@ -6712,17 +7106,20 @@ function _agendaBuildTimeLayout(colCount) {
   body.appendChild(evArea);
 
   wrap.appendChild(body);
-  return { wrap:wrap, timeCol:timeCol, evArea:evArea, adArea:adArea, body:body };
+  return { wrap:wrap, timeCol:timeCol, evArea:evArea, adArea:adArea, body:body, winSt:_winSt, winEd:_winEd, hP:_hP, dhP:_dhP };
 }
 
 function _agendaShowNowLine(evArea, colIdxOrPct, totalCols) {
-  var now = new Date();
-  var pct = (now.getHours()*60 + now.getMinutes()) / (24*60);
-  var top = Math.round(pct * _AG_HOUR_H * 24);
+  var now    = new Date();
+  var nowH   = now.getHours() + now.getMinutes()/60;
+  var _winSt = Math.max(0, Math.min(23, _agendaDayStart));
+  var _winEd = Math.max(_winSt + 1, Math.min(24, _agendaDayEnd));
+  if (nowH < _winSt || nowH > _winEd) return; // heure actuelle hors fenêtre
+  var top = ((nowH - _winSt) / (_winEd - _winSt) * 100).toFixed(4) + '%';
   var line = evArea.querySelector('#ag-now-line');
   if (!line) return;
   line.style.display = 'block';
-  line.style.top = top + 'px';
+  line.style.top = top;
   if (colIdxOrPct !== undefined && totalCols !== undefined) {
     // Positionnement par colonne (vue Semaine)
     line.style.left = (colIdxOrPct / totalCols * 100).toFixed(3) + '%';
@@ -6854,11 +7251,23 @@ function _agendaRenderMonth() {
           var ev = document.createElement('div');
           ev.className = 'ag-ev-block';
           ev.style.cssText = 'top:'+top+'px;left:calc('+lpct+'% + '+(contL?0:3)+'px);width:calc('+wpct+'% - '+(contL?0:3)+'px - '+(contR?0:3)+'px);background:'+color+';border-radius:'+(contL?'0':'4px')+' '+(contR?'0':'4px')+' '+(contR?'0':'4px')+' '+(contL?'0':'4px')+';padding:0 '+(contL?4:7)+'px'+(contR?';border-right:2px solid rgba(255,255,255,.25)':'');
-          ev.textContent = (contL ? '↳ ' : '') + (e.name||'').substring(0,26);
-          ev.title = e.name||'';
+          var _evLbl = (e.name||'') + (e._ganttSt && e._compNom ? ' ('+e._compNom+')' : '');
+          ev.textContent = (contL ? '↳ ' : '') + _agendaAbbrev(_evLbl);
+          ev.title = _evLbl;
           ev.onmouseover = function(){ this.style.filter='brightness(1.2)'; };
           ev.onmouseout  = function(){ this.style.filter=''; };
-          (function(comp){ ev.onclick = function(ev2){ ev2.stopPropagation(); _agendaSelectDate(comp.dateFrom); _agendaHighlightComp(comp.id); }; })(e);
+          (function(comp){ ev.onclick = function(ev2){
+            ev2.stopPropagation();
+            if (comp._ganttSt && comp._compId) {
+              openGanttModal(comp._compId);
+              _ganttState.fromAgenda = true;
+              if (comp._taskId) openGanttTaskDialog(comp._compId, comp._taskId);
+            } else {
+              _compFromAgenda = true;
+              closeAgenda();
+              openCompDetail(comp.id);
+            }
+          }; })(e);
           weekEl.appendChild(ev);
         });
 
@@ -6903,7 +7312,13 @@ function _agendaRenderWeek() {
   var today  = _agendaFmtDate(new Date());
   var JOURS  = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   var TW     = 44;  // largeur colonne heures (px)
-  var SEP    = 'rgba(255,255,255,.14)'; // couleur séparateurs
+  var _isLight = document.body.classList.contains('theme-light');
+  var SEP    = _isLight ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.14)';
+  var SEP_D  = _isLight ? 'rgba(0,0,0,.14)' : 'rgba(255,255,255,.22)';
+  var SEP_WE = _isLight ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.40)'; // transition Ven→Sam
+  var SEP_TC = _isLight ? 'rgba(0,0,0,.20)' : 'rgba(255,255,255,.35)'; // colonne heures
+  var HR_MJ  = _isLight ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.12)'; // trait horaire majeur (x6)
+  var HR_MN  = _isLight ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.05)'; // trait horaire mineur
   var GRID   = TW+'px repeat(7,1fr)';
   var LANE_H = 22;
 
@@ -6920,24 +7335,33 @@ function _agendaRenderWeek() {
   hdr.style.cssText = 'display:grid;grid-template-columns:'+GRID+';flex-shrink:0;border-bottom:2px solid '+SEP;
   // Coin heures
   var c0 = document.createElement('div');
-  c0.style.cssText = 'border-right:1px solid '+SEP;
+  c0.style.cssText = 'position:relative';
+  var c0sep = document.createElement('div');
+  c0sep.style.cssText = 'position:absolute;top:0;right:0;width:2px;height:100%;background:'+SEP_TC;
+  c0.appendChild(c0sep);
   hdr.appendChild(c0);
   // 7 colonnes jours
-  days.forEach(function(day) {
+  days.forEach(function(day, di) {
     var col = document.createElement('div');
     var bg = day.isToday ? 'rgba(0,87,255,.07)' : day.isWend ? 'rgba(255,255,255,.025)' : 'transparent';
-    col.style.cssText = 'padding:8px 2px 9px;text-align:center;border-right:1px solid '+SEP+';cursor:pointer;background:'+bg;
+    col.style.cssText = 'padding:8px 2px 9px;text-align:center;cursor:pointer;background:'+bg+';position:relative';
     col.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:'+(day.isToday?'var(--stol)':'var(--txt3)')+';margin-bottom:4px">'+day.label+'</div>'
       +'<div style="width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;'
       +(day.isToday?'background:var(--stol);color:#fff;box-shadow:0 0 0 3px rgba(0,87,255,.25)':'color:var(--txt)')+'" >'+day.day+'</div>';
+    // Séparateur gauche (ajouté après innerHTML pour ne pas être écrasé)
+    var hSep = document.createElement('div');
+    hSep.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:100%;background:'+((di===5)?SEP_WE:SEP_D)+';pointer-events:none';
+    col.appendChild(hSep);
     (function(ds){ col.onclick = function(){ _agendaDayDate=ds; _agendaSetView('day'); }; })(day.date);
     hdr.appendChild(col);
   });
   main.appendChild(hdr);
 
-  // ── ÉVÉNEMENTS : tri + lanes ──
-  var wEvts = _agendaGetComps().filter(function(c){
-    return (c.dateFrom||'') <= days[6].date && (c.dateTo||c.dateFrom||'') >= days[0].date;
+  // ── ÉVÉNEMENTS : tri + lanes (hors sous-tâches avec horaire → elles vont dans la grille) ──
+  var _allComps = _agendaGetComps();
+  var wEvts = _allComps.filter(function(c){
+    return (c.dateFrom||'') <= days[6].date && (c.dateTo||c.dateFrom||'') >= days[0].date
+      && !(c._ganttSt && c.heureDebut);  // timed gantt subtasks go to time grid, not all-day
   });
   wEvts.sort(function(a,b){
     var da=Math.round((new Date((a.dateTo||a.dateFrom)+'T00:00:00')-new Date(a.dateFrom+'T00:00:00'))/86400000);
@@ -6958,14 +7382,20 @@ function _agendaRenderWeek() {
   adRow.style.cssText = 'display:grid;grid-template-columns:'+GRID+';flex-shrink:0;border-bottom:1px solid '+SEP+';position:relative;min-height:'+(numLanes*LANE_H+8)+'px';
   // Coin "Tout le jour"
   var adC = document.createElement('div');
-  adC.style.cssText = 'border-right:1px solid '+SEP+';display:flex;align-items:center;justify-content:flex-end;padding:0 6px';
+  adC.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:flex-end;padding:0 8px 0 0';
+  var adCSep = document.createElement('div');
+  adCSep.style.cssText = 'position:absolute;top:0;right:0;width:2px;height:100%;background:'+SEP_TC+';pointer-events:none';
+  adC.appendChild(adCSep);
   adC.innerHTML = '<span style="font-size:8px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;line-height:1.3;text-align:right">Tout<br>le jour</span>';
   adRow.appendChild(adC);
   // Cellules jours (juste les fonds + bordures)
-  days.forEach(function(day) {
+  days.forEach(function(day, di) {
     var cell = document.createElement('div');
-    var bg = day.isToday ? 'rgba(0,87,255,.04)' : day.isWend ? 'rgba(255,255,255,.015)' : 'transparent';
-    cell.style.cssText = 'border-right:1px solid '+SEP+';background:'+bg;
+    var bg = day.isToday ? 'rgba(0,87,255,.04)' : day.isWend ? 'rgba(255,255,255,.03)' : 'transparent';
+    cell.style.cssText = 'position:relative;background:'+bg;
+    var adSep = document.createElement('div');
+    adSep.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:100%;background:'+((di===5)?SEP_WE:SEP_D)+';pointer-events:none';
+    cell.appendChild(adSep);
     adRow.appendChild(cell);
   });
   // Blocs événements (position:absolute sur toute la largeur de adRow sauf le coin TW)
@@ -6988,11 +7418,23 @@ function _agendaRenderWeek() {
     var wPx = 'calc((100% - '+TW+'px) * '+(span/7).toFixed(4)+' - '+(contL?0:2)+'px - '+(contR?0:2)+'px)';
     ev.style.cssText = 'position:absolute;top:'+top+'px;left:'+lPx+';width:'+wPx+';height:'+(LANE_H-5)+'px;background:'+color
       +';border-radius:'+(contL?'0':'4px')+' '+(contR?'0':'4px')+' '+(contR?'0':'4px')+' '+(contL?'0':'4px');
-    ev.textContent = (contL?'↳ ':'')+( e.name||'');
-    ev.title = e.name||'';
+    var _evLbl2 = (e.name||'') + (e._ganttSt && e._compNom ? ' ('+e._compNom+')' : '');
+    ev.textContent = (contL?'↳ ':'')+_agendaAbbrev(_evLbl2);
+    ev.title = _evLbl2;
     ev.onmouseover = function(){ this.style.filter='brightness(1.2)'; };
     ev.onmouseout  = function(){ this.style.filter=''; };
-    (function(c){ ev.onclick = function(ev2){ ev2.stopPropagation(); _agendaSelectDate(c.dateFrom); _agendaHighlightComp(c.id); }; })(e);
+    (function(c){ ev.onclick = function(ev2){
+      ev2.stopPropagation();
+      if (c._ganttSt && c._compId) {
+        openGanttModal(c._compId);
+        _ganttState.fromAgenda = true;
+        if (c._taskId) openGanttTaskDialog(c._compId, c._taskId);
+      } else {
+        _compFromAgenda = true;
+        closeAgenda();
+        openCompDetail(c.id);
+      }
+    }; })(e);
     adRow.appendChild(ev);
   });
   if (!wEvts.length) {
@@ -7003,55 +7445,115 @@ function _agendaRenderWeek() {
   }
   main.appendChild(adRow);
 
-  // ── GRILLE HORAIRE SCROLLABLE : même grille ──
+  // ── GRILLE HORAIRE : s'étale sur toute la hauteur disponible ──
+  // Les heures sélectionnées (_agendaDayStart → _agendaDayEnd) remplissent 100% de la hauteur.
+  // Toutes les positions sont en pourcentage pour s'adapter à n'importe quelle hauteur d'écran.
+  var _winStart = Math.max(0, Math.min(23, _agendaDayStart));
+  var _winEnd   = Math.max(_winStart + 1, Math.min(24, _agendaDayEnd));
+  var _span     = _winEnd - _winStart; // nombre d'heures visibles
+
+  // Convertit une heure décimale en pourcentage dans la fenêtre
+  function _hPct(h)  { return (h - _winStart) / _span * 100; }
+  function _dhPct(dh){ return dh / _span * 100; }
+
   var scroll = document.createElement('div');
-  scroll.style.cssText = 'flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:'+GRID;
+  scroll.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:grid;grid-template-columns:'+GRID;
 
   // Colonne heures
   var timeCol = document.createElement('div');
-  timeCol.style.cssText = 'border-right:1px solid '+SEP+';position:relative;height:'+(_AG_HOUR_H*24)+'px;background:var(--navy)';
-  _AG_HOURS.forEach(function(h) {
+  timeCol.style.cssText = 'position:relative;height:100%;background:var(--navy)';
+  var tcSep = document.createElement('div');
+  tcSep.style.cssText = 'position:absolute;top:0;right:0;width:2px;height:100%;background:'+SEP_TC+';pointer-events:none;z-index:2';
+  timeCol.appendChild(tcSep);
+  for (var _wh = _winStart; _wh <= _winEnd; _wh++) {
     var lbl = document.createElement('div');
-    lbl.style.cssText = 'position:absolute;right:6px;top:'+(h*_AG_HOUR_H - 6)+'px;font-size:9px;font-weight:600;color:var(--txt3);line-height:1;white-space:nowrap';
-    if (h > 0) lbl.textContent = String(h).padStart(2,'0')+'h';
+    lbl.style.cssText = 'position:absolute;right:6px;top:'+_hPct(_wh).toFixed(4)+'%;font-size:9px;font-weight:600;color:var(--txt3);line-height:1;white-space:nowrap;transform:translateY(-50%)';
+    if (_wh > _winStart && _wh <= _winEnd) lbl.textContent = (_wh < 10 ? '0' : '') + _wh + 'h';
     timeCol.appendChild(lbl);
-  });
+  }
   scroll.appendChild(timeCol);
 
   // 7 colonnes jours
   var todayColEl = null;
+  var dayColEls  = [];
   days.forEach(function(day, i) {
     var col = document.createElement('div');
-    var bg = day.isToday ? 'rgba(251,191,36,.05)' : day.isWend ? 'rgba(255,255,255,.018)' : 'transparent';
-    col.style.cssText = 'border-right:1px solid '+SEP+';position:relative;height:'+(_AG_HOUR_H*24)+'px;background:'+bg;
-    // Lignes horaires
-    _AG_HOURS.forEach(function(h) {
+    var bg = day.isToday ? 'rgba(251,191,36,.05)' : day.isWend ? 'rgba(255,255,255,.03)' : 'transparent';
+    col.style.cssText = 'position:relative;height:100%;background:'+bg+';cursor:default';
+    var vSep = document.createElement('div');
+    vSep.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:100%;background:'+((i===5)?SEP_WE:SEP_D)+';pointer-events:none;z-index:2';
+    col.appendChild(vSep);
+    // Lignes horaires en pourcentage
+    for (var _lh = _winStart; _lh < _winEnd; _lh++) {
       var line = document.createElement('div');
-      line.style.cssText = 'position:absolute;left:0;right:0;top:'+(h*_AG_HOUR_H)+'px;border-top:1px solid rgba(255,255,255,'+(h===0?'0':h%6===0?'.12':'.05')+')';
+      line.style.cssText = 'position:absolute;left:1px;right:0;top:'+_hPct(_lh).toFixed(4)+'%;border-top:1px solid '+(_lh===_winStart?'transparent':_lh%6===0?HR_MJ:HR_MN);
       col.appendChild(line);
-    });
+    }
+    // Double-clic → heure calculée via la hauteur réelle de la colonne
+    (function(dayDate) {
+      col.addEventListener('dblclick', function(e) {
+        if (e.target !== col) return;
+        var offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY - col.getBoundingClientRect().top);
+        var frac   = offsetY / col.getBoundingClientRect().height;
+        var hourF  = _winStart + frac * _span;
+        var hour   = Math.min(23, Math.max(0, Math.floor(hourF)));
+        var minute = Math.round((hourF - Math.floor(hourF)) * 60 / 15) * 15;
+        if (minute >= 60) { hour = Math.min(23, hour + 1); minute = 0; }
+        _agendaCreateMenu(dayDate, hour, minute);
+      });
+    })(day.date);
     if (day.isToday) todayColEl = col;
+    dayColEls.push(col);
     scroll.appendChild(col);
   });
+
+  // ── Blocs horodatés sous-tâches Planning ──
+  var wTimedEvts = _allComps.filter(function(c){
+    return c._ganttSt && c.heureDebut
+      && (c.dateFrom||'') <= days[6].date && (c.dateFrom||'') >= days[0].date;
+  });
+  wTimedEvts.forEach(function(c){
+    var dayIdx = days.findIndex(function(d){ return d.date === c.dateFrom; });
+    if (dayIdx < 0) return;
+    var col2 = dayColEls[dayIdx];
+    if (!col2) return;
+    var color = _agendaColor(c);
+    var hd = c.heureDebut.split(':'), hf = c.heureFin ? c.heureFin.split(':') : null;
+    var startH = parseInt(hd[0]) + parseInt(hd[1])/60;
+    var endH   = hf ? (parseInt(hf[0]) + parseInt(hf[1])/60) : startH + 1;
+    if (endH <= startH) endH = startH + 0.5;
+    var topPct  = _hPct(startH).toFixed(4) + '%';
+    var hgtPct  = _dhPct(endH - startH).toFixed(4) + '%';
+    var blk = document.createElement('div');
+    blk.style.cssText = 'position:absolute;left:2px;right:2px;top:'+topPct+';height:'+hgtPct
+      +';background:'+color+';border-radius:5px;padding:3px 6px;cursor:pointer;z-index:3;overflow:hidden'
+      +';box-shadow:0 1px 3px rgba(0,0,0,.2);transition:filter .12s;min-height:18px';
+    var _wBlkNm = (c.name||'') + (c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '');
+    blk.innerHTML = '<div style="font-size:10px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_agendaAbbrev(_wBlkNm)+'</div>';
+    blk.title = _wBlkNm+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
+    blk.onmouseover = function(){ this.style.filter='brightness(1.12)'; };
+    blk.onmouseout  = function(){ this.style.filter=''; };
+    (function(ev){ blk.onclick = function(e2){
+      e2.stopPropagation();
+      if (ev._compId){ openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
+    }; })(c);
+    col2.appendChild(blk);
+  });
+
   main.appendChild(scroll);
 
-  // ── LIGNE "MAINTENANT" ──
+  // ── LIGNE "MAINTENANT" en pourcentage ──
   if (todayColEl) {
     var now2 = new Date();
-    var pct  = (now2.getHours()*60+now2.getMinutes())/(24*60);
-    var top2 = Math.round(pct*_AG_HOUR_H*24);
-    var nl   = document.createElement('div');
-    nl.style.cssText = 'position:absolute;left:-1px;right:0;top:'+top2+'px;pointer-events:none;z-index:4';
-    nl.innerHTML = '<div style="height:2px;background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.5)"></div>'
-      +'<div style="position:absolute;left:-3px;top:-4px;width:8px;height:8px;border-radius:50%;background:#ef4444"></div>';
-    todayColEl.appendChild(nl);
+    var nowH = now2.getHours() + now2.getMinutes()/60;
+    if (nowH >= _winStart && nowH <= _winEnd) {
+      var nl = document.createElement('div');
+      nl.style.cssText = 'position:absolute;left:-1px;right:0;top:'+_hPct(nowH).toFixed(4)+'%;pointer-events:none;z-index:4';
+      nl.innerHTML = '<div style="height:2px;background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.5)"></div>'
+        +'<div style="position:absolute;left:-3px;top:-4px;width:8px;height:8px;border-radius:50%;background:#ef4444"></div>';
+      todayColEl.appendChild(nl);
+    }
   }
-
-  // ── SCROLL AUTO vers l'heure courante ──
-  requestAnimationFrame(function(){
-    var now3 = new Date();
-    scroll.scrollTop = Math.max(0, (now3.getHours()-1)*_AG_HOUR_H - 30);
-  });
 }
 
 /* ─── Vue Jour ─── */
@@ -7085,14 +7587,18 @@ function _agendaRenderDay() {
   // ── Grille horaire ──
   var tl = _agendaBuildTimeLayout(1);
 
-  // Zone all-day : cartes des événements du jour
-  if (dayEvts.length) {
+  // Séparer événements avec horaire (→ grille) et sans (→ all-day)
+  var timedEvts   = dayEvts.filter(function(c){ return c._ganttSt && c.heureDebut; });
+  var allDayEvts  = dayEvts.filter(function(c){ return !(c._ganttSt && c.heureDebut); });
+
+  // Zone all-day : cartes des événements sans horaire
+  if (allDayEvts.length) {
     tl.adArea.style.padding = '4px 6px';
     tl.adArea.style.display = 'flex';
     tl.adArea.style.flexDirection = 'column';
     tl.adArea.style.gap = '4px';
     tl.adArea.style.position = 'static';
-    dayEvts.forEach(function(c){
+    allDayEvts.forEach(function(c){
       var color = _agendaColor(c);
       var card  = document.createElement('div');
       card.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:'+color+'18;border-left:3px solid '+color+';cursor:pointer;transition:background .15s';
@@ -7114,8 +7620,11 @@ function _agendaRenderDay() {
           +'</div>'
           +'<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#7c3aed22;color:#a78bfa;white-space:nowrap;flex-shrink:0">Planning</span>';
         (function(comp){ card.onclick = function(){
-          closeAgenda();
-          if (comp._compId) openGantt(comp._compId);
+          if (comp._compId) {
+            openGanttModal(comp._compId);
+            _ganttState.fromAgenda = true;
+            if (comp._taskId) openGanttTaskDialog(comp._compId, comp._taskId);
+          }
         }; })(c);
       } else {
         // ── Carte compétition ──
@@ -7127,18 +7636,43 @@ function _agendaRenderDay() {
           + '<div style="font-size:12px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name||'—')+'</div>'
           + '<div style="font-size:10px;color:var(--txt3);margin-top:1px">'+(typ?esc(typ):'')+(lieu?' · '+esc(lieu):'')+(dur2?' · '+dur2:'')+'</div>'
           + '</div>'
-          + '<button onclick="event.stopPropagation();closeAgenda();openCompDetail(\''+c.id+'\')" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;flex-shrink:0">Ouvrir</button>';
-        (function(comp){ card.onclick = function(){ _agendaHighlightComp(comp.id); }; })(c);
+          + '<button onclick="event.stopPropagation();_compFromAgenda=true;closeAgenda();openCompDetail(\''+c.id+'\')" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;flex-shrink:0">Ouvrir</button>';
+        (function(comp){ card.onclick = function(){ _compFromAgenda=true; closeAgenda(); openCompDetail(comp.id); }; })(c);
       }
 
       card.onmouseover = function(){ this.style.background=color+'28'; };
       card.onmouseout  = function(){ this.style.background=color+'18'; };
       tl.adArea.appendChild(card);
     });
-  } else {
+  } else if (!timedEvts.length) {
     tl.adArea.style.cssText += 'display:flex;align-items:center;justify-content:center;';
     tl.adArea.innerHTML = '<span style="font-size:11px;color:var(--txt3)">Aucun événement ce jour</span>';
   }
+
+  // ── Événements horodatés : blocs positionnés dans la grille temporelle ──
+  timedEvts.forEach(function(c) {
+    var color = _agendaColor(c);
+    var hd = c.heureDebut.split(':'), hf = c.heureFin ? c.heureFin.split(':') : null;
+    var startH = parseInt(hd[0]) + parseInt(hd[1])/60;
+    var endH   = hf ? (parseInt(hf[0]) + parseInt(hf[1])/60) : startH + 1;
+    if (endH <= startH) endH = startH + 0.5;
+    var topPct    = tl.hP(startH);
+    var hgtPct    = tl.dhP(endH - startH);
+    var blk = document.createElement('div');
+    blk.style.cssText = 'position:absolute;left:4px;right:4px;top:'+topPct+';height:'+hgtPct
+      +';background:'+color+';border-radius:6px;padding:4px 8px;cursor:pointer;z-index:2;overflow:hidden'
+      +';box-shadow:0 1px 4px rgba(0,0,0,.18);transition:filter .12s';
+    var _dBlkNm = (c.name||'') + (c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '');
+    blk.innerHTML = '<div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(_agendaAbbrev(_dBlkNm))+'</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+c.heureDebut+(c.heureFin?' – '+c.heureFin:'')+' · Planning</div>';
+    blk.title = (c.name||'')+(c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '')+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
+    blk.onmouseover = function(){ this.style.filter='brightness(1.12)'; };
+    blk.onmouseout  = function(){ this.style.filter=''; };
+    (function(ev){ blk.onclick = function(){
+      if (ev._compId) { openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
+    }; })(c);
+    tl.evArea.appendChild(blk);
+  });
 
   // Fond "aujourd'hui" dans la zone horaire
   if (isToday) {
@@ -7151,12 +7685,6 @@ function _agendaRenderDay() {
 
   // ── Ligne "maintenant" ──
   if (isToday) _agendaShowNowLine(tl.evArea);
-
-  // ── Scroll auto vers l'heure courante ──
-  requestAnimationFrame(function(){
-    var now = new Date();
-    tl.body.scrollTop = Math.max(0, (now.getHours() - 1) * _AG_HOUR_H - 30);
-  });
 }
 
 function _agendaRenderList() {
@@ -7198,9 +7726,9 @@ function _agendaRenderList() {
         dur = Math.round((dt-df)/86400000)+1+' j';
       }
       var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
-      var rowClick = e._ganttSt
-        ? '_agendaSelectDate(\''+e.dateFrom+'\')'
-        : '_agendaSelectDate(\''+e.dateFrom+'\');_agendaHighlightComp(\''+e.id+'\')';
+      var rowClick = (e._ganttSt && e._compId)
+        ? 'openGanttModal(\''+e._compId+'\');_ganttState.fromAgenda=true'+(e._taskId?';openGanttTaskDialog(\''+e._compId+'\',\''+e._taskId+'\')':'')
+        : '_compFromAgenda=true;closeAgenda();openCompDetail(\''+e.id+'\')';
       var subtitle = e._ganttSt
         ? [e._taskTitre, e._compNom].filter(Boolean).join(' · ')
         : [typ, lieu].filter(Boolean).join(' · ');
@@ -7330,8 +7858,8 @@ function _agendaShowSide(dateStr, dayComps) {
       + (dFrom ? '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt3);margin-bottom:'+(durée?'2px':'9px')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'+esc(dFrom===dTo?dFrom:dFrom+' → '+dTo)+'</div>' : '')
       + (durée ? '<div style="font-size:10px;color:var(--txt3);margin-bottom:9px;padding-left:15px">'+esc(durée)+'</div>' : '')
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-      + '<button onclick="closeAgenda();editComp(\''+c.id+'\')" style="padding:7px 0;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✏️ Modifier</button>'
-      + '<button onclick="closeAgenda();openCompDetail(\''+c.id+'\')" style="padding:7px 0;border-radius:8px;border:1px solid var(--bdr);background:rgba(255,255,255,.04);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">👁 Ouvrir</button>'
+      + '<button onclick="_compFromAgenda=true;closeAgenda();editComp(\''+c.id+'\')" style="padding:7px 0;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✏️ Modifier</button>'
+      + '<button onclick="_compFromAgenda=true;closeAgenda();openCompDetail(\''+c.id+'\')" style="padding:7px 0;border-radius:8px;border:1px solid var(--bdr);background:rgba(255,255,255,.04);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">👁 Ouvrir</button>'
       + '</div>'
       + '</div></div>';
   }).join('');
@@ -13492,23 +14020,21 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           htmlR += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 4px">';
           if (entry) {
             if (g.isBi) {
-              // ── Biplace : deux grands avatars côte à côte ──
-              htmlR += '<div style="display:flex;gap:6px;justify-content:center;align-items:center">';
-              htmlR += _avtr(entry.pilot,    76, col);
-              htmlR += _avtr(entry.navPilot, 76, col);
-              htmlR += '</div>';
-              // Médaille à gauche + les deux noms empilés à droite
+              // ── Biplace : deux avatars compacts côte à côte (42px pour tenir dans flex:1) ──
               var licP = (entry.pilot||{}).licence||'';
               var licN = (entry.navPilot||{}).licence||'';
-              /* Même structure que monoplace : flex gap:5px médaille + noms */
-              htmlR += '<div style="display:flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap">';
-              htmlR += '<span style="font-size:28px;line-height:1;flex-shrink:0">'+emo+'</span>';
-              htmlR += '<div style="display:flex;flex-direction:column;gap:1px;align-items:center;text-align:center;min-width:0">';
-              htmlR += '<div style="font-size:11px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word">'+_pname(entry.pilot)+'</div>';
-              if (licP) htmlR += '<div style="font-size:9px;color:var(--txt3)">Lic. '+licP+'</div>';
-              htmlR += '<div style="font-size:11px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word;margin-top:2px">'+(entry.navPilot ? _pname(entry.navPilot) : '—')+'</div>';
-              if (licN) htmlR += '<div style="font-size:9px;color:var(--txt3)">Lic. '+licN+'</div>';
+              htmlR += '<div style="display:flex;gap:4px;justify-content:center;align-items:center">';
+              htmlR += _avtr(entry.pilot,    42, col);
+              htmlR += _avtr(entry.navPilot, 42, col);
               htmlR += '</div>';
+              // Médaille + noms empilés
+              htmlR += '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center">';
+              htmlR += '<span style="font-size:20px;line-height:1">'+emo+'</span>';
+              htmlR += '<div style="font-size:10px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word;max-width:100%">'+_pname(entry.pilot)+'</div>';
+              if (licP) htmlR += '<div style="font-size:9px;color:var(--txt3)">'+licP+'</div>';
+              htmlR += '<div style="font-size:9px;color:var(--txt3);margin:1px 0">+</div>';
+              htmlR += '<div style="font-size:10px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word;max-width:100%">'+(entry.navPilot ? _pname(entry.navPilot) : '—')+'</div>';
+              if (licN) htmlR += '<div style="font-size:9px;color:var(--txt3)">'+licN+'</div>';
               htmlR += '</div>';
             } else {
               // ── Mono : grand avatar ──
@@ -13542,12 +14068,47 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
 
     // ── Podium ──
+    // Construire immat→[pid] pour identifier les paires biplaces
+    var _podImmatMap = {};
+    enrolled.forEach(function(pid){
+      var _ux = ((S.ulms||{})[pid]||[])[0]||{};
+      var im = (_ux.immat||'').trim();
+      if (im) { if (!_podImmatMap[im]) _podImmatMap[im]=[]; _podImmatMap[im].push(pid); }
+    });
+    var _biCatSetP = {PF2:1,PL2:1,AW2:1,WL2:1,GP2:1};
+    var _isPodBiplace = function(pid) {
+      var pp = (S.pilots||[]).find(function(p){return p.id===pid;})||{};
+      var cat = (pp.categorie||'').trim();
+      return !!(_biCatSetP[cat] || pp.equipage==='Biplace');
+    };
+    var _podNavOf = function(pid) {
+      var _ux = ((S.ulms||{})[pid]||[])[0]||{};
+      var im = (_ux.immat||'').trim();
+      if (!im) return null;
+      var partners = _podImmatMap[im]||[];
+      return partners.find(function(pid2){
+        if (pid2===pid) return false;
+        var pp2 = (S.pilots||[]).find(function(p){return p.id===pid2;})||{};
+        return pp2.role==='Navigateur';
+      }) || null;
+    };
     var byPilotR = {};
+    var _podNavSeen = {};   // navigateurs déjà absorbés dans leur pilote
     runs.forEach(function(r){
       var sc = parseFloat(r.score);
       if (!isNaN(sc)) {
         if (!byPilotR[r.pilotId] || sc < byPilotR[r.pilotId].score)
           byPilotR[r.pilotId] = {score:sc, classe:r.classe||'multiaxes'};
+      }
+    });
+    // Supprimer les navigateurs des biplaces (leur score est déjà dans le pilote)
+    Object.keys(byPilotR).forEach(function(pid){
+      if (_podNavSeen[pid]) return;
+      if (_isPodBiplace(pid)) {
+        var pp = (S.pilots||[]).find(function(p){return p.id===pid;})||{};
+        if (pp.role==='Navigateur') { _podNavSeen[pid]=true; delete byPilotR[pid]; return; }
+        var navId = _podNavOf(pid);
+        if (navId) { _podNavSeen[navId]=true; delete byPilotR[navId]; }
       }
     });
     var CLSPOD = {multiaxes:{label:'Classe 3 · Multiaxes',color:'#22c55e',order:0},gyro:{label:'Classe 4 · Autogire',color:'#f59e0b',order:1},pendulaire:{label:'Classe 2 · Pendulaire',color:'#3b82f6',order:2}};
@@ -13558,8 +14119,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     Object.keys(byPilotR).forEach(function(pid){
       var info = byPilotR[pid];
       var pilot = (S.pilots||[]).find(function(p){return p.id===pid;})||{};
+      var navId = _isPodBiplace(pid) ? _podNavOf(pid) : null;
+      var nav   = navId ? ((S.pilots||[]).find(function(p){return p.id===navId;})||null) : null;
       if (!byClassR[info.classe]) byClassR[info.classe]=[];
-      byClassR[info.classe].push({pid:pid,score:info.score,pilot:pilot});
+      byClassR[info.classe].push({pid:pid, score:info.score, pilot:pilot, nav:nav, isBi:!!nav});
     });
     Object.keys(byClassR).forEach(function(cls){byClassR[cls].sort(function(a,b){return a.score-b.score;});});
     var classKeysR = Object.keys(byClassR).sort(function(a,b){return ((CLSPOD[a]||{order:9}).order)-((CLSPOD[b]||{order:9}).order);});
@@ -13583,12 +14146,29 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var item=top3[rankIdx], rank=rankIdx+1, color=podColors[rankIdx], blockH=podHeights[rankIdx];
         var name=((item.pilot.prenom||'')+' '+(item.pilot.nom||'')).trim()||'—';
         htmlR += '<div style="flex:1;max-width:150px;display:flex;flex-direction:column;align-items:center">';
-        if (item.pilot.photo) {
-          htmlR += '<img src="'+item.pilot.photo+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid '+color+';margin-bottom:5px" onerror="this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px&quot;>👤</div>\'">';
+        if (item.isBi) {
+          // ── Biplace : deux petits avatars côte à côte ──
+          var navName = item.nav ? ((item.nav.prenom||'')+' '+(item.nav.nom||'')).trim() : '—';
+          htmlR += '<div style="display:flex;gap:3px;justify-content:center;margin-bottom:5px">';
+          if (item.pilot.photo) htmlR += '<img src="'+item.pilot.photo+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid '+color+'" onerror="this.outerHTML=\'<div style=&quot;width:36px;height:36px;border-radius:50%;background:#e2e8f0;border:2px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:16px&quot;>👤</div>\'">';
+          else htmlR += '<div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;border:2px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>';
+          if (item.nav) {
+            if (item.nav.photo) htmlR += '<img src="'+item.nav.photo+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid '+color+'" onerror="this.outerHTML=\'<div style=&quot;width:36px;height:36px;border-radius:50%;background:#e2e8f0;border:2px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:16px&quot;>👤</div>\'">';
+            else htmlR += '<div style="width:36px;height:36px;border-radius:50%;background:#e2e8f0;border:2px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:16px">👤</div>';
+          }
+          htmlR += '</div>';
+          htmlR += '<div style="font-size:10px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:1px;padding:0 2px;word-break:break-word">'+name+'</div>';
+          htmlR += '<div style="font-size:9px;color:#64748b;margin-bottom:1px">+</div>';
+          htmlR += '<div style="font-size:10px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:2px;padding:0 2px;word-break:break-word">'+navName+'</div>';
         } else {
-          htmlR += '<div style="width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px">👤</div>';
+          // ── Mono ──
+          if (item.pilot.photo) {
+            htmlR += '<img src="'+item.pilot.photo+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid '+color+';margin-bottom:5px" onerror="this.outerHTML=\'<div style=&quot;width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px&quot;>👤</div>\'">';
+          } else {
+            htmlR += '<div style="width:52px;height:52px;border-radius:50%;background:#e2e8f0;border:3px solid '+color+';display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:5px">👤</div>';
+          }
+          htmlR += '<div style="font-size:11px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:2px;padding:0 4px;word-break:break-word">'+name+'</div>';
         }
-        htmlR += '<div style="font-size:11px;font-weight:700;text-align:center;color:#1e293b;line-height:1.3;margin-bottom:2px;padding:0 4px;word-break:break-word">'+name+'</div>';
         htmlR += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">'+item.score.toFixed(2)+'s</div>';
         htmlR += '<div style="width:100%;height:'+blockH+'px;background:#fff;border:1.5px solid #3b82f6;border-radius:6px 6px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">';
         if (rank===1&&appLogo) htmlR += '<img src="'+appLogo+'" style="width:22px;height:22px;border-radius:50%;object-fit:contain;background:#fff;margin-bottom:2px" onerror="this.style.display=\'none\'">';
@@ -13617,9 +14197,40 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       if (!byClassPilot[cls][r.pilotId]) byClassPilot[cls][r.pilotId] = {essais:[],qualif:[],finale:[]};
       byClassPilot[cls][r.pilotId][bucket].push(r);
     });
+    // Supprimer les navigateurs biplaces du classement (absorbés dans leur pilote)
+    var _clsNavSeen = {};
+    var _clsBiCatSet = {PF2:1,PL2:1,AW2:1,WL2:1,GP2:1};
+    var _clsIsBi = function(pid){
+      var pp=(S.pilots||[]).find(function(p){return p.id===pid;})||{};
+      return !!(_clsBiCatSet[(pp.categorie||'').trim()]||pp.equipage==='Biplace');
+    };
+    var _clsNavOf = function(pid){
+      var _ux=((S.ulms||{})[pid]||[])[0]||{};
+      var im=(_ux.immat||'').trim(); if(!im) return null;
+      var partners=(_podImmatMap[im]||[]);
+      return partners.find(function(pid2){
+        if(pid2===pid) return false;
+        return ((S.pilots||[]).find(function(p){return p.id===pid2;})||{}).role==='Navigateur';
+      })||null;
+    };
+    Object.keys(byClassPilot).forEach(function(cls){
+      Object.keys(byClassPilot[cls]).forEach(function(pid){
+        if(_clsNavSeen[pid]) return;
+        if(_clsIsBi(pid)){
+          var pp=(S.pilots||[]).find(function(p){return p.id===pid;})||{};
+          if(pp.role==='Navigateur'){ _clsNavSeen[pid]=true; delete byClassPilot[cls][pid]; return; }
+          var navId=_clsNavOf(pid);
+          if(navId){ _clsNavSeen[navId]=true; delete byClassPilot[cls][navId]; }
+        }
+      });
+    });
     var medals2 = ['🥇','🥈','🥉'];
     var ckeys2 = Object.keys(byClassPilot).sort(function(a,b){return ((CLSR[a]||{order:9}).order)-((CLSR[b]||{order:9}).order);});
-    var COL = 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
+    var _isMob = window.innerWidth < 768;
+    // Grille mobile compacte (sans colonnes Essais/Qualif), desktop complète
+    var COL    = _isMob
+      ? 'grid-template-columns:24px minmax(0,1fr) 58px'
+      : 'grid-template-columns:28px minmax(0,1fr) 66px 66px 66px 70px';
     ckeys2.forEach(function(cls){
       var meta = CLSR[cls]||{label:cls,color:'#64748b'};
       var pilotMap = byClassPilot[cls];
@@ -13636,12 +14247,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlR += '<span class="ra" style="color:var(--txt3);font-size:14px">▼</span>';
       htmlR += '</button>';
       htmlR += '<div id="'+clsBodyId+'" style="padding-top:6px">';
+      // En-tête colonnes
       htmlR += '<div style="display:grid;'+COL+';gap:0;padding:4px 8px 6px;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);margin-bottom:2px">';
-      htmlR += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
+      if (_isMob) {
+        htmlR += '<div></div><div>Nom</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
+      } else {
+        htmlR += '<div></div><div>Nom</div><div style="text-align:center">Essais</div><div style="text-align:center">Qualif</div><div style="text-align:center">Finale</div><div style="text-align:center;color:var(--stol)">Temps ↓</div>';
+      }
       htmlR += '</div>';
       pilotIds.forEach(function(pid, i){
         var pilot = (S.pilots||[]).find(function(p){return p.id===pid;})||{prenom:'?',nom:'?'};
         var pr = pilotMap[pid];
+        var isBiPilot = _clsIsBi(pid);
+        var navId2 = isBiPilot ? _clsNavOf(pid) : null;
+        var nav2   = navId2 ? ((S.pilots||[]).find(function(p){return p.id===navId2;})||null) : null;
         var getBestPhase = function(arr){
           var scores = arr.map(function(r){return parseFloat(r.score)||0;}).filter(function(v){return v>0;});
           return scores.length ? Math.min.apply(null,scores) : null;
@@ -13652,13 +14271,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var overall = getBest(pid);
         var fmt = function(v){ return v!==null ? v.toFixed(2)+'s' : '—'; };
         var isEven = i%2===1;
+        var pilotNameHtml = (pilot.prenom||'')+' '+(pilot.nom||'');
+        if (nav2) pilotNameHtml += '<div style="font-size:10px;color:var(--txt3);font-weight:500;line-height:1.2">+ '+(nav2.prenom||'')+' '+(nav2.nom||'')+'</div>';
         htmlR += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" title="Voir le profil" style="display:grid;'+COL+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
-        htmlR += '<div style="font-size:13px;text-align:center">'+(medals2[i]||((i+1)+'.'))+'</div>';
-        htmlR += '<div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pilot.prenom||'')+' '+(pilot.nom||'')+'</div>';
-        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
-        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
-        htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
-        htmlR += '<div style="font-size:13px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
+        htmlR += '<div style="font-size:12px;text-align:center">'+(medals2[i]||((i+1)+'.'))+'</div>';
+        htmlR += '<div style="font-size:12px;font-weight:700;overflow:hidden;'+(nav2?'':'text-overflow:ellipsis;white-space:nowrap')+'">'+pilotNameHtml+'</div>';
+        if (!_isMob) {
+          htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(essaisB)+'</div>';
+          htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(qualifB)+'</div>';
+          htmlR += '<div style="font-size:12px;text-align:center;color:var(--txt2)">'+fmt(finaleB)+'</div>';
+        }
+        htmlR += '<div style="font-size:12px;text-align:center;font-weight:800;color:var(--stol)">'+(overall<9999?overall.toFixed(2)+'s':'—')+'</div>';
         htmlR += '</div>';
       });
       htmlR += '</div></div>';
@@ -24667,7 +25290,7 @@ function quitterApp() {
   if (dtn) dtn.style.display = 'none';
   var app = document.getElementById('app');
   if (app) app.style.display = 'none';
-  ['page-securite','page-acces','page-territoires'].forEach(function(id){
+  ['page-securite','page-formations','page-acces','page-territoires'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.style.display = 'none';
   });
   // Sortir du plein écran si actif
@@ -28811,7 +29434,7 @@ function refreshAllFromLicenceDB() {
    GANTT — Planning des tâches par compétition
 ══════════════════════════════════════════════════════════════════ */
 
-var _ganttState = { compId: null, filter: '', globalMode: false, tmpCoequipiers: [], tmpSousTaches: [], tmpPartenaires: [], stEditIdx: -1, zoom: 28 };
+var _ganttState = { compId: null, filter: '', globalMode: false, tmpCoequipiers: [], tmpSousTaches: [], tmpPartenaires: [], stEditIdx: -1, zoom: 28, fromAgenda: false };
 var _ganttDragSrcId = null, _ganttDragCid = null;
 
 // ── Helpers internes ──────────────────────────────────────────────
@@ -29298,8 +29921,12 @@ function openGanttTaskDialog(compId, taskId) {
   right += '</select>';
   right += '<select id="gt-st-part" style="'+iSt+'">'+_stPartOpts+'</select>';
   right += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  right += '<div><label style="'+lSt+'">Début</label><input id="gt-st-deb" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+' onchange="(function(){var f=document.getElementById(\'gt-st-fin\');if(f&&!f.value)f.value=this.value;}).call(this)"></div>';
-  right += '<div><label style="'+lSt+'">Fin</label><input id="gt-st-fin" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+'></div>';
+  right += '<div><label style="'+lSt+'">Date début</label><input id="gt-st-deb" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+' onchange="(function(){var f=document.getElementById(\'gt-st-fin\');if(f&&!f.value)f.value=this.value;}).call(this)"></div>';
+  right += '<div><label style="'+lSt+'">Date fin</label><input id="gt-st-fin" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+'></div>';
+  right += '</div>';
+  right += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  right += '<div><label style="'+lSt+'">🕐 Horaire de</label><input id="gt-st-hdeb" type="time" style="'+iSt+'"></div>';
+  right += '<div><label style="'+lSt+'">🕐 Horaire à</label><input id="gt-st-hfin" type="time" style="'+iSt+'"></div>';
   right += '</div>';
   right += '<div style="display:flex;gap:7px">';
   right += '<button id="gt-st-cancel" onclick="_ganttCancelStEdit()" style="display:none;flex:1;padding:7px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✕ Annuler</button>';
@@ -29342,6 +29969,11 @@ function _ganttCloseTaskDlg() {
   _ganttState.tmpSousTaches = [];
   _ganttState.tmpPartenaires = [];
   _ganttState.stEditIdx = -1;
+  // Si ouvert depuis l'agenda : fermer aussi le panneau Gantt → l'agenda redevient visible
+  if (_ganttState.fromAgenda) {
+    _ganttState.fromAgenda = false;
+    closeGanttModal();
+  }
 }
 
 function _ganttRenderCoequipierChips() {
@@ -29420,11 +30052,13 @@ function _ganttEditSousTache(idx) {
   if (!st) return;
   _ganttState.stEditIdx = idx;
   // Remplir le formulaire
-  var tEl = document.getElementById('gt-st-titre');   if(tEl)  tEl.value  = st.titre||'';
-  var pEl = document.getElementById('gt-st-pilote');  if(pEl)  pEl.value  = st.piloteId||'';
-  var ptEl= document.getElementById('gt-st-part');    if(ptEl) ptEl.value = st.partId||'';
-  var dEl = document.getElementById('gt-st-deb');     if(dEl)  dEl.value  = st.dateDebut||'';
-  var fEl = document.getElementById('gt-st-fin');     if(fEl)  fEl.value  = st.dateFin||'';
+  var tEl  = document.getElementById('gt-st-titre');  if(tEl)  tEl.value  = st.titre||'';
+  var pEl  = document.getElementById('gt-st-pilote'); if(pEl)  pEl.value  = st.piloteId||'';
+  var ptEl = document.getElementById('gt-st-part');   if(ptEl) ptEl.value = st.partId||'';
+  var dEl  = document.getElementById('gt-st-deb');    if(dEl)  dEl.value  = st.dateDebut||'';
+  var fEl  = document.getElementById('gt-st-fin');    if(fEl)  fEl.value  = st.dateFin||'';
+  var hdEl = document.getElementById('gt-st-hdeb');   if(hdEl) hdEl.value = st.heureDebut||'';
+  var hfEl = document.getElementById('gt-st-hfin');   if(hfEl) hfEl.value = st.heureFin||'';
   // Mettre à jour les labels
   var ft = document.getElementById('gt-st-form-title'); if(ft) ft.textContent = 'Modifier la sous-tâche #'+(idx+1);
   var sb = document.getElementById('gt-st-submit');     if(sb) sb.textContent = '✔ Enregistrer la modification';
@@ -29435,11 +30069,13 @@ function _ganttEditSousTache(idx) {
 
 function _ganttCancelStEdit() {
   _ganttState.stEditIdx = -1;
-  var tEl = document.getElementById('gt-st-titre');   if(tEl)  tEl.value  = '';
-  var pEl = document.getElementById('gt-st-pilote');  if(pEl)  pEl.value  = '';
-  var ptEl= document.getElementById('gt-st-part');    if(ptEl) ptEl.value = '';
-  var dEl = document.getElementById('gt-st-deb');     if(dEl)  dEl.value  = '';
-  var fEl = document.getElementById('gt-st-fin');     if(fEl)  fEl.value  = '';
+  var tEl  = document.getElementById('gt-st-titre');  if(tEl)  tEl.value  = '';
+  var pEl  = document.getElementById('gt-st-pilote'); if(pEl)  pEl.value  = '';
+  var ptEl = document.getElementById('gt-st-part');   if(ptEl) ptEl.value = '';
+  var dEl  = document.getElementById('gt-st-deb');    if(dEl)  dEl.value  = '';
+  var fEl  = document.getElementById('gt-st-fin');    if(fEl)  fEl.value  = '';
+  var hdEl = document.getElementById('gt-st-hdeb');   if(hdEl) hdEl.value = '';
+  var hfEl = document.getElementById('gt-st-hfin');   if(hfEl) hfEl.value = '';
   var ft = document.getElementById('gt-st-form-title'); if(ft) ft.textContent = 'Nouvelle sous-tâche';
   var sb = document.getElementById('gt-st-submit');     if(sb) sb.textContent = '+ Ajouter la sous-tâche';
   var cb = document.getElementById('gt-st-cancel');     if(cb) cb.style.display = 'none';
@@ -29488,6 +30124,7 @@ function _ganttRenderSousTaches() {
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:12px;font-weight:600;color:var(--txt1)">'+_gEsc(st.titre||'Sans titre')+'</div>';
     var meta = _gEsc(deb)+' → '+_gEsc(fin);
+    if (st.heureDebut) meta += ' · 🕐 '+_gEsc(st.heureDebut)+(st.heureFin?' → '+_gEsc(st.heureFin):'');
     if (st.piloteNom) meta += ' · '+_gEsc(st.piloteNom);
     if (st.partNom)   meta += ' · 🤝 '+_gEsc(st.partNom);
     html += '<div style="font-size:10px;color:var(--txt3)">'+meta+'</div>';
@@ -29510,6 +30147,8 @@ function _ganttAddSousTache() {
   var partEl   = document.getElementById('gt-st-part');
   var debEl    = document.getElementById('gt-st-deb');
   var finEl    = document.getElementById('gt-st-fin');
+  var hdebEl   = document.getElementById('gt-st-hdeb');
+  var hfinEl   = document.getElementById('gt-st-hfin');
   if (!titreEl) return;
   var titre = (titreEl.value||'').trim();
   if (!titre) { toast('Le titre de la sous-tâche est obligatoire','err'); titreEl.focus(); return; }
@@ -29521,14 +30160,17 @@ function _ganttAddSousTache() {
   }
   var partId  = partEl ? partEl.value : '';
   var partNom = partEl && partEl.value ? ((partEl.options[partEl.selectedIndex]||{}).text||'').trim() : '';
-  var deb = debEl ? debEl.value : '';
-  var fin = finEl ? finEl.value : '';
+  var deb  = debEl  ? debEl.value  : '';
+  var fin  = finEl  ? finEl.value  : '';
+  var hdeb = hdebEl ? hdebEl.value : '';
+  var hfin = hfinEl ? hfinEl.value : '';
   if (deb && fin && deb > fin) { toast('Date début > date fin','err'); return; }
+  if (hdeb && hfin && deb === fin && hdeb > hfin) { toast('Horaire de début > horaire de fin','err'); return; }
   var editIdx = _ganttState.stEditIdx;
   if (editIdx >= 0 && editIdx < _ganttState.tmpSousTaches.length) {
     // Mode édition : mettre à jour la sous-tâche existante
     var existing = _ganttState.tmpSousTaches[editIdx];
-    Object.assign(existing, {titre:titre, piloteId:piloteId, piloteNom:piloteNom, partId:partId, partNom:partNom, dateDebut:deb, dateFin:fin});
+    Object.assign(existing, {titre:titre, piloteId:piloteId, piloteNom:piloteNom, partId:partId, partNom:partNom, dateDebut:deb, dateFin:fin, heureDebut:hdeb, heureFin:hfin});
     _ganttState.stEditIdx = -1;
     var ft = document.getElementById('gt-st-form-title'); if(ft) ft.textContent='Nouvelle sous-tâche';
     var sb = document.getElementById('gt-st-submit'); if(sb) sb.textContent='+ Ajouter la sous-tâche';
@@ -29536,14 +30178,16 @@ function _ganttAddSousTache() {
   } else {
     // Mode ajout
     var id = 'st_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-    _ganttState.tmpSousTaches.push({id:id, titre:titre, piloteId:piloteId, piloteNom:piloteNom, partId:partId, partNom:partNom, dateDebut:deb, dateFin:fin});
+    _ganttState.tmpSousTaches.push({id:id, titre:titre, piloteId:piloteId, piloteNom:piloteNom, partId:partId, partNom:partNom, dateDebut:deb, dateFin:fin, heureDebut:hdeb, heureFin:hfin});
   }
   // Réinitialiser le formulaire
   titreEl.value = '';
-  if (piloteEl) piloteEl.value = '';
-  if (partEl)   partEl.value   = '';
-  if (debEl) debEl.value = '';
-  if (finEl) finEl.value = '';
+  if (piloteEl)  piloteEl.value  = '';
+  if (partEl)    partEl.value    = '';
+  if (debEl)     debEl.value     = '';
+  if (finEl)     finEl.value     = '';
+  if (hdebEl)    hdebEl.value    = '';
+  if (hfinEl)    hfinEl.value    = '';
   _ganttRenderSousTaches();
   titreEl.focus();
 }
@@ -29586,9 +30230,11 @@ function saveGanttTask(compId, taskId, isNew) {
     var t = S.ganttTasks[compId].find(function(x){return x.id===taskId;});
     if (t) { Object.assign(t, rec); t._updatedAt = Date.now(); }
   }
+  var _wasFromAgenda = _ganttState.fromAgenda; // capturer avant que _ganttCloseTaskDlg le remette à false
   _ganttCloseTaskDlg();
   saveState(); if(typeof silentPush==='function') silentPush();
   _renderGantt(true);
+  if (_wasFromAgenda && typeof _agendaRender === 'function') _agendaRender(); // rafraîchir l'agenda
   toast(isNew?'Tâche créée ✓':'Tâche mise à jour ✓','ok');
 }
 
@@ -29597,9 +30243,11 @@ function deleteGanttTask(compId, taskId) {
   if (S.ganttTasks&&S.ganttTasks[compId]) {
     S.ganttTasks[compId] = S.ganttTasks[compId].filter(function(t){return t.id!==taskId;});
   }
+  var _wasFromAgenda2 = _ganttState.fromAgenda;
   _ganttCloseTaskDlg();
   saveState(); if(typeof silentPush==='function') silentPush();
   _renderGantt(true);
+  if (_wasFromAgenda2 && typeof _agendaRender === 'function') _agendaRender();
   toast('Tâche supprimée','');
 }
 
@@ -34283,7 +34931,7 @@ function showDTNPortal() {
   if (_homeTodoPanelOpen)  toggleHomeTodoPanel(false);
   // Cacher l'app principale et les pages modules
   document.getElementById('app').style.display = 'none';
-  ['page-securite','page-acces','page-territoires'].forEach(function(id){
+  ['page-securite','page-formations','page-acces','page-territoires'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -34310,7 +34958,11 @@ function showDTNPortal() {
   // Afficher le portail
   var dtn = document.getElementById('page-dtn');
   if (dtn) dtn.style.display = 'flex';
+  // Rafraîchir les stats live
+  _dtnRefreshStats();
 }
+
+function _dtnRefreshStats() { /* réservé */ }
 
 function openDTNModule(module) {
   _fromDTN = true;
@@ -34351,7 +35003,7 @@ function openDTNModule(module) {
     updateHeader();
   } else {
     // Ouvrir une page module vierge
-    var pageMap = { securite:'page-securite', acces:'page-acces', territoires:'page-territoires' };
+    var pageMap = { securite:'page-securite', acces:'page-acces', territoires:'page-territoires', formations:'page-formations' };
     var pid = pageMap[module];
     if (pid) {
       var el = document.getElementById(pid);
