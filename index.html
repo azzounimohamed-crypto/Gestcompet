@@ -513,7 +513,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
   /* ═══ PAGE ACCUEIL : détail pleine largeur + tiroir compétitions ═══ */
   #page-home.active{display:block!important;position:relative;height:calc(100vh - 108px);overflow:visible}
-  #page-comp-detail.active{display:flex!important;flex-direction:column;height:calc(100vh - 60px);overflow:hidden}
+  #page-comp-detail.active{display:flex!important;flex-direction:row;height:calc(100vh - 60px);overflow:hidden}
   /* ── Panneau flottant déplaçable (Documents & À faire) ── */
   #home-col-left,#home-todo-panel{
     position:fixed;left:20px;top:120px;
@@ -847,7 +847,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       Base
     </button>
     <!-- Logo cercle blanc — visible mobile + desktop -->
-    <div id="header-logo-wrap" style="width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.22);cursor:pointer" onclick="showDTNPortal()" title="Accueil Gest'DTN">
+    <div id="header-logo-wrap" style="width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.22);cursor:pointer" onclick="if(window.innerWidth>=768){showDTNPortal();}else{showPage('page-home');}" title="Accueil">
       <img id="header-logo-img" style="width:42px;height:42px;object-fit:contain;display:none" src="" onerror="this.style.display='none';document.getElementById('header-logo-fallback').style.display='flex'">
       <div id="header-logo-fallback" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center">
         <img src="https://ffplum.fr/templates/ffplum/images/logo.png" style="width:38px;height:38px;object-fit:contain" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:9px;font-weight:800;color:#003399;text-align:center;line-height:1.1\'>FF<br>PLUM</span>'">
@@ -1223,18 +1223,16 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
     <!-- PAGE DÉTAIL COMPÉTITION (pleine largeur + sidebar DTN) -->
     <div class="page" id="page-comp-detail" style="overflow:hidden">
-      <div style="display:flex;height:100%;overflow:hidden">
-        <!-- Corps principal de la compétition -->
-        <div id="comp-detail-body" style="flex:1;display:flex;flex-direction:column;height:100%;overflow:hidden;min-width:0"></div>
-        <!-- Panneau droit : À faire / Documents -->
-        <div id="comp-right-panel" style="width:0;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;transition:width .22s cubic-bezier(.22,.9,.2,1);background:var(--navy2);border-left:0px solid var(--bdr)">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px 10px;border-bottom:1px solid var(--bdr);flex-shrink:0">
-            <span id="crp-title" style="font-size:13px;font-weight:800;color:var(--txt)"></span>
-            <button onclick="_crpClose()" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;cursor:pointer;font-family:inherit" title="Fermer">✕</button>
-          </div>
-          <div id="crp-body" style="flex:1;overflow-y:auto;min-height:0;padding:12px 12px 6px"></div>
-          <div id="crp-footer" style="flex-shrink:0;padding:9px 11px;border-top:1px solid var(--bdr)"></div>
+      <!-- Corps principal de la compétition — flex:1 dans la ligne flex-row de page-comp-detail.active -->
+      <div id="comp-detail-body" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden"></div>
+      <!-- Panneau droit : À faire / Documents — caché (display:none) par défaut, montré via JS -->
+      <div id="comp-right-panel" style="display:none;width:280px;flex-shrink:0;flex-direction:column;overflow:hidden;background:var(--navy2);border-left:1px solid var(--bdr)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px 10px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+          <span id="crp-title" style="font-size:13px;font-weight:800;color:var(--txt)"></span>
+          <button onclick="_crpClose()" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;cursor:pointer;font-family:inherit" title="Fermer">✕</button>
         </div>
+        <div id="crp-body" style="flex:1;overflow-y:auto;min-height:0;padding:12px 12px 6px"></div>
+        <div id="crp-footer" style="flex-shrink:0;padding:9px 11px;border-top:1px solid var(--bdr)"></div>
       </div>
     </div>
 
@@ -2361,7 +2359,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- À faire -->
       <button id="dtn-sub-todo" onclick="_crpToggle('todo')"
         style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
-        onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt2)'">
+        onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_crpBtnOut('todo')">
         <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
         À faire
       </button>
@@ -2369,7 +2367,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- Documents -->
       <button id="dtn-sub-docs" onclick="_crpToggle('docs')"
         style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
-        onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt2)'">
+        onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_crpBtnOut('docs')">
         <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Documents
       </button>
@@ -2541,7 +2539,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 <input type="file" id="gantt-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importGantt(this)">
 
 <!-- GANTT : dialog tâche -->
-<div id="gantt-task-dlg" style="display:none;position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)" onclick="if(event.target===this)_ganttCloseTaskDlg()">
+<div id="gantt-task-dlg" style="display:none;position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)" onclick="if(event.target===this)_ganttCloseTaskDlg()">
   <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:900px;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr)">
       <span id="gantt-dlg-title" style="font-size:15px;font-weight:800">Nouvelle tâche</span>
@@ -4129,7 +4127,7 @@ function clearLocalStorageQuota() {
   try {
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_ENROLL && k !== LS_ENROLL_META && _COL_KEYS.indexOf(k) === -1) { localStorage.removeItem(k); return; }
+      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== 'geststol_agenda_colors' && k !== 'geststol_agenda_window' && _COL_KEYS.indexOf(k) === -1) { localStorage.removeItem(k); return; }
     });
     // Retirer les photos des pilotes dans S
     if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
@@ -12364,8 +12362,14 @@ function showHomeCompDetail(compId) {
     if (_tools) _tools.style.display = 'block';
     var cb = document.getElementById('comp-detail-body');
     if (cb) {
-      cb.style.cssText = 'flex:1;display:flex;flex-direction:column;height:100%;overflow:hidden;min-width:0';
+      cb.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden';
       renderHomeDetailPanel(cp, cb);
+    }
+    // Si le panneau droit était ouvert pour une autre compétition, rafraîchir son contenu
+    // (évite que l'utilisateur doive cliquer deux fois : fermer l'ancien puis ouvrir le nouveau)
+    if (typeof _crpOpen !== 'undefined' && _crpOpen) {
+      _crpHighlightSbBtn(_crpOpen);
+      _crpRender();
     }
     if (cp._base44Id) { syncBase44Registrations(cp.id).catch(function(){}); }
     return;
@@ -14142,107 +14146,88 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     return html5;
 
   } else if (tab === 'installation') {
-    var iSub = _installSubTab || 'site';
-    var btnStyle = function(active){ return 'flex:1;padding:8px 10px;border-radius:8px;border:none;background:'+(active?'var(--stol)':'transparent')+';color:'+(active?'#fff':'var(--txt2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s'; };
     var instH = '<div style="display:flex;flex-direction:column;height:100%">';
-    // Sous-onglets SITE | CARTE
-    instH += '<div style="display:flex;background:var(--navy3);border-radius:10px;padding:3px;gap:2px;margin:10px 12px 8px;flex-shrink:0">';
-    instH += '<button onclick="switchInstallSubTab(\'site\')" style="'+btnStyle(iSub==='site')+'">Site</button>';
-    instH += '<button onclick="switchInstallSubTab(\'carte\')" style="'+btnStyle(iSub==='carte')+'">Carte</button>';
+    var iStyle = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
+    var lbSt   = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px';
+    var _escQ  = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+    var sid    = cp.id;
+    var oaci   = (cp.oaci||'').trim().toUpperCase();
+    var basulmPDF  = oaci ? 'https://basulm.ffplum.fr/PDF/'+oaci+'.pdf' : '';
+    var basulmSite = oaci ? 'https://www.basulm.ffplum.fr/index.html#o='+encodeURIComponent(oaci) : '';
+
+    instH += '<div style="flex:1;overflow-y:auto;padding:0 14px 16px;min-height:0">';
+
+    // ── Bloc identité du site ────────────────────────────────────────────
+    instH += '<div style="border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:12px">';
+    instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Identité du site</div>';
+    // OACI + Lieu + Région sur une ligne
+    instH += '<div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px">';
+    instH += '<div><div style="'+lbSt+'">Code OACI</div>'
+           + '<input id="inst-oaci" style="'+iStyle+';text-transform:uppercase;font-weight:700;font-size:14px;letter-spacing:1px" placeholder="LFSE" value="'+_escQ(cp.oaci||'')+'" '
+           + 'oninput="saveInstallField(\''+sid+'\',\'oaci\',this.value.toUpperCase().trim());updateInstOACI(\''+sid+'\')" maxlength="6"></div>';
+    instH += '<div><div style="'+lbSt+'">Lieu / Aérodrome</div>'
+           + '<input id="inst-lieu" style="'+iStyle+'" placeholder="Commune, terrain…" value="'+_escQ(cp.lieu||'')+'" '
+           + 'oninput="saveInstallField(\''+sid+'\',\'lieu\',this.value)"></div>';
+    instH += '<div><div style="'+lbSt+'">Région</div>'
+           + '<input id="inst-region" style="'+iStyle+'" placeholder="Occitanie…" value="'+_escQ(cp.region||'')+'" '
+           + 'oninput="saveInstallField(\''+sid+'\',\'region\',this.value)"></div>';
     instH += '</div>';
-    if (iSub === 'site') {
-      var iStyle = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
-      var lbSt   = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px';
-      var _escQ  = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
-      var sid    = cp.id;
-      var oaci   = (cp.oaci||'').trim().toUpperCase();
-      var basulmPDF  = oaci ? 'https://basulm.ffplum.fr/PDF/'+oaci+'.pdf' : '';
-      var basulmSite = oaci ? 'https://www.basulm.ffplum.fr/index.html#o='+encodeURIComponent(oaci) : '';
+    instH += '</div>'; // fin bloc identité
 
-      instH += '<div style="flex:1;overflow-y:auto;padding:0 14px 16px;min-height:0">';
-
-      // ── Bloc identité du site (lié à Modifier) ──────────────────────────
-      instH += '<div style="border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:12px">';
-      instH += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px">Identité du site</div>';
-      instH += '<button onclick="editComp(\''+sid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);cursor:pointer;font-family:inherit">Modifier la compétition</button>';
+    // ── Bloc BasULM ─────────────────────────────────────────────────────
+    instH += '<div id="inst-basulm-block" style="border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:12px">';
+    if (oaci) {
+      instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Fiche BasULM — '+oaci+'</div>';
+      instH += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+      instH += '<a href="'+basulmPDF+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Fiche PDF '+oaci+'</a>';
+      instH += '<a href="'+basulmSite+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:none;border:1.5px solid var(--bdr);color:var(--txt2);border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Ouvrir BasULM</a>';
+      instH += '<button id="inst-map-toggle" onclick="_instToggleMap(\''+sid+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:none;border:1.5px solid var(--bdr);color:var(--txt2);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s">🗺 Carte</button>';
       instH += '</div>';
-      // OACI + Lieu + Région sur une ligne
-      instH += '<div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px">';
-      instH += '<div><div style="'+lbSt+'">Code OACI</div>'
-             + '<input id="inst-oaci" style="'+iStyle+';text-transform:uppercase;font-weight:700;font-size:14px;letter-spacing:1px" placeholder="LFSE" value="'+_escQ(cp.oaci||'')+'" '
-             + 'oninput="saveInstallField(\''+sid+'\',\'oaci\',this.value.toUpperCase().trim());updateInstOACI(\''+sid+'\')" maxlength="6"></div>';
-      instH += '<div><div style="'+lbSt+'">Lieu / Aérodrome</div>'
-             + '<input id="inst-lieu" style="'+iStyle+'" placeholder="Commune, terrain…" value="'+_escQ(cp.lieu||'')+'" '
-             + 'oninput="saveInstallField(\''+sid+'\',\'lieu\',this.value)"></div>';
-      instH += '<div><div style="'+lbSt+'">Région</div>'
-             + '<input id="inst-region" style="'+iStyle+'" placeholder="Occitanie…" value="'+_escQ(cp.region||'')+'" '
-             + 'oninput="saveInstallField(\''+sid+'\',\'region\',this.value)"></div>';
+      // Carte dépliable
+      instH += '<div id="inst-map-wrap" style="display:none;margin-top:10px;flex-direction:column;gap:6px">';
+      instH += '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+      instH += '    <button id="hdp-map-btn-osm" onclick="hdpMapTile(\'osm\')" style="padding:5px 12px;border:1.5px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗺 Carte OACI</button>';
+      instH += '    <button id="hdp-map-btn-sat" onclick="hdpMapTile(\'sat\')" style="padding:5px 12px;border:1.5px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🛰 Satellite</button>';
+      instH += '  </div>';
+      instH += '  <div id="hdp-map" style="height:280px;border-radius:10px;overflow:hidden;background:var(--navy3)"></div>';
       instH += '</div>';
-      instH += '</div>'; // fin bloc identité
-
-      // ── Bloc BasULM ─────────────────────────────────────────────────────
-      instH += '<div id="inst-basulm-block" style="border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:12px">';
-      if (oaci) {
-        instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Fiche BasULM — '+oaci+'</div>';
-        instH += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-        instH += '<a href="'+basulmPDF+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Fiche PDF '+oaci+'</a>';
-        instH += '<a href="'+basulmSite+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:none;border:1.5px solid var(--bdr);color:var(--txt2);border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Ouvrir BasULM</a>';
-        instH += '</div>';
-      } else {
-        instH += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:10px 0">'
-               + '📡 Saisissez un code OACI ci-dessus pour accéder à la fiche BasULM et à la carte du terrain'
-               + '</div>';
-      }
-      instH += '</div>'; // fin bloc BasULM
-
-      // ── Champs spécifiques installation ─────────────────────────────────
-      var siteFields2 = [
-        {key:'clubOrga',      lbl:'Club organisateur',    ph:'Nom du club…',                          full:false},
-        {key:'contactClub',   lbl:'Contact club',         ph:'Téléphone ou email…',                   full:false},
-        {key:'typePiste',     lbl:'Type de piste',        ph:'Herbe, bitume, terre…',                 full:false},
-        {key:'longPiste',     lbl:'Longueur de piste',    ph:'Ex : 800 m',                            full:false},
-        {key:'services',      lbl:'Services disponibles', ph:'Carburant, restauration, hébergement…', full:true},
-        {key:'acteursLocaux', lbl:'Acteurs locaux',       ph:'Partenaires, autorités locales…',       full:true},
-        {key:'remarquesSite', lbl:'Remarques',            ph:'Informations complémentaires…',         full:true}
-      ];
-      instH += '<div style="border:1px solid var(--bdr);border-radius:10px;padding:14px">';
-      instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Détails du site</div>';
-      instH += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-      siteFields2.forEach(function(f){
-        var val     = cp[f.key] || '';
-        var colSpan = f.full ? 'grid-column:1/-1' : '';
-        instH += '<div style="'+colSpan+'">';
-        instH += '<div style="'+lbSt+'">'+f.lbl+'</div>';
-        if (f.full) {
-          instH += '<textarea rows="2" style="'+iStyle+';resize:vertical" placeholder="'+f.ph+'" '
-                +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">'+_escQ(val)+'</textarea>';
-        } else {
-          instH += '<input style="'+iStyle+'" placeholder="'+f.ph+'" value="'+_escQ(val)+'" '
-                +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">';
-        }
-        instH += '</div>';
-      });
-      instH += '</div></div>'; // fin bloc détails
-
-      instH += '</div>'; // fin scroll
     } else {
-      // Carte
-      if (!cp.oaci) {
-        instH += '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:13px">Code OACI non renseigné — saisissez-le dans Modifier</div>';
-      } else {
-        var basulmUrl2 = 'https://www.basulm.ffplum.fr/index.html#o='+encodeURIComponent(cp.oaci);
-        instH += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;padding:0 12px 12px">';
-        instH += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0">';
-        instH += '<button id="hdp-map-btn-osm" onclick="hdpMapTile(\'osm\')" style="padding:5px 12px;border:1.5px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗺 Carte OACI</button>';
-        instH += '<button id="hdp-map-btn-sat" onclick="hdpMapTile(\'sat\')" style="padding:5px 12px;border:1.5px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🛰 Satellite</button>';
-        instH += '<a href="'+basulmUrl2+'" target="_blank" style="margin-left:auto;padding:5px 12px;border:1.5px solid var(--bdr);border-radius:6px;font-size:12px;font-weight:600;color:var(--txt2);text-decoration:none;white-space:nowrap">BasULM ↗</a>';
-        instH += '</div>';
-        instH += '<div id="hdp-map" style="flex:1;min-height:300px;border-radius:10px;overflow:hidden;background:var(--navy3)"></div>';
-        instH += '</div>';
-        setTimeout(function(){ initHDPMap(cp); }, 80);
-      }
+      instH += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:10px 0">'
+             + '📡 Saisissez un code OACI ci-dessus pour accéder à la fiche BasULM et à la carte du terrain'
+             + '</div>';
     }
+    instH += '</div>'; // fin bloc BasULM
+
+    // ── Champs spécifiques installation ─────────────────────────────────
+    var siteFields2 = [
+      {key:'clubOrga',      lbl:'Club organisateur',    ph:'Nom du club…',                          full:false},
+      {key:'contactClub',   lbl:'Contact club',         ph:'Téléphone ou email…',                   full:false},
+      {key:'typePiste',     lbl:'Type de piste',        ph:'Herbe, bitume, terre…',                 full:false},
+      {key:'longPiste',     lbl:'Longueur de piste',    ph:'Ex : 800 m',                            full:false},
+      {key:'services',      lbl:'Services disponibles', ph:'Carburant, restauration, hébergement…', full:true},
+      {key:'acteursLocaux', lbl:'Acteurs locaux',       ph:'Partenaires, autorités locales…',       full:true},
+      {key:'remarquesSite', lbl:'Remarques',            ph:'Informations complémentaires…',         full:true}
+    ];
+    instH += '<div style="border:1px solid var(--bdr);border-radius:10px;padding:14px">';
+    instH += '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Détails du site</div>';
+    instH += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    siteFields2.forEach(function(f){
+      var val     = cp[f.key] || '';
+      var colSpan = f.full ? 'grid-column:1/-1' : '';
+      instH += '<div style="'+colSpan+'">';
+      instH += '<div style="'+lbSt+'">'+f.lbl+'</div>';
+      if (f.full) {
+        instH += '<textarea rows="2" style="'+iStyle+';resize:vertical" placeholder="'+f.ph+'" '
+              +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">'+_escQ(val)+'</textarea>';
+      } else {
+        instH += '<input style="'+iStyle+'" placeholder="'+f.ph+'" value="'+_escQ(val)+'" '
+              +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">';
+      }
+      instH += '</div>';
+    });
+    instH += '</div></div>'; // fin bloc détails
+
+    instH += '</div>'; // fin scroll
     instH += '</div>';
     return instH;
 
@@ -31086,10 +31071,20 @@ function renderReglagesLogoSection() {
 // ═══════════════════════════════════════════════════
 // INSTALLATION SUB-TAB
 // ═══════════════════════════════════════════════════
-var _installSubTab = 'site';
-function switchInstallSubTab(sub) {
-  _installSubTab = sub;
-  switchHomeDetailTab('installation');
+function _instToggleMap(compId) {
+  var wrap   = document.getElementById('inst-map-wrap');
+  var toggle = document.getElementById('inst-map-toggle');
+  if (!wrap) return;
+  var open = wrap.style.display === 'flex';
+  if (open) {
+    wrap.style.display = 'none';
+    if (toggle) { toggle.style.borderColor = 'var(--bdr)'; toggle.style.color = 'var(--txt2)'; }
+  } else {
+    wrap.style.display = 'flex';
+    if (toggle) { toggle.style.borderColor = 'var(--stol)'; toggle.style.color = 'var(--stol)'; }
+    var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+    if (cp) setTimeout(function(){ initHDPMap(cp); }, 60);
+  }
 }
 function saveInstallField(compId, key, val) {
   var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
@@ -31142,9 +31137,17 @@ function updateInstOACI(compId) {
   var basulmPDF  = 'https://basulm.ffplum.fr/PDF/'+oaci+'.pdf';
   var basulmSite = 'https://www.basulm.ffplum.fr/index.html#o='+encodeURIComponent(oaci);
   var h = '<div style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Fiche BasULM — '+oaci+'</div>';
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
   h += '<a href="'+basulmPDF+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Fiche PDF '+oaci+'</a>';
   h += '<a href="'+basulmSite+'" target="_blank" style="display:inline-flex;align-items:center;padding:8px 16px;background:none;border:1.5px solid var(--bdr);color:var(--txt2);border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Ouvrir BasULM</a>';
+  h += '<button id="inst-map-toggle" onclick="_instToggleMap(\''+compId+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:none;border:1.5px solid var(--bdr);color:var(--txt2);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s">🗺 Carte</button>';
+  h += '</div>';
+  h += '<div id="inst-map-wrap" style="display:none;margin-top:10px;flex-direction:column;gap:6px">';
+  h += '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+  h += '    <button id="hdp-map-btn-osm" onclick="hdpMapTile(\'osm\')" style="padding:5px 12px;border:1.5px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🗺 Carte OACI</button>';
+  h += '    <button id="hdp-map-btn-sat" onclick="hdpMapTile(\'sat\')" style="padding:5px 12px;border:1.5px solid var(--bdr);border-radius:6px;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🛰 Satellite</button>';
+  h += '  </div>';
+  h += '  <div id="hdp-map" style="height:280px;border-radius:10px;overflow:hidden;background:var(--navy3)"></div>';
   h += '</div>';
   bloc.innerHTML = h;
 }
@@ -35320,6 +35323,12 @@ function saveBudgetDetailModal() {
 var _fromDTN = false; // true si l'app a été ouverte depuis le portail DTN
 
 function showDTNPortal() {
+  // Sur mobile (< 768px) → afficher la page d'accueil smartphone, pas le tableau de bord desktop
+  if (window.innerWidth < 768) {
+    document.getElementById('app').style.display = '';
+    showPage('page-home');
+    return;
+  }
   // Fermer les autres volets avant d'afficher le portail
   _dtnCloseOverlays();
   _compHideSidebar();
@@ -35667,10 +35676,11 @@ function _dtnSubNavOut(key) {
 var _crpOpen = null;
 
 function _crpToggle(type) {
-  if (_crpOpen === type) { _crpClose(); return; }
+  // Ouvre toujours le panneau (ou change de type).
+  // Le panneau ne se ferme QUE via le bouton ✕ (_crpClose).
   _crpOpen = type;
   var panel = document.getElementById('comp-right-panel');
-  if (panel) { panel.style.width = '280px'; panel.style.borderLeftWidth = '1px'; }
+  if (panel) panel.style.display = 'flex';
   _crpRender();
   _crpHighlightSbBtn(type);
 }
@@ -35678,7 +35688,7 @@ function _crpToggle(type) {
 function _crpClose() {
   _crpOpen = null;
   var panel = document.getElementById('comp-right-panel');
-  if (panel) { panel.style.width = '0'; panel.style.borderLeftWidth = '0px'; }
+  if (panel) panel.style.display = 'none';
   var b = document.getElementById('crp-body');
   var f = document.getElementById('crp-footer');
   if (b) b.innerHTML = '';
@@ -35693,6 +35703,18 @@ function _crpHighlightSbBtn(type) {
     btn.style.background = k===type ? 'rgba(255,255,255,.07)' : 'transparent';
     btn.style.color      = k===type ? 'var(--txt)' : 'var(--txt2)';
   });
+}
+// Appelé par onmouseout des boutons À faire / Documents : respecte _crpOpen
+function _crpBtnOut(key) {
+  var btn = document.getElementById('dtn-sub-'+key);
+  if (!btn) return;
+  if (_crpOpen === key) {
+    btn.style.background = 'rgba(255,255,255,.07)';
+    btn.style.color = 'var(--txt)';
+  } else {
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--txt2)';
+  }
 }
 
 function _crpRender() {
