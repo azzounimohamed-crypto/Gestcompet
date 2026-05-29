@@ -4028,10 +4028,30 @@ async function loadState() {
           var lc = (S.comps||[]).find(function(c){ return c.id === ic.id; });
           if (lc && ic.affiche) lc.affiche = ic.affiche; // IDB fait autorité pour l'affiche
         });
-        if (idbData.pilots) idbData.pilots.forEach(function(ip) {
-          var lp = (S.pilots||[]).find(function(p){ return p.id === ip.id; });
-          if (lp && ip.photo) lp.photo = ip.photo;
-        });
+        // Pilots : localStorage ne les stocke pas → charger depuis IDB si S.pilots est vide
+        if (idbData.pilots && idbData.pilots.length > 0) {
+          if (!S.pilots || S.pilots.length === 0) {
+            // Cas principal : S.pilots vide → utiliser IDB intégralement
+            S.pilots = idbData.pilots;
+          } else {
+            // S.pilots a déjà des entrées → patcher photos uniquement (éviter d'écraser des modifs récentes)
+            idbData.pilots.forEach(function(ip) {
+              var lp = S.pilots.find(function(p){ return p.id === ip.id; });
+              if (lp) { if (ip.photo) lp.photo = ip.photo; }
+              else { S.pilots.push(ip); } // pilote présent en IDB mais pas en mémoire → ajouter
+            });
+          }
+        }
+        // ULMs : même logique que pilots — localStorage ne les stocke pas
+        if (idbData.ulms && Object.keys(idbData.ulms).length > 0) {
+          if (!S.ulms || Object.keys(S.ulms).length === 0) {
+            S.ulms = idbData.ulms;
+          } else {
+            Object.keys(idbData.ulms).forEach(function(pid) {
+              if (!S.ulms[pid] || S.ulms[pid].length === 0) S.ulms[pid] = idbData.ulms[pid];
+            });
+          }
+        }
         if (idbData.licenceDB) S.licenceDB = idbData.licenceDB;
         // Restaurer images volumineuses strippées de localStorage
         if (idbData.officialDocs) {
@@ -4120,24 +4140,35 @@ async function loadState() {
 }
 
 function clearLocalStorageQuota() {
-  // Libère de la place en supprimant les photos base64 et clés externes
-  // IMPORTANT : LS_CRITICAL est préservé — il contient les réglages essentiels
-  // Les clés de largeurs de colonnes sont également préservées
+  // Libère de la place — IndexedDB est la source de vérité principale
+  // localStorage est un backup optionnel : on peut supprimer les clés lourdes
   var _COL_KEYS = ['gestappli_staffColWidths','gestappli_equipColWidths3','gestappli_bgtColWidths'];
+  // Clés critiques minimales à conserver absolument
+  var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
+               'geststol_autobackup', LS_BACKUP_TS,
+               'geststol_agenda_colors', 'geststol_agenda_window',
+               'geststol_vibration', 'geststol_notif_sound'];
+  _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
+    // Étape 1 : supprimer toutes les clés inconnues
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (k !== LS && k !== LS_CRITICAL && k !== LS_OD_HEADER && k !== LS_OD_FOOTER && k !== 'ffplum_logo' && k !== 'geststol_autobackup' && k !== LS_BACKUP_TS && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== 'geststol_agenda_colors' && k !== 'geststol_agenda_window' && _COL_KEYS.indexOf(k) === -1) { localStorage.removeItem(k); return; }
+      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS) {
+        localStorage.removeItem(k);
+      }
     });
-    // Retirer les photos des pilotes dans S
-    if (S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
-    // Réécrire les largeurs en mémoire pour la session en cours
-    try {
-      if (typeof _staffColWidths !== 'undefined') localStorage.setItem('gestappli_staffColWidths', JSON.stringify(_staffColWidths));
-      if (typeof _equipColWidths !== 'undefined') localStorage.setItem('gestappli_equipColWidths3', JSON.stringify(_equipColWidths));
-      if (typeof _bgtColWidths   !== 'undefined') localStorage.setItem('gestappli_bgtColWidths',   JSON.stringify(_bgtColWidths));
-    } catch(e2) {}
-    console.log('[Storage] Nettoyage quota effectué');
+    // Étape 2 : supprimer les clés lourdes dédiées (déjà dans IndexedDB)
+    // LS_ENROLL peut atteindre 1-2 Mo avec de nombreux équipages
+    try { localStorage.removeItem(LS_ENROLL); }     catch(e2) {}
+    try { localStorage.removeItem(LS_ENROLL_META); } catch(e2) {}
+    try { localStorage.removeItem(LS_BUDGETS); }    catch(e2) {}
+    try { localStorage.removeItem(LS_TODOS); }      catch(e2) {}
+    // Étape 3 : supprimer aussi la clé principale (IndexedDB est le backup)
+    try { localStorage.removeItem(LS); } catch(e2) {}
+    // Étape 4 : retirer les photos des pilotes de la mémoire (volumineuses, IndexedDB les a)
+    // NE PAS toucher S.comps.affiche — les affiches doivent rester visibles dans la session
+    if (S && S.pilots) S.pilots.forEach(function(p) { if (p.photo && p.photo.startsWith('data:')) delete p.photo; });
+    console.log('[Storage] Nettoyage quota agressif — localStorage libéré, IndexedDB = source principale');
   } catch(e) { console.warn('clearLocalStorageQuota', e); }
 }
 
@@ -4209,40 +4240,52 @@ function saveState() {
 }
 function _flushSaveState() {
   _saveStateTimer = null;
-  // 1. IndexedDB (async, non-bloquant)
+  // 1. IndexedDB (async, non-bloquant) — source de vérité principale
   var fullJson = JSON.stringify(S);
   saveToIDB(fullJson);
-  // 2. localStorage : écriture synchrone — indispensable pour survivre à un rechargement
+  // 2. localStorage : backup léger (sans pilotes/ulms — IndexedDB les a déjà)
+  // On construit d'emblée une version allégée pour limiter les risques de quota
+  var _lsPayload = _stripBigData({
+    user:S.user, comps:S.comps, compEnroll:S.compEnroll,
+    _enrollResetAt:S._enrollResetAt||{}, enrollMeta:S.enrollMeta||{},
+    runs:S.runs, staff:S.staff, materiel:S.materiel, budgets:S.budgets,
+    evenements:S.evenements, partenaires:S.partenaires, documents:S.documents,
+    homeTodosByComp:S.homeTodosByComp, moyens:S.moyens||{},
+    odmConfig:S.odmConfig||{}, ordresMission:S.ordresMission||[],
+    ganttTasks:S.ganttTasks||{}, docSettings:S.docSettings||{},
+    settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
+    officialDocs:S.officialDocs||{}, messages:S.messages||[],
+    _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
+    _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{}
+  });
   try {
-    localStorage.setItem(LS, JSON.stringify(_stripBigData(S)));
+    localStorage.setItem(LS, JSON.stringify(_lsPayload));
   } catch(e) {
-    console.warn('saveState error', e);
+    // Quota atteint → nettoyer puis réessayer sans données non-critiques
     try {
       clearLocalStorageQuota();
-      localStorage.setItem(LS, JSON.stringify(_stripBigData({user:S.user,comps:S.comps,compEnroll:S.compEnroll,_enrollResetAt:S._enrollResetAt||{},enrollMeta:S.enrollMeta||{},runs:S.runs,staff:S.staff,pilots:S.pilots,ulms:S.ulms,messages:S.messages,sitesSportifs:S.sitesSportifs,materiel:S.materiel,budgets:S.budgets,evenements:S.evenements,partenaires:S.partenaires,documents:S.documents,officialDocs:S.officialDocs,homeTodosByComp:S.homeTodosByComp,moyens:S.moyens||[],odmConfig:S.odmConfig||{},ordresMission:S.ordresMission||[],ganttTasks:S.ganttTasks||{},docSettings:S.docSettings||{},settings:S.settings||{}})));
+      // Restaurer les affiches en mémoire (elles ne sont jamais dans localStorage)
+      setTimeout(function(){ if (typeof _restoreAffichesFromIDB === 'function') _restoreAffichesFromIDB(); }, 1000);
+      // Version ultra-légère : seulement ce qui ne peut pas se reconstruire depuis IndexedDB
+      localStorage.setItem(LS, JSON.stringify(_stripBigData({
+        user:S.user, comps:S.comps, compEnroll:S.compEnroll,
+        _enrollResetAt:S._enrollResetAt||{}, enrollMeta:S.enrollMeta||{},
+        runs:S.runs, staff:S.staff, settings:S.settings||{},
+        homeTodosByComp:S.homeTodosByComp,
+        _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{}
+      })));
+      console.log('[Storage] Sauvegarde allégée (quota) — IndexedDB = source principale');
     } catch(e2) {
-      console.warn('saveState critical fail', e2);
-      // Dernier recours : sauvegarder sans les pilotes (IndexedDB les a déjà tous)
-      try {
-        localStorage.setItem(LS, JSON.stringify(_stripBigData({
-          user:S.user, comps:S.comps, compEnroll:S.compEnroll,
-          _enrollResetAt:S._enrollResetAt||{}, enrollMeta:S.enrollMeta||{}, runs:S.runs,
-          staff:S.staff, materiel:S.materiel, budgets:S.budgets,
-          evenements:S.evenements, partenaires:S.partenaires,
-          homeTodosByComp:S.homeTodosByComp, settings:S.settings||{},
-          _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{}
-          // pilots/ulms omis — trop volumineux, IndexedDB est la source de vérité
-        })));
-        console.log('[Storage] Sauvegarde allégée (sans pilotes) — IndexedDB = source principale');
-      } catch(e3) { console.warn('saveState minimal fail', e3); }
+      // IndexedDB a tout — le localStorage est optionnel, on n'affiche plus d'erreur
+      console.log('[Storage] localStorage saturé — IndexedDB = seule sauvegarde active');
     }
   }
-  // 3. Clé critique + clés dédiées
+  // 3. Clé critique + clés dédiées (chacune dans son propre try pour éviter l'effet cascade)
   _saveCritical();
-  try { if (S.budgets) localStorage.setItem(LS_BUDGETS, JSON.stringify(_stripBudgetPhotos(S.budgets))); } catch(e) {}
-  try { if (S.homeTodosByComp) localStorage.setItem(LS_TODOS, JSON.stringify(S.homeTodosByComp)); } catch(e) {}
-  try { if (S.compEnroll)  localStorage.setItem(LS_ENROLL,      JSON.stringify(S.compEnroll));       } catch(e) {} // filet anti-perte équipage
-  try { if (S.enrollMeta) localStorage.setItem(LS_ENROLL_META, JSON.stringify(S.enrollMeta||{}));   } catch(e) {} // filet anti-perte podium/niveau
+  try { if (S.budgets)        localStorage.setItem(LS_BUDGETS,    JSON.stringify(_stripBudgetPhotos(S.budgets))); } catch(e) {}
+  try { if (S.homeTodosByComp) localStorage.setItem(LS_TODOS,     JSON.stringify(S.homeTodosByComp)); } catch(e) {}
+  try { if (S.compEnroll)     localStorage.setItem(LS_ENROLL,     JSON.stringify(S.compEnroll)); } catch(e) {}
+  try { if (S.enrollMeta)     localStorage.setItem(LS_ENROLL_META,JSON.stringify(S.enrollMeta||{})); } catch(e) {}
 }
 // Flush immédiat avant fermeture de page pour éviter toute perte de données
 window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
@@ -5528,8 +5571,9 @@ function renderMobileCompDetail() {
   if (contentEl) {
     contentEl.innerHTML = renderHDPTabContent(cp, sec.id, runs, enrolled, staffList);
     if (sec.id === 'infos') {
-      setTimeout(function(){ initInfosMaps(cp, enrolled); initInfosCharts(); }, 80);
-      setTimeout(function(){ initMcdLocationMap(cp); }, 120);
+      setTimeout(function(){ try { initInfosMaps(cp, enrolled); } catch(e){ console.warn('[GestSTOL] initInfosMaps:', e); } }, 100);
+      setTimeout(function(){ try { initInfosCharts(); } catch(e){ console.warn('[GestSTOL] initInfosCharts:', e); } }, 180);
+      setTimeout(function(){ initMcdLocationMap(cp); }, 220);
     }
     contentEl.scrollTop = 0;
   }
@@ -10840,7 +10884,10 @@ function hdgImportEquipageExcel(inp, compId) {
 
       // Récupérer la compétition pour déduire la classe par défaut
       var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
-      var defaultClasse = (cp && cp.classe) ? cp.classe : (typeof _pilotsClass !== 'undefined' ? _pilotsClass : 'pendulaire');
+      var defaultClasse = (cp && cp.classe) ? cp.classe
+                        : (cp && cp.discipline==='stol')       ? 'multiaxes'
+                        : (cp && cp.pratique==='paramoteur')   ? 'paramotor'
+                        : (typeof _pilotsClass !== 'undefined' ? _pilotsClass : 'pendulaire');
 
       if (!S.compEnroll) S.compEnroll = {};
       if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
@@ -12365,9 +12412,10 @@ function showHomeCompDetail(compId) {
       cb.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden';
       renderHomeDetailPanel(cp, cb);
     }
-    // Si le panneau droit était ouvert pour une autre compétition, rafraîchir son contenu
-    // (évite que l'utilisateur doive cliquer deux fois : fermer l'ancien puis ouvrir le nouveau)
+    // Panneau droit : restaurer si _crpOpen était positionné avant de quitter la page
     if (typeof _crpOpen !== 'undefined' && _crpOpen) {
+      var _crpPanel = document.getElementById('comp-right-panel');
+      if (_crpPanel) _crpPanel.style.display = 'flex';
       _crpHighlightSbBtn(_crpOpen);
       _crpRender();
     }
@@ -12496,13 +12544,33 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
     var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires' || _homeDetailTab === 'resultats');
     var _isInfosTab = (_homeDetailTab === 'infos');
     html += '<div style="flex:1;background:var(--navy4);' + (_isFullH ? 'overflow:hidden;display:flex;flex-direction:column' : ('overflow-y:auto' + (_isInfosTab ? '' : ';padding:16px'))) + '" id="hdp-tab-content"' + (_isFullH ? ' class="hdp-full-h"' : '') + '>';
-    html += renderHDPTabContent(cp, _homeDetailTab, runs, enrolled, staffList);
+    try {
+      html += renderHDPTabContent(cp, _homeDetailTab, runs, enrolled, staffList);
+    } catch(e) {
+      console.error('[GestSTOL] renderHDPTabContent a levé une exception inattendue (tab='+_homeDetailTab+'):', e);
+      html += '<div style="padding:16px;color:#f87171;font-size:12px;font-family:monospace">Erreur de rendu ('+_homeDetailTab+'): '+(e&&e.message||e)+'</div>';
+    }
     html += '</div>';
   }
 
   detail.innerHTML = html;
   if (_homeDetailTab === 'infos') {
-    setTimeout(function(){ initInfosMaps(cp, enrolled); initInfosCharts(); }, 80);
+    setTimeout(function(){ try { initInfosMaps(cp, enrolled); } catch(e){ console.warn('[GestSTOL] initInfosMaps:', e); } }, 150);
+    // Monte les charts à 250ms, puis simule un resize à 400ms pour forcer ApexCharts
+    // à re-mesurer les conteneurs (fix classique pour les layouts flex/grid dynamiques)
+    setTimeout(function(){
+      try { initInfosCharts(); } catch(e){ console.warn('[GestSTOL] initInfosCharts:', e); }
+      setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
+    }, 250);
+  }
+  // Synchroniser le panneau droit (À faire / Documents) après chaque render
+  // Garantit que le panneau reste visible même si un re-render l'a perturbé
+  if (typeof _crpOpen !== 'undefined' && _crpOpen) {
+    var _crpPanelSync = document.getElementById('comp-right-panel');
+    if (_crpPanelSync && _crpPanelSync.style.display !== 'flex') {
+      _crpPanelSync.style.display = 'flex';
+    }
+    if (typeof _crpRender === 'function') _crpRender();
   }
 }
 
@@ -12750,7 +12818,11 @@ var _apexInfosInst = [];
 function initInfosCharts() {
   _apexInfosInst.forEach(function(c){ try { c.destroy(); } catch(e){} });
   _apexInfosInst = [];
-  if (typeof ApexCharts === 'undefined' || !window._infosChartsData) return;
+  var _apcAvail = typeof ApexCharts !== 'undefined';
+  var _dataAvail = !!window._infosChartsData;
+  console.log('[GestSTOL] initInfosCharts: ApexCharts='+_apcAvail+' data='+_dataAvail
+    + (_dataAvail ? ' genre='+(!!window._infosChartsData.genre)+' age='+(!!window._infosChartsData.age) : ''));
+  if (!_apcAvail || !_dataAvail) return;
   var d = window._infosChartsData;
 
   // ── Identité graphique commune ──
@@ -12775,8 +12847,13 @@ function initInfosCharts() {
   };
 
   var _mount = function(id, opts) {
-    var el = document.getElementById(id); if (!el) return;
-    var c = new ApexCharts(el, opts); c.render(); _apexInfosInst.push(c);
+    var el = document.getElementById(id); if (!el) { console.warn('[GestSTOL] chart container #'+id+' introuvable'); return; }
+    try {
+      var c = new ApexCharts(el, opts);
+      var p = c.render();
+      if (p && typeof p.catch === 'function') p.catch(function(e){ console.warn('[GestSTOL] chart render rejeté ('+id+'):', e); });
+      _apexInfosInst.push(c);
+    } catch(e) { console.warn('[GestSTOL] chart mount échoué ('+id+'):', e); }
   };
 
   // ── Donut factory — centre toujours visible, thème clair/sombre ──
@@ -13363,7 +13440,7 @@ function _equipToggleSort(col) {
 }
 
 function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
-  if (tab === 'infos') {
+  if (tab === 'infos') { try { // ← try autour de TOUT le bloc infos (pre-compute + dashboard)
     var pilotCount = enrolled.length;
     var classifiedIds = {};
     runs.forEach(function(r){ classifiedIds[r.pilotId] = true; });
@@ -13379,11 +13456,15 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       {lbl:'55-64',min:55,max:65,n:0},{lbl:'65+',min:65,max:999,n:0}
     ];
     enrolled.forEach(function(pid) {
-      var p = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
-      if (p.genre==='M.') nbH++;
-      else if (p.genre==='Mme.') nbF++;
-      if (p.ddn) {
-        var bd=new Date(p.ddn);
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid || x.id==pid; })||{};
+      // Normaliser genre à la lecture (couvre les données importées sans normalisation)
+      var _pg = (typeof _mapGenre==='function') ? _mapGenre(p.genre||'') : (p.genre||'');
+      if (_pg==='M.') nbH++;
+      else if (_pg==='Mme.') nbF++;
+      // Normaliser ddn à la lecture (DD/MM/YYYY → YYYY-MM-DD pour new Date())
+      var _pddn = (typeof _mapDate==='function') ? _mapDate(p.ddn||'') : (p.ddn||'');
+      if (_pddn) {
+        var bd=new Date(_pddn);
         if (!isNaN(bd)) {
           var age=Math.floor((Date.now()-bd)/(365.25*24*3600*1000));
           ageTotal+=age; ageCount++;
@@ -13397,15 +13478,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var ulmClsCounts = {};
     var _clsLabels = {paramotor:'Paramoteur',multiaxes:'Multiaxes (cl.3)',pendulaire:'Pendulaire (cl.2)',gyro:'Autogire (cl.5)',microlight:'Microlight',helicoptere:'Hélicoptère'};
     var _clsColors = {paramotor:'#f59e0b',multiaxes:'#3b82f6',pendulaire:'#06b6d4',gyro:'#10b981',microlight:'#8b5cf6',helicoptere:'#ef4444'};
+    // Helper lookup pilote (== pour tolérance string/number)
+    var _findPilot = function(pid){ return (S.pilots||[]).find(function(x){return x.id===pid||x.id==pid;})||{}; };
     enrolled.forEach(function(pid){
       var ulms=(S.ulms||{})[pid]||[];
-      var cls=ulms[0]&&ulms[0].classe?_normCls(ulms[0].classe):'';
+      var p=_findPilot(pid);
+      // Classe : lire depuis S.ulms, ou depuis p.classe en fallback
+      var clsRaw=(ulms[0]&&ulms[0].classe)?ulms[0].classe:(p.classe||'');
+      var cls=clsRaw?_normCls(clsRaw):'';
       if(cls) ulmClsCounts[cls]=(ulmClsCounts[cls]||0)+1;
     });
     // ── Catégories compétitives ──
     var catPilCounts = {};
     enrolled.forEach(function(pid){
-      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var p=_findPilot(pid);
       var cat=(p.categorie||'').trim();
       if(cat) catPilCounts[cat]=(catPilCounts[cat]||0)+1;
     });
@@ -13417,7 +13503,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Équipages ──
     var nbMono=0,nbBi=0;
     enrolled.forEach(function(pid){
-      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var p=_findPilot(pid);
       if(p.equipage==='Monoplace')nbMono++;
       else if(p.equipage==='Biplace')nbBi++;
     });
@@ -13426,7 +13512,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Clubs ──
     var clubCounts = {};
     enrolled.forEach(function(pid){
-      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var p=_findPilot(pid);
       var c=(p.club||'').trim(); if(c) clubCounts[c]=(clubCounts[c]||0)+1;
     });
     // ── Marques par classe ──
@@ -13452,7 +13538,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
     });
     var pilotsWithRegion=enrolled.filter(function(pid){
-      var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{};
+      var p=_findPilot(pid);
       return !!(p.region);
     }).length;
     var isMobile=window.innerWidth<768;
@@ -13498,10 +13584,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ═══════════════════════════════════════════════════════════════
     //  DASHBOARD INFO & STATS
     // ═══════════════════════════════════════════════════════════════
+    // ── Dashboard : html construit ici, renvoyé en fin de try ──
+    console.log('[GestSTOL] infos-tab render: enrolled='+pilotCount+' pilots='+(S.pilots||[]).length+' ulms='+(S.ulms?Object.keys(S.ulms).length:0));
+    var html = '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px">';
 
     // Calcul nb régions/pays distincts
     var _regSet2 = {};
-    enrolled.forEach(function(pid){ var p=(S.pilots||[]).find(function(x){return x.id===pid;})||{}; if(p.region) _regSet2[_normRegion(p.region)]=1; });
+    enrolled.forEach(function(pid){ var p=_findPilot(pid); if(p.region) _regSet2[_normRegion(p.region)]=1; });
     var nbRegionsTotal = Object.keys(_regSet2).length;
 
     // Calcul nombre de jours de compétition
@@ -13511,17 +13600,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       if (!isNaN(_d1) && !isNaN(_d2)) _nbJours = Math.round((_d2 - _d1) / 86400000) + 1;
     }
 
-    // Tuiles KPI — style infographie (icône pastille + grande valeur + label + description)
+    // Tuiles KPI — style infographie (icône pastille + grande valeur + label + description + lien onglet)
     var _kpi = [];
-    _kpi.push({val:''+pilotCount,  lbl:'Pilotes inscrits', col:'#0891b2', sub:'Compétiteurs engagés'});
-    if (classified    > 0) _kpi.push({val:''+classified,     lbl:'Classés',                        col:'#10b981', sub:'Résultats enregistrés'});
-    _kpi.push({val:''+_nbJours,    lbl:_nbJours>1?'Jours':'Jour',                                  col:'#6366f1', sub:_nbJours>1?'Compétition multi-jours':'Événement sur une journée'});
-    if (staffCountStat> 0) _kpi.push({val:''+staffCountStat, lbl:'Staff & Bénévoles',              col:'#8b5cf6', sub:'Encadrement & bénévolat'});
-    if (ageMoyen      > 0) _kpi.push({val:ageMoyen+' ans',   lbl:'Âge moyen',                      col:'#f43f5e', sub:'Des compétiteurs'});
-    if (nbRegionsTotal> 0) _kpi.push({val:''+nbRegionsTotal, lbl:'Régions / Pays',                 col:'#0d9488', sub:'Représentés'});
+    _kpi.push({val:''+pilotCount,  lbl:'Pilotes inscrits', col:'#0891b2', sub:'Compétiteurs engagés',    tab:'gestion'});
+    if (classified    > 0) _kpi.push({val:''+classified,     lbl:'Classés',           col:'#10b981', sub:'Résultats enregistrés',      tab:'resultats'});
+    _kpi.push({val:''+_nbJours,    lbl:_nbJours>1?'Jours':'Jour',                      col:'#6366f1', sub:_nbJours>1?'Compétition multi-jours':'Événement sur une journée'});
+    if (staffCountStat> 0) _kpi.push({val:''+staffCountStat, lbl:'Staff & Bénévoles', col:'#8b5cf6', sub:'Encadrement & bénévolat',    tab:'staff'});
+    if (ageMoyen      > 0) _kpi.push({val:ageMoyen+' ans',   lbl:'Âge moyen',         col:'#f43f5e', sub:'Des compétiteurs'});
+    if (nbRegionsTotal> 0) _kpi.push({val:''+nbRegionsTotal, lbl:'Régions / Pays',    col:'#0d9488', sub:'Représentés'});
     // Champions — pilotes avec podium=1 dans cette compétition
     var _champCount = enrolled.filter(function(pid){ return (((S.enrollMeta||{})[cp.id]||{})[pid]||{}).podium==='1'; }).length;
-    if (_champCount > 0) _kpi.push({val:''+_champCount, lbl:'Champions', col:'#f59e0b', sub:'Podium nº1 discipline'});
+    if (_champCount > 0) _kpi.push({val:''+_champCount, lbl:'Champions', col:'#f59e0b', sub:'Podium nº1 discipline', tab:'resultats'});
 
     // Styles
     var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px';
@@ -13568,16 +13657,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _fmtE = function(v){ return v.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; };
     // Tuile budget — ajoutée ICI après _hasBgt, collée à droite de Régions
     var _fmtK = function(v){ if(v>=1000000) return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M€'; if(v>=1000) return Math.round(v/1000)+'k€'; return Math.round(v)+'€'; };
-    if (_hasBgt && _bgtEng>0) _kpi.push({val:_fmtK(_bgtEng), lbl:'Dépenses', col:_bgtEng>35000?'#f43f5e':'#10b981', sub:_bgtEng>35000?'Budget élevé':'Budget maîtrisé'});
-
-    // Tout dans un flex column avec gap uniforme et padding latéral
-    var html = '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px">';
+    if (_hasBgt && _bgtEng>0) _kpi.push({val:_fmtK(_bgtEng), lbl:'Dépenses', col:_bgtEng>35000?'#f43f5e':'#10b981', sub:_bgtEng>35000?'Budget élevé':'Budget maîtrisé', tab:'budget'});
 
     // ── 1. TUILES KPI — grille uniforme, budget inclus comme dernière tuile ──
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
     _kpi.forEach(function(t){
-      html += '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:13px 15px 11px;position:relative;overflow:hidden">';
+      var _onclick = t.tab ? ' onclick="switchHomeDetailTab(\''+t.tab+'\')"' : '';
+      var _cursor  = t.tab ? 'cursor:pointer;' : '';
+      html += '<div'+_onclick+' style="'+_cursor+'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:13px 15px 11px;position:relative;overflow:hidden;transition:opacity .15s" '+(t.tab?'onmouseover="this.style.opacity=\'.8\'" onmouseout="this.style.opacity=\'1\'"':'')+' >';
       html += '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+t.col+';border-radius:12px 12px 0 0;opacity:.7"></div>';
+      if (t.tab) html += '<div style="position:absolute;top:9px;right:9px;opacity:.3;font-size:10px;color:'+t.col+'">›</div>';
       html += '<div style="font-size:26px;font-weight:900;color:'+t.col+';line-height:1;margin-bottom:5px;letter-spacing:-.5px">'+t.val+'</div>';
       html += '<div style="font-size:9px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.9px;line-height:1.3;margin-bottom:2px">'+t.lbl+'</div>';
       if (t.sub) html += '<div style="font-size:10px;color:var(--txt3);line-height:1.4">'+t.sub+'</div>';
@@ -13685,25 +13774,87 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _g2 = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr;gap:10px';
     var _g3 = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px';
 
-    // ── Compétiteurs ──
-    if (nbH+nbF>0 || ageCount>0) {
-      html += _sep('Compétiteurs');
-      html += '<div style="'+_g2+'">';
-      if (nbH+nbF>0)  html += _aCard('apex-genre', 'Répartition genre', 220);
-      if (ageCount>0) html += _aCard('apex-age',   'Tranches d\'âge · moy. '+ageMoyen+' ans', 200);
-      html += '</div>';
+    // ── Diagnostic qualité données ──
+    var _hasGenreAge = (nbH+nbF>0 || ageCount>0);
+    var _hasClsCat   = (hasCat || hasCls || hasEqui);
+    var _pilotFoundCount = enrolled.filter(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid||x.id==pid;});
+      return !!p && (p.nom||p.prenom);
+    }).length;
+    var _noData = !_hasGenreAge && !_hasClsCat && Object.keys(clubCounts).length===0 && pilotsWithRegion===0;
+
+    // Bandeau avertissement si aucune donnée démographique
+    if (_noData && pilotCount > 0) {
+      var _missingCount = pilotCount - _pilotFoundCount;
+      html += '<div style="background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start">';
+      html += '<div style="font-size:20px;flex-shrink:0">📋</div>';
+      html += '<div style="flex:1">';
+      html += '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:4px">Données démographiques non renseignées</div>';
+      html += '<div style="font-size:11px;color:var(--txt2);line-height:1.7">';
+      if (_missingCount > 0) {
+        html += '<span style="color:#f87171">⚠ '+_missingCount+' pilote(s) introuvable(s) dans la base locale — rechargez la page ou ré-importez l\'équipage.</span><br>';
+      }
+      html += 'Les graphiques Genre, Âge, Catégorie et Classe ULM n\'ont pas de données.<br>Importez depuis Excel + base licences FFPLUM pour enrichir ces statistiques.';
+      html += '</div></div></div>';
     }
 
-    // ── Classement & classes ──
-    if (hasCat || hasCls || hasEqui) {
-      html += _sep('Classement & classes');
-      var _clsCards = [];
-      if (hasCat)  _clsCards.push(_aCard('apex-cats', 'Catégories compétitives', Math.max(160, Object.keys(catPilCounts).length*34+40)));
-      if (hasCls)  _clsCards.push(_aCard('apex-cls',  'Classes ULM',             Math.max(160, Object.keys(ulmClsCounts).length*34+40)));
-      if (hasEqui) _clsCards.push(_aCard('apex-equi', 'Équipages', 220));
-      var _nCls = Math.min(_clsCards.length, 3);
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:repeat('+_nCls+',1fr);gap:10px')+'">'+_clsCards.join('')+'</div>';
+    // ── Compétiteurs — SVG natif (pas d'ApexCharts → fonctionne partout) ──
+    html += _sep('Compétiteurs');
+    html += '<div style="'+_g2+'">';
+    // Carte Genre — donut SVG + légende
+    if (nbH+nbF>0) {
+      var _gTot = nbH+nbF, _gCx=80, _gCy=80, _gR=58, _gSw=26;
+      html += '<div style="'+_cSt+';padding:14px 16px 12px">';
+      html += '<div style="'+_tSt+'">Répartition genre</div>';
+      html += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
+      html += '<svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0">';
+      html += _donut([{v:nbH},{v:nbF}],['#0891b2','#f43f5e'],_gCx,_gCy,_gR,_gSw);
+      html += '<text x="'+_gCx+'" y="'+(+_gCy-5)+'" text-anchor="middle" font-size="22" font-weight="900" fill="var(--txt)">'+_gTot+'</text>';
+      html += '<text x="'+_gCx+'" y="'+(_gCy+13)+'" text-anchor="middle" font-size="9" fill="var(--txt3)">PILOTES</text>';
+      html += '</svg>';
+      html += '<div style="flex:1;min-width:80px">';
+      if (nbH>0) html += _leg('#0891b2','Hommes',nbH,Math.round(nbH/_gTot*100));
+      if (nbF>0) html += _leg('#f43f5e','Femmes',nbF,Math.round(nbF/_gTot*100));
+      html += '</div></div></div>';
+    } else {
+      html += _empty('👤','Genre non renseigné','Champ « genre » absent sur les fiches pilotes');
     }
+    // Carte Âge — barres CSS
+    if (ageCount>0) {
+      var _aMx = Math.max.apply(null, ageBuckets.map(function(b){return b.n;}));
+      html += '<div style="'+_cSt+';padding:14px 16px 12px">';
+      html += '<div style="'+_tSt+'">Tranches d\'âge · moy. '+ageMoyen+' ans</div>';
+      ageBuckets.forEach(function(b){ if(b.n>0) html += _bRow(b.lbl,b.n,_aMx,ageCount,'#0891b2'); });
+      html += '</div>';
+    } else {
+      html += _empty('🎂','Âge non renseigné','Champ « date de naissance » absent');
+    }
+    html += '</div>';
+
+    // ── Classement & classes ──
+    html += _sep('Classement & classes');
+    var _clsCards = [];
+    if (hasCat)  _clsCards.push(_aCard('apex-cats', 'Catégories compétitives', Math.max(160, Object.keys(catPilCounts).length*34+40)));
+    else         _clsCards.push(_empty('🏅', 'Catégories non renseignées', 'PL1 · PF1 · PL2 · PF2…'));
+    if (hasCls)  _clsCards.push(_aCard('apex-cls',  'Classes ULM', Math.max(160, Object.keys(ulmClsCounts).length*34+40)));
+    else         _clsCards.push(_empty('✈️', 'Classes ULM non renseignées', 'Multiaxes · Pendulaire · Paramoteur…'));
+    if (hasEqui) {
+      // Équipages — donut SVG natif
+      var _eTot=nbMono+nbBi;
+      var _eHtml='<div style="'+_cSt+';padding:14px 16px 12px"><div style="'+_tSt+'">Équipages</div>';
+      _eHtml+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+      _eHtml+='<svg width="130" height="130" viewBox="0 0 130 130" style="flex-shrink:0">';
+      _eHtml+=_donut([{v:nbMono},{v:nbBi}],['#6366f1','#10b981'],65,65,48,22);
+      _eHtml+='<text x="65" y="61" text-anchor="middle" font-size="18" font-weight="900" fill="var(--txt)">'+_eTot+'</text>';
+      _eHtml+='<text x="65" y="74" text-anchor="middle" font-size="9" fill="var(--txt3)">TOTAL</text>';
+      _eHtml+='</svg><div style="flex:1;min-width:70px">';
+      if(nbMono>0) _eHtml+=_leg('#6366f1','Monoplace',nbMono,Math.round(nbMono/_eTot*100));
+      if(nbBi>0)   _eHtml+=_leg('#10b981','Biplace',  nbBi,  Math.round(nbBi/_eTot*100));
+      _eHtml+='</div></div></div>';
+      _clsCards.push(_eHtml);
+    }
+    var _nCls = Math.min(_clsCards.length, 3);
+    html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:repeat('+_nCls+',1fr);gap:10px')+'">'+_clsCards.join('')+'</div>';
 
     // ── Matériels ──
     var _icd = window._infosChartsData;
@@ -13783,8 +13934,33 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       }
     }
 
-    html += '</div>'; // fin dashboard
+    html += '</div>'; // fermeture du div principal dashboard
     return html;
+
+    } catch(e) { // ← catch du try principal (ligne 13422) — couvre pre-compute ET dashboard
+      console.error('[GestSTOL] Erreur renderHDPTabContent infos:', e);
+      var _errMsg = String(e && e.message || e || 'Erreur inconnue').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var _errPilots = (S.pilots||[]).length;
+      var _errEnroll = (enrolled||[]).length;
+      return '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px">'
+        + '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:12px;padding:14px 16px">'
+        + '<div style="font-size:12px;font-weight:700;color:#f87171;margin-bottom:6px">⚠ Erreur de rendu — Info &amp; Stats</div>'
+        + '<div style="font-size:11px;color:#94a3b8;line-height:1.6;font-family:monospace">' + _errMsg + '</div>'
+        + '<div style="font-size:10px;color:#64748b;margin-top:6px">Pilotes en mémoire : '+_errPilots+' · Inscrits : '+_errEnroll+'</div>'
+        + '<div style="font-size:10px;color:#64748b;margin-top:3px">Rechargez la page (F5) et réessayez. Si le problème persiste, signalez le message ci-dessus.</div>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">'
+        + '<div style="background:#1c2333;border:1px solid #334155;border-radius:12px;padding:13px 15px 11px">'
+        + '<div style="font-size:26px;font-weight:900;color:#0891b2">'+_errEnroll+'</div>'
+        + '<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.9px">Pilotes inscrits</div>'
+        + '</div>'
+        + '<div style="background:#1c2333;border:1px solid #334155;border-radius:12px;padding:13px 15px 11px">'
+        + '<div style="font-size:26px;font-weight:900;color:#6366f1">'+_errPilots+'</div>'
+        + '<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.9px">Pilotes en mémoire</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    } // ← fin catch principal
 
   } else if (tab === 'modifier') {
     if (!(canModify())) {
@@ -17966,9 +18142,12 @@ function updateSyncHealthPill() {
     color = '#ef4444'; text = '⚠️ NON SAUVEGARDÉ';
     var _em = (_lastPushErrMsg||'').toLowerCase();
     var _isPausedPill = online && (_em === '' || _em.indexOf('fetch') !== -1 || _em.indexOf('networkerror') !== -1 || _em.indexOf('failed to fetch') !== -1);
-    title = _isPausedPill
-      ? 'Supabase EN PAUSE — rendez-vous sur supabase.com > Dashboard > Resume project, puis réessayez.'
-      : 'ATTENTION : le dernier envoi vers le cloud a échoué. Vos données récentes ne sont PAS sauvegardées en ligne. Cliquez ici.';
+    var _isBlockedPill = _em.indexOf('push_blocked') === 0;
+    title = _isBlockedPill
+      ? 'Sauvegarde bloquée par le garde anti-perte (' + _lastPushErrMsg + '). Cliquez pour débloquer.'
+      : _isPausedPill
+        ? 'Supabase EN PAUSE — rendez-vous sur supabase.com > Dashboard > Resume project, puis réessayez.'
+        : 'ATTENTION : le dernier envoi vers le cloud a échoué (' + (_lastPushErrMsg||'erreur inconnue') + '). Cliquez ici.';
     _showSyncAlerte();
   } else if (sinceSync < 0 && sincePush < 0) {
     color = '#f59e0b'; text = '☁️ En attente';
@@ -18476,8 +18655,10 @@ function renderSettingsCompte() {
   html += '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--txt3)">';
   html += '<span id="sync-status">○</span><span>Données partagées · Dernière : </span><span id="sync-time">jamais</span>';
   html += '</div>';
-  html += '<div style="margin-top:6px">';
+  html += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">';
   html += '<button onclick="diagCloud()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);cursor:pointer">🔍 Voir données dans le cloud</button>';
+  html += '<button onclick="_emergencyStorageFree()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer" title="Libère le localStorage saturé — IndexedDB conserve toutes les données">🗑 Libérer l\'espace local</button>';
+  html += '<button onclick="_restoreAffichesFromIDB()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(99,179,135,.3);background:rgba(99,179,135,.07);color:#68d391;cursor:pointer" title="Restaure les affiches des compétitions depuis IndexedDB si elles ont disparu">🖼 Restaurer les affiches</button>';
   html += '</div>';
   html += '</div>';
 
@@ -21006,29 +21187,57 @@ async function pushToCloud() {
       var prev = prevRaw ? JSON.parse(prevRaw) : null;
 
       function countStaff(obj) {
-        return Object.values(obj||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+        if (!obj) return 0;
+        if (Array.isArray(obj)) return obj.length; // format tableau plat [{...}, ...]
+        var vals = Object.values(obj);
+        if (!vals.length) return 0;
+        // format {compId:[...]} — valeurs sont des tableaux
+        if (Array.isArray(vals[0])) return vals.reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+        // format {compId:{...}} — valeurs sont des objets (membres directs)
+        return vals.reduce(function(t,v){
+          if (!v) return t;
+          if (Array.isArray(v)) return t + v.length;
+          if (typeof v === 'object') return t + Object.keys(v).length;
+          return t;
+        }, 0);
       }
       function countPartenaires(obj) {
-        return Object.values(obj||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+        if (!obj) return 0;
+        if (Array.isArray(obj)) return obj.length;
+        var vals = Object.values(obj);
+        if (!vals.length) return 0;
+        if (Array.isArray(vals[0])) return vals.reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+        return vals.reduce(function(t,v){
+          if (!v) return t;
+          if (Array.isArray(v)) return t + v.length;
+          if (typeof v === 'object') return t + Object.keys(v).length;
+          return t;
+        }, 0);
       }
 
       var curStaff = countStaff(S.staff);
       var curPart  = countPartenaires(S.partenaires);
+      // Déterminer si S.staff est VRAIMENT absent (null/undefined) ou juste vide
+      var _staffAbsent = !S.staff || (Array.isArray(S.staff) ? S.staff.length === 0 : Object.keys(S.staff).length === 0);
+      var _partAbsent  = !S.partenaires || (Array.isArray(S.partenaires) ? S.partenaires.length === 0 : Object.keys(S.partenaires).length === 0);
+
+      console.log('[GestSTOL] garde anti-perte : staff=' + curStaff + ' (absent=' + _staffAbsent + ') part=' + curPart + ' (absent=' + _partAbsent + ') prev=', prev);
 
       if (prev) {
         // Alerte si perte > 50% de staff ou partenaires vs dernier push réussi
-        if (prev.staff > 5 && curStaff === 0) {
+        // Ne bloquer que si S.staff est VRAIMENT vide/absent (évite faux positifs de format)
+        if (prev.staff > 5 && curStaff === 0 && _staffAbsent) {
           console.error('[GestSTOL] 🚫 PUSH BLOQUÉ — staff vide (était', prev.staff, 'membres au dernier push)');
           throw new Error('PUSH_BLOCKED_STAFF_EMPTY');
         }
-        if (prev.staff > 5 && curStaff < prev.staff * 0.4) {
+        if (prev.staff > 5 && curStaff === 0 && !_staffAbsent) {
+          console.warn('[GestSTOL] ⚠️ staff compte 0 mais structure non vide — format inattendu, push autorisé. staff=', S.staff);
+        }
+        if (prev.staff > 5 && curStaff > 0 && curStaff < prev.staff * 0.4) {
           console.error('[GestSTOL] ⚠️ PUSH SUSPECT — staff chute de', prev.staff, 'à', curStaff);
           // On laisse passer avec avertissement (peut être volontaire)
         }
-        if (prev.partenaires > 3 && curPart === 0) {
-          console.error('[GestSTOL] 🚫 PUSH BLOQUÉ — partenaires vides (étaient', prev.partenaires, 'au dernier push)');
-          throw new Error('PUSH_BLOCKED_PARTENAIRES_EMPTY');
-        }
+        // Garde partenaires supprimée — trop de faux positifs lors de réinitialisations volontaires
       }
 
       // Mémoriser les compteurs actuels pour le prochain push
@@ -22482,6 +22691,56 @@ function startAutoSync() {
         }
       });
   }, 180000); // toutes les 3 minutes (était 15s — réduction ×12 des requêtes Storage)
+}
+
+// ── Libération d'urgence du localStorage saturé ────────────────────
+function _emergencyStorageFree() {
+  // Calcul avant nettoyage
+  var _before = 0;
+  try {
+    Object.keys(localStorage).forEach(function(k) { _before += (localStorage.getItem(k)||'').length; });
+  } catch(e) {}
+  // Nettoyage agressif (IndexedDB = source de vérité)
+  clearLocalStorageQuota();
+  // Réécrire uniquement la clé critique et les réglages (< 50 Ko)
+  _saveCritical();
+  // Calcul après
+  var _after = 0;
+  try {
+    Object.keys(localStorage).forEach(function(k) { _after += (localStorage.getItem(k)||'').length; });
+  } catch(e) {}
+  var freed = Math.round((_before - _after) / 1024);
+  toast('🗑 ' + freed + ' Ko libérés — IndexedDB conserve tout ✓', 'ok');
+  // Re-sauvegarder proprement
+  setTimeout(saveState, 500);
+  // Restaurer les affiches depuis IDB (supprimées du cache par le nettoyage)
+  setTimeout(_restoreAffichesFromIDB, 800);
+}
+
+// ── RESTAURATION AFFICHES depuis IndexedDB ─────────────
+async function _restoreAffichesFromIDB() {
+  try {
+    var idbData = await loadFromIDB();
+    if (!idbData || !idbData.comps) {
+      toast('Aucune affiche trouvée dans IndexedDB', 'warn');
+      return;
+    }
+    var restored = 0;
+    idbData.comps.forEach(function(ic) {
+      if (!ic.affiche) return;
+      var lc = (S.comps||[]).find(function(c){ return c.id === ic.id; });
+      if (lc) { lc.affiche = ic.affiche; restored++; }
+    });
+    if (restored > 0) {
+      renderCompetitions();
+      if (typeof renderHome === 'function') renderHome();
+      toast('✅ ' + restored + ' affiche(s) restaurée(s) depuis IndexedDB', 'ok');
+    } else {
+      toast('Aucune affiche à restaurer (IndexedDB vide pour les affiches ?)', 'warn');
+    }
+  } catch(e) {
+    toast('Erreur restauration affiches : ' + e.message, 'err');
+  }
 }
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
@@ -24209,8 +24468,12 @@ function _mergeImportIntoPilot(pilot, src, ldb) {
   fill('tel',       v(ldb&&ldb.tel,       src.tel));
   fill('club',      v(ldb&&ldb.club,      src.club));
   fill('region',    v(ldb&&ldb.region,    src.region));
-  fill('ddn',       v(ldb&&ldb.ddn,       src.ddn));
-  fill('genre',     v(ldb&&ldb.genre,     src.genre));
+  // ddn : normaliser vers YYYY-MM-DD pour que new Date() soit fiable
+  var _rawDdn = v(ldb&&ldb.ddn, src.ddn);
+  fill('ddn',   (typeof _mapDate  === 'function') ? _mapDate(_rawDdn)  : _rawDdn);
+  // genre : normaliser vers 'M.' / 'Mme.' pour que les stats fonctionnent
+  var _rawGenre = v(ldb&&ldb.genre, src.genre);
+  fill('genre', (typeof _mapGenre === 'function') ? _mapGenre(_rawGenre) : _rawGenre);
   fill('adresse',   v(ldb&&ldb.adresse,   ''));
   // Champs contrôlés : ne pas écraser si déjà défini
   if (!pilot.pratique   && src.pratique)   pilot.pratique   = src.pratique;
@@ -25024,7 +25287,7 @@ async function syncBase44Registrations(geststolCompId) {
   if (!S.compEnroll) S.compEnroll = {};
   if (!S.compEnroll[geststolCompId]) S.compEnroll[geststolCompId] = [];
 
-  var AIRCRAFT_CLASS_MAP = { classe_2:'pendulaire', classe_3:'multiaxes', classe_4:'autogire', classe_6:'microlight' };
+  var AIRCRAFT_CLASS_MAP = { classe_1:'paramotor', classe_2:'pendulaire', classe_3:'multiaxes', classe_4:'autogire', classe_5:'gyro', classe_6:'microlight', 'PF1':'paramotor', 'PF2':'paramotor' };
 
   // Convertit l'URL base44 privée en URL media.base44.com publique (CORS *)
   var _b44ToMediaUrl = function(url) {
@@ -25033,11 +25296,6 @@ async function syncBase44Registrations(geststolCompId) {
     return m ? 'https://media.base44.com/images/public/' + m[1] : url;
   };
 
-  // Diagnostic : afficher les clés du premier inscrit pour identifier les bons noms de champs
-  if (regs.length > 0) {
-    console.log('[Base44 fields] Clés disponibles sur la 1ère inscription :', JSON.stringify(Object.keys(regs[0])));
-    console.log('[Base44 fields] Exemple reg[0] :', JSON.stringify(regs[0]).substring(0, 500));
-  }
 
   regs.forEach(function(reg) {
     // a. Chercher pilote existant
@@ -25123,14 +25381,30 @@ async function syncBase44Registrations(geststolCompId) {
     // d. Ajouter / mettre à jour ULM
     if (!S.ulms[pilotId]) S.ulms[pilotId] = [];
     var existingUlm = S.ulms[pilotId].find(function(u){ return u._base44RegId === reg.id; });
+    if (existingUlm) {
+      // Mettre à jour les champs ULM depuis Base44
+      var _updMoteur = reg.engine_brand || reg.aircraft_engine_brand_model || '';
+      var _updHelice = reg.propeller_model || '';
+      var _updClasse = AIRCRAFT_CLASS_MAP[reg.aircraft_class] || (reg.practice === 'paramotor' ? 'paramotor' : '') || existingUlm.classe || '';
+      if (_updMoteur) existingUlm.moteur = _updMoteur;
+      if (_updHelice) existingUlm.helice = _updHelice;
+      if (_updClasse) existingUlm.classe = _updClasse;
+      if (reg.aircraft_brand || reg.chassis_brand) existingUlm.marque = reg.aircraft_brand || reg.chassis_brand;
+      if (reg.aircraft_model) existingUlm.modele = reg.aircraft_model;
+    }
     if (!existingUlm) {
+      // Mapping Base44 API → Gest'DTN (vérifié sur données réelles) :
+      // engine_brand / aircraft_engine_brand_model → moteur
+      // propeller_model                            → helice
+      // aircraft_class (classe_1…PF1/PF2…)        → classe ULM
+      // discipline = discipline de COMPÉTITION (stol/slalom/classic) → ne pas mettre dans ULM
       S.ulms[pilotId].push({
         id:            'ulm-b44-' + reg.id,
         _base44RegId:  reg.id,
         marque:        reg.aircraft_brand  || reg.chassis_brand || '',
         modele:        reg.aircraft_model  || '',
         immat:         reg.aircraft_registration || reg.wing_registration_1 || '',
-        classe:        AIRCRAFT_CLASS_MAP[reg.aircraft_class] || '',
+        classe:        AIRCRAFT_CLASS_MAP[reg.aircraft_class] || (reg.practice === 'paramotor' ? 'paramotor' : '') || '',
         moteur:        reg.engine_brand || reg.aircraft_engine_brand_model || '',
         helice:        reg.propeller_model || '',
         places:        reg.seat_config === 'biplace' ? '2' : '1'
@@ -25214,13 +25488,28 @@ function _showSyncAlerte() {
   div.id = '_sync-alerte-banner';
   div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 4px 20px rgba(239,68,68,.5)';
   var _errM = (_lastPushErrMsg||'').toLowerCase();
+  var _errRaw = _lastPushErrMsg || '';
   var _isPaused = !navigator.onLine ? false : (_errM === '' || _errM.indexOf('fetch') !== -1 || _errM.indexOf('networkerror') !== -1 || _errM.indexOf('failed to fetch') !== -1 || _errM.indexOf('cors') !== -1);
-  var _causeMsg = _isPaused
-    ? '⚠️ Supabase <b>EN PAUSE</b> — <a href="https://supabase.com/dashboard" target="_blank" style="color:#ffe4e4;text-decoration:underline">Reprendre le projet →</a>'
-    : ('⚠️ DONNÉES NON SAUVEGARDÉES SUR LE CLOUD depuis ' + Math.round(failDur/60) + 'min');
+  var _isBlocked = _errM.indexOf('push_blocked') === 0;
+  var _isTimeout = _errM.indexOf('timeout') !== -1;
+  var _causeMsg, _extraBtn = '';
+  if (_isPaused) {
+    _causeMsg = '⚠️ Supabase <b>EN PAUSE</b> — <a href="https://supabase.com/dashboard" target="_blank" style="color:#ffe4e4;text-decoration:underline">Reprendre le projet →</a>';
+  } else if (_isBlocked) {
+    var _blockedWhat = _errM.indexOf('staff') !== -1 ? 'équipe' : 'partenaires';
+    _causeMsg = '⚠️ Sauvegarde BLOQUÉE (protection anti-perte ' + _blockedWhat + ')';
+    _extraBtn = '<button onclick="_forceUnblockPush()" style="background:#fff;color:#dc2626;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">🔓 Débloquer</button>';
+  } else if (_isTimeout) {
+    _causeMsg = '⚠️ DONNÉES NON SAUVEGARDÉES — Délai dépassé (réseau lent ?)';
+  } else if (_errRaw) {
+    _causeMsg = '⚠️ DONNÉES NON SAUVEGARDÉES — <span style="font-weight:400;font-size:11px">' + _errRaw.replace(/</g,'&lt;').slice(0,80) + '</span>';
+  } else {
+    _causeMsg = '⚠️ DONNÉES NON SAUVEGARDÉES SUR LE CLOUD depuis ' + Math.round(failDur/60) + 'min';
+  }
   div.innerHTML = '<span>' + _causeMsg + '</span>'
     + '<div style="display:flex;gap:8px;flex-shrink:0">'
     + '<button onclick="exportData()" style="background:#fff;color:#ef4444;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">⬇ Sauvegarder maintenant</button>'
+    + _extraBtn
     + '<button onclick="_retrySyncAlerte()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">🔄 Réessayer</button>'
     + '<button onclick="this.parentElement.parentElement.remove();_syncAlerteShown=false" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:0 4px">✕</button>'
     + '</div>';
@@ -25239,6 +25528,32 @@ function _retrySyncAlerte() {
     updateSyncHealthPill();
   }).catch(function(){
     toast('❌ Échec — téléchargez la sauvegarde JSON', 'err');
+  });
+}
+
+// Déblocage d'urgence du garde anti-perte (PUSH_BLOCKED_*)
+// Réinitialise les compteurs mémorisés et relance le push immédiatement
+function _forceUnblockPush() {
+  try { localStorage.removeItem('geststol_last_push_counts'); } catch(e) {}
+  var ban = document.getElementById('_sync-alerte-banner');
+  if (ban) ban.remove();
+  _syncAlerteShown = false;
+  _lastPushFailed = false;
+  _lastPushErrMsg = '';
+  toast('🔓 Garde désactivé — tentative de sauvegarde…', '');
+  pushToCloud().then(function(){
+    _lastPushOkAt   = Date.now();
+    _lastPushFailed = false;
+    _lastPushErrMsg = '';
+    _syncFailSince  = 0;
+    toast('✅ Sauvegarde cloud réussie', 'ok');
+    updateSyncHealthPill();
+  }).catch(function(e){
+    _lastPushFailed = true;
+    _lastPushErrMsg = e ? (e.message||'') : '';
+    _syncFailSince  = _syncFailSince || Date.now();
+    toast('❌ Échec même après déblocage : ' + (e&&e.message||'erreur'), 'err');
+    updateSyncHealthPill();
   });
 }
 
@@ -27499,18 +27814,37 @@ async function _base44DoImportMulti(regs, eventIds, compId) {
 
     // ── ULM / matériel ──
     var immat = (r.aircraft_registration || r.wing_registration_1 || '').trim();
-    var moteur = (r.engine_brand||'') + (r.engine_model ? ' '+r.engine_model : '') || (r.aircraft_engine||'') || (r.aircraft_engine_brand_model||'');
-    if (immat || r.aircraft_brand || r.aircraft_model || r.wing_registration_1) {
-      _mergeImportUlm(pid,
-        immat,
-        (r.aircraft_brand || r.chassis_brand || '').trim(),
-        (r.aircraft_model||'').trim(),
-        classe || (pratique==='paramoteur' ? 'paramotor' : 'multiaxes'),
-        r.discipline||'',
-        moteur.trim(),
-        r.propeller_model||'',
-        (r.wing_registration_1||'').trim()
-      );
+    // Moteur = engine_brand (ex: "ROTAX 80 CV", "Vottorazzimoster 185 plus")
+    // Hélice = propeller_model (ex: "eprops")
+    // Discipline = competition type (classic/slalom/stol) → NE PAS mettre dans ULM
+    var moteur = ((r.engine_brand||'') + (r.engine_model ? ' '+r.engine_model : '')).trim()
+                 || (r.aircraft_engine_brand_model||'') || (r.aircraft_engine||'');
+    var helice = r.propeller_model||'';
+    // Créer ou mettre à jour l'ULM avec les bons champs
+    if (!S.ulms[pid]) S.ulms[pid] = [];
+    var _ulmExist = S.ulms[pid][0];
+    if (_ulmExist) {
+      // Mise à jour forcée des champs matériel
+      if (r.aircraft_brand || r.chassis_brand) _ulmExist.marque = (r.aircraft_brand||r.chassis_brand||'').trim();
+      if (r.aircraft_model) _ulmExist.modele = r.aircraft_model.trim();
+      if (immat) _ulmExist.immat = immat;
+      _ulmExist.classe = classe || (pratique==='paramoteur' ? 'paramotor' : 'multiaxes');
+      _ulmExist.moteur = moteur;  // toujours écraser — engine_brand, pas discipline
+      _ulmExist.helice = helice;  // toujours écraser — propeller_model
+      _ulmExist._updatedAt = Date.now();
+    } else {
+      S.ulms[pid].push({
+        id: 'ulm-b44-' + r.id,
+        _base44RegId: r.id,
+        immat:  immat,
+        marque: (r.aircraft_brand || r.chassis_brand || '').trim(),
+        modele: (r.aircraft_model||'').trim(),
+        classe: classe || (pratique==='paramoteur' ? 'paramotor' : 'multiaxes'),
+        moteur: moteur,   // engine_brand
+        helice: helice,   // propeller_model
+        places: r.seat_config === 'biplace' ? '2' : '1',
+        _updatedAt: Date.now()
+      });
     }
   });
 
@@ -27526,12 +27860,46 @@ async function _base44DoImportMulti(regs, eventIds, compId) {
   if (!S._enrollResetAt) S._enrollResetAt = {};
   S._enrollResetAt[compId] = Date.now();
 
+  // ── Correction des données déjà mal importées (bug ordre des arguments) ──────
+  _fixB44UlmMapping();
+
   saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   var _evLabel = eventIds.length > 1 ? eventIds.length+' événements fusionnés' : '1 événement';
   toast(nbEnrolled+' inscrit'+(nbEnrolled>1?'s':'')+' importé'+(nbEnrolled>1?'s':'')+' ('+_evLabel+')'+(nbUpdated?' · '+nbUpdated+' mis à jour':''), 'ok');
   console.log('[base44] créés:'+nbCreated+' mis à jour:'+nbUpdated+' inscrits:'+nbEnrolled+' events:'+eventIds.join(','));
 
 }
+
+// ── Correction globale des ULM mal importés depuis Base44 ─────────────────────
+// Le bug original mettait discipline→moteur, moteur→helice, helice→voile
+// Cette fonction détecte et corrige tous les ULMs affectés
+function _fixB44UlmMapping() {
+  // Valeurs de discipline qui ne doivent JAMAIS être dans un champ moteur
+  var _isDisc = function(s) {
+    var v = (s||'').toLowerCase().trim();
+    return v==='classic'||v==='slalom'||v==='stol'||v==='performance'||v==='speed'||v==='cross'||v==='freestyle'||v==='';
+  };
+  var fixed = 0;
+  Object.keys(S.ulms||{}).forEach(function(pid) {
+    (S.ulms[pid]||[]).forEach(function(ulm) {
+      if (!ulm._base44RegId) return; // seulement les ULMs importés depuis Base44
+      var curMoteur = (ulm.moteur||'').trim();
+      var curHelice = (ulm.helice||'').trim();
+      var curVoile  = (ulm.voile||'').trim();
+      // Cas typique du bug : moteur contient une discipline, helice contient le vrai moteur
+      if (_isDisc(curMoteur) && curHelice) {
+        ulm.moteur = curHelice;        // le vrai moteur était dans hélice
+        ulm.helice = curVoile || '';   // le vrai hélice était dans voile
+        ulm.voile  = '';               // voile corrigé
+        fixed++;
+      }
+    });
+  });
+  if (fixed > 0) {
+    console.log('[GestSTOL] _fixB44UlmMapping: ' + fixed + ' ULM(s) corrigé(s)');
+  }
+}
+
 // ── Auto-sync base44 toutes les 5 minutes sur la compétition active ──────────
 (function() {
   var _b44AutoTimer = null;
@@ -27683,8 +28051,8 @@ function importEquipageAuto(inp, compId) {
             pilot = {
               id: 'p_csv_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
               nom:nomF, prenom:prenomF, licence:licF,
-              genre:(ldb&&ldb.genre)||get(r,'genre')||'',
-              ddn:(ldb&&ldb.ddn)||get(r,'ddn')||'',
+              genre:(typeof _mapGenre==='function')?_mapGenre((ldb&&ldb.genre)||get(r,'genre')||''):((ldb&&ldb.genre)||get(r,'genre')||''),
+              ddn:(typeof _mapDate==='function')?_mapDate((ldb&&ldb.ddn)||get(r,'ddn')||''):((ldb&&ldb.ddn)||get(r,'ddn')||''),
               email:(ldb&&ldb.email)||get(r,'email')||'',
               tel:(ldb&&ldb.tel)||get(r,'tel')||'',
               club:(ldb&&ldb.club)||get(r,'club')||'',
@@ -29364,6 +29732,9 @@ function importDataFull(inp) {
       delete data._exportMeta;
       // Écraser S
       Object.keys(data).forEach(function(k) { S[k] = data[k]; });
+      // Réinitialiser la garde anti-perte (les compteurs anciens ne sont plus valides)
+      try { localStorage.removeItem('geststol_last_push_counts'); } catch(e) {}
+      _lastPushFailed = false; _lastPushErrMsg = ''; _syncFailSince = 0;
       // Sauvegarder dans localStorage ET IndexedDB
       saveState();
       toast('Restauration : envoi vers le cloud…', 'ok');
@@ -35720,6 +36091,11 @@ function _crpBtnOut(key) {
 }
 
 function _crpRender() {
+  // Garantir la visibilité du panneau si _crpOpen est positionné
+  if (_crpOpen) {
+    var _panel = document.getElementById('comp-right-panel');
+    if (_panel && _panel.style.display !== 'flex') _panel.style.display = 'flex';
+  }
   var title = document.getElementById('crp-title');
   var body  = document.getElementById('crp-body');
   var foot  = document.getElementById('crp-footer');
@@ -35761,7 +36137,7 @@ function _crpRenderTodo(body, footer) {
     html += '<span style="font-size:10px;color:var(--txt3);display:inline-block;transform:rotate('+(open?'90':'0')+'deg);transition:transform .18s">▶</span>';
     html += '<span style="flex:1;font-size:12px;font-weight:700;color:'+(done?'var(--txt3)':'var(--txt)')+'">'+_todoEsc(dom.label)+'</span>';
     if (domTaches.length) html += '<span style="font-size:10px;color:var(--txt3)">'+pct+'%</span>';
-    html += '<button onclick="event.stopPropagation();todoDeleteDomaine(\''+dom.id+'\')" style="'+bDel+'" title="Supprimer">×</button>';
+    html += '<button id="crpdd-'+dom.id+'" onclick="event.stopPropagation();_crpTodoDelDom(\''+dom.id+'\')" style="'+bDel+'" title="Supprimer (2× pour confirmer)">×</button>';
     html += '</div>';
     if (open) {
       domTaches.forEach(function(t) {
@@ -35816,6 +36192,29 @@ function crpTodoAddTache(domaineId) {
   _crpRenderTodo(document.getElementById('crp-body'), document.getElementById('crp-footer'));
 }
 
+// Suppression domaine dans le volet CRP — double-clic (évite confirm() bloqué en PWA)
+var _crpDomDelPending = {};
+function _crpTodoDelDom(domId) {
+  var btn = document.getElementById('crpdd-'+domId);
+  if (_crpDomDelPending[domId]) {
+    clearTimeout(_crpDomDelPending[domId]);
+    delete _crpDomDelPending[domId];
+    var todos = getHomeTodosForCurrentComp();
+    for (var i = todos.length-1; i >= 0; i--) {
+      if (todos[i].id===domId || todos[i].domaineId===domId) todos.splice(i,1);
+    }
+    saveState(); if (typeof silentPush==='function') silentPush();
+    if (typeof renderHomeTodoPanel==='function') renderHomeTodoPanel();
+    _crpRenderTodo(document.getElementById('crp-body'), document.getElementById('crp-footer'));
+  } else {
+    if (btn) { btn.textContent='?'; btn.style.background='rgba(239,68,68,.35)'; btn.style.color='#fff'; }
+    _crpDomDelPending[domId] = setTimeout(function(){
+      delete _crpDomDelPending[domId];
+      if (btn) { btn.textContent='×'; btn.style.background='rgba(239,68,68,.10)'; btn.style.color='#ef4444'; }
+    }, 2500);
+  }
+}
+
 // ── Documents ─────────────────────────────────────────────────────
 function _crpRenderDocs(body, footer) {
   if (!body) return;
@@ -35849,18 +36248,59 @@ function _crpRenderDocs(body, footer) {
     html += '<div style="color:var(--txt3);font-size:12px;text-align:center;padding:20px 4px">Aucun document pour cette compétition.</div>';
   } else {
     docs.forEach(function(d) {
-      var ico = d.type==='link' ? '🔗' : ((d.mimeType||'').startsWith('image') ? '🖼' : '📄');
-      html += '<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;border:1px solid var(--bdr);margin-bottom:5px;background:var(--navy3)">';
-      html += '<span style="font-size:14px">'+ico+'</span>';
-      html += '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc2(d.label||d.name||'Document')+'</div>';
+      var ico = d.type==='link' ? '🔗' : ((d.mimeType||d.type||'').startsWith('image') ? '🖼' : '📄');
+      var label = esc2(d.label||d.name||'Document');
+      var openable = !!(d.url || d.data);
+      html += '<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;border:1px solid var(--bdr);margin-bottom:5px;background:var(--navy3)'+(openable?';cursor:pointer':'')+'"'+(openable?' onclick="_crpDocOpen(\''+esc2(d.id)+'\')"':'')+' title="'+(openable?'Ouvrir':'')+'">';
+      html += '<span style="font-size:15px;flex-shrink:0">'+ico+'</span>';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div id="crplbl-'+esc2(d.id)+'" style="font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</div>';
       if (d.size) html += '<div style="font-size:10px;color:var(--txt3)">'+(d.size<1048576?Math.round(d.size/1024)+'Ko':(d.size/1048576).toFixed(1)+'Mo')+'</div>';
       html += '</div>';
-      if (d.url) html += '<a href="'+esc2(d.url)+'" target="_blank" rel="noopener" style="flex-shrink:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bdr);color:var(--txt2);text-decoration:none;font-size:13px" title="Ouvrir">↗</a>';
-      html += '<button id="crpdel-'+esc2(d.id)+'" onclick="event.stopPropagation();_crpDocDelete(\''+esc2(d.id)+'\')" style="flex-shrink:0;width:24px;height:24px;border-radius:5px;border:none;background:rgba(239,68,68,.1);color:#ef4444;font-size:13px;cursor:pointer;font-family:inherit" title="Supprimer">×</button>';
+      // Bouton renommer
+      html += '<button onclick="event.stopPropagation();_crpDocRename(\''+esc2(d.id)+'\')" style="flex-shrink:0;width:24px;height:24px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:11px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center" title="Renommer">✏</button>';
+      // Bouton supprimer (double-clic)
+      html += '<button id="crpdel-'+esc2(d.id)+'" onclick="event.stopPropagation();_crpDocDelete(\''+esc2(d.id)+'\')" style="flex-shrink:0;width:24px;height:24px;border-radius:5px;border:none;background:rgba(239,68,68,.1);color:#ef4444;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center" title="Supprimer (2× pour confirmer)">×</button>';
       html += '</div>';
     });
   }
   body.innerHTML = html;
+}
+
+function _crpDocOpen(id) {
+  var doc = (S.documents||[]).find(function(d){ return d.id===id; });
+  if (!doc) return;
+  if (doc.url)  { window.open(doc.url,  '_blank', 'noopener'); return; }
+  if (doc.data) { window.open(doc.data, '_blank'); return; }
+}
+
+function _crpDocRename(id) {
+  var doc = (S.documents||[]).find(function(d){ return d.id===id; });
+  if (!doc) return;
+  var lbl = document.getElementById('crplbl-'+id);
+  if (!lbl) return;
+  var current = doc.label || doc.name || '';
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = current;
+  inp.style.cssText = 'width:100%;background:var(--navy2);border:1px solid var(--stol);border-radius:5px;color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;padding:2px 6px;outline:none;box-sizing:border-box';
+  lbl.innerHTML = '';
+  lbl.appendChild(inp);
+  inp.focus(); inp.select();
+  function _save() {
+    var v = inp.value.trim();
+    if (v && v !== current) {
+      if (doc.label !== undefined) doc.label = v; else doc.name = v;
+      doc._updatedAt = Date.now();
+      saveState(); if (typeof silentPush==='function') silentPush();
+    }
+    _crpRenderDocs(document.getElementById('crp-body'), document.getElementById('crp-footer'));
+  }
+  inp.onblur = _save;
+  inp.onkeydown = function(e) {
+    if (e.key === 'Enter')  { e.preventDefault(); _save(); }
+    if (e.key === 'Escape') { _crpRenderDocs(document.getElementById('crp-body'), document.getElementById('crp-footer')); }
+  };
 }
 
 function _crpDocLinkToggle() {
@@ -35926,8 +36366,22 @@ function _compSbSetActive(pageId) {
   // À faire / Documents : visibles seulement sur page-comp-detail
   var tools = document.getElementById('dtn-sub-detail-tools');
   if (tools) tools.style.display = (pageId === 'page-comp-detail') ? 'block' : 'none';
-  // Fermer le panneau droit si on quitte page-comp-detail
-  if (pageId !== 'page-comp-detail' && typeof _crpOpen !== 'undefined' && _crpOpen) _crpClose();
+
+  if (pageId === 'page-comp-detail') {
+    // Restaurer le panneau droit si _crpOpen est mémorisé
+    if (typeof _crpOpen !== 'undefined' && _crpOpen) {
+      var _crpPanelRestore = document.getElementById('comp-right-panel');
+      if (_crpPanelRestore) _crpPanelRestore.style.display = 'flex';
+      _crpHighlightSbBtn(_crpOpen);
+      _crpRender();
+    }
+  } else if (typeof _crpOpen !== 'undefined' && _crpOpen) {
+    // Masquer le panneau droit quand on quitte page-comp-detail, mais mémoriser _crpOpen
+    // pour le restaurer automatiquement au retour sur page-comp-detail
+    var _crpPanelHide = document.getElementById('comp-right-panel');
+    if (_crpPanelHide) _crpPanelHide.style.display = 'none';
+    // Ne PAS remettre _crpOpen à null : on garde la mémoire du panneau ouvert
+  }
 }
 
 function _compSbNav(pageId) {
