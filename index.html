@@ -268,6 +268,7 @@ body.theme-light .ag-wdh.ag-wend{color:rgba(0,0,0,.25)}
 body.theme-light .ag-day-cell{border-color:rgba(0,0,0,.07)}
 body.theme-light .ag-day-cell.ag-wend-cell{background:rgba(0,0,0,.02)}
 body.theme-light .ag-day-num{color:#1e293b}
+body.theme-light .ag-day-num.ag-today{color:#fff!important}
 body.theme-light .ag-list-mhdr{background:#f8fafc;border-color:rgba(0,0,0,.08)}
 body.theme-light .ag-list-row{border-color:rgba(0,0,0,.05)}
 body.theme-light .ag-list-row:hover{background:#f1f5f9}
@@ -460,7 +461,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   }
 
   /* ── Header ── */
-  #header{grid-column:1;grid-row:1;height:60px;padding:0 20px;justify-content:space-between}
+  #header{grid-column:1;grid-row:1;height:60px;padding:0 20px;justify-content:space-between;position:relative}
   #header-desktop-brand{display:flex!important}
   #dtn-base-btn{display:none!important}
   #header-mobile-title{display:none!important}
@@ -496,7 +497,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   /* ── Workspace sidebar compétitions ── */
   #comp-sidebar{display:none;position:fixed;left:0;top:0;bottom:0;width:216px;z-index:150;background:var(--navy2);border-right:1px solid var(--bdr);flex-direction:column;overflow-y:auto}
   body.has-comp-sidebar{justify-content:flex-start!important}
-  body.has-comp-sidebar #app{width:calc(100vw - 216px)!important;max-width:none!important;margin-left:216px!important;margin-right:0!important}
+  body.has-comp-sidebar #app{width:calc(100vw - 216px)!important;max-width:none!important;margin-left:216px!important;margin-right:0!important;transition:margin-left .22s ease,width .22s ease}
+  body.has-comp-sidebar.dtn-sb-hidden #app{width:100vw!important;margin-left:0!important}
+  body.dtn-sb-hidden #header-mobile-title{display:none!important}
   body.has-comp-sidebar #desktop-nav-rail{display:none!important}
   body.has-comp-sidebar #home-col-left,body.has-comp-sidebar #home-todo-panel{left:236px!important}
   /* En-tête : masquer logo + brand + titre central (déjà dans le sidebar DTN) */
@@ -504,6 +507,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   body.has-comp-sidebar #header-desktop-brand,
   body.has-comp-sidebar #header-desktop-center{display:none!important}
   body.has-comp-sidebar #header{padding-left:8px}
+  /* Sidebar cachée : spacer pour pousser sync+avatar à droite */
+  body.dtn-sb-hidden #header-spacer{display:block!important;flex:1!important}
 
   /* ── Zone contenu ── */
   #main{grid-column:1;grid-row:2;overflow:visible;height:calc(100vh - 60px);padding-bottom:0}
@@ -575,12 +580,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     overflow-y:auto;
     overflow-x:hidden;
   }
-  /* Compétitions : header fixe + liste scrollable */
+  /* Compétitions : masquée par défaut, affichée uniquement quand active */
+  #page-competitions{display:none!important}
   #page-competitions.active{
+    display:flex!important;
+    flex-direction:column;
     overflow-y:hidden;
     overflow-x:hidden;
-    display:flex;
-    flex-direction:column;
   }
   #page-moyens.active,#page-acteurs.active{
     display:flex!important;
@@ -841,6 +847,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
   <!-- HEADER -->
   <div id="header">
+    <!-- Bouton afficher sidebar DTN (visible dans app quand sidebar cachée) -->
+    <button id="dtn-sb-show-btn2" onclick="_dtnToggleSidebar()" title="Afficher le menu"
+      style="display:none;width:34px;height:34px;align-items:center;justify-content:center;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit;flex-shrink:0;margin-right:4px"
+      onmouseover="this.style.background='var(--navy4)'" onmouseout="this.style.background='var(--navy3)'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
     <!-- Bouton Base DTN (affiché uniquement en mode module depuis Gest'DTN) -->
     <button id="dtn-base-btn" onclick="showDTNPortal()" style="display:none;align-items:center;gap:5px;padding:5px 10px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;flex-shrink:0;margin-right:4px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -859,6 +871,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
     <!-- Desktop : titre centré -->
     <div id="header-desktop-center" style="display:none;font-size:19px;font-weight:800;flex:1;text-align:center">Compétitions</div>
+    <!-- Spacer flex pour pousser sync+avatar à droite -->
+    <div id="header-spacer" style="display:none;flex:1"></div>
     <!-- Mobile : titre (masqué) -->
     <div id="header-mobile-title" style="font-size:20px;font-weight:800;flex:1">Gest<span style="color:var(--stol)">'STOL</span></div>
     <!-- Mobile : logo FFPLUM SPORT -->
@@ -868,15 +882,15 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <span style="color:#2e4a9e">FF</span><span style="color:transparent;-webkit-text-stroke:1.5px #2e4a9e">PLUM</span><span style="color:#2e4a9e"> </span><span style="color:#c41230">SPORT</span>
       </div>
     </div>
-    <!-- Indicateur de santé sync (toujours visible) -->
-    <div id="sync-health-pill" onclick="showSyncHealthPanel()" title="État de la synchronisation" style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);cursor:pointer;flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
-      <span id="sync-health-dot" style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;transition:background .4s"></span>
-      <span id="sync-health-lbl" style="font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">☁️ —</span>
-    </div>
     <!-- Badge ODM en attente de validation -->
     <div id="odm-validation-badge" onclick="openOdmValidationPanel()" title="ODM en attente de validation présidente" style="display:none;position:relative;cursor:pointer;margin-right:4px">
       <div style="width:36px;height:36px;border-radius:50%;background:rgba(239,68,68,.12);border:2px solid #ef4444;display:flex;align-items:center;justify-content:center;font-size:18px">🔔</div>
       <div id="odm-validation-count" style="position:absolute;top:-3px;right:-3px;background:#ef4444;color:#fff;font-size:10px;font-weight:900;border-radius:10px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--navy2)"></div>
+    </div>
+    <!-- Indicateur de santé sync (déplacé à droite) -->
+    <div id="sync-health-pill" onclick="showSyncHealthPanel()" title="État de la synchronisation" style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;border:1.5px solid var(--bdr);background:var(--navy3);cursor:pointer;flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
+      <span id="sync-health-dot" style="width:8px;height:8px;border-radius:50%;background:#6b7280;flex-shrink:0;transition:background .4s"></span>
+      <span id="sync-health-lbl" style="font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">☁️ —</span>
     </div>
     <!-- Avatar + flèche (nom supprimé) -->
     <div id="header-identity" style="display:flex;align-items:center;gap:5px;flex-shrink:0;cursor:pointer;border-radius:24px;padding:3px 6px 3px 3px;transition:background .15s" onclick="openUserAccountPopup()" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background=''">
@@ -1162,61 +1176,61 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
 
     <!-- PAGE COMPÉTITIONS -->
-    <div class="page active" id="page-competitions">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;flex-wrap:wrap;gap:8px;flex-shrink:0">
+    <div class="page" id="page-competitions">
+      <!-- Titre + Filtres + Boutons -->
+      <div style="padding:12px 16px 4px;flex-shrink:0">
         <div style="font-size:18px;font-weight:700">Compétitions</div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap">
-          <!-- Groupe vitré -->
-          <div class="mob-hidden" style="display:flex;gap:4px;align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 6px">
-            <button onclick="openGlobalGantt()" title="Planning global de la saison" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Planning global
-            </button>
-            <div style="position:relative" id="comps-act-wrap">
-              <button onclick="_compsActMenu()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                Actions
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div id="comps-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">
-                <button onclick="exportComps('json');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>
-                <button onclick="exportComps('excel');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>
-                <button onclick="exportComps('csv');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>
-                <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
-                <label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" id="comps-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importComps(this);_compsActClose()"></label>
-                <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
-                <button onclick="printComps();_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>
-              </div>
-            </div>
-          </div>
-          <button class="btn btn-sm btn-primary" id="btn-add-comp" style="display:none" onclick="openAddComp()">+ Créer</button>
-        </div>
       </div>
-      <!-- Barre de filtres -->
-      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 8px;flex-wrap:wrap;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 14px 8px;flex-shrink:0;flex-wrap:wrap">
         <!-- Recherche -->
-        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;min-width:140px;flex:1">
+        <div style="display:flex;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:0 10px;gap:6px;flex:1;min-width:80px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="flex-shrink:0;color:var(--txt3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 0;outline:none;min-width:0" oninput="_debRender()">
+          <input id="comp-search-filter" type="search" placeholder="Rechercher…" style="flex:1;background:transparent;border:none;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 0;outline:none;min-width:0" oninput="_debRender()">
         </div>
         <!-- Saison -->
-        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="_globalSaison=this.value;_syncSaisonSelects();renderCompetitions()">
+        <select id="comp-season-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none;flex-shrink:0" onchange="_globalSaison=this.value;_syncSaisonSelects();renderCompetitions()">
           <option value="all">Toutes saisons</option>
         </select>
         <!-- Pratique -->
-        <select id="comp-pratique-filter" class="mob-hidden" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
+        <select id="comp-pratique-filter" class="mob-hidden" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
           <option value="all">Toutes pratiques</option>
           <option value="microlight">Microlight</option>
           <option value="paramoteur">Paramoteur</option>
           <option value="multi">Multi-pratiques</option>
         </select>
         <!-- Discipline -->
-        <select id="comp-discipline-filter" class="mob-hidden" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
+        <select id="comp-discipline-filter" class="mob-hidden" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none;flex-shrink:0" onchange="renderCompetitions()">
           <option value="all">Toutes disciplines</option>
           <option value="classic">Classic</option>
           <option value="slalom">Slalom</option>
           <option value="stol">STOL</option>
         </select>
+        <!-- Séparateur -->
+        <div style="width:1px;height:24px;background:var(--bdr);flex-shrink:0"></div>
+        <!-- Bouton Planning global -->
+        <button onclick="openGlobalGantt()" class="mob-hidden" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background .12s" onmouseover="this.style.background='var(--navy4)'" onmouseout="this.style.background='var(--navy3)'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Planning global
+        </button>
+        <!-- Bouton Actions -->
+        <div style="position:relative;flex-shrink:0" id="comps-act-wrap" class="mob-hidden">
+          <button onclick="_compsActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background='var(--navy4)'" onmouseout="this.style.background='var(--navy3)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            Actions
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="comps-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">
+            <button onclick="exportComps('json');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>
+            <button onclick="exportComps('excel');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>
+            <button onclick="exportComps('csv');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>
+            <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
+            <label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" id="comps-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importComps(this);_compsActClose()"></label>
+            <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
+            <button onclick="printComps();_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>
+          </div>
+        </div>
+        <!-- Bouton + Créer -->
+        <button class="btn btn-sm btn-primary" id="btn-add-comp" style="display:none;height:32px;padding:0 12px;font-size:12px;flex-shrink:0" onclick="openAddComp()">+ Créer</button>
       </div>
       <div id="comp-list" style="flex:1;overflow-y:auto;overflow-x:hidden"></div>
     </div>
@@ -2219,8 +2233,29 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 <div id="page-dtn" style="display:none;position:fixed;inset:0;z-index:300;background:var(--bg);flex-direction:column;overflow:hidden">
 
   <!-- ── Header : offset sidebar 216px, contrôles à droite ── -->
-  <div style="background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;padding-left:216px">
-    <div style="padding:10px 20px;display:flex;align-items:center;justify-content:flex-end;gap:8px">
+  <div id="dtn-header" style="background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;padding-left:216px;transition:padding-left .22s ease">
+    <div style="padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:relative">
+
+      <!-- Bouton afficher sidebar à GAUCHE (visible uniquement quand sidebar cachée) -->
+      <button id="dtn-sb-show-btn" onclick="_dtnToggleSidebar()" title="Afficher le menu"
+        style="display:none;width:34px;height:34px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:var(--navy2);color:var(--txt2);cursor:pointer;font-family:inherit;transition:all .15s;flex-shrink:0;position:relative;z-index:10"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.28)';this.style.background='rgba(255,255,255,.1)'"
+        onmouseout="this.style.borderColor='rgba(255,255,255,.12)';this.style.background='var(--navy2)'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+
+      <!-- Logo + titre Gest'DTN centré (sidebar cachée) -->
+      <div id="dtn-header-brand" style="display:none;align-items:center;gap:10px;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none">
+        <div id="dtn-brand-logo-wrap" style="width:36px;height:36px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.25)">
+          <!-- Contenu copié depuis dtn-sb-logo-fb au moment de l'affichage -->
+        </div>
+        <div style="line-height:1.25">
+          <div style="font-size:8px;font-weight:700;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase">FFPLUM</div>
+          <div style="font-size:14px;font-weight:900;color:var(--txt);letter-spacing:-.3px">Gest'<span style="color:var(--stol)">DTN</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
 
       <button id="dtn-fs-btn" onclick="toggleFullscreen()" title="Plein écran"
         style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.05);color:var(--txt2);cursor:pointer;font-family:inherit;transition:all .15s;flex-shrink:0"
@@ -2244,11 +2279,11 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   <div style="flex:1;display:flex;overflow:hidden">
 
     <!-- Espaceur pour la sidebar fixe (216px) -->
-    <div style="width:216px;flex-shrink:0"></div>
+    <div id="dtn-sb-spacer" style="width:216px;flex-shrink:0;transition:width .22s ease"></div>
 
     <!-- ══ WORKSPACE ══ -->
     <div id="dtn-workspace-body" style="flex:1;overflow-y:auto;background:var(--bg)">
-      <div style="max-width:880px;padding:28px 32px 52px">
+      <div style="padding:28px 32px 52px">
 
         <!-- Zone Aujourd'hui -->
         <div id="dtn-today-zone" style="margin-bottom:32px">
@@ -2279,7 +2314,14 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
 <!-- ══ SIDEBAR DTN — niveau body, z-index racine 2500 ══
      Positionnée HORS de #page-dtn pour dépasser l'agenda (z:800) et le gantt (z:2000) -->
-<div id="dtn-sidebar" style="display:none;position:fixed;left:0;top:0;bottom:0;width:216px;z-index:2500;background:var(--navy2);border-right:1px solid var(--bdr);flex-direction:column;overflow:hidden">
+<div id="dtn-sidebar" style="display:none;position:fixed;left:0;top:0;bottom:0;width:216px;z-index:2500;background:var(--navy2);border-right:1px solid var(--bdr);flex-direction:column;overflow:hidden;transition:transform .22s ease">
+
+  <!-- Bouton fermer sidebar -->
+  <button onclick="_dtnToggleSidebar()" title="Réduire le menu"
+    style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;border-radius:7px;background:rgba(255,255,255,.07);color:var(--txt3);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;transition:background .15s"
+    onmouseover="this.style.background='rgba(255,255,255,.15)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
 
   <!-- Brand -->
   <div style="padding:10px 14px;flex-shrink:0;display:flex;align-items:center;gap:10px">
@@ -4413,9 +4455,10 @@ function navBaseClick() {
   }
 }
 
-var _curPage = 'page-competitions';
+var _curPage = '';
 var _pageRendered = {};
 var _pendingPageRender = null;
+var _isStartup = true; // Flag pour ignorer showPage('page-competitions') au démarrage
 function _renderPageById(id) {
   // Sidebar compétitions : show/hide selon la page
   if (typeof _compSidebarPages !== 'undefined') {
@@ -4477,13 +4520,18 @@ function _deskNav(page, btnId) {
 }
 
 function showPage(id) {
+  // CRITICAL: Bloquer page-competitions au démarrage pour éviter le flashage
+  if (_isStartup && id === 'page-competitions') return;
+
   // Toujours mettre à jour la visibilité des onglets Réglages (droits peuvent avoir changé)
   // ET toujours recharger les valeurs Documents officiels (évite les valeurs par défaut après warmup)
   if (id === 'page-settings') { _refreshSettingsTabs(); _officialDocRefreshPreview(); }
   if (_curPage === id && _pageRendered[id]) return;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var el = document.getElementById(id);
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+  }
   _curPage = id;
   document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
   var _isMob = window.innerWidth < 768;
@@ -6808,6 +6856,7 @@ function _baseCard(title, content, extra) {
 // ═══════════════════════════════════════════════════════════════════════════
 var _agendaYear       = null;
 var _agendaMonth      = 0;
+var _agendaNavScrolling = false; // bloque le listener scroll pendant navigation flèches
 var _compFromAgenda   = false;   // retour agenda après fermeture sheet-comp / sheet-comp-detail
 var _agendaSelDate    = null;
 var _agendaCompsByDate = {};
@@ -7109,18 +7158,28 @@ function agendaNav(dir) {
     _agendaDayDate = _agendaDateAdd(_agendaDayDate, dir);
     _agendaRender();
   } else if (_agendaView === 'month') {
-    // Vue mois : scroller vers le mois précédent/suivant dans la vue continue
+    // Vue mois : scroller vers le mois précédent/suivant (début du mois)
     _agendaMonth += dir;
     if (_agendaMonth < 0)  { _agendaMonth = 11; _agendaYear--; }
     if (_agendaMonth > 11) { _agendaMonth = 0;  _agendaYear++; }
     var main = document.getElementById('ag-main');
     var targetEl = document.getElementById('ag-mhdr-'+_agendaYear+'-'+_agendaMonth);
     if (targetEl && main) {
-      main.scrollTo({ top: targetEl.offsetTop - 1, behavior: 'smooth' });
-      // Mettre à jour le label du header
+      // Bloquer le listener scroll pendant la navigation
+      _agendaNavScrolling = true;
+      // Mettre à jour le label immédiatement
       var lbl = document.getElementById('agenda-month-label');
       var MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
       if (lbl) lbl.textContent = MOIS[_agendaMonth] + ' ' + _agendaYear;
+      // Calcul exact de la position du mois cible dans main
+      var pos = 0;
+      var children = main.children;
+      for (var ci = 0; ci < children.length; ci++) {
+        if (children[ci] === targetEl) break;
+        pos += children[ci].offsetHeight;
+      }
+      main.scrollTo({ top: pos, behavior: 'smooth' });
+      setTimeout(function(){ _agendaNavScrolling = false; }, 700);
     } else {
       _agendaRender(); // mois hors de la fenêtre courante → reconstruire
     }
@@ -7220,6 +7279,8 @@ function _agendaToggleType(keysStr) {
 }
 
 function _agendaRender() {
+  // Toujours recharger les couleurs depuis localStorage pour qu'elles survivent aux syncs
+  _agendaLoadColors();
   var MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   var MOIS_S = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
   var sub  = document.getElementById('agenda-subtitle');
@@ -7524,6 +7585,12 @@ function _agendaRenderMonth() {
     mhdr.id = mhdrId;
     mhdr.setAttribute('data-yr', yr);
     mhdr.setAttribute('data-mo', mo);
+    // Séparateur visuel plein entre mois (sauf avant le premier)
+    if (mi > 0) {
+      var sep = document.createElement('div');
+      sep.style.cssText = 'height:10px;background:var(--navy3,rgba(0,0,0,.18));flex-shrink:0;border-top:2px solid rgba(0,87,255,.4);border-bottom:2px solid rgba(0,87,255,.4);';
+      main.appendChild(sep);
+    }
     mhdr.style.cssText = 'padding:10px 12px 5px;display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--navy);z-index:2;border-bottom:1px solid rgba(255,255,255,.07)';
     mhdr.innerHTML = '<span style="font-size:14px;font-weight:900;color:var(--txt)">'+MOIS[mo]+'</span>'
       + '<span style="font-size:12px;font-weight:600;color:var(--txt3)">'+yr+'</span>'
@@ -7634,16 +7701,27 @@ function _agendaRenderMonth() {
     })(yr, mo, lastDay);
   }
 
-  // ── Scroll vers le mois courant ──
-  requestAnimationFrame(function(){
-    // Priorité : mois cible (_agendaYear/_agendaMonth), puis aujourd'hui en dernier recours
-    var el = document.getElementById('ag-mhdr-'+_agendaYear+'-'+_agendaMonth)
-          || (todayMhdrId ? document.getElementById(todayMhdrId) : null);
-    if (el) main.scrollTop = el.offsetTop - 1;
-  });
+  // ── Scroll vers le début du mois du jour ──
+  // Calcul exact : somme des hauteurs des éléments précédents dans main
+  (function() {
+    var targetId = todayMhdrId || ('ag-mhdr-'+_agendaYear+'-'+_agendaMonth);
+    main.scrollTop = 0;
+    setTimeout(function(){
+      var target = document.getElementById(targetId);
+      if (!target || !main) return;
+      var pos = 0;
+      var children = main.children;
+      for (var i = 0; i < children.length; i++) {
+        if (children[i] === target) break;
+        pos += children[i].offsetHeight;
+      }
+      main.scrollTop = pos;
+    }, 80);
+  })();
 
-  // ── Mettre à jour le label du header en scrollant ──
+  // ── Mettre à jour le label du header en scrollant (bloqué pendant navigation flèches) ──
   main.addEventListener('scroll', function() {
+    if (_agendaNavScrolling) return; // ignorer pendant navigation flèches
     var hdrs = main.querySelectorAll('[id^="ag-mhdr-"]');
     var mainTop = main.getBoundingClientRect().top;
     var lbl = document.getElementById('agenda-month-label');
@@ -35731,10 +35809,27 @@ function showDTNPortal() {
       if (sbFb) sbFb.style.display = 'flex';
     }
   }
-  // Afficher le portail + sidebar
+  // Afficher le portail + sidebar (toujours visible à l'ouverture)
   var dtn = document.getElementById('page-dtn');
   if (dtn) dtn.style.display = 'flex';
   _dtnShowSidebar();
+  // Réinitialiser l'état sidebar (toujours visible à l'ouverture)
+  _dtnSidebarVisible = true;
+  document.body.classList.remove('dtn-sb-hidden');
+  var _sbEl = document.getElementById('dtn-sidebar');
+  if (_sbEl) _sbEl.style.transform = 'translateX(0)';
+  var _hdrEl = document.getElementById('dtn-header');
+  if (_hdrEl) _hdrEl.style.paddingLeft = '216px';
+  var _spEl = document.getElementById('dtn-sb-spacer');
+  if (_spEl) _spEl.style.width = '216px';
+  var _showBtn = document.getElementById('dtn-sb-show-btn');
+  if (_showBtn) _showBtn.style.display = 'none';
+  var _showBtn2 = document.getElementById('dtn-sb-show-btn2');
+  if (_showBtn2) _showBtn2.style.display = 'none';
+  var _brand = document.getElementById('dtn-header-brand');
+  if (_brand) _brand.style.display = 'none';
+  var _floatBrand = document.getElementById('floating-brand');
+  if (_floatBrand) _floatBrand.style.display = 'none';
   // Réinitialiser la nav sidebar sur Accueil
   _dtnSetActiveNav('home');
   // Rafraîchir les stats live
@@ -36412,6 +36507,55 @@ function _dtnHideSidebar() {
   if (sb) sb.style.display = 'none';
 }
 
+var _dtnSidebarVisible = true;
+function _dtnToggleSidebar() {
+  var sb        = document.getElementById('dtn-sidebar');
+  var spacer    = document.getElementById('dtn-sb-spacer');
+  var header    = document.getElementById('dtn-header');
+  var showBtn   = document.getElementById('dtn-sb-show-btn');
+  var showBtn2  = document.getElementById('dtn-sb-show-btn2');
+  var brand     = document.getElementById('dtn-header-brand');
+  var floatBrand = document.getElementById('floating-brand');
+
+  _dtnSidebarVisible = !_dtnSidebarVisible;
+
+  if (_dtnSidebarVisible) {
+    // Afficher la sidebar
+    if (sb)       { sb.style.display = 'flex'; sb.style.transform = 'translateX(0)'; }
+    if (spacer)   { spacer.style.width = '216px'; }
+    if (header)   { header.style.paddingLeft = '216px'; }
+    if (showBtn)  { showBtn.style.display = 'none'; }
+    if (showBtn2) { showBtn2.style.display = 'none'; }
+    if (brand)      { brand.style.display = 'none'; }
+    if (floatBrand) { floatBrand.style.display = 'none'; }
+    document.body.classList.remove('dtn-sb-hidden');
+  } else {
+    // Cacher la sidebar
+    if (sb)       { sb.style.transform = 'translateX(-216px)'; }
+    if (spacer)   { spacer.style.width = '0'; }
+    if (header)   { header.style.paddingLeft = '0'; }
+    if (showBtn)  { showBtn.style.display = 'flex'; }
+    if (showBtn2) { showBtn2.style.display = 'flex'; }
+    // Afficher le brand flottant sur toutes les pages
+    if (floatBrand) {
+      // Utiliser le logo custom si disponible
+      var _customImg = document.getElementById('dtn-sb-logo-img');
+      var _floatImg  = document.getElementById('floating-brand-img');
+      var _floatFb   = document.getElementById('floating-brand-fb');
+      if (_customImg && _customImg.style.display !== 'none' && _customImg.naturalWidth > 0 && _floatImg) {
+        _floatImg.src = _customImg.src;
+        _floatImg.style.display = 'block';
+        if (_floatFb) _floatFb.style.display = 'none';
+      }
+      floatBrand.style.display = 'flex';
+    }
+    document.body.classList.add('dtn-sb-hidden');
+    setTimeout(function(){
+      if (!_dtnSidebarVisible && sb) sb.style.display = 'none';
+    }, 230);
+  }
+}
+
 // ── Navigation DTN sidebar ─────────────────────────────────────────
 var _dtnActiveNav = 'home';
 var _dtnNavIds = ['home','comp','collectif','agenda','gantt','acces','formations','securite','territoires'];
@@ -36463,7 +36607,7 @@ function _dtnGoHome() {
   }
   // Restaurer le workspace home
   var wb = document.getElementById('dtn-workspace-body');
-  if (wb) wb.innerHTML = '<div style="max-width:880px;padding:28px 32px 52px">'
+  if (wb) wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div id="dtn-today-zone" style="margin-bottom:32px"><div style="font-size:12px;color:var(--txt3)">Chargement…</div></div>'
     + '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
     + '<div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>'
@@ -36507,7 +36651,7 @@ function _dtnShowPanel(module) {
   if (!p) return;
   var wb = document.getElementById('dtn-workspace-body');
   if (!wb) return;
-  wb.innerHTML = '<div style="max-width:880px;padding:28px 32px 52px">'
+  wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding-top:80px;color:var(--txt3)">'
     + p.icon
     + '<div style="font-size:17px;font-weight:800;color:var(--txt)">' + p.title + '</div>'
@@ -37333,6 +37477,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     }, 2500);
   }
   function afterSplash() {
+    // CRITICAL: Ajouter classe startup-lock directement sur page-competitions pour la masquer
+    var compEl = document.getElementById('page-competitions');
+    if (compEl) compEl.classList.add('startup-lock');
+
     var emailField = document.getElementById('auth-email');
     if (emailField && S.user && S.user.email) emailField.value = S.user.email;
     var isActivated = !!(S.user && (S.user.prenom || S.user.email || S.user.statut !== 'invite'));
@@ -37359,6 +37507,17 @@ document.addEventListener('DOMContentLoaded', async function() {
       // pullFromCloud() reste disponible pour la sync manuelle et périodique en session.
       _lastSyncAt = Date.now();
     }
+    // CRITICAL: Terminer le mode démarrage — afficher le contenu et enlever le verrou
+    setTimeout(function() {
+      var compEl = document.getElementById('page-competitions');
+      if (compEl) {
+        compEl.classList.remove('startup-lock');
+        compEl.style.display = '';
+      }
+      // Afficher le contenu
+      if (window._showContent) window._showContent();
+      _isStartup = false;
+    }, 250);
   }
   var photoSplash = document.getElementById('photo-splash');
   var psBg = document.getElementById('photo-splash-bg');
@@ -40588,6 +40747,20 @@ document.addEventListener('DOMContentLoaded', async function() {
       <button onclick="closeCfEditModal()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
       <button onclick="cfSaveMemberModal()" style="flex:2;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">💾 Enregistrer</button>
     </div>
+  </div>
+</div>
+
+<!-- ══ BRAND FLOTTANT — visible sur toutes les pages quand sidebar cachée ══ -->
+<div id="floating-brand" style="display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);height:60px;z-index:3000;align-items:center;gap:10px;pointer-events:none">
+  <div style="width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.25)">
+    <img id="floating-brand-img" src="" style="width:36px;height:36px;object-fit:contain;display:none">
+    <div id="floating-brand-fb" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">
+      <img src="https://ffplum.fr/templates/ffplum/images/logo.png" style="width:34px;height:34px;object-fit:contain" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-size:7px;font-weight:800;color:#003399;text-align:center;line-height:1.1\'>FF<br>PLUM</span>'">
+    </div>
+  </div>
+  <div style="line-height:1.25">
+    <div style="font-size:8px;font-weight:700;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase">FFPLUM</div>
+    <div style="font-size:15px;font-weight:900;color:var(--txt);letter-spacing:-.3px">Gest'<span style="color:var(--stol)">DTN</span></div>
   </div>
 </div>
 
