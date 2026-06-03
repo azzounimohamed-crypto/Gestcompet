@@ -499,8 +499,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   body.has-comp-sidebar{justify-content:flex-start!important}
   body.has-comp-sidebar #app{width:calc(100vw - 216px)!important;max-width:none!important;margin-left:216px!important;margin-right:0!important;transition:margin-left .22s ease,width .22s ease}
   body.has-comp-sidebar.dtn-sb-hidden #app{width:100vw!important;margin-left:0!important}
+  /* Quand sidebar cachée : étaler aussi les overlays gantt et agenda */
+  body.dtn-sb-hidden #gantt-overlay{left:0!important;transition:left .22s ease}
+  body.dtn-sb-hidden #agenda-overlay{left:0!important;transition:left .22s ease}
   body.dtn-sb-hidden #header-mobile-title{display:none!important}
   body.has-comp-sidebar #desktop-nav-rail{display:none!important}
+  /* Cacher le rail quand le portail DTN est en cours d'affichage */
+  body.dtn-portal-visible #desktop-nav-rail{display:none!important}
   body.has-comp-sidebar #home-col-left,body.has-comp-sidebar #home-todo-panel{left:236px!important}
   /* En-tête : masquer logo + brand + titre central (déjà dans le sidebar DTN) */
   body.has-comp-sidebar #header-logo-wrap,
@@ -14271,7 +14276,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       if (_isMobEquip) {
         // Mobile card layout
         var ini2 = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase();
-        var avCol = catColMap[catVal]||'#6b7280';
+        var avCol = 'var(--stol)';
         var _podMob = (((S.enrollMeta||{})[cid]||{})[pid]||{}).podium||'';
         html5 += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'+bg+';border-bottom:1px solid var(--bdr);min-height:64px;position:relative;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
         var _photoMob = p.photo||'';
@@ -14304,7 +14309,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var _rowBdr  = _missing ? 'border-left:2px solid #f59e0b;' : '';
         var _rowBg   = i%2===1 ? 'var(--navy3)' : 'var(--navy4)';
         html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 0;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer;'+_rowBdr+'" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\'var(--navy3)\'})" onmouseout="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\''+_rowBg+'\'})" title="Voir / modifier le profil">';
-        var _avCol2 = catColMap[catVal]||'#6b7280';
+        var _avCol2 = 'var(--stol)';
         var _ini2   = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase()||'?';
         var _photo2 = p.photo||'';
         // Avatar — sticky left:0
@@ -15012,7 +15017,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var iniS = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
         var _photoMobS = pilot.photo || s.photo || '';
         html3 += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);min-height:72px;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')">';
-        html3 += '<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;margin-top:2px;border:2px solid #0891b2">';
+        html3 += '<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;margin-top:2px;border:2px solid var(--stol)">';
         html3 += _photoMobS ? '<img src="'+_photoMobS+'" style="width:100%;height:100%;object-fit:cover">' : iniS;
         html3 += '</div>';
         html3 += '<div style="flex:1;min-width:0">';
@@ -15035,7 +15040,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var iniS2  = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
         html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:4px 8px 4px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
         // Avatar
-        html3 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid #0891b2">';
+        html3 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid var(--stol)">';
         html3 += photoS ? '<img src="'+photoS+'" style="width:100%;height:100%;object-fit:cover">' : iniS2;
         html3 += '</div>';
         html3 += '<div style="'+_dStS+';font-weight:700;text-transform:uppercase;letter-spacing:.3px">'+nom+'</div>';
@@ -30312,8 +30317,11 @@ function closeGanttModal() {
   // Si on était dans le portail DTN → retour au tableau de bord
   try {
     var dtn = document.getElementById('page-dtn');
-    if (dtn && dtn.style.display !== 'none' && typeof _dtnGoHome === 'function') {
-      _dtnGoHome();
+    if (dtn && dtn.style.display !== 'none') {
+      // Cacher l'app pour ne pas voir le rail derrière le portail
+      var app = document.getElementById('app');
+      if (app) app.style.display = 'none';
+      if (typeof _dtnGoHome === 'function') _dtnGoHome();
     }
   } catch(e) {}
 }
@@ -35811,6 +35819,8 @@ function showDTNPortal() {
   // Afficher le portail + sidebar (toujours visible à l'ouverture)
   var dtn = document.getElementById('page-dtn');
   if (dtn) dtn.style.display = 'flex';
+  // Marquer que le portail DTN est visible (pour cacher le rail desktop)
+  document.body.classList.add('dtn-portal-visible');
   _dtnShowSidebar();
   // Réinitialiser l'état sidebar (toujours visible à l'ouverture)
   _dtnSidebarVisible = true;
@@ -36475,13 +36485,19 @@ function _compSbSetActive(pageId) {
       if (_crpPanelRestore) _crpPanelRestore.style.display = 'flex';
       _crpHighlightSbBtn(_crpOpen);
       _crpRender();
+    } else {
+      // Aucun panneau ouvert : remettre les boutons en gris
+      _crpHighlightSbBtn(null);
     }
   } else if (typeof _crpOpen !== 'undefined' && _crpOpen) {
-    // Masquer le panneau droit quand on quitte page-comp-detail, mais mémoriser _crpOpen
-    // pour le restaurer automatiquement au retour sur page-comp-detail
+    // Masquer le panneau droit quand on quitte page-comp-detail
     var _crpPanelHide = document.getElementById('comp-right-panel');
     if (_crpPanelHide) _crpPanelHide.style.display = 'none';
-    // Ne PAS remettre _crpOpen à null : on garde la mémoire du panneau ouvert
+    // Remettre les boutons en gris pendant qu'on est hors de la page
+    _crpHighlightSbBtn(null);
+  } else {
+    // Page hors comp-detail et aucun panneau ouvert
+    _crpHighlightSbBtn(null);
   }
 }
 
@@ -36674,6 +36690,7 @@ function openDTNModule(module) {
     // Le sidebar DTN reste visible (géré par showPage → _compShowSidebar)
     var dtn = document.getElementById('page-dtn');
     if (dtn) dtn.style.display = 'none';
+    document.body.classList.remove('dtn-portal-visible');
     document.getElementById('app').style.display = '';
     var baseBtn = document.getElementById('dtn-base-btn');
     if (baseBtn) baseBtn.style.display = 'flex';
