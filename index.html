@@ -2352,7 +2352,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </button>
 
     <div style="height:1px;background:var(--bdr);margin:8px 4px"></div>
-    <div id="dtn-saison-label" style="font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--txt3);padding:4px 12px 5px;opacity:.65">Saison</div>
+    <div id="dtn-saison-label" style="font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--txt3);padding:4px 12px 5px;opacity:.65">Performances</div>
 
     <button id="dtn-nav-comp" onclick="openDTNModule('competitions')"
       style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
@@ -4193,7 +4193,7 @@ function clearLocalStorageQuota() {
   // Clés critiques minimales à conserver absolument
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
-               'geststol_agenda_colors', 'geststol_agenda_window',
+               'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_ts',
                'geststol_vibration', 'geststol_notif_sound'];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
@@ -5110,8 +5110,26 @@ function renderCompetitions() {
   });
   list.sort(function(a,b){ return (a.dateFrom||'').localeCompare(b.dateFrom||''); });
   if (!list.length) { c.innerHTML = '<div style="text-align:center;color:var(--txt3);padding:32px;font-size:14px">Aucune comp&eacute;tition<br><span style="font-size:12px">Utilisez + Cr&eacute;er pour en ajouter</span></div>'; return; }
+  // Séparer les compétitions terminées (passées) des actives (en cours + à venir)
+  var todayDate = new Date().toISOString().substring(0,10);
+  var pastComps   = list.filter(function(cp){ return (cp.dateTo||cp.dateFrom) < todayDate; });
+  var activeComps = list.filter(function(cp){ return (cp.dateTo||cp.dateFrom) >= todayDate; });
+  // Tri chronologique : du plus ancien au plus récent dans chaque groupe
+  // (la liste est déjà triée ASC par dateFrom)
+  // Ordre final : [passées ancien→récent] [séparateur] [actives + à venir proche→lointain]
+  var orderedList = pastComps.concat(activeComps);
   c.innerHTML = '';
-  list.forEach(function(cp) {
+  // Marqueur pour séparer visuellement
+  var separatorIdx = pastComps.length;
+  orderedList.forEach(function(cp, idx) {
+    // Insérer un séparateur entre passées et actives
+    if (idx === separatorIdx && separatorIdx > 0) {
+      var sep = document.createElement('div');
+      sep.id = 'comp-list-separator';
+      sep.style.cssText = 'display:flex;align-items:center;gap:10px;padding:14px 16px 10px;margin:8px 12px 4px;border-top:2px solid var(--stol);background:rgba(0,87,255,.04);border-radius:8px 8px 0 0';
+      sep.innerHTML = '<span style="font-size:11px;font-weight:800;color:var(--stol);letter-spacing:1px;text-transform:uppercase">↓ En cours & à venir</span><div style="flex:1;height:1px;background:rgba(0,87,255,.2)"></div>';
+      c.appendChild(sep);
+    }
     var today = new Date().toISOString().substring(0,10);
     var status = today < cp.dateFrom ? 'badge-prog' : today <= (cp.dateTo||cp.dateFrom) ? 'badge-enc' : 'badge-term';
     var statusLabel = status === 'badge-prog' ? 'Programmée' : status === 'badge-enc' ? 'En cours' : 'Terminée';
@@ -5212,6 +5230,17 @@ function renderCompetitions() {
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
+  // Scroll automatique pour afficher le séparateur en haut + les actives en dessous
+  setTimeout(function(){
+    var sep = document.getElementById('comp-list-separator');
+    if (sep && c) {
+      // Calculer la position relative au conteneur scrollable c
+      var sepRect = sep.getBoundingClientRect();
+      var cRect = c.getBoundingClientRect();
+      var offset = sepRect.top - cRect.top + c.scrollTop;
+      c.scrollTop = Math.max(0, offset - 8);
+    }
+  }, 80);
 }
 
 function exportComps(fmt) {
@@ -22567,14 +22596,52 @@ async function pullFromCloud() {
   console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
 }
 
+// Flag pour limiter la vérification des updates de médias à 1× par session
+var _mediaCheckDoneAt = 0;
 async function _pullMedias(sb) {
   try {
+    // 1) RÉCUPÉRATION INITIALE : médias absents en local (comportement d'origine, léger)
     var needed = [];
     S.comps.forEach(function(c){  if (!c.affiche || !c.affiche.startsWith('data:')) needed.push('affiche_'+c.id); });
-    S.pilots.forEach(function(p){ if (!p.photo) needed.push('photo_'+p.id); }); // uniquement si aucune photo (data: ou https:)
+    S.pilots.forEach(function(p){ if (!p.photo) needed.push('photo_'+p.id); });
+
+    // 2) VÉRIFICATION DES MISES À JOUR : 1× par session, uniquement pour compétitions actives/futures
+    var now = Date.now();
+    var SESSION_TTL = 30 * 60 * 1000; // 30 minutes entre 2 checks
+    if (now - _mediaCheckDoneAt > SESSION_TTL) {
+      _mediaCheckDoneAt = now;
+      try {
+        var localMediaTs = (function(){
+          try { return JSON.parse(localStorage.getItem('geststol_media_ts')||'{}'); } catch(e){ return {}; }
+        })();
+        var todayStr = new Date().toISOString().substring(0,10);
+        // Seulement les affiches des compétitions à venir ou récentes (< 30 jours)
+        var dateMin = new Date(Date.now() - 30*86400000).toISOString().substring(0,10);
+        var checkIds = [];
+        S.comps.forEach(function(c){
+          if (c.affiche && c.affiche.startsWith('data:') && (c.dateTo||c.dateFrom||'') >= dateMin) {
+            checkIds.push('affiche_'+c.id);
+          }
+        });
+        if (checkIds.length) {
+          var headRes = await sb.from('stol_medias').select('id,updated_at').in('id', checkIds);
+          if (!headRes.error && headRes.data) {
+            headRes.data.forEach(function(row){
+              if (!row.id || !row.updated_at) return;
+              var localTs = localMediaTs[row.id] || '';
+              if (row.updated_at > localTs && needed.indexOf(row.id) === -1) needed.push(row.id);
+            });
+          }
+        }
+      } catch(e) { /* check optionnel : silencieux */ }
+    }
+
     if (!needed.length) return;
-    var { data, error } = await sb.from('stol_medias').select('id,data').in('id', needed);
+    var { data, error } = await sb.from('stol_medias').select('id,data,updated_at').in('id', needed);
     if (error || !data) return;
+    var localMediaTs2 = (function(){
+      try { return JSON.parse(localStorage.getItem('geststol_media_ts')||'{}'); } catch(e){ return {}; }
+    })();
     data.forEach(function(row){
       if (!row.id || !row.data) return;
       if (row.id.startsWith('affiche_')) {
@@ -22584,7 +22651,9 @@ async function _pullMedias(sb) {
         var p = S.pilots.find(function(x){ return x.id === row.id.replace('photo_',''); });
         if (p) p.photo = row.data;
       }
+      if (row.updated_at) localMediaTs2[row.id] = row.updated_at;
     });
+    try { localStorage.setItem('geststol_media_ts', JSON.stringify(localMediaTs2)); } catch(e) {}
   } catch(e){ console.warn('_pullMedias', e.message||e); }
 }
 
@@ -36099,8 +36168,8 @@ function _compShowSidebar() {
   var sel = document.getElementById('comp-season-filter') || document.getElementById('base-saison-sel');
   var lbl = document.getElementById('dtn-saison-label');
   if (lbl) {
-    if (sel && sel.value && sel.value !== 'all') lbl.textContent = 'Saison ' + sel.value;
-    else { lbl.textContent = 'Saison ' + new Date().getFullYear(); }
+    if (sel && sel.value && sel.value !== 'all') lbl.textContent = 'Performances ' + sel.value;
+    else { lbl.textContent = 'Performances ' + new Date().getFullYear(); }
   }
 }
 function _compHideSidebar() {
@@ -36110,7 +36179,7 @@ function _compHideSidebar() {
   if (sub) sub.style.display = 'none';
   _dtnSubSetActive(null);
   var lbl = document.getElementById('dtn-saison-label');
-  if (lbl) lbl.textContent = 'Saison';
+  if (lbl) lbl.textContent = 'Performances';
   // Cacher le sidebar DTN sauf si le portail DTN est actif
   var dtnPage = document.getElementById('page-dtn');
   if (!dtnPage || dtnPage.style.display === 'none') _dtnHideSidebar();
@@ -36622,7 +36691,7 @@ function _dtnGoHome() {
     _dtnSubSetActive(null);
     document.body.classList.remove('has-comp-sidebar');
     var lbl = document.getElementById('dtn-saison-label');
-    if (lbl) lbl.textContent = 'Saison';
+    if (lbl) lbl.textContent = 'Performances';
     // Revenir au portail
     dtnPage.style.display = 'flex';
     if (app) app.style.display = 'none';
