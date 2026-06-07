@@ -29091,6 +29091,30 @@ function _stolAggregateForClassement(eps, categorie) {
 }
 
 // Tableau de classement consolidé pour une catégorie
+// Récupérer / mettre à jour les Points régions par pilote (clé pid ou nom normalisé)
+function _stolGetPointsRegion(compId, pilote) {
+  if (!S.stolResults || !S.stolResults[compId]) return '';
+  var pr = S.stolResults[compId].pointsRegion || {};
+  var key = pilote.pid || ((pilote.prenom||'')+'_'+(pilote.nom||'')).toLowerCase();
+  return pr[key] !== undefined ? pr[key] : '';
+}
+
+function stolSetPointsRegion(compId, pidOrKey, val) {
+  if (!S.stolResults) S.stolResults = {};
+  if (!S.stolResults[compId]) S.stolResults[compId] = { multi:[], pendu:[], title:'', updated:0 };
+  if (!S.stolResults[compId].pointsRegion) S.stolResults[compId].pointsRegion = {};
+  var n = parseFloat(val);
+  if (isNaN(n)) {
+    delete S.stolResults[compId].pointsRegion[pidOrKey];
+  } else {
+    S.stolResults[compId].pointsRegion[pidOrKey] = n;
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  if (typeof _saveStolBackup === 'function') _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+}
+
 function _renderStolClassementTable(cat, pilotes, cp) {
   var titre = cat === 'multiaxes' ? 'MULTIAXES' : 'PENDULAIRE';
   var html = '<div style="margin-bottom:16px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
@@ -29106,6 +29130,7 @@ function _renderStolClassementTable(cat, pilotes, cp) {
     + '<th colspan="3" style="'+th+';background:rgba(245,158,11,.08);border-left:1px solid var(--bdr)">Essais libres</th>'
     + '<th colspan="3" style="'+th+';background:rgba(59,130,246,.08);border-left:1px solid var(--bdr)">Qualifications</th>'
     + '<th colspan="3" style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr)">Finale</th>'
+    + '<th rowspan="2" style="'+th+';background:rgba(124,58,237,.12);border-left:1px solid var(--bdr);width:78px;color:#7c3aed">Points<br>régions</th>'
     + '</tr><tr>'
     + '<th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th>'
     + '<th style="'+th+';background:rgba(245,158,11,.04);border-left:1px solid var(--bdr);width:46px">Poule</th>'
@@ -29150,6 +29175,12 @@ function _renderStolClassementTable(cat, pilotes, cp) {
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(0,87,255,.05);color:var(--txt2);font-weight:700">'+(p.finale.poule||'—')+'</td>'
       + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:700">'+fmt(p.finale.perf)+'</td>'
       + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:800;color:var(--stol)">'+fmtP(p.finale.place)+'</td>'
+      // Points régions (saisissable)
+      + (function(){
+          var prKey = p.pid || ((p.prenom||'')+'_'+(p.nom||'')).toLowerCase();
+          var prVal = _stolGetPointsRegion(cp.id, p);
+          return '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(124,58,237,.06);padding:4px"><input type="number" step="1" value="'+(prVal===''?'':prVal)+'" placeholder="—" onchange="stolSetPointsRegion(\''+cp.id+'\',\''+prKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#7c3aed;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>';
+        })()
       + '</tr>';
   });
   html += '</tbody></table></div></div>';
@@ -29200,15 +29231,16 @@ function printStolClassementConsolide(compId) {
     var h = '<div style="font-size:11pt;font-weight:800;color:#003399;margin:10pt 0 4pt;padding:3pt 6pt;background:#e8edf3;border-left:4px solid #003399">Classement '+label+' — '+rows.length+'</div>';
     h += '<table style="width:100%;border-collapse:collapse;font-size:9pt;border:1px solid #999">';
     h += '<thead><tr style="background:#003399;color:#fff;font-weight:700;font-size:8.5pt">'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:5%">Rg</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:7%">N°</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:30%;text-align:left;padding-left:8pt">NOM</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">'+(isPendu?'Points 2025':'Points au début')+'</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:6%">Poule</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">Résultat</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:6%">Place</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:8%">Points</th>'
-      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">Points Total</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:4%">Rg</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:6%">N°</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:26%;text-align:left;padding-left:8pt">NOM</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:9%">'+(isPendu?'Points 2025':'Points au début')+'</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:5%">Poule</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:9%">Résultat</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:5%">Place</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:7%">Points</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:9%">Points Total</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;background:#7c3aed;width:9%">Points régions</th>'
       + '</tr></thead><tbody>';
     rows.forEach(function(x, idx){
       var p = x.p;
@@ -29312,28 +29344,42 @@ function printStolClassementConsolide(compId) {
   } else {
     footerHTML = '<div style="margin-top:8pt;padding-top:6pt;border-top:1px solid #003399;text-align:center;font-size:8pt;color:#003399;font-weight:700">Fédération Française d\'ULM · 96 bis rue Marc Sangnier · 94700 Maisons Alfort</div>';
   }
+  // Hauteur imprimable d'une page A4 portrait moins les marges (297mm - mt - mb)
+  var printableH = 297 - mt - mb;
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Classement '+_escapeHTML(cp.name||'')+'</title>'
-    + '<style>@page{size:A4 portrait;margin:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm} body{font-family:Arial,sans-serif;color:#222;margin:0;padding:0;font-size:10pt}'
-    + '@media print{button{display:none!important}}</style></head><body>'
-    + '<div>'
-    // Image d'en-tête officielle (depuis Réglages > Documents officiels)
+    + '<style>'
+    + '@page{size:A4 portrait;margin:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm}'
+    + 'html,body{margin:0;padding:0;height:100%}'
+    + 'body{font-family:Arial,sans-serif;color:#222;font-size:10pt}'
+    + '.page-wrap{display:flex;flex-direction:column;box-sizing:border-box}'
+    + '.page-main{flex:1 0 auto}'
+    + '.page-footer{flex-shrink:0;margin-top:auto;padding-top:6pt}'
+    + '@media screen{body{background:#e8edf3;padding:20px}.page-wrap{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm;box-shadow:0 4px 20px rgba(0,0,0,.15)}}'
+    + '@media print{button{display:none!important}.page-wrap{box-shadow:none;min-height:100vh;height:100vh}}'
+    + '</style></head><body>'
+    + '<div class="page-wrap">'
+    // ── Contenu principal ──
+    + '<div class="page-main">'
     + headerHTML
-    // En-tête textuel : titre de la compétition + dates
     + '<div style="text-align:center;border-bottom:3px double #003399;padding-bottom:8pt;margin-bottom:8pt">'
-    + '<div style="font-size:9pt;color:#003399;font-weight:700;letter-spacing:2pt">CLASSEMENT</div>'
+    + '<div style="font-size:9pt;color:#003399;font-weight:700;letter-spacing:2pt">RÉSULTATS</div>'
     + '<div style="font-size:13pt;font-weight:800;color:#003399;margin-top:4pt">'+_escapeHTML(titreCompet)+'</div>'
     + (subTitre?'<div style="font-size:10pt;color:#666;margin-top:2pt">'+_escapeHTML(subTitre)+'</div>':'')
     + '</div>'
-    // Bouton impression (caché à l'impression)
-    + '<div style="text-align:right;margin-bottom:8pt">'
+    // Boutons (cachés à l'impression)
+    + '<div style="margin-bottom:8pt;display:flex;justify-content:flex-end;gap:8pt">'
     + '<button onclick="window.print()" style="padding:8pt 16pt;background:#003399;color:#fff;border:none;border-radius:4pt;font-weight:700;cursor:pointer;font-size:10pt">🖨️ Imprimer</button>'
+    + '<button onclick="window.close()" style="padding:8pt 16pt;background:#fff;color:#003399;border:1px solid #003399;border-radius:4pt;font-weight:700;cursor:pointer;font-size:10pt">✕ Quitter</button>'
     + '</div>'
     + tableHTML('Multiaxe', buildRows(multi), false)
     + tableHTML('Pendulaire', buildRows(pendu), true)
     + staffHTML
-    // Pied de page officiel (depuis Réglages)
+    + '</div>'
+    // ── Bas de page (ancré en bas de la feuille) ──
+    + '<div class="page-footer">'
     + footerHTML
     + '<div style="margin-top:6pt;font-size:7pt;color:#999;text-align:center">Édité le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    + '</div>'
     + '</div></body></html>';
   var w = window.open('','_blank');
   if (!w) { toast('Bloqueur de pop-up : autorisez les fenêtres','err'); return; }
