@@ -29200,11 +29200,16 @@ function _stolAggregateForClassement(eps, categorie) {
 }
 
 // Tableau de classement consolidé pour une catégorie
-// Récupérer / mettre à jour les Points régions par pilote (clé pid ou nom normalisé)
+// Helper : générer la clé d'un pilote (pid ou nom normalisé)
+function _stolPiloteKey(pilote) {
+  return pilote.pid || ((pilote.prenom||'')+'_'+(pilote.nom||'')).toLowerCase();
+}
+
+// ─── Points régions (saisissable) ───
 function _stolGetPointsRegion(compId, pilote) {
   if (!S.stolResults || !S.stolResults[compId]) return '';
   var pr = S.stolResults[compId].pointsRegion || {};
-  var key = pilote.pid || ((pilote.prenom||'')+'_'+(pilote.nom||'')).toLowerCase();
+  var key = _stolPiloteKey(pilote);
   return pr[key] !== undefined ? pr[key] : '';
 }
 
@@ -29224,6 +29229,58 @@ function stolSetPointsRegion(compId, pidOrKey, val) {
   if (typeof silentPush === 'function') silentPush();
 }
 
+// ─── Points début (saisissable — "Points au début" ou "Points 2025") ───
+function _stolGetPointsDebut(compId, pilote) {
+  if (!S.stolResults || !S.stolResults[compId]) return '';
+  var pd = S.stolResults[compId].pointsDebut || {};
+  var key = _stolPiloteKey(pilote);
+  return pd[key] !== undefined ? pd[key] : '';
+}
+
+function stolSetPointsDebut(compId, pidOrKey, val) {
+  if (!S.stolResults) S.stolResults = {};
+  if (!S.stolResults[compId]) S.stolResults[compId] = { multi:[], pendu:[], title:'', updated:0 };
+  if (!S.stolResults[compId].pointsDebut) S.stolResults[compId].pointsDebut = {};
+  var n = parseFloat(val);
+  if (isNaN(n)) {
+    delete S.stolResults[compId].pointsDebut[pidOrKey];
+  } else {
+    S.stolResults[compId].pointsDebut[pidOrKey] = n;
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  if (typeof _saveStolBackup === 'function') _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  // Re-render pour mettre à jour la colonne "Points régions" (calculée)
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// ─── Points acquis (saisissable manuellement) ───
+function _stolGetPointsAcquis(compId, pilote) {
+  if (!S.stolResults || !S.stolResults[compId]) return '';
+  var pa = S.stolResults[compId].pointsAcquis || {};
+  var key = _stolPiloteKey(pilote);
+  return pa[key] !== undefined ? pa[key] : '';
+}
+
+function stolSetPointsAcquis(compId, pidOrKey, val) {
+  if (!S.stolResults) S.stolResults = {};
+  if (!S.stolResults[compId]) S.stolResults[compId] = { multi:[], pendu:[], title:'', updated:0 };
+  if (!S.stolResults[compId].pointsAcquis) S.stolResults[compId].pointsAcquis = {};
+  var n = parseFloat(val);
+  if (isNaN(n)) {
+    delete S.stolResults[compId].pointsAcquis[pidOrKey];
+  } else {
+    S.stolResults[compId].pointsAcquis[pidOrKey] = n;
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  if (typeof _saveStolBackup === 'function') _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  // Re-render pour mettre à jour la colonne "Points régions" (calculée)
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
 function _renderStolClassementTable(cat, pilotes, cp) {
   var titre = cat === 'multiaxes' ? 'MULTIAXES' : 'PENDULAIRE';
   var html = '<div style="margin-bottom:16px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
@@ -29236,9 +29293,11 @@ function _renderStolClassementTable(cat, pilotes, cp) {
     + '<th style="'+th+';width:36px">Rg</th>'
     + '<th style="'+th+';width:62px">N°</th>'
     + '<th style="'+th+';text-align:left;padding-left:12px">Pilote</th>'
+    + '<th rowspan="2" style="'+th+';background:rgba(16,185,129,.08);border-left:1px solid var(--bdr);width:72px;color:#10b981">Points</th>'
     + '<th colspan="3" style="'+th+';background:rgba(245,158,11,.08);border-left:1px solid var(--bdr)">Essais libres</th>'
     + '<th colspan="3" style="'+th+';background:rgba(59,130,246,.08);border-left:1px solid var(--bdr)">Qualifications</th>'
     + '<th colspan="3" style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr)">Finale</th>'
+    + '<th rowspan="2" style="'+th+';background:rgba(34,197,94,.12);border-left:1px solid var(--bdr);width:72px;color:#22c55e">Points<br>acquis</th>'
     + '<th rowspan="2" style="'+th+';background:rgba(124,58,237,.12);border-left:1px solid var(--bdr);width:78px;color:#7c3aed">Points<br>régions</th>'
     + '</tr><tr>'
     + '<th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th>'
@@ -29268,10 +29327,18 @@ function _renderStolClassementTable(cat, pilotes, cp) {
       rgBadge = '<span style="color:var(--txt3)">—</span>';
     }
     var trBg = idx%2 ? 'background:rgba(255,255,255,.015)' : '';
+    var pKey = _stolPiloteKey(p);
+    var ptsDebVal = _stolGetPointsDebut(cp.id, p);
+    var ptsAcqVal = _stolGetPointsAcquis(cp.id, p);
+    // Suggestion auto basée sur la place finale (utilisée si rien n'est saisi)
+    var ptsAcqSuggest = (p.finale && p.finale.place) ? _stolPointsFor(p.finale.place) : 0;
+    var ptsAcq = (ptsAcqVal !== '' && ptsAcqVal !== undefined) ? (parseInt(ptsAcqVal,10)||0) : ptsAcqSuggest;
     html += '<tr style="'+trBg+'">'
       + '<td style="'+td+'">'+rgBadge+'</td>'
       + '<td style="'+td+';color:var(--stol);font-weight:800">'+_escapeHTML(p.num||'—')+'</td>'
       + '<td style="'+tdL+'">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')+'</td>'
+      // Points (saisissable — "Points au début")
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(16,185,129,.04);padding:4px"><input type="number" step="1" value="'+(ptsDebVal===''?'':ptsDebVal)+'" placeholder="—" onchange="stolSetPointsDebut(\''+cp.id+'\',\''+pKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#10b981;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>'
       // Essais
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(245,158,11,.03);color:var(--txt2);font-weight:700">'+(p.essais.poule||'—')+'</td>'
       + '<td style="'+td+';background:rgba(245,158,11,.03)">'+fmt(p.essais.perf)+'</td>'
@@ -29284,11 +29351,13 @@ function _renderStolClassementTable(cat, pilotes, cp) {
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(0,87,255,.05);color:var(--txt2);font-weight:700">'+(p.finale.poule||'—')+'</td>'
       + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:700">'+fmt(p.finale.perf)+'</td>'
       + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:800;color:var(--stol)">'+fmtP(p.finale.place)+'</td>'
-      // Points régions (saisissable)
+      // Points acquis (saisissable — pré-rempli avec la suggestion auto basée sur la place finale)
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(34,197,94,.08);padding:4px"><input type="number" step="1" value="'+(ptsAcqVal===''?(ptsAcqSuggest?ptsAcqSuggest:''):ptsAcqVal)+'" placeholder="—" onchange="stolSetPointsAcquis(\''+cp.id+'\',\''+pKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#22c55e;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>'
+      // Points régions = Points (début) + Points acquis (auto)
       + (function(){
-          var prKey = p.pid || ((p.prenom||'')+'_'+(p.nom||'')).toLowerCase();
-          var prVal = _stolGetPointsRegion(cp.id, p);
-          return '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(124,58,237,.06);padding:4px"><input type="number" step="1" value="'+(prVal===''?'':prVal)+'" placeholder="—" onchange="stolSetPointsRegion(\''+cp.id+'\',\''+prKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#7c3aed;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>';
+          var ptsDebNum = (ptsDebVal !== '' && ptsDebVal !== undefined) ? (parseInt(ptsDebVal,10)||0) : 0;
+          var ptsReg = ptsDebNum + (ptsAcq||0);
+          return '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(124,58,237,.12);font-weight:800;color:#7c3aed;font-size:13px">'+(ptsReg||'—')+'</td>';
         })()
       + '</tr>';
   });
@@ -29347,7 +29416,7 @@ function printStolClassementConsolide(compId) {
       + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:6%">Poule</th>'
       + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:10%">Résultat</th>'
       + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:6%">Place</th>'
-      + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:10%">Points</th>'
+      + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:10%">Points acquis</th>'
       + '<th style="padding:2pt 4pt;border:1px solid #001a66;width:10%;background:#fff;color:#003399">Points Total</th>'
       + '</tr></thead><tbody>';
     rows.forEach(function(x, idx){
@@ -29355,10 +29424,18 @@ function printStolClassementConsolide(compId) {
       var rg = x.place;
       var rgCol = rg===1?'#f59e0b':rg===2?'#94a3b8':rg===3?'#cd7c2f':'';
       var bg = idx%2 ? 'background:#f8fafc' : 'background:#fff';
-      var ptsDebut = parseInt(p.ptsSaison || 0, 10) || 0;
-      var ptsGagnes = x.points || 0;
+      // "Points" : priorité à la valeur saisie (colonne Points du tableau Classement)
+      var ptsDebutSaisi = _stolGetPointsDebut(compId, p);
+      var ptsDebut = (ptsDebutSaisi !== '' && ptsDebutSaisi !== undefined) ? parseInt(ptsDebutSaisi, 10) : (parseInt(p.ptsSaison || 0, 10) || 0);
+      // "Points acquis" : MÊME calcul que dans la page Classement
+      //   1. Valeur saisie en priorité
+      //   2. Sinon : barème STOL selon la place dans la poule de Finale (p.finale.place)
+      var ptsAcquisSaisi = _stolGetPointsAcquis(compId, p);
+      var ptsAcqSuggest = (p.finale && p.finale.place) ? _stolPointsFor(p.finale.place) : 0;
+      var ptsGagnes = (ptsAcquisSaisi !== '' && ptsAcquisSaisi !== undefined) ? (parseInt(ptsAcquisSaisi, 10)||0) : ptsAcqSuggest;
       var ptsTotal = ptsDebut + ptsGagnes;
-      var prVal = _stolGetPointsRegion(compId, p);
+      // Colonne "Points Total" = Points (début) + Points acquis (auto, ne plus saisir)
+      var ptsRegCalc = ptsDebut + ptsGagnes;
       h += '<tr style="'+bg+'">'
         + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;'+(rgCol?'color:#fff;background:'+rgCol:'')+'">'+rg+'</td>'
         + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700;color:#003399">'+_escapeHTML(p.num||'')+'</td>'
@@ -29367,8 +29444,8 @@ function printStolClassementConsolide(compId) {
         + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700">'+(x.poule||'')+'</td>'
         + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700;color:#003399">'+fmt(x.perf)+'</td>'
         + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800">'+rg+'</td>'
-        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;background:#e8edf3">'+ptsTotal+'</td>'
-        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;color:#003399;background:#fff">'+(prVal===''?'':prVal)+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;background:#e8edf3">'+(ptsGagnes||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;color:#003399;background:#fff">'+(ptsTotal?ptsTotal:'')+'</td>'
         + '</tr>';
     });
     h += '</tbody></table>';
