@@ -10789,7 +10789,7 @@ function _hdpSaveNow() {
   if (dot) dot.style.background = '#f59e0b';
   if (lbl) { lbl.textContent = '☁️ À envoyer'; lbl.style.color = '#f59e0b'; }
   if (_hdpSaveTimer) clearTimeout(_hdpSaveTimer);
-  _hdpSaveTimer = setTimeout(function(){ _hdpFlushNow(); }, 20000); // 20s debounce
+  _hdpSaveTimer = setTimeout(function(){ _hdpFlushNow(); }, 10000); // 10s debounce — compromis fiabilité / coût Supabase
 }
 
 async function _hdpFlushNow() {
@@ -10813,11 +10813,24 @@ async function _hdpFlushNow() {
 
 // Flush immédiat si l'utilisateur quitte la page avec une sauvegarde en attente
 window.addEventListener('beforeunload', function() {
+  // Forcer le flush localStorage IMMÉDIATEMENT (synchrone, garantit la persistance locale)
+  try { if (typeof _flushSaveState === 'function') _flushSaveState(); } catch(e) {}
+  // Push manuel HDP en attente
   if (_hdpSavePending && _hdpSaveTimer) {
     clearTimeout(_hdpSaveTimer);
-    // Lance le push en fire-and-forget (navigateur peut couper avant la fin — c'est acceptable)
     _hdpFlushNow();
   }
+  // Forcer aussi le push silencieux en attente (s'il y en a un)
+  try {
+    if (typeof _silentPushTimer !== 'undefined' && _silentPushTimer) {
+      clearTimeout(_silentPushTimer);
+      _silentPushTimer = null;
+      if (typeof pushToCloud === 'function' && getSB() && navigator.onLine) {
+        // Fire-and-forget : le navigateur tente l'envoi mais peut couper
+        pushToCloud().catch(function(){});
+      }
+    }
+  } catch(e) {}
 });
 
 // Bouton "Réessayer" dans la bannière d'erreur
@@ -21346,8 +21359,36 @@ function _withTimeout(promise, ms) {
 }
 
 // ── PUSH : envoyer vers Supabase Storage (Option 2 — sans timeout PostgreSQL) ──
+// Hash léger pour déduplication des pushes (signature des données critiques)
+function _stolPushSignature() {
+  try {
+    var sig = [
+      (S.comps||[]).length,
+      Object.keys(S.staff||{}).length,
+      Object.values(S.staff||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0),
+      Object.keys(S.compEnroll||{}).length,
+      Object.values(S.compEnroll||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0),
+      (S.pilots||[]).length,
+      JSON.stringify(S.officialDocs||{}).length,
+      JSON.stringify(S.stolResults||{}).length,
+      (S._deletedComps||[]).length,
+      Object.keys(S._deletedEnroll||{}).length
+    ].join(':');
+    return sig;
+  } catch(e) { return Date.now().toString(); }
+}
+var _lastPushSig = null;
+
 async function pushToCloud() {
   var sb = getSB(); if (!sb) throw new Error('Supabase non disponible');
+
+  // ── Déduplication : skip si rien n'a vraiment changé depuis le dernier push réussi
+  // (économise les requêtes Supabase, évite les bandwidth inutiles)
+  var curSig = _stolPushSignature();
+  if (_lastPushSig && _lastPushSig === curSig) {
+    console.log('[pushToCloud] skip — signature inchangée depuis le dernier push');
+    return;
+  }
 
   // ══ GARDE ANTI-PERTE ══════════════════════════════════════════════════════
   // Ne jamais pousser vers Supabase si des données critiques ont subitement disparu
@@ -21487,6 +21528,8 @@ async function pushToCloud() {
   }
   if (lastErr) throw lastErr;
   S._lastPushAt = payload._pushAt;
+  // Mémoriser la signature pour la déduplication des prochains pushes
+  _lastPushSig = curSig;
 
   // ══ SAUVEGARDES HORODATÉES — RATE-LIMITÉES POUR MAÎTRISER LES COÛTS ═════
   // Règle stricte : max 1 backup Storage par heure, max 1 snapshot DB par heure
@@ -22033,6 +22076,20 @@ async function loadFromSupabaseFirst() {
     var savedTodos   = keepLocalTodos   ? S.homeTodosByComp  : null;
     var savedPilots  = keepLocalPilots  ? (S.pilots||[]).slice() : null;
 
+    // ✅ GARDE OFFICIALDOCS : préserver les images locales (en-tête / pied de page)
+    // Elles sont JAMAIS écrasées si elles existent en local (les images sont volumineuses
+    // et peuvent ne pas avoir été poussées avant un reload)
+    var savedOfficialDocs = null;
+    if (S.officialDocs && (S.officialDocs.header || S.officialDocs.footer)) {
+      savedOfficialDocs = Object.assign({}, S.officialDocs);
+    }
+    // ✅ GARDE STOLRESULTS : préserver les tableaux STOL locaux
+    var savedStolResults = (S.stolResults && Object.keys(S.stolResults).length) ? Object.assign({}, S.stolResults) : null;
+    // ✅ GARDE DELETED ENROLLS : préserver les tombstones de suppression locale
+    var savedDeletedEnroll = S._deletedEnroll ? Object.assign({}, S._deletedEnroll) : null;
+    var savedDeletedStaff  = S._deletedStaff  ? Object.assign({}, S._deletedStaff)  : null;
+    var savedDeletedComps  = S._deletedComps  ? S._deletedComps.slice() : null;
+
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
 
@@ -22042,6 +22099,58 @@ async function loadFromSupabaseFirst() {
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
     if (savedPilots)  S.pilots = savedPilots;
+    // ✅ Restaurer officialDocs locaux si présents (jamais écraser les images locales par cloud vide)
+    if (savedOfficialDocs) {
+      if (!S.officialDocs) S.officialDocs = {};
+      // Préserver chaque champ local s'il existe (le cloud peut avoir une version partielle/ancienne)
+      Object.keys(savedOfficialDocs).forEach(function(k){
+        if (savedOfficialDocs[k] !== null && savedOfficialDocs[k] !== undefined && savedOfficialDocs[k] !== '') {
+          S.officialDocs[k] = savedOfficialDocs[k];
+        }
+      });
+    }
+    // ✅ Restaurer stolResults locaux (déjà géré par _restoreStolBackup mais double sécurité)
+    if (savedStolResults) {
+      if (!S.stolResults) S.stolResults = {};
+      Object.keys(savedStolResults).forEach(function(cid){
+        var localD = savedStolResults[cid];
+        var cloudD = S.stolResults[cid];
+        var localUpd = (localD && localD.updated) || 0;
+        var cloudUpd = (cloudD && cloudD.updated) || 0;
+        if (localUpd >= cloudUpd) S.stolResults[cid] = localD;
+      });
+    }
+    // ✅ Fusionner les tombstones (suppression respectées même après pull)
+    if (savedDeletedEnroll) {
+      if (!S._deletedEnroll) S._deletedEnroll = {};
+      Object.keys(savedDeletedEnroll).forEach(function(cid){
+        if (!S._deletedEnroll[cid]) S._deletedEnroll[cid] = {};
+        Object.keys(savedDeletedEnroll[cid]||{}).forEach(function(pid){
+          S._deletedEnroll[cid][pid] = savedDeletedEnroll[cid][pid];
+          // Appliquer la tombstone : retirer le pilote du compEnroll s'il y est revenu via cloud
+          if (S.compEnroll && S.compEnroll[cid]) {
+            S.compEnroll[cid] = S.compEnroll[cid].filter(function(p){ return p !== pid; });
+          }
+        });
+      });
+    }
+    if (savedDeletedStaff) {
+      if (!S._deletedStaff) S._deletedStaff = {};
+      Object.keys(savedDeletedStaff).forEach(function(cid){
+        if (!S._deletedStaff[cid]) S._deletedStaff[cid] = {};
+        Object.keys(savedDeletedStaff[cid]||{}).forEach(function(sid){
+          S._deletedStaff[cid][sid] = savedDeletedStaff[cid][sid];
+        });
+      });
+    }
+    if (savedDeletedComps) {
+      if (!S._deletedComps) S._deletedComps = [];
+      savedDeletedComps.forEach(function(cid){
+        if (S._deletedComps.indexOf(cid) === -1) S._deletedComps.push(cid);
+        // Retirer la compétition revenue via cloud
+        if (S.comps) S.comps = S.comps.filter(function(c){ return c.id !== cid; });
+      });
+    }
     // Fusionner (union) les équipages locaux et cloud — on ne supprime JAMAIS un pilote local
     if (!S.compEnroll) S.compEnroll = {};
     Object.keys(_savedEnrollByComp).forEach(function(cid) {
@@ -25680,7 +25789,7 @@ function silentPush() {
       updateSyncHealthPill();
       console.warn('[silentPush] échec:', e);
     });
-  }, 20000); // debounce 20s — même timing que _hdpSaveNow
+  }, 10000); // debounce 10s — compromis fiabilité / coût Supabase (15 modifs en 10s = 1 seul push)
 }
 
 var _syncFailSince   = 0;
