@@ -2476,6 +2476,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       Planning général
     </button>
 
+    <button id="dtn-nav-espaces" onclick="openEspacesPartages()"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
+      onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnNavOut('espaces')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      Espaces partagés
+    </button>
+
   </nav>
   <!-- ── Pied de page fixe : Réglages toujours visible ── -->
   <div style="flex-shrink:0;padding:8px 8px 10px;border-top:1px solid var(--bdr)">
@@ -2583,6 +2590,32 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
 <!-- ══ GANTT : overlay plein écran ══ -->
 <div id="gantt-overlay" style="display:none;position:fixed;inset:0;z-index:2600;flex-direction:column;background:var(--navy);overflow:hidden"></div>
+
+<!-- ══════════ ESPACES PARTAGÉS ══════════ -->
+<div id="espaces-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:var(--txt)">Espaces partagés</div>
+        <div style="font-size:11px;color:var(--txt3)">Accès rapide aux dossiers OneDrive de l'équipe</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="addEspacePartage()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouvel espace
+      </button>
+      <button onclick="closeEspacesPartages()" title="Fermer" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <!-- Grille des espaces -->
+  <div id="espaces-grid" style="flex:1;overflow-y:auto;padding:28px 32px"></div>
+</div>
+
 <input type="file" id="gantt-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importGantt(this)">
 
 <!-- GANTT : dialog tâche -->
@@ -3811,6 +3844,8 @@ var S = {
   runs: {},
   staff: {},
   sitesSportifs: [],
+  espacesPartages: [],
+  stolResults: {},
   ulms: {},
   compEnroll: {},
   _enrollResetAt: {},
@@ -4193,7 +4228,7 @@ function clearLocalStorageQuota() {
   // Clés critiques minimales à conserver absolument
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
-               'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v',
+               'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
                'geststol_vibration', 'geststol_notif_sound'];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
@@ -4300,6 +4335,8 @@ function _flushSaveState() {
     homeTodosByComp:S.homeTodosByComp, moyens:S.moyens||{},
     odmConfig:S.odmConfig||{}, ordresMission:S.ordresMission||[],
     ganttTasks:S.ganttTasks||{}, docSettings:S.docSettings||{},
+    espacesPartages:S.espacesPartages||[],
+    stolResults:S.stolResults||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -7102,6 +7139,8 @@ function openAgenda() {
   // ── 0. Fermer le gantt si ouvert (gantt z:2000 > agenda z:800) ─
   var gg = document.getElementById('gantt-overlay');
   if (gg && gg.style.display !== 'none') { gg.style.display = 'none'; gg.style.left = ''; }
+  var esp = document.getElementById('espaces-overlay');
+  if (esp && esp.style.display !== 'none') esp.style.display = 'none';
 
   // ── 1. Afficher l'overlay en priorité absolue ──────────────────
   var dtn     = document.getElementById('page-dtn');
@@ -14541,21 +14580,37 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     htmlR += '<div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:4px 8px">';
     htmlR += '<button onclick="_resActMenu()" style="'+_resGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
     htmlR += '</div>';
-    htmlR += '<div id="res-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
-    htmlR += _resMI(_resPr,'Imprimer',                   'printCompResults(\''+_cid+'\')');
-    htmlR += _resSep;
-    htmlR += _resMI(_resDl,'Exporter CSV',              'exportRunsFmt(\'csv\',\''+_cid+'\')');
-    htmlR += _resMI(_resDl,'Exporter Excel',            'exportRunsFmt(\'excel\',\''+_cid+'\')');
-    htmlR += _resMI(_resDl,'Exporter JSON',             'exportRunsFmt(\'json\',\''+_cid+'\')');
-    if (_canEditR) {
+    htmlR += '<div id="res-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:260px;max-height:80vh;overflow-y:auto;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow-x:hidden;padding:6px">';
+    // ═══ Section STOL — Tableaux d'épreuves (nouveau) ═══
+    var _isStolCp = ((cp.discipline||'')+''+(cp.type||'')+''+(cp.name||'')).toLowerCase().indexOf('stol') !== -1;
+    if (_isStolCp) {
+      htmlR += '<div style="padding:6px 10px 4px;font-size:9.5px;font-weight:800;color:var(--stol);letter-spacing:1px;text-transform:uppercase">🏁 Tableaux STOL</div>';
+      htmlR += _resMI(_resPr,'🏆 Imprimer classement général','printStolClassementConsolide(\''+_cid+'\')');
+      htmlR += _resMI(_resDl,'📥 Exporter tous les tableaux (Excel)','stolExportAll(\'excel\',\''+_cid+'\')');
+      htmlR += _resMI(_resDl,'📥 Exporter tous les tableaux (CSV)','stolExportAll(\'csv\',\''+_cid+'\')');
+      htmlR += _resMI(_resDl,'📥 Exporter tous les tableaux (JSON)','stolExportAll(\'json\',\''+_cid+'\')');
+      if (_canEditR) {
+        htmlR += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--stol);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(0,87,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_resUl+'<span>📤 Importer un classeur STOL</span><input type="file" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="stolImportAll(this,\''+_cid+'\');_resActClose()"></label>';
+      }
       htmlR += _resSep;
-      htmlR += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_resUl+'<span>Importer résultats…</span><input type="file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importRunsAuto(this,\''+_cid+'\');_resActClose()"></label>';
+    }
+    // ═══ Section Podiums (ancien système basé sur enrollMeta) ═══
+    htmlR += '<div style="padding:6px 10px 4px;font-size:9.5px;font-weight:800;color:var(--txt3);letter-spacing:1px;text-transform:uppercase">🥇 Podiums & résultats par run</div>';
+    htmlR += _resMI(_resPr,'Imprimer les podiums','printCompResults(\''+_cid+'\')');
+    htmlR += _resMI(_resDl,'Exporter podiums (CSV)','exportRunsFmt(\'csv\',\''+_cid+'\')');
+    htmlR += _resMI(_resDl,'Exporter podiums (Excel)','exportRunsFmt(\'excel\',\''+_cid+'\')');
+    htmlR += _resMI(_resDl,'Exporter podiums (JSON)','exportRunsFmt(\'json\',\''+_cid+'\')');
+    if (_canEditR) {
+      htmlR += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_resUl+'<span>Importer podiums…</span><input type="file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importRunsAuto(this,\''+_cid+'\');_resActClose()"></label>';
     }
     htmlR += '</div>';
     htmlR += '</div>';
     htmlR += '</div>';
     // Contenu scrollable sous la barre d'actions
     htmlR += '<div style="flex:1;overflow-y:auto;padding:16px">';
+
+    // ── Section STOL : tableaux de performances ──
+    htmlR += _renderStolResults(cp);
 
     // ── Champions (podiums manuels via enrollMeta) ──
     var _pratLbl  = {microlight:'Microlight', paramoteur:'Paramoteur', multi:'Multi-axes'};
@@ -21411,6 +21466,8 @@ async function pushToCloud() {
     repas:                S.repas                || {},
     repasTarifs:          S.repasTarifs          || {},
     enrollMeta:           S.enrollMeta           || {},
+    espacesPartages:      S.espacesPartages      || [],
+    stolResults:          S.stolResults          || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -22165,6 +22222,8 @@ async function loadFromSupabaseFirst() {
     }
 
     _applyCloudData(cloudData);
+    // ✅ Garde anti-écrasement : restaurer les saisies STOL locales si plus récentes que le cloud
+    try { if (typeof _restoreStolBackup === 'function') _restoreStolBackup(); } catch(e) {}
     saveState();
     console.log('[GestSTOL] ✅ Données Supabase chargées —', (S.comps||[]).length, 'compétitions,', (S.pilots||[]).length, 'pilotes');
     // Vérifier les affiches mises à jour (asynchrone, ne bloque pas le rendu)
@@ -22604,6 +22663,8 @@ async function pullFromCloud() {
   await _pullMedias(sb);
 
   updateNationalRanking();
+  // ✅ Garde anti-écrasement : restaurer les saisies STOL locales si plus récentes que le cloud
+  try { if (typeof _restoreStolBackup === 'function') _restoreStolBackup(); } catch(e) {}
   saveState();
   // Mettre à jour les backups dédiés (filets de sécurité — synchronisés après chaque pull)
   try { if (S.compEnroll)  localStorage.setItem(LS_ENROLL,      JSON.stringify(S.compEnroll));     } catch(e) {}
@@ -25731,6 +25792,7 @@ function _autoBackupLocal() {
       documents:      (S.documents||[]).map(function(d){ var dd=Object.assign({},d); delete dd.base64; return dd; }),
       runs:           S.runs           || {},
       messages:       S.messages       || [],
+      espacesPartages: S.espacesPartages || [],
       _deletedComps:  S._deletedComps  || [],
       _deletedStaff:  S._deletedStaff  || {},
       _deletedPartenaires: S._deletedPartenaires || {},
@@ -25791,6 +25853,7 @@ function exportGlobalBackup() {
       documents:      S.documents      || [],
       officialDocs:   S.officialDocs   || {},
       docSettings:    S.docSettings    || {},
+      espacesPartages: S.espacesPartages || [],
       _deletedComps:  S._deletedComps  || [],
       _deletedStaff:  S._deletedStaff  || {},
       _deletedPartenaires: S._deletedPartenaires || {},
@@ -27661,6 +27724,1930 @@ function exportRunsFmt(fmt, compId) {
   var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Resultats_'+cpName+'.'+ext; a.click(); URL.revokeObjectURL(a.href);
   toast('Export CSV téléchargé ✓','ok');
 }
+// ═══════════════════════════════════════════════════════
+// STOL — Import classeur Excel, rendu & impression
+// ═══════════════════════════════════════════════════════
+
+// Barème de points STOL : place → points
+var _STOL_POINTS = {1:25, 2:18, 3:15, 4:12, 5:10, 6:8, 7:6, 8:5, 9:4, 10:3, 11:2, 12:1};
+function _stolPointsFor(place) {
+  var p = parseInt(place,10);
+  if (!p) return 0;
+  return _STOL_POINTS[p] || 0;
+}
+
+function _getStolResults(compId) {
+  if (!S.stolResults) S.stolResults = {};
+  if (!S.stolResults[compId]) S.stolResults[compId] = { multi: [], pendu: [], title: '', updated: 0 };
+  return S.stolResults[compId];
+}
+
+// Import du fichier Excel au format STOL — détection auto des 2 formats :
+//   1) Classement final : tableaux MULTIAXES/PENDULAIRES avec Poule/Résultat/Place
+//   2) Classeur de saisie : poules A/B… avec D1/A1/D2/A2/D3/A3 + PERF + Retenue
+function importStolResults(input, compId) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true });
+      // ── Détection du format ──
+      var format = _detectStolFormat(grid);
+      if (format === 'final') {
+        _importStolFinal(grid, compId);
+      } else if (format === 'saisie') {
+        _importStolSaisie(grid, compId);
+      } else {
+        toast('Format non reconnu — vérifiez le fichier', 'err');
+      }
+    } catch(err) {
+      console.error('importStolResults', err);
+      toast('Erreur de lecture du fichier', 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Détecte si le fichier est un classement final ou un classeur de saisie
+function _detectStolFormat(grid) {
+  var hasFinal = false, hasSaisie = false;
+  for (var r = 0; r < Math.min(grid.length, 20); r++) {
+    for (var c = 0; c < (grid[r]||[]).length; c++) {
+      var v = (grid[r][c]||'').toString().trim().toUpperCase();
+      // Format saisie : présence "RUN 1" ou "RUN 2" + "PERF"
+      if (v === 'RUN 1' || v === 'RUN 2' || v === 'D1' || v === 'A1' || v === 'PERF' || v === 'RETENUE') hasSaisie = true;
+      // Format final : "MULTIAXES" / "PENDULAIRES" en tant qu'en-tête de tableau (avec "NUM" à côté)
+      if (v === 'NUM') {
+        // Vérifier que la ligne contient bien "MULTIAXES" ou "PENDULAIRES"
+        var lineText = (grid[r]||[]).map(function(x){ return (x||'').toString().toUpperCase(); }).join(' ');
+        if (lineText.indexOf('MULTIAXES') !== -1 || lineText.indexOf('PENDULAIRES') !== -1) hasFinal = true;
+      }
+    }
+  }
+  // Priorité au format final si les deux sont détectés (cas du modèle complet)
+  if (hasFinal && !hasSaisie) return 'final';
+  if (hasSaisie && !hasFinal) return 'saisie';
+  if (hasFinal && hasSaisie) return 'final'; // tableau de synthèse présent
+  return null;
+}
+
+// Import classement final
+function _importStolFinal(grid, compId) {
+  // Trouver titre
+  var title = '';
+  for (var r = 0; r < Math.min(grid.length, 15); r++) {
+    for (var c = 0; c < (grid[r]||[]).length; c++) {
+      var v = (grid[r][c]||'').toString().trim();
+      if (v && v.toUpperCase().indexOf('COMP') !== -1 && v.length > 10) { title = v; break; }
+    }
+    if (title) break;
+  }
+  function findTableHeader(label) {
+    for (var r = 0; r < grid.length; r++) {
+      var rowText = (grid[r]||[]).map(function(x){ return (x||'').toString().trim().toUpperCase(); });
+      // Cherche une ligne contenant "NUM" et le label (MULTIAXES ou PENDULAIRES)
+      if (rowText.indexOf('NUM') !== -1 && rowText.indexOf(label) !== -1) {
+        return { row: r, col: rowText.indexOf('NUM') };
+      }
+    }
+    return null;
+  }
+  function parseTable(label) {
+    var pos = findTableHeader(label);
+    if (!pos) return [];
+    var rows = [];
+    for (var r = pos.row + 1; r < grid.length; r++) {
+      var rowData = grid[r] || [];
+      var num = rowData[2];
+      var nom = rowData[3];
+      if (!num && !nom) break;
+      if (!nom) continue;
+      rows.push({
+        num: (num||'').toString().trim(),
+        nom: (nom||'').toString().trim(),
+        ptsSaison: parseFloat(rowData[4])||0,
+        essais: { poule:(rowData[5]||'').toString().trim(), res:parseFloat(rowData[6])||0, place:parseInt(rowData[7],10)||0 },
+        qualif: { poule:(rowData[8]||'').toString().trim(), res:parseFloat(rowData[9])||0, place:parseInt(rowData[10],10)||0 },
+        finale: { poule:(rowData[11]||'').toString().trim(), res:parseFloat(rowData[12])||0, place:parseInt(rowData[13],10)||0 },
+        ptsObtenus: parseFloat(rowData[14])||0
+      });
+    }
+    return rows;
+  }
+  var multi = parseTable('MULTIAXES');
+  var pendu = parseTable('PENDULAIRES');
+  if (!multi.length && !pendu.length) {
+    toast('Aucun résultat reconnu dans le classement final', 'err');
+    return;
+  }
+  var data = _getStolResults(compId);
+  data.title = title;
+  data.multi = multi;
+  data.pendu = pendu;
+  data.updated = Date.now();
+  ['multi','pendu'].forEach(function(cls) {
+    data[cls].forEach(function(p) {
+      if (!p.ptsObtenus && p.finale && p.finale.place) p.ptsObtenus = _stolPointsFor(p.finale.place);
+    });
+  });
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  toast('✓ Classement final importé : '+(multi.length+pendu.length)+' pilotes','ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Import classeur de saisie (phase unique : essais libres / qualif / finale)
+function _importStolSaisie(grid, compId) {
+  // 1) Détecter la phase depuis C2 (ex: "STOL ESSAIS LIBRES", "STOL QUALIF", "STOL FINALE")
+  var phase = 'essais';
+  var phaseTextRaw = '';
+  for (var r = 0; r < Math.min(grid.length, 5); r++) {
+    for (var c = 0; c < (grid[r]||[]).length; c++) {
+      var v = (grid[r][c]||'').toString().trim().toUpperCase();
+      if (v.indexOf('STOL') !== -1 && (v.indexOf('ESSAIS') !== -1 || v.indexOf('QUALIF') !== -1 || v.indexOf('FINALE') !== -1)) {
+        phaseTextRaw = v;
+        if (v.indexOf('QUALIF') !== -1) phase = 'qualif';
+        else if (v.indexOf('FINALE') !== -1) phase = 'finale';
+        else phase = 'essais';
+        break;
+      }
+    }
+    if (phaseTextRaw) break;
+  }
+  // 2) Parcourir les blocs : chaque bloc commence par une ligne "POULE X / MULTIAXES" (ou PENDULAIRES)
+  // structure : ligne label (POULE A | MULTIAXES | ...), ligne headers (N° | NOM | D1 | A1 ...), N lignes pilotes, ligne vide
+  var blocks = []; // [{cls:'multi'|'pendu', poule:'A', pilotes:[{num,nom,run1:{d1,a1,d2,a2,d3,a3,perf}, run2:{...}, retenue}]}]
+  for (var r = 0; r < grid.length; r++) {
+    var rowText = (grid[r]||[]).map(function(x){ return (x||'').toString().trim().toUpperCase(); });
+    // Détecter une ligne qui contient "MULTIAXES" ou "PENDULAIRES" et qui correspond à un en-tête de bloc
+    var hasMulti = rowText.indexOf('MULTIAXES') !== -1;
+    var hasPendu = rowText.indexOf('PENDULAIRES') !== -1;
+    if (!hasMulti && !hasPendu) continue;
+    var cls = hasMulti ? 'multi' : 'pendu';
+    // Trouver la lettre de poule : 1ère cellule = lettre A/B/C…
+    var firstCell = ((grid[r]||[])[0]||'').toString().trim().toUpperCase();
+    var poule = /^[A-Z]$/.test(firstCell) ? firstCell : '';
+    if (!poule) {
+      // Sinon chercher "POULE X" dans la ligne
+      var m = rowText.find(function(x){ return /^POULE\s+[A-Z]$/.test(x); });
+      if (m) poule = m.split(/\s+/)[1];
+    }
+    if (!poule) continue;
+    // La ligne suivante est l'en-tête (N° / NOM / D1 / A1 …) — on s'attend à r+1
+    var hdrRow = grid[r+1] || [];
+    var hdrText = hdrRow.map(function(x){ return (x||'').toString().trim().toUpperCase(); });
+    if (hdrText.indexOf('N°') === -1 && hdrText.indexOf('NOM') === -1) continue;
+    // Lignes pilotes : à partir de r+2 jusqu'à ligne vide
+    var pilotes = [];
+    for (var rr = r + 2; rr < grid.length; rr++) {
+      var d = grid[rr] || [];
+      var num = (d[0]||'').toString().trim();
+      var nom = (d[1]||'').toString().trim();
+      if (!num && !nom) break;
+      if (!nom) continue;
+      // Détection des colonnes en se basant sur la ligne d'en-tête
+      function colOf(name, startIdx) {
+        for (var ci = startIdx||0; ci < hdrText.length; ci++) if (hdrText[ci] === name) return ci;
+        return -1;
+      }
+      // RUN 1 : 1ères occurrences de D1/A1/D2/A2/D3/A3/PERF
+      var cD1 = colOf('D1'), cA1 = colOf('A1'), cD2 = colOf('D2'), cA2 = colOf('A2'), cD3 = colOf('D3'), cA3 = colOf('A3'), cP1 = colOf('PERF');
+      // RUN 2 : 2èmes occurrences (après cP1)
+      var cD1b = colOf('D1', cP1+1), cA1b = colOf('A1', cP1+1), cD2b = colOf('D2', cP1+1), cA2b = colOf('A2', cP1+1), cD3b = colOf('D3', cP1+1), cA3b = colOf('A3', cP1+1), cP2 = colOf('PERF', cP1+1);
+      var cRet = colOf('RETENUE');
+      function gv(idx){ if (idx<0) return ''; var v = d[idx]; return (v===undefined||v===null||v==='')?'':v; }
+      function fv(idx){ var v = gv(idx); var n = parseFloat(v); return isNaN(n) ? (v||0) : n; }
+      pilotes.push({
+        num: num,
+        nom: nom,
+        run1: { d1:fv(cD1), a1:fv(cA1), d2:fv(cD2), a2:fv(cA2), d3:fv(cD3), a3:fv(cA3), perf:fv(cP1) },
+        run2: { d1:fv(cD1b), a1:fv(cA1b), d2:fv(cD2b), a2:fv(cA2b), d3:fv(cD3b), a3:fv(cA3b), perf:fv(cP2) },
+        retenue: fv(cRet)
+      });
+    }
+    if (pilotes.length) blocks.push({ cls: cls, poule: poule, pilotes: pilotes });
+  }
+  if (!blocks.length) {
+    toast('Aucune poule reconnue dans le classeur de saisie','err');
+    return;
+  }
+  // 3) Enregistrer dans S.stolResults : on alimente la phase concernée (essais|qualif|finale) pour chaque pilote
+  var data = _getStolResults(compId);
+  // Stocker les saisies brutes par phase pour traçabilité
+  if (!data.saisies) data.saisies = {};
+  data.saisies[phase] = { blocks: blocks, importedAt: Date.now() };
+
+  // 4) Calculer les places dans chaque poule à partir de la "Retenue" (min = meilleur)
+  blocks.forEach(function(b){
+    var withRet = b.pilotes.filter(function(p){ var v = parseFloat(p.retenue); return !isNaN(v) && v > 0; });
+    withRet.sort(function(a,c){ return parseFloat(a.retenue) - parseFloat(c.retenue); });
+    withRet.forEach(function(p, idx){ p._place = idx + 1; });
+  });
+
+  // 5) Mettre à jour data.multi / data.pendu : pour chaque pilote, alimenter sa phase
+  ['multi','pendu'].forEach(function(cls){
+    if (!data[cls]) data[cls] = [];
+  });
+  blocks.forEach(function(b){
+    var arr = data[b.cls];
+    b.pilotes.forEach(function(p){
+      // Trouver ou créer la ligne pilote
+      var line = arr.find(function(x){ return (x.num||'').toString() === (p.num||'').toString() && (x.nom||'').toUpperCase() === (p.nom||'').toUpperCase(); });
+      if (!line) {
+        line = { num: p.num, nom: p.nom, ptsSaison: 0,
+                 essais:{poule:'',res:0,place:0}, qualif:{poule:'',res:0,place:0}, finale:{poule:'',res:0,place:0}, ptsObtenus: 0 };
+        arr.push(line);
+      }
+      // Alimenter la phase concernée
+      var ret = parseFloat(p.retenue) || 0;
+      line[phase] = { poule: b.poule, res: ret, place: p._place || 0 };
+    });
+  });
+
+  // 6) Si phase = finale → recalculer les points selon la place
+  if (phase === 'finale') {
+    ['multi','pendu'].forEach(function(cls){
+      data[cls].forEach(function(p){
+        if (p.finale && p.finale.place) p.ptsObtenus = _stolPointsFor(p.finale.place);
+      });
+    });
+  }
+  data.updated = Date.now();
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  var phaseLbl = phase==='essais'?'Essais libres':phase==='qualif'?'Qualifications':'Finale';
+  toast('✓ '+phaseLbl+' importé : '+blocks.reduce(function(t,b){return t+b.pilotes.length;},0)+' pilotes','ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// État local : phase sélectionnée dans le volet Épreuves
+var _stolViewPhase = 'essais'; // 'essais' | 'qualif' | 'finale'
+
+function setStolViewPhase(phase, compId) {
+  _stolViewPhase = phase;
+  if (typeof showHomeCompDetail === 'function' && compId) showHomeCompDetail(compId);
+}
+
+// Initialiser la structure des épreuves
+function _getStolEpreuves(compId) {
+  var d = _getStolResults(compId);
+  if (!d.epreuves) d.epreuves = { essais: { tables: [] }, qualif: { tables: [] }, finale: { tables: [] } };
+  ['essais','qualif','finale'].forEach(function(ph){
+    if (!d.epreuves[ph]) d.epreuves[ph] = { tables: [] };
+    if (!Array.isArray(d.epreuves[ph].tables)) d.epreuves[ph].tables = [];
+  });
+  return d.epreuves;
+}
+
+// Calcul des performances STOL :
+// Perf X = min(des décollages saisis) + min(des atterrissages saisis)
+//   → On prend la plus petite valeur strictement positive parmi les décollages (D1 et/ou D2)
+//   → + la plus petite valeur strictement positive parmi les atterrissages (A1 et/ou A2)
+//   → 0 et "mordu" sont ignorés (considérés comme essai invalide)
+//   → Si aucun décollage OU aucun atterrissage valide : pas de calcul (=0)
+// Retenue = min(Perf1, Perf2) = meilleur des 2 RUNs
+function _stolCalcPerf(run) {
+  if (!run) return 0;
+  var d1 = parseFloat(run.d1), a1 = parseFloat(run.a1);
+  var d2 = parseFloat(run.d2), a2 = parseFloat(run.a2);
+  var ds = [], as = [];
+  if (!isNaN(d1) && d1 > 0) ds.push(d1);
+  if (!isNaN(d2) && d2 > 0) ds.push(d2);
+  if (!isNaN(a1) && a1 > 0) as.push(a1);
+  if (!isNaN(a2) && a2 > 0) as.push(a2);
+  if (!ds.length || !as.length) return 0;
+  return Math.min.apply(null, ds) + Math.min.apply(null, as);
+}
+function _stolCalcRetenue() {
+  // Accepte un nombre variable de RUNs (run1, run2, run3, ...)
+  var runs = Array.prototype.slice.call(arguments).filter(Boolean);
+  var perfs = runs.map(_stolCalcPerf).filter(function(p){ return p > 0; });
+  if (!perfs.length) return 0;
+  return Math.min.apply(null, perfs);
+}
+
+// Récupère le nombre de RUNs d'un tableau
+function _stolGetNbRuns(table) {
+  if (table && table.nbRuns) return table.nbRuns;
+  // Legacy : tableaux créés avant l'introduction de nbRuns → vérifier les runs existants
+  if (!table || !table.lignes || !table.lignes[0]) return 1;
+  var n = 0;
+  var first = table.lignes[0];
+  for (var i = 1; i <= 10; i++) { if (first['run'+i]) n = i; else break; }
+  return Math.max(n, 1);
+}
+
+// Retourne les objets run d'une ligne (run1, run2, ..., runN)
+function _stolGetRuns(ligne, nbRuns) {
+  var runs = [];
+  for (var i = 1; i <= nbRuns; i++) {
+    runs.push(ligne['run'+i] || { d1:'', a1:'', d2:'', a2:'' });
+  }
+  return runs;
+}
+
+// Calculer la retenue d'une ligne en fonction du nombre de runs du tableau
+function _stolLigneRetenue(ligne, nbRuns) {
+  return _stolCalcRetenue.apply(null, _stolGetRuns(ligne, nbRuns));
+}
+
+// Ajouter un RUN à un tableau
+function stolAddRun(compId, tableId) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table) return;
+  var n = _stolGetNbRuns(table);
+  var newN = n + 1;
+  if (newN > 6) { toast('Maximum 6 RUNs par tableau','err'); return; }
+  (table.lignes||[]).forEach(function(l){
+    if (!l['run'+newN]) l['run'+newN] = { d1:'', a1:'', d2:'', a2:'' };
+  });
+  table.nbRuns = newN;
+  S.stolResults[compId].updated = Date.now();
+  saveState(); _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Supprimer le dernier RUN d'un tableau
+function stolRemoveLastRun(compId, tableId) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table) return;
+  var n = _stolGetNbRuns(table);
+  if (n <= 1) { toast('Au moins 1 RUN requis','err'); return; }
+  if (!confirm('Supprimer le RUN '+n+' et toutes ses données ?')) return;
+  (table.lignes||[]).forEach(function(l){ delete l['run'+n]; });
+  table.nbRuns = n - 1;
+  S.stolResults[compId].updated = Date.now();
+  saveState(); _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Récupère le N° de dossard déjà attribué à un pilote dans une compétition
+// en parcourant tous les tableaux STOL (toutes phases : essais, qualif, finale)
+function _stolFindExistingNum(compId, pid) {
+  var eps = (S.stolResults && S.stolResults[compId] && S.stolResults[compId].epreuves) || {};
+  var phases = ['essais', 'qualif', 'finale'];
+  for (var i = 0; i < phases.length; i++) {
+    var tables = (eps[phases[i]] && eps[phases[i]].tables) || [];
+    for (var j = 0; j < tables.length; j++) {
+      var lignes = tables[j].lignes || [];
+      for (var k = 0; k < lignes.length; k++) {
+        if (lignes[k].pid === pid && lignes[k].num) return lignes[k].num;
+      }
+    }
+  }
+  return '';
+}
+
+// Créer un nouveau tableau d'épreuve
+function stolNewTable(compId) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  // Demander la catégorie
+  var cat = prompt('Catégorie du tableau ?\n\nTapez : multiaxes  ou  pendulaire');
+  if (!cat) return;
+  cat = cat.trim().toLowerCase();
+  if (cat !== 'multiaxes' && cat !== 'pendulaire') {
+    alert('Catégorie invalide. Tapez "multiaxes" ou "pendulaire".');
+    return;
+  }
+  // Initialiser les équipages depuis le volet Équipage filtrés par catégorie
+  var enrolled = ((S.compEnroll||{})[compId])||[];
+  var equipages = enrolled.map(function(pid){
+    var p = (S.pilots||[]).find(function(x){ return x.id === pid; }) || {};
+    var ulm = ((S.ulms||{})[pid]||[])[0]||{};
+    var classe = (p.classe || ulm.classe || '').toLowerCase();
+    return { pid: pid, prenom: p.prenom||'', nom: p.nom||'', classe: classe };
+  }).filter(function(e){
+    if (cat === 'multiaxes') return e.classe.indexOf('multi') !== -1 || e.classe === 'multiaxes' || !e.classe; // tolérer non renseigné
+    if (cat === 'pendulaire') return e.classe.indexOf('pendu') !== -1;
+    return false;
+  });
+  var reprisCount = 0;
+  var table = {
+    id: 'stbl-'+Date.now(),
+    categorie: cat,
+    createdAt: Date.now(),
+    nbRuns: 1, // RUN 1 par défaut — utilisez "Run +" pour en ajouter
+    lignes: equipages.map(function(e){
+      // Récupérer le N° déjà saisi pour ce pilote dans cette compétition
+      var existingNum = _stolFindExistingNum(compId, e.pid);
+      if (existingNum) reprisCount++;
+      return {
+        pid: e.pid,
+        prenom: e.prenom,
+        nom: e.nom,
+        num: existingNum,
+        poule: '',
+        run1: { d1:'', a1:'', d2:'', a2:'' }
+      };
+    })
+  };
+  d[phase].tables.push(table);
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (reprisCount > 0) toast('✓ Tableau créé — '+reprisCount+' N° de dossard repris', 'ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Re-render différé pour appliquer le tri sans perdre le focus pendant la saisie
+var _stolResortTimer = null;
+function _stolScheduleResort(compId) {
+  if (_stolResortTimer) clearTimeout(_stolResortTimer);
+  _stolResortTimer = setTimeout(function(){
+    _stolResortTimer = null;
+    // Ne re-render que si aucun input distance/N° n'est focus
+    var ae = document.activeElement;
+    if (ae && ae.tagName === 'INPUT' && ae.type === 'number') return; // saisie en cours → reporter
+    if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+  }, 900);
+}
+
+// Mettre à jour une cellule
+function stolUpdateCell(compId, tableId, ligneIdx, field, sub, val) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table || !table.lignes[ligneIdx]) return;
+  var ligne = table.lignes[ligneIdx];
+  var nbRuns = _stolGetNbRuns(table);
+  var isRunField = /^run\d+$/.test(field);
+  if (field === 'poule') ligne.poule = val;
+  else if (field === 'num')   ligne.num = val;
+  else if (isRunField) {
+    if (!ligne[field]) ligne[field] = { d1:'', a1:'', d2:'', a2:'' };
+    ligne[field][sub] = val;
+  }
+  // Marquer la date de mise à jour pour la garde anti-écrasement
+  S.stolResults[compId].updated = Date.now();
+  // Mettre à jour les cellules Perf X et Retenue en direct (sans re-render complet)
+  if (isRunField) {
+    var fmt = function(v){ if (!v) return '—'; return (Math.round(v*10)/10).toString(); };
+    // Recalculer toutes les Perfs
+    for (var pi = 1; pi <= nbRuns; pi++) {
+      var perfCell = document.getElementById('stol-perf'+pi+'-'+tableId+'-'+ligneIdx);
+      if (perfCell) perfCell.textContent = fmt(_stolCalcPerf(ligne['run'+pi]));
+    }
+    var cr = document.getElementById('stol-retenue-'+tableId+'-'+ligneIdx);
+    if (cr) cr.textContent = fmt(_stolLigneRetenue(ligne, nbRuns));
+  }
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (field === 'poule' && typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+  if (isRunField || field === 'num') _stolScheduleResort(compId);
+}
+
+// Sauvegarde locale dédiée des résultats STOL (survit aux reloads et aux écrasements de sync)
+function _saveStolBackup() {
+  try {
+    if (S.stolResults && Object.keys(S.stolResults).length) {
+      localStorage.setItem('geststol_stolresults_backup', JSON.stringify({
+        data: S.stolResults,
+        savedAt: Date.now()
+      }));
+    }
+  } catch(e) { console.warn('_saveStolBackup', e); }
+}
+
+// Restauration depuis la sauvegarde locale dédiée
+function _restoreStolBackup() {
+  try {
+    var raw = localStorage.getItem('geststol_stolresults_backup');
+    if (!raw) return false;
+    var bk = JSON.parse(raw);
+    if (!bk || !bk.data) return false;
+    // Fusionner : si une compétition existe dans le backup local mais pas dans S.stolResults, on la restaure
+    if (!S.stolResults) S.stolResults = {};
+    var restored = 0;
+    Object.keys(bk.data).forEach(function(compId){
+      var localData = bk.data[compId];
+      var cloudData = S.stolResults[compId];
+      // Stratégie : on conserve le local si plus récent que le cloud
+      // OU si le cloud n'a pas de epreuves alors que le local en a
+      var localUpdated = localData.updated || 0;
+      var cloudUpdated = (cloudData && cloudData.updated) || 0;
+      var localHasEpreuves = localData.epreuves && (
+        ((localData.epreuves.essais||{}).tables||[]).length +
+        ((localData.epreuves.qualif||{}).tables||[]).length +
+        ((localData.epreuves.finale||{}).tables||[]).length
+      ) > 0;
+      var cloudHasEpreuves = cloudData && cloudData.epreuves && (
+        ((cloudData.epreuves.essais||{}).tables||[]).length +
+        ((cloudData.epreuves.qualif||{}).tables||[]).length +
+        ((cloudData.epreuves.finale||{}).tables||[]).length
+      ) > 0;
+      if (localUpdated > cloudUpdated || (localHasEpreuves && !cloudHasEpreuves)) {
+        S.stolResults[compId] = localData;
+        restored++;
+      }
+    });
+    if (restored) console.log('[GestSTOL] stolResults restaurés depuis backup local :', restored, 'compétition(s)');
+    return restored > 0;
+  } catch(e) { console.warn('_restoreStolBackup', e); return false; }
+}
+
+// Supprimer une ligne d'équipage d'un tableau
+function stolDeleteLigne(compId, tableId, ligneIdx) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table || !table.lignes || !table.lignes[ligneIdx]) return;
+  var ligne = table.lignes[ligneIdx];
+  var nom = ((ligne.prenom||'')+' '+(ligne.nom||'')).trim() || 'cet équipage';
+  if (!confirm('Retirer '+nom+' du tableau ?')) return;
+  table.lignes.splice(ligneIdx, 1);
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Supprimer un tableau
+// ═══════════════════════════════════════════════════════
+// STOL — Export / Import GLOBAL des 3 phases (Essais + Qualifs + Finale + Classement)
+// ═══════════════════════════════════════════════════════
+
+// Construire la structure de données exportable
+function _stolBuildExportData(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  var eps = _getStolEpreuves(compId);
+  var rows = [];
+  var phaseLabels = { essais:'Essais libres', qualif:'Qualifications', finale:'Finale' };
+  ['essais','qualif','finale'].forEach(function(ph){
+    var tables = (eps[ph] && eps[ph].tables) || [];
+    tables.forEach(function(t){
+      (t.lignes||[]).forEach(function(l){
+        var p1 = _stolCalcPerf(l.run1);
+        var p2 = _stolCalcPerf(l.run2);
+        var rt = _stolCalcRetenue(l.run1, l.run2);
+        rows.push({
+          phase: phaseLabels[ph],
+          categorie: (t.categorie||'').toUpperCase(),
+          num: l.num || '',
+          prenom: l.prenom || '',
+          nom: l.nom || '',
+          poule: l.poule || '',
+          r1_d1: l.run1.d1, r1_a1: l.run1.a1, r1_d2: l.run1.d2, r1_a2: l.run1.a2, r1_perf: p1 || '',
+          r2_d1: l.run2.d1, r2_a1: l.run2.a1, r2_d2: l.run2.d2, r2_a2: l.run2.a2, r2_perf: p2 || '',
+          retenue: rt || ''
+        });
+      });
+    });
+  });
+  return { comp: cp, rows: rows };
+}
+
+// Exporter tous les tableaux STOL
+function stolExportAll(fmt, compId) {
+  var data = _stolBuildExportData(compId);
+  if (!data.rows.length) { toast('Aucun tableau STOL à exporter','err'); return; }
+  var cp = data.comp || {};
+  var safeName = ((cp.name||'STOL')+'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,40);
+  var dateStr = new Date().toISOString().substring(0,10);
+  if (fmt === 'json') {
+    var blob = new Blob([JSON.stringify({
+      _type: 'stol_tableaux',
+      compId: compId,
+      compName: cp.name||'',
+      exportedAt: new Date().toISOString(),
+      data: ((S.stolResults||{})[compId])||{}
+    }, null, 2)], { type:'application/json' });
+    _stolDownload(blob, 'stol_'+safeName+'_'+dateStr+'.json');
+    toast('✓ JSON exporté','ok');
+    return;
+  }
+  var headers = ['Phase','Catégorie','N°','Prénom','Nom','Poule',
+                 'R1 D1','R1 A1','R1 D2','R1 A2','R1 PERF',
+                 'R2 D1','R2 A1','R2 D2','R2 A2','R2 PERF','Retenue'];
+  var aoa = [headers].concat(data.rows.map(function(r){
+    return [r.phase, r.categorie, r.num, r.prenom, r.nom, r.poule,
+            r.r1_d1, r.r1_a1, r.r1_d2, r.r1_a2, r.r1_perf,
+            r.r2_d1, r.r2_a1, r.r2_d2, r.r2_a2, r.r2_perf, r.retenue];
+  }));
+  if (fmt === 'csv') {
+    var csv = aoa.map(function(row){
+      return row.map(function(v){
+        v = (v===undefined||v===null)?'':v.toString();
+        if (v.indexOf(',')!==-1 || v.indexOf('"')!==-1 || v.indexOf('\n')!==-1) v = '"'+v.replace(/"/g,'""')+'"';
+        return v;
+      }).join(',');
+    }).join('\n');
+    var blob2 = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+    _stolDownload(blob2, 'stol_'+safeName+'_'+dateStr+'.csv');
+    toast('✓ CSV exporté','ok');
+    return;
+  }
+  if (fmt === 'excel') {
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tableaux STOL');
+    XLSX.writeFile(wb, 'stol_'+safeName+'_'+dateStr+'.xlsx');
+    toast('✓ Excel exporté','ok');
+    return;
+  }
+}
+
+function _stolDownload(blob, filename) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 100);
+}
+
+// Importer un classeur STOL global (auto-détection format + JSON natif)
+function stolImportAll(input, compId) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  var name = (file.name||'').toLowerCase();
+  // Format JSON natif (export GestSTOL)
+  if (name.endsWith('.json')) {
+    var rd = new FileReader();
+    rd.onload = function(e){
+      try {
+        var obj = JSON.parse(e.target.result);
+        if (obj && obj._type === 'stol_tableaux' && obj.data) {
+          if (!S.stolResults) S.stolResults = {};
+          S.stolResults[compId] = obj.data;
+          S.stolResults[compId].updated = Date.now();
+          saveState(); _saveStolBackup();
+          if (typeof silentPush === 'function') silentPush();
+          toast('✓ Tableaux STOL importés depuis JSON','ok');
+          if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+        } else { toast('JSON non reconnu','err'); }
+      } catch(e2){ toast('Erreur JSON','err'); }
+    };
+    rd.readAsText(file);
+    return;
+  }
+  // CSV / Excel : format aplati avec colonne "Phase"
+  var rd2 = new FileReader();
+  rd2.onload = function(e){
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { toast('Fichier vide','err'); return; }
+      _stolImportFlatRows(rows, compId);
+    } catch(err){
+      console.error('stolImportAll', err);
+      toast('Erreur de lecture du fichier','err');
+    }
+  };
+  rd2.readAsArrayBuffer(file);
+}
+
+// Import depuis lignes aplaties (avec colonne Phase)
+function _stolImportFlatRows(rows, compId) {
+  function getCol(row, names) {
+    for (var i = 0; i < names.length; i++) {
+      var v = row[names[i]];
+      if (v !== undefined && v !== '') return v;
+    }
+    return '';
+  }
+  function pv(v) {
+    if (v === undefined || v === null || v === '') return '';
+    var t = v.toString().trim().toLowerCase();
+    if (t === 'mordu' || t === '-' || t === '—' || t === 'nul') return '';
+    var n = parseFloat(v.toString().replace(/\s/g,'').replace(',', '.'));
+    return isNaN(n) ? '' : n;
+  }
+  var phaseMap = { 'essais libres':'essais', 'essais':'essais', 'qualifications':'qualif', 'qualif':'qualif', 'finale':'finale' };
+  var catMap = { 'multiaxes':'multiaxes', 'multi':'multiaxes', 'pendulaire':'pendulaire', 'pendulaires':'pendulaire', 'pendu':'pendulaire' };
+  var byKey = {}; // key = phase|categorie → { lignes:[] }
+  var nbImported = 0;
+  rows.forEach(function(r){
+    var phLbl = (getCol(r, ['Phase','phase'])||'').toString().toLowerCase().trim();
+    var catLbl = (getCol(r, ['Catégorie','Categorie','categorie'])||'').toString().toLowerCase().trim();
+    var ph = phaseMap[phLbl];
+    var cat = catMap[catLbl];
+    if (!ph || !cat) return;
+    var key = ph + '|' + cat;
+    if (!byKey[key]) byKey[key] = { phase:ph, cat:cat, lignes:[] };
+    byKey[key].lignes.push({
+      pid: null,
+      num: (getCol(r, ['N°','No','Num','num'])||'').toString().trim(),
+      prenom: (getCol(r, ['Prénom','Prenom','prenom'])||'').toString().trim(),
+      nom: (getCol(r, ['Nom','nom'])||'').toString().trim(),
+      poule: (getCol(r, ['Poule','poule'])||'').toString().trim().toUpperCase(),
+      run1: {
+        d1: pv(getCol(r, ['R1 D1','r1_d1'])),
+        a1: pv(getCol(r, ['R1 A1','r1_a1'])),
+        d2: pv(getCol(r, ['R1 D2','r1_d2'])),
+        a2: pv(getCol(r, ['R1 A2','r1_a2']))
+      },
+      run2: {
+        d1: pv(getCol(r, ['R2 D1','r2_d1'])),
+        a1: pv(getCol(r, ['R2 A1','r2_a1'])),
+        d2: pv(getCol(r, ['R2 D2','r2_d2'])),
+        a2: pv(getCol(r, ['R2 A2','r2_a2']))
+      }
+    });
+    nbImported++;
+  });
+  if (!nbImported) { toast('Aucune ligne valide (colonnes Phase + Catégorie attendues)','err'); return; }
+  // Tenter de matcher les pid depuis les pilotes inscrits
+  var enrolled = ((S.compEnroll||{})[compId])||[];
+  function normalize(s) { return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function findPid(prenom, nom) {
+    var full = normalize(prenom+' '+nom);
+    var nomKey = normalize(nom);
+    for (var i = 0; i < enrolled.length; i++) {
+      var p = (S.pilots||[]).find(function(x){ return x.id === enrolled[i]; }) || {};
+      var pFull = normalize((p.prenom||'')+' '+(p.nom||''));
+      var pNom = normalize(p.nom||'');
+      if (pFull === full || pNom === nomKey || (full && pFull && (pFull.indexOf(full)!==-1 || full.indexOf(pFull)!==-1))) return p.id;
+    }
+    return null;
+  }
+  // Écraser les tableaux existants par les nouveaux
+  var d = _getStolEpreuves(compId);
+  Object.keys(byKey).forEach(function(k){
+    var grp = byKey[k];
+    grp.lignes.forEach(function(l){ l.pid = findPid(l.prenom, l.nom); });
+    if (!d[grp.phase].tables) d[grp.phase].tables = [];
+    // Vérifier s'il existe déjà un tableau pour cette catégorie
+    var existing = d[grp.phase].tables.find(function(t){ return t.categorie === grp.cat; });
+    if (existing) {
+      existing.lignes = grp.lignes;
+    } else {
+      d[grp.phase].tables.push({
+        id: 'stbl-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+        categorie: grp.cat,
+        createdAt: Date.now(),
+        lignes: grp.lignes
+      });
+    }
+  });
+  S.stolResults[compId].updated = Date.now();
+  saveState(); _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  toast('✓ '+nbImported+' ligne(s) importée(s) — '+Object.keys(byKey).length+' tableau(x) mis à jour','ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// ═══════════════════════════════════════════════════════
+// STOL — Importer fichier Excel dans le tableau actif
+// ═══════════════════════════════════════════════════════
+function stolImportFileToTable(input, compId, tableId) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  var name = (file.name||'').toLowerCase();
+  var isImage = file.type && file.type.indexOf('image/') === 0;
+  if (isImage || /\.(png|jpe?g|webp|bmp|gif)$/i.test(name)) {
+    _stolImportImageOCR(file, compId, tableId);
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: true });
+      var pilotes = _stolExtractFromGrid(grid);
+      if (!pilotes || !pilotes.length) {
+        toast('Aucun pilote détecté dans le fichier', 'err');
+        return;
+      }
+      _stolApplyImportedPilotes(compId, tableId, pilotes);
+    } catch(err) {
+      console.error('stolImportFileToTable', err);
+      toast('Erreur de lecture du fichier', 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── OCR sur image (capture d'écran ou photo) avec Tesseract.js ───
+var _tesseractLoading = false;
+function _loadTesseract(callback) {
+  if (window.Tesseract) return callback();
+  if (_tesseractLoading) { setTimeout(function(){ _loadTesseract(callback); }, 200); return; }
+  _tesseractLoading = true;
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  s.onload = function(){ _tesseractLoading = false; callback(); };
+  s.onerror = function(){ _tesseractLoading = false; toast('Impossible de charger Tesseract.js (vérifiez votre connexion)','err'); };
+  document.head.appendChild(s);
+}
+
+function _stolImportImageOCR(file, compId, tableId) {
+  // Modal de progression
+  var ov = document.createElement('div');
+  ov.id = '_stol-ocr-dlg';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2900;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  ov.innerHTML = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:520px;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
+    + '<div style="font-size:42px;margin-bottom:10px">📸</div>'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:6px">Reconnaissance en cours…</div>'
+    + '<div style="font-size:11.5px;color:var(--txt3);margin-bottom:14px">L\'image est analysée localement (aucune donnée envoyée à un serveur)</div>'
+    + '<div style="height:6px;background:var(--navy3);border-radius:3px;overflow:hidden"><div id="_stol-ocr-bar" style="height:100%;width:0%;background:var(--stol);transition:width .3s"></div></div>'
+    + '<div id="_stol-ocr-status" style="font-size:11px;color:var(--txt3);margin-top:8px">Chargement du moteur OCR…</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  var setBar = function(p, msg){
+    var bar = document.getElementById('_stol-ocr-bar');
+    var st  = document.getElementById('_stol-ocr-status');
+    if (bar) bar.style.width = Math.round(p*100)+'%';
+    if (st && msg) st.textContent = msg;
+  };
+  _loadTesseract(function(){
+    setBar(0.1, 'Préparation de l\'image…');
+    var imgURL = URL.createObjectURL(file);
+    Tesseract.recognize(imgURL, 'fra+eng', {
+      logger: function(m){
+        if (m.status === 'recognizing text') setBar(0.2 + m.progress*0.7, 'Lecture du tableau… '+Math.round(m.progress*100)+'%');
+        else if (m.status === 'loading tesseract core') setBar(0.05, 'Chargement du moteur…');
+        else if (m.status === 'loading language traineddata') setBar(0.1, 'Chargement de la langue…');
+      }
+    }).then(function(result){
+      URL.revokeObjectURL(imgURL);
+      setBar(1, 'Analyse terminée');
+      var text = (result && result.data && result.data.text) || '';
+      setTimeout(function(){
+        var dlg = document.getElementById('_stol-ocr-dlg');
+        if (dlg) dlg.remove();
+        if (!text.trim()) { toast('Aucun texte reconnu','err'); return; }
+        // Préparer le texte pour le parseur (remplacer espaces multiples par tab pour simuler colonnes)
+        var prepared = _stolPrepareOCRText(text);
+        // Afficher dans la modal "Coller" pour validation
+        stolPasteResults(compId, tableId);
+        setTimeout(function(){
+          var ta = document.getElementById('_stol-paste-input');
+          if (ta) { ta.value = prepared; if (typeof _stolUpdatePastePreview === 'function') _stolUpdatePastePreview(); ta.focus(); }
+        }, 80);
+      }, 300);
+    }).catch(function(err){
+      console.error('OCR error', err);
+      var dlg = document.getElementById('_stol-ocr-dlg'); if (dlg) dlg.remove();
+      toast('Erreur OCR : '+(err.message||'inconnue'),'err');
+    });
+  });
+}
+
+// Convertit le texte OCR en format tabulé : remplace les groupes de 2+ espaces par tab
+function _stolPrepareOCRText(text) {
+  return text.split(/\r?\n/).map(function(line){
+    // Nettoyer : conserver virgule pour décimales, remplacer "perf" et "retenue" en majuscules
+    var l = line.replace(/[ \t]+/g, ' ').trim();
+    // Remplacer les espaces multiples (déjà collapsés) — utiliser ce caractère comme séparateur
+    // Séparateur "intelligent" : entre tokens contenant chiffres ou mots, on suppose colonnes
+    var tokens = l.split(' ');
+    return tokens.join('\t');
+  }).join('\n');
+}
+
+// Extraction des pilotes depuis une grille (classeur Excel parsé)
+function _stolExtractFromGrid(grid) {
+  if (!grid || !grid.length) return [];
+  function up(v) { return (v||'').toString().trim().toUpperCase(); }
+  function pv(v) {
+    if (v === undefined || v === null) return '';
+    var t = v.toString().trim().toLowerCase();
+    if (!t) return '';
+    if (t === 'mordu' || t === '-' || t === '—' || t === 'nul') return '';
+    var n = parseFloat(v.toString().replace(/\s/g,'').replace(',', '.'));
+    return isNaN(n) ? '' : n;
+  }
+  var allPilotes = [];
+  // Parcourir le grid à la recherche des blocs d'en-tête + lignes pilotes
+  for (var r = 0; r < grid.length; r++) {
+    var row = (grid[r]||[]).map(up);
+    // Détecter une ligne d'en-tête : contient "N°" (ou "NO") et "NOM"
+    var idxNum = row.indexOf('N°'); if (idxNum === -1) idxNum = row.indexOf('NO');
+    var idxNom = row.indexOf('NOM');
+    if (idxNum === -1 || idxNom === -1) continue;
+    // Trouver les indices D1, A1, D2, A2 pour RUN 1 puis RUN 2
+    function findFrom(label, startIdx) {
+      for (var i = startIdx; i < row.length; i++) if (row[i] === label) return i;
+      return -1;
+    }
+    var iD1a = findFrom('D1', 0), iA1a = findFrom('A1', iD1a+1), iD2a = findFrom('D2', iA1a+1), iA2a = findFrom('A2', iD2a+1), iPa = findFrom('PERF', iA2a+1);
+    var iD1b = findFrom('D1', iPa+1), iA1b = findFrom('A1', iD1b+1), iD2b = findFrom('D2', iA1b+1), iA2b = findFrom('A2', iD2b+1);
+    // Détecter la poule : sur la ligne r-1 ou r (cellule "A","B","C","D" ou "POULE X")
+    var poule = '';
+    for (var pr = Math.max(0, r-2); pr <= r; pr++) {
+      var prow = grid[pr]||[];
+      for (var pc = 0; pc < prow.length; pc++) {
+        var cv = up(prow[pc]);
+        var pm = cv.match(/^POULE\s+([A-D])$/);
+        if (pm) { poule = pm[1]; break; }
+        if (/^[A-D]$/.test(cv) && pc <= 2) { poule = cv; break; }
+      }
+      if (poule) break;
+    }
+    // Lire les lignes suivantes jusqu'à ligne vide
+    for (var rr = r + 1; rr < grid.length; rr++) {
+      var d = grid[rr] || [];
+      var num = (d[idxNum]||'').toString().trim();
+      var nom = (d[idxNom]||'').toString().trim();
+      if (!num && !nom) break;
+      if (!nom) continue;
+      allPilotes.push({
+        num: num,
+        nom: nom,
+        poule: poule,
+        run1: {
+          d1: iD1a >= 0 ? pv(d[iD1a]) : '',
+          a1: iA1a >= 0 ? pv(d[iA1a]) : '',
+          d2: iD2a >= 0 ? pv(d[iD2a]) : '',
+          a2: iA2a >= 0 ? pv(d[iA2a]) : ''
+        },
+        run2: {
+          d1: iD1b >= 0 ? pv(d[iD1b]) : '',
+          a1: iA1b >= 0 ? pv(d[iA1b]) : '',
+          d2: iD2b >= 0 ? pv(d[iD2b]) : '',
+          a2: iA2b >= 0 ? pv(d[iA2b]) : ''
+        }
+      });
+    }
+    // Passer après ce bloc pour ne pas re-parser
+    // (on reprend la boucle r normalement, prochain en-tête sera détecté)
+  }
+  return allPilotes;
+}
+
+// Appliquer les pilotes importés au tableau actif (matching par nom)
+function _stolApplyImportedPilotes(compId, tableId, pilotes) {
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table) { toast('Tableau introuvable','err'); return; }
+  function normalize(s) {
+    return (s||'').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  var matched = 0, notMatched = [];
+  pilotes.forEach(function(p){
+    var pNom = normalize(p.nom);
+    if (!pNom) return;
+    var pKeys = pNom.split(' ').filter(function(w){ return w.length >= 2; });
+    var ligne = (table.lignes||[]).find(function(l){
+      var lFull = normalize((l.prenom||'') + ' ' + (l.nom||''));
+      var lNom  = normalize(l.nom||'');
+      var lPre  = normalize(l.prenom||'');
+      if (!lFull) return false;
+      if (pNom === lFull || pNom === lNom) return true;
+      return pKeys.every(function(w){ return lFull.indexOf(w) !== -1 || lNom.indexOf(w) !== -1 || lPre.indexOf(w) !== -1; });
+    });
+    if (ligne) {
+      if (p.num) ligne.num = p.num;
+      if (p.poule) ligne.poule = p.poule;
+      ['d1','a1','d2','a2'].forEach(function(f){
+        if (p.run1[f] !== '' && p.run1[f] !== undefined) ligne.run1[f] = p.run1[f];
+        if (p.run2[f] !== '' && p.run2[f] !== undefined) ligne.run2[f] = p.run2[f];
+      });
+      matched++;
+    } else {
+      notMatched.push(p.nom);
+    }
+  });
+  if (matched === 0) {
+    alert('Aucun pilote du tableau n\'a été reconnu.\n\nVérifiez que les noms du fichier correspondent aux pilotes inscrits dans Équipage.\n\nNoms du fichier non trouvés :\n• '+notMatched.slice(0,8).join('\n• ')+(notMatched.length>8?'\n• …':''));
+    return;
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  var msg = '✓ '+matched+' pilote(s) mis à jour';
+  if (notMatched.length) msg += ' — '+notMatched.length+' non reconnu(s)';
+  toast(msg, 'ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// ═══════════════════════════════════════════════════════
+// STOL — Coller depuis Excel/Google Sheets
+// ═══════════════════════════════════════════════════════
+function stolPasteResults(compId, tableId) {
+  var ov = document.createElement('div');
+  ov.id = '_stol-paste-dlg';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2900;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var html = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:760px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)" onclick="event.stopPropagation()">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr)">'
+    + '<div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="var(--stol)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+    + '<div><div style="font-size:15px;font-weight:800;color:var(--txt)">Coller depuis un tableur</div><div style="font-size:11.5px;color:var(--txt3);margin-top:2px">Copiez les cellules depuis Excel/Google Sheets puis Ctrl+V dans la zone ci-dessous</div></div></div>'
+    + '<button onclick="document.getElementById(\'_stol-paste-dlg\').remove()" style="width:30px;height:30px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;font-family:inherit">×</button></div>'
+    + '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">'
+    + '<div style="padding:10px 14px;background:rgba(0,87,255,.07);border:1px solid rgba(0,87,255,.2);border-radius:10px;font-size:11.5px;color:var(--txt2);line-height:1.6">'
+    + '<b style="color:var(--stol)">📋 Format attendu :</b> incluez les lignes d\'en-tête de votre tableur (POULE / N° / NOM / D1 / A1 / D2 / A2 / PERF / D1 / A1 / D2 / A2 / PERF / Retenue).<br>'
+    + 'Le nom des pilotes sera automatiquement matché avec ceux du tableau. La poule (A, B, C, D) est détectée automatiquement. <i style="color:var(--txt3)">"mordu"</i> est interprété comme 0.</div>'
+    + '<textarea id="_stol-paste-input" placeholder="Cliquez ici puis Ctrl+V (ou Cmd+V) pour coller vos cellules copiées du tableur..." style="width:100%;min-height:220px;padding:12px;border-radius:10px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:Menlo,Monaco,monospace;font-size:11.5px;outline:none;resize:vertical;box-sizing:border-box" oninput="_stolUpdatePastePreview()"></textarea>'
+    + '<div id="_stol-paste-preview" style="font-size:12px;min-height:24px;padding:8px 12px;background:rgba(255,255,255,.02);border-radius:8px;border:1px solid var(--bdr)"></div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px">'
+    + '<button onclick="document.getElementById(\'_stol-paste-dlg\').remove()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_stolApplyPaste(\''+compId+'\',\''+tableId+'\')" style="padding:10px 22px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">✓ Importer dans le tableau</button>'
+    + '</div></div></div>';
+  ov.innerHTML = html;
+  document.body.appendChild(ov);
+  setTimeout(function(){ var ta = document.getElementById('_stol-paste-input'); if (ta) ta.focus(); }, 50);
+}
+
+// Parser les données collées (format TSV depuis Excel/Sheets)
+function _stolParsePastedData(text) {
+  if (!text || !text.trim()) return null;
+  var lines = text.split(/\r?\n/).filter(function(l){ return l.trim() !== ''; });
+  if (!lines.length) return null;
+  // Trouver la ligne d'en-tête (contient "N°" et "NOM")
+  var hdrIdx = -1;
+  for (var i = 0; i < lines.length; i++) {
+    var cells = lines[i].split('\t').map(function(c){ return c.trim().toUpperCase(); });
+    if ((cells.indexOf('N°') !== -1 || cells.indexOf('NO') !== -1) && cells.indexOf('NOM') !== -1) {
+      hdrIdx = i;
+      break;
+    }
+  }
+  if (hdrIdx === -1) return null;
+  var hdr = lines[hdrIdx].split('\t').map(function(c){ return c.trim().toUpperCase(); });
+  var idxNum = hdr.indexOf('N°'); if (idxNum === -1) idxNum = hdr.indexOf('NO');
+  var idxNom = hdr.indexOf('NOM');
+  function findFrom(label, startIdx) {
+    for (var i = startIdx; i < hdr.length; i++) if (hdr[i] === label) return i;
+    return -1;
+  }
+  // Run 1
+  var iD1a = findFrom('D1', 0), iA1a = findFrom('A1', iD1a+1), iD2a = findFrom('D2', iA1a+1), iA2a = findFrom('A2', iD2a+1), iPa = findFrom('PERF', iA2a+1);
+  // Run 2
+  var iD1b = findFrom('D1', iPa+1), iA1b = findFrom('A1', iD1b+1), iD2b = findFrom('D2', iA1b+1), iA2b = findFrom('A2', iD2b+1);
+  // Détecter la poule
+  var pouleDetected = '';
+  for (var pi = 0; pi <= hdrIdx; pi++) {
+    var lineUp = lines[pi].toUpperCase();
+    var m = lineUp.match(/POULE\s+([A-D])\b/);
+    if (m) { pouleDetected = m[1]; break; }
+    var firstCell = (lines[pi].split('\t')[0]||'').trim().toUpperCase();
+    if (/^[A-D]$/.test(firstCell)) { pouleDetected = firstCell; break; }
+  }
+  function pv(v) {
+    if (v === undefined || v === null) return '';
+    var t = v.toString().trim().toLowerCase();
+    if (!t) return '';
+    if (t === 'mordu' || t === '-' || t === '—' || t === 'nul') return '';
+    var n = parseFloat(v.toString().replace(/\s/g,'').replace(',', '.'));
+    return isNaN(n) ? '' : n;
+  }
+  var pilotes = [];
+  for (var i = hdrIdx + 1; i < lines.length; i++) {
+    var cells = lines[i].split('\t').map(function(c){ return c.trim(); });
+    var num = idxNum >= 0 ? (cells[idxNum]||'') : '';
+    var nom = idxNom >= 0 ? (cells[idxNom]||'') : '';
+    if (!num && !nom) continue;
+    if (!nom) continue;
+    pilotes.push({
+      num: num.toString().trim(),
+      nom: nom,
+      poule: pouleDetected,
+      run1: {
+        d1: iD1a >= 0 ? pv(cells[iD1a]) : '',
+        a1: iA1a >= 0 ? pv(cells[iA1a]) : '',
+        d2: iD2a >= 0 ? pv(cells[iD2a]) : '',
+        a2: iA2a >= 0 ? pv(cells[iA2a]) : ''
+      },
+      run2: {
+        d1: iD1b >= 0 ? pv(cells[iD1b]) : '',
+        a1: iA1b >= 0 ? pv(cells[iA1b]) : '',
+        d2: iD2b >= 0 ? pv(cells[iD2b]) : '',
+        a2: iA2b >= 0 ? pv(cells[iA2b]) : ''
+      }
+    });
+  }
+  return { pouleDetected: pouleDetected, pilotes: pilotes };
+}
+
+function _stolUpdatePastePreview() {
+  var ta = document.getElementById('_stol-paste-input');
+  var prev = document.getElementById('_stol-paste-preview');
+  if (!ta || !prev) return;
+  if (!ta.value.trim()) {
+    prev.innerHTML = '<span style="color:var(--txt3);font-style:italic">En attente de données…</span>';
+    return;
+  }
+  var parsed = _stolParsePastedData(ta.value);
+  if (!parsed || !parsed.pilotes.length) {
+    prev.innerHTML = '<span style="color:#ef4444">⚠️ Format non reconnu — assurez-vous d\'inclure la ligne d\'en-tête : <b>N° / NOM / D1 / A1 / D2 / A2 / PERF</b></span>';
+    return;
+  }
+  var detail = parsed.pilotes.slice(0,3).map(function(p){ return '<span style="color:var(--txt2)">'+p.num+' '+_escapeHTML(p.nom)+'</span>'; }).join(' · ');
+  if (parsed.pilotes.length > 3) detail += ' <span style="color:var(--txt3)">+'+(parsed.pilotes.length-3)+' autre(s)</span>';
+  prev.innerHTML = '<span style="color:#22c55e;font-weight:700">✓ '+parsed.pilotes.length+' pilote(s) détecté(s)'
+    + (parsed.pouleDetected ? ' · Poule <b>'+parsed.pouleDetected+'</b>' : '')
+    + '</span><div style="margin-top:6px;font-size:11px">'+detail+'</div>';
+}
+
+function _stolApplyPaste(compId, tableId) {
+  var ta = document.getElementById('_stol-paste-input');
+  if (!ta || !ta.value.trim()) { alert('Aucune donnée à importer'); return; }
+  var parsed = _stolParsePastedData(ta.value);
+  if (!parsed || !parsed.pilotes.length) {
+    alert('Impossible de parser les données.\n\nFormat attendu :\nN°  NOM  D1  A1  D2  A2  PERF  D1  A1  D2  A2  PERF  Retenue\n\nCopiez les cellules y compris l\'en-tête.');
+    return;
+  }
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
+  if (!table) { alert('Tableau introuvable'); return; }
+  function normalize(s) {
+    return (s||'').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  var matched = 0, notMatched = [];
+  parsed.pilotes.forEach(function(p){
+    var pNom = normalize(p.nom);
+    if (!pNom) return;
+    var pNomKeys = pNom.split(' ').filter(function(w){ return w.length >= 2; });
+    var ligne = (table.lignes||[]).find(function(l){
+      var lFull = normalize((l.prenom||'') + ' ' + (l.nom||''));
+      var lNom  = normalize(l.nom||'');
+      var lPre  = normalize(l.prenom||'');
+      if (!lFull) return false;
+      if (pNom === lFull || pNom === lNom) return true;
+      // Vérifier que tous les mots significatifs de pNom sont dans lFull
+      return pNomKeys.every(function(w){ return lFull.indexOf(w) !== -1 || lNom.indexOf(w) !== -1 || lPre.indexOf(w) !== -1; });
+    });
+    if (ligne) {
+      if (p.num) ligne.num = p.num;
+      if (p.poule) ligne.poule = p.poule;
+      ['d1','a1','d2','a2'].forEach(function(f){
+        if (p.run1[f] !== '' && p.run1[f] !== undefined) ligne.run1[f] = p.run1[f];
+        if (p.run2[f] !== '' && p.run2[f] !== undefined) ligne.run2[f] = p.run2[f];
+      });
+      matched++;
+    } else {
+      notMatched.push(p.nom);
+    }
+  });
+  if (matched === 0) {
+    alert('Aucun pilote du tableau n\'a été reconnu.\n\nVérifiez que les noms collés correspondent aux pilotes inscrits dans Équipage.\n\nPilotes non trouvés : '+notMatched.slice(0,5).join(', '));
+    return;
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  var dlg = document.getElementById('_stol-paste-dlg');
+  if (dlg) dlg.remove();
+  var msg = '✓ '+matched+' pilote(s) mis à jour';
+  if (notMatched.length) msg += ' — '+notMatched.length+' non reconnu(s)';
+  toast(msg, 'ok');
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+function stolDeleteTable(compId, tableId) {
+  if (!confirm('Supprimer ce tableau ?')) return;
+  var d = _getStolEpreuves(compId);
+  var phase = _stolViewPhase || 'essais';
+  d[phase].tables = (d[phase].tables||[]).filter(function(t){ return t.id !== tableId; });
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+
+// Rendu HTML des épreuves STOL dans l'onglet Résultats (au-dessus de Champions)
+function _renderStolResults(cp) {
+  if (!cp || !cp.id) return '';
+  // Détecter STOL : discipline contient 'stol' OU type/nom contient stol
+  var isStol = ((cp.discipline||'')+''+(cp.type||'')+''+(cp.name||'')).toLowerCase().indexOf('stol') !== -1;
+  if (!isStol) return ''; // affiche uniquement pour compétitions STOL
+
+  var eps = _getStolEpreuves(cp.id);
+  var phase = _stolViewPhase || 'essais';
+  var tables = (eps[phase] && eps[phase].tables) || [];
+
+  var html = '';
+  // ── Volet Épreuves : menu de sélection de la phase ──
+  html += '<div style="margin-bottom:18px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,87,255,.05);border-bottom:1px solid var(--bdr)">';
+  html += '<div style="display:flex;align-items:center;gap:10px">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--stol)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
+  html += '<div><div style="font-size:14px;font-weight:800;color:var(--txt)">Épreuves STOL</div>';
+  html += '<div style="font-size:10.5px;color:var(--txt3)">Saisissez les distances par RUN — calcul automatique des performances</div></div>';
+  html += '</div>';
+  if (phase !== 'classement') {
+    html += '<button onclick="stolNewTable(\''+cp.id+'\')" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 14px;border-radius:8px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nouveau tableau</button>';
+  }
+  html += '</div>';
+  // Boutons menu : Essais / Qualifications / Finale
+  html += '<div style="display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap;background:var(--navy3)">';
+  var phases = [
+    { id:'essais',    lbl:'🟠 Essais libres',   col:'#f59e0b' },
+    { id:'qualif',    lbl:'🔵 Qualifications',  col:'#3b82f6' },
+    { id:'finale',    lbl:'🏁 Finale',           col:'#0057FF' },
+    { id:'classement',lbl:'🏆 Classement',       col:'#7c3aed' }
+  ];
+  phases.forEach(function(p){
+    var active = (phase === p.id);
+    var bg = active ? p.col : 'transparent';
+    var col = active ? '#fff' : 'var(--txt2)';
+    var br = active ? p.col : 'var(--bdr)';
+    var nT = (eps[p.id]&&eps[p.id].tables) ? eps[p.id].tables.length : 0;
+    var badge = (p.id !== 'classement' && nT) ? ' <span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:'+(active?'rgba(255,255,255,.25)':p.col)+';color:#fff;font-size:9.5px;font-weight:800">'+nT+'</span>' : '';
+    html += '<button onclick="setStolViewPhase(\''+p.id+'\',\''+cp.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:1.5px solid '+br+';background:'+bg+';color:'+col+';font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap">'+p.lbl+badge+'</button>';
+  });
+  html += '</div></div>';
+
+  // ── Vue Classement consolidé ──
+  if (phase === 'classement') {
+    html += _renderStolClassementView(cp);
+    return html;
+  }
+  // ── Tableaux pour la phase sélectionnée ──
+  if (!tables.length) {
+    var phaseLbl = phase==='essais'?'Essais libres':phase==='qualif'?'Qualifications':'Finale';
+    html += '<div style="padding:24px 18px;background:rgba(0,87,255,.04);border:1px dashed rgba(0,87,255,.3);border-radius:14px;display:flex;align-items:center;gap:14px;margin-bottom:18px">'
+      + '<div style="font-size:30px">📋</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:13px;font-weight:800;color:var(--stol);margin-bottom:3px">Aucun tableau d\'épreuve — '+phaseLbl+'</div>'
+      + '<div style="font-size:11.5px;color:var(--txt2);line-height:1.5">Cliquez sur <b>+ Nouveau tableau</b> pour créer un tableau Multiaxes ou Pendulaire. Les équipages sont automatiquement chargés depuis le volet Équipage.</div>'
+      + '</div></div>';
+    return html;
+  }
+  tables.forEach(function(table){
+    html += _renderStolEpreuveTable(cp.id, table);
+  });
+  return html;
+}
+
+// ─── Vue Classement consolidé : agrégation Essais + Qualifs + Finale par catégorie ───
+function _renderStolClassementView(cp) {
+  var eps = _getStolEpreuves(cp.id);
+  var html = '';
+  // Pour chaque catégorie : agréger tous les pilotes
+  ['multiaxes','pendulaire'].forEach(function(cat){
+    var agg = _stolAggregateForClassement(eps, cat);
+    if (!agg.length) return;
+    html += _renderStolClassementTable(cat, agg, cp);
+  });
+  // Cas où aucune donnée
+  var allEmpty = !html;
+  if (allEmpty) {
+    html += '<div style="padding:24px 18px;background:rgba(124,58,237,.05);border:1px dashed rgba(124,58,237,.3);border-radius:14px;display:flex;align-items:center;gap:14px;margin-bottom:18px">'
+      + '<div style="font-size:30px">🏆</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:13px;font-weight:800;color:#7c3aed;margin-bottom:3px">Classement vide</div>'
+      + '<div style="font-size:11.5px;color:var(--txt2);line-height:1.5">Saisissez d\'abord les résultats dans les volets <b>Essais libres</b>, <b>Qualifications</b> et <b>Finale</b>. Le classement consolidé apparaîtra automatiquement ici.</div>'
+      + '</div></div>';
+  } else {
+    // Bouton impression
+    html = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="printStolClassementConsolide(\''+cp.id+'\')" style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 14px;border-radius:8px;border:1px solid #7c3aed;background:#7c3aed;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Imprimer le classement A4</button></div>' + html;
+  }
+  return html;
+}
+
+// Agréger tous les pilotes d'une catégorie sur les 3 phases
+function _stolAggregateForClassement(eps, categorie) {
+  // Collecter tous les pilotes uniques par pid OU par nom normalisé
+  function normalize(s) {
+    return (s||'').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  var pilotesMap = {}; // key = pid ou nom normalisé
+  var phaseList = ['essais','qualif','finale'];
+  phaseList.forEach(function(ph){
+    var tables = (eps[ph] && eps[ph].tables) || [];
+    tables.forEach(function(t){
+      if (t.categorie !== categorie) return;
+      var nbR = _stolGetNbRuns(t);
+      // Calculer les places dans chaque poule de ce tableau pour cette phase
+      var byPoule = {};
+      (t.lignes||[]).forEach(function(l){
+        var pl = (l.poule||'').toUpperCase();
+        var ret = _stolLigneRetenue(l, nbR);
+        if (!byPoule[pl]) byPoule[pl] = [];
+        byPoule[pl].push({ l:l, ret:ret });
+      });
+      Object.keys(byPoule).forEach(function(pl){
+        var arr = byPoule[pl];
+        var withPerf = arr.filter(function(x){ return x.ret > 0; });
+        withPerf.sort(function(a,b){ return a.ret - b.ret; });
+        withPerf.forEach(function(x, idx){ x.place = idx + 1; });
+      });
+      (t.lignes||[]).forEach(function(l){
+        var key = l.pid || normalize((l.prenom||'')+' '+(l.nom||''));
+        if (!key) return;
+        if (!pilotesMap[key]) {
+          pilotesMap[key] = {
+            pid: l.pid || null,
+            num: l.num || '',
+            prenom: l.prenom || '',
+            nom: l.nom || '',
+            essais: { poule:'', perf:0, place:0 },
+            qualif: { poule:'', perf:0, place:0 },
+            finale: { poule:'', perf:0, place:0 }
+          };
+        }
+        var p = pilotesMap[key];
+        if (!p.num && l.num) p.num = l.num;
+        var pl = (l.poule||'').toUpperCase();
+        var ret = _stolLigneRetenue(l, nbR);
+        var place = 0;
+        if (pl && byPoule[pl]) {
+          var entry = byPoule[pl].find(function(x){ return x.l === l; });
+          place = (entry && entry.place) || 0;
+        }
+        p[ph] = { poule: pl, perf: ret, place: place };
+      });
+    });
+  });
+  var list = Object.values(pilotesMap);
+  // Tri : par perf finale croissante (les meilleurs en premier)
+  // Pilotes sans perf finale → en bas
+  list.sort(function(a,b){
+    var fa = a.finale && a.finale.perf ? a.finale.perf : Infinity;
+    var fb = b.finale && b.finale.perf ? b.finale.perf : Infinity;
+    if (fa !== fb) return fa - fb;
+    // À égalité : tri par perf qualif puis essais
+    var qa = a.qualif && a.qualif.perf ? a.qualif.perf : Infinity;
+    var qb = b.qualif && b.qualif.perf ? b.qualif.perf : Infinity;
+    if (qa !== qb) return qa - qb;
+    var ea = a.essais && a.essais.perf ? a.essais.perf : Infinity;
+    var eb = b.essais && b.essais.perf ? b.essais.perf : Infinity;
+    return ea - eb;
+  });
+  return list;
+}
+
+// Tableau de classement consolidé pour une catégorie
+function _renderStolClassementTable(cat, pilotes, cp) {
+  var titre = cat === 'multiaxes' ? 'MULTIAXES' : 'PENDULAIRE';
+  var html = '<div style="margin-bottom:16px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
+  html += '<div style="padding:10px 16px;background:linear-gradient(to right, rgba(124,58,237,.15), rgba(0,87,255,.08));border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">';
+  html += '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;font-weight:800;color:#7c3aed;letter-spacing:1px">'+titre+'</span><span style="font-size:11px;color:var(--txt3)">· '+pilotes.length+' pilote(s)</span></div>';
+  html += '</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:980px">';
+  var th = 'padding:8px 6px;background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;border-bottom:1px solid var(--bdr)';
+  html += '<thead><tr>'
+    + '<th style="'+th+';width:36px">Rg</th>'
+    + '<th style="'+th+';width:62px">N°</th>'
+    + '<th style="'+th+';text-align:left;padding-left:12px">Pilote</th>'
+    + '<th colspan="3" style="'+th+';background:rgba(245,158,11,.08);border-left:1px solid var(--bdr)">Essais libres</th>'
+    + '<th colspan="3" style="'+th+';background:rgba(59,130,246,.08);border-left:1px solid var(--bdr)">Qualifications</th>'
+    + '<th colspan="3" style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr)">Finale</th>'
+    + '</tr><tr>'
+    + '<th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);border-left:1px solid var(--bdr);width:46px">Poule</th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);width:60px">Perf</th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);width:46px">Place</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);border-left:1px solid var(--bdr);width:46px">Poule</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);width:60px">Perf</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);width:46px">Place</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.05);border-left:1px solid var(--bdr);width:46px">Poule</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.05);width:60px">Perf</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.05);width:46px">Place</th>'
+    + '</tr></thead><tbody>';
+  var td = 'padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
+  var tdL = 'padding:8px 12px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600';
+  var fmt = function(v){ if (!v) return '—'; return (Math.round(v*10)/10).toString(); };
+  var fmtP = function(v){ return v ? v : '—'; };
+  pilotes.forEach(function(p, idx) {
+    var rg = idx + 1;
+    var rgBadge = '';
+    if (p.finale && p.finale.perf > 0) {
+      if (rg === 1)      rgBadge = '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#f59e0b;color:#fff;font-weight:900;line-height:26px">1</span>';
+      else if (rg === 2) rgBadge = '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:900;line-height:26px">2</span>';
+      else if (rg === 3) rgBadge = '<span style="display:inline-block;width:26px;height:26px;border-radius:50%;background:#cd7c2f;color:#fff;font-weight:900;line-height:26px">3</span>';
+      else               rgBadge = '<span style="color:var(--txt2);font-weight:700">'+rg+'</span>';
+    } else {
+      rgBadge = '<span style="color:var(--txt3)">—</span>';
+    }
+    var trBg = idx%2 ? 'background:rgba(255,255,255,.015)' : '';
+    html += '<tr style="'+trBg+'">'
+      + '<td style="'+td+'">'+rgBadge+'</td>'
+      + '<td style="'+td+';color:var(--stol);font-weight:800">'+_escapeHTML(p.num||'—')+'</td>'
+      + '<td style="'+tdL+'">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')+'</td>'
+      // Essais
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(245,158,11,.03);color:var(--txt2);font-weight:700">'+(p.essais.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(245,158,11,.03)">'+fmt(p.essais.perf)+'</td>'
+      + '<td style="'+td+';background:rgba(245,158,11,.03);font-weight:800;color:#f59e0b">'+fmtP(p.essais.place)+'</td>'
+      // Qualif
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(59,130,246,.03);color:var(--txt2);font-weight:700">'+(p.qualif.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(59,130,246,.03)">'+fmt(p.qualif.perf)+'</td>'
+      + '<td style="'+td+';background:rgba(59,130,246,.03);font-weight:800;color:#3b82f6">'+fmtP(p.qualif.place)+'</td>'
+      // Finale
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(0,87,255,.05);color:var(--txt2);font-weight:700">'+(p.finale.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:700">'+fmt(p.finale.perf)+'</td>'
+      + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:800;color:var(--stol)">'+fmtP(p.finale.place)+'</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+// Impression du classement consolidé — format FFPLUM A4 portrait
+// Inspiré du modèle "RESULTATS STOL LFFG.xlsx" : colonnes Rang/NUM/NOM/Points début/Poule/Résultat/Place/Points/Total
+function printStolClassementConsolide(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  if (!cp) { toast('Compétition introuvable','err'); return; }
+  var eps = _getStolEpreuves(compId);
+  var multi = _stolAggregateForClassement(eps, 'multiaxes');
+  var pendu = _stolAggregateForClassement(eps, 'pendulaire');
+  if (!multi.length && !pendu.length) { toast('Aucune donnée à imprimer','err'); return; }
+  // Date format français
+  function frDate(s){ if(!s) return ''; var m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m? (m[3]+'/'+m[2]+'/'+m[1]) : s; }
+  var dateLbl = frDate(cp.dateFrom||'') + (cp.dateTo && cp.dateTo !== cp.dateFrom ? ' & '+frDate(cp.dateTo) : '');
+  var fmt = function(v){ if (!v) return ''; return (Math.round(v*10)/10).toString(); };
+  // Titre principal type modèle
+  var titreCompet = (cp.name||'').toUpperCase();
+  var subTitre = ((cp.oaci ? ' - '+cp.oaci : '') + (cp.region ? ' - '+cp.region : '') + (dateLbl ? ' - '+dateLbl : '')).replace(/^\s*-\s*/, '');
+  // Filtrer pilotes avec au moins une perf (finale, sinon qualif, sinon essais)
+  function effectivePerf(p) {
+    if (p.finale && p.finale.perf > 0) return { perf: p.finale.perf, poule: p.finale.poule, phase: 'finale' };
+    if (p.qualif && p.qualif.perf > 0) return { perf: p.qualif.perf, poule: p.qualif.poule, phase: 'qualif' };
+    if (p.essais && p.essais.perf > 0) return { perf: p.essais.perf, poule: p.essais.poule, phase: 'essais' };
+    return null;
+  }
+  function buildRows(pilotes) {
+    var withPerf = [];
+    pilotes.forEach(function(p){
+      var ef = effectivePerf(p);
+      if (!ef) return;
+      withPerf.push({ p:p, perf:ef.perf, poule:ef.poule });
+    });
+    // Tri par perf croissante (la plus petite = meilleure)
+    withPerf.sort(function(a,b){ return a.perf - b.perf; });
+    // Attribuer Place + Points selon barème STOL
+    withPerf.forEach(function(x, idx){
+      x.place = idx + 1;
+      x.points = _stolPointsFor(x.place);
+    });
+    return withPerf;
+  }
+  function tableHTML(label, rows, isPendu) {
+    if (!rows || !rows.length) return '';
+    var h = '<div style="font-size:11pt;font-weight:800;color:#003399;margin:10pt 0 4pt;padding:3pt 6pt;background:#e8edf3;border-left:4px solid #003399">Classement '+label+' — '+rows.length+'</div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9pt;border:1px solid #999">';
+    h += '<thead><tr style="background:#003399;color:#fff;font-weight:700;font-size:8.5pt">'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:5%">Rg</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:7%">N°</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:30%;text-align:left;padding-left:8pt">NOM</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">'+(isPendu?'Points 2025':'Points au début')+'</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:6%">Poule</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">Résultat</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:6%">Place</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:8%">Points</th>'
+      + '<th style="padding:4pt;border:1px solid #001a66;width:10%">Points Total</th>'
+      + '</tr></thead><tbody>';
+    rows.forEach(function(x, idx){
+      var p = x.p;
+      var rg = x.place;
+      var rgCol = rg===1?'#f59e0b':rg===2?'#94a3b8':rg===3?'#cd7c2f':'';
+      var bg = idx%2 ? 'background:#f8fafc' : 'background:#fff';
+      var ptsDebut = parseInt(p.ptsSaison || 0, 10) || 0;
+      var ptsGagnes = x.points || 0;
+      var ptsTotal = ptsDebut + ptsGagnes;
+      h += '<tr style="'+bg+'">'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;'+(rgCol?'color:#fff;background:'+rgCol:'')+'">'+rg+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700;color:#003399">'+_escapeHTML(p.num||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;font-weight:700;padding-left:8pt">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+ptsDebut+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700">'+(x.poule||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700;color:#003399">'+fmt(x.perf)+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800">'+rg+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700;color:#10b981">'+ptsGagnes+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;background:#e8edf3">'+ptsTotal+'</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+  // Affiche de la compétition (préparée avant le bloc Staff pour pouvoir la placer à droite)
+  var afficheImgTag = '';
+  if (cp.affiche) {
+    afficheImgTag = '<img src="'+cp.affiche+'" style="max-width:100%;max-height:42mm;object-fit:contain;display:block">';
+  }
+  // Section Staff (depuis S.staff[compId]) en petite police compacte
+  // + Affiche de la compétition à droite alignée sur le tableau
+  var staffArr = ((S.staff||{})[compId])||[];
+  var staffHTML = '';
+  // Filtrer les NDF et entrées sans nom
+  var staffFiltered = staffArr.filter(function(s){
+    var nm = ((s.prenom||'')+' '+(s.nom||'')).trim();
+    var role = (s.role||'').toUpperCase();
+    return nm && role !== 'NDF';
+  });
+  if (staffFiltered.length || afficheImgTag) {
+    staffHTML += '<div style="margin-top:8pt;padding-top:4pt;border-top:1px solid #ccc;display:flex;justify-content:space-between;align-items:flex-start;gap:10pt">';
+    // Bloc Staff (gauche)
+    if (staffFiltered.length) {
+      staffHTML += '<div style="flex:1;min-width:0">';
+      staffHTML += '<div style="font-size:8pt;font-weight:800;color:#003399;margin-bottom:2pt;letter-spacing:.5pt">STAFF</div>';
+      staffHTML += '<table style="border-collapse:collapse;font-size:7pt;line-height:1.15">';
+      staffFiltered.forEach(function(s){
+        var nm = ((s.prenom||'')+' '+(s.nom||'')).trim().toUpperCase();
+        var role = s.role || '';
+        staffHTML += '<tr>'
+          + '<td style="padding:0 6pt 0 0;color:#666;white-space:nowrap;vertical-align:top">'+_escapeHTML(role)+'</td>'
+          + '<td style="padding:0;font-weight:700;vertical-align:top">'+_escapeHTML(nm)+'</td>'
+          + '</tr>';
+      });
+      staffHTML += '</table>';
+      staffHTML += '</div>';
+    } else {
+      staffHTML += '<div style="flex:1"></div>'; // spacer si pas de staff
+    }
+    // Bloc Affiche (droite, alignée bord droit du tableau)
+    if (afficheImgTag) {
+      staffHTML += '<div style="flex:0 0 32mm;background:#fff;border:1px solid #ccc;padding:2pt;display:flex;align-items:center;justify-content:center;overflow:hidden">'
+        + afficheImgTag
+        + '</div>';
+    }
+    staffHTML += '</div>';
+  }
+  // Récupérer les logos depuis Réglages > Documents officiels (avec fallback FFPLUM)
+  var headerImg = '';
+  var footerImg = '';
+  try {
+    headerImg = (S.officialDocs && S.officialDocs.header) || localStorage.getItem('geststol_od_header') || '';
+    footerImg = (S.officialDocs && S.officialDocs.footer) || localStorage.getItem('geststol_od_footer') || '';
+  } catch(e) {}
+  // Fallback : logo de l'app (S.settings.logo) si pas d'en-tête officiel configuré
+  if (!headerImg) {
+    try { headerImg = (typeof _getAppLogo === 'function') ? _getAppLogo() : ''; } catch(e) {}
+  }
+  var od = (S.officialDocs||{});
+  var headerH = parseInt(od.headerHeight, 10) || 22;
+  var footerH = parseInt(od.footerHeight, 10) || 15;
+  var headerPos = od.headerPos || 'left';
+  // Marges paramétrables depuis Réglages
+  var mt = parseInt(od.marginTop, 10) || 12;
+  var mb = parseInt(od.marginBottom, 10) || 12;
+  var ml = parseInt(od.marginLeft, 10) || 12;
+  var mr = parseInt(od.marginRight, 10) || 12;
+  // Bloc en-tête (image officielle + titre)
+  var headerHTML = '';
+  if (headerImg) {
+    var alignH = headerPos === 'center' ? 'center' : (headerPos === 'right' ? 'right' : 'left');
+    var imgStyle = headerImg.length > 200 ? 'height:'+headerH+'mm;max-width:100%;object-fit:contain' : 'height:'+headerH+'mm;max-width:100%;object-fit:contain';
+    headerHTML = '<div style="text-align:'+alignH+';margin-bottom:6pt">'
+      + '<img src="'+headerImg+'" style="'+imgStyle+'">'
+      + '</div>';
+  }
+  // Bloc pied de page : image officielle OU texte FFPLUM par défaut
+  var footerHTML = '';
+  if (footerImg) {
+    footerHTML = '<div style="margin-top:8pt;text-align:center"><img src="'+footerImg+'" style="height:'+footerH+'mm;max-width:100%;object-fit:contain"></div>';
+  } else {
+    footerHTML = '<div style="margin-top:8pt;padding-top:6pt;border-top:1px solid #003399;text-align:center;font-size:8pt;color:#003399;font-weight:700">Fédération Française d\'ULM · 96 bis rue Marc Sangnier · 94700 Maisons Alfort</div>';
+  }
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Classement '+_escapeHTML(cp.name||'')+'</title>'
+    + '<style>@page{size:A4 portrait;margin:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm} body{font-family:Arial,sans-serif;color:#222;margin:0;padding:0;font-size:10pt}'
+    + '@media print{button{display:none!important}}</style></head><body>'
+    + '<div>'
+    // Image d'en-tête officielle (depuis Réglages > Documents officiels)
+    + headerHTML
+    // En-tête textuel : titre de la compétition + dates
+    + '<div style="text-align:center;border-bottom:3px double #003399;padding-bottom:8pt;margin-bottom:8pt">'
+    + '<div style="font-size:9pt;color:#003399;font-weight:700;letter-spacing:2pt">CLASSEMENT</div>'
+    + '<div style="font-size:13pt;font-weight:800;color:#003399;margin-top:4pt">'+_escapeHTML(titreCompet)+'</div>'
+    + (subTitre?'<div style="font-size:10pt;color:#666;margin-top:2pt">'+_escapeHTML(subTitre)+'</div>':'')
+    + '</div>'
+    // Bouton impression (caché à l'impression)
+    + '<div style="text-align:right;margin-bottom:8pt">'
+    + '<button onclick="window.print()" style="padding:8pt 16pt;background:#003399;color:#fff;border:none;border-radius:4pt;font-weight:700;cursor:pointer;font-size:10pt">🖨️ Imprimer</button>'
+    + '</div>'
+    + tableHTML('Multiaxe', buildRows(multi), false)
+    + tableHTML('Pendulaire', buildRows(pendu), true)
+    + staffHTML
+    // Pied de page officiel (depuis Réglages)
+    + footerHTML
+    + '<div style="margin-top:6pt;font-size:7pt;color:#999;text-align:center">Édité le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    + '</div></body></html>';
+  var w = window.open('','_blank');
+  if (!w) { toast('Bloqueur de pop-up : autorisez les fenêtres','err'); return; }
+  w.document.write(html); w.document.close();
+}
+
+// Tableau d'épreuve avec saisie inline et calcul automatique
+function _renderStolEpreuveTable(compId, table) {
+  var titre = table.categorie === 'multiaxes' ? 'MULTIAXES' : 'PENDULAIRE';
+  var nbRuns = _stolGetNbRuns(table);
+  // Couleurs par run (au-delà de 3 on cycle)
+  var runColors = ['#f59e0b','#3b82f6','#10b981','#7c3aed','#ec4899','#06b6d4'];
+  function colOf(i){ return runColors[(i-1) % runColors.length]; }
+  function hex2rgba(hex, a){ var h=hex.replace('#',''); var r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16); return 'rgba('+r+','+g+','+b+','+a+')'; }
+  // Min-width adaptatif
+  var minW = 760 + nbRuns * 330; // 330px par RUN
+  var html = '<div style="margin-bottom:16px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
+  // En-tête tableau
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(0,87,255,.08);border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:6px">';
+  html += '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;font-weight:800;color:var(--stol);letter-spacing:1px">'+titre+'</span><span style="font-size:10.5px;color:var(--txt3);background:var(--navy3);padding:2px 8px;border-radius:10px;font-weight:600">'+nbRuns+' RUN'+(nbRuns>1?'s':'')+'</span></div>';
+  html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+  // Bouton Run +
+  html += '<button onclick="stolAddRun(\''+compId+'\',\''+table.id+'\')" title="Ajouter un RUN" style="display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 12px;border:1px solid #10b981;border-radius:7px;background:#10b981;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Run +</button>';
+  if (nbRuns > 1) {
+    html += '<button onclick="stolRemoveLastRun(\''+compId+'\',\''+table.id+'\')" title="Retirer le dernier RUN" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>';
+  }
+  // Bouton "Importer fichier"
+  html += '<label title="Importer un fichier Excel / CSV ou une image (capture d\'écran, photo)" style="display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 12px;border:1px solid var(--stol);border-radius:7px;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Importer<input type="file" accept=".xlsx,.xls,.csv,image/*" style="display:none" onchange="stolImportFileToTable(this,\''+compId+'\',\''+table.id+'\')"></label>';
+  // Bouton "Coller"
+  html += '<button onclick="stolPasteResults(\''+compId+'\',\''+table.id+'\')" title="Coller depuis Google Sheets/Excel" style="display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Coller</button>';
+  html += '<button onclick="stolDeleteTable(\''+compId+'\',\''+table.id+'\')" title="Supprimer ce tableau" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(239,68,68,.3);border-radius:7px;background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+  html += '</div>';
+  html += '</div>';
+  // Tableau HTML
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:'+minW+'px">';
+  var th = 'padding:7px 6px;background:var(--navy3);color:var(--txt3);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;border-bottom:1px solid var(--bdr)';
+  // En-tête ligne 1 : groupes
+  html += '<thead><tr>'
+    + '<th style="'+th+';width:34px"></th>'
+    + '<th style="'+th+';width:62px">N°</th>'
+    + '<th style="'+th+';text-align:left;padding-left:12px">Pilote</th>'
+    + '<th style="'+th+';width:60px">Poule</th>';
+  for (var ri = 1; ri <= nbRuns; ri++) {
+    var col = colOf(ri);
+    html += '<th colspan="5" style="'+th+';background:'+hex2rgba(col,0.08)+';border-left:1px solid var(--bdr)">RUN '+ri+'</th>';
+  }
+  html += '<th style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr);width:64px;color:var(--stol)">Retenue</th>'
+    + '<th style="'+th+';width:38px"></th>'
+    + '</tr><tr>'
+    + '<th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th>';
+  // En-tête ligne 2 : Déc.1 Att.1 Déc.2 Att.2 Perf
+  for (var ri2 = 1; ri2 <= nbRuns; ri2++) {
+    var c2 = colOf(ri2);
+    html += '<th style="'+th+';background:'+hex2rgba(c2,0.04)+';border-left:1px solid var(--bdr);width:82px">Déc.1</th>'
+      + '<th style="'+th+';background:'+hex2rgba(c2,0.04)+';width:82px">Att.1</th>'
+      + '<th style="'+th+';background:'+hex2rgba(c2,0.04)+';width:82px">Déc.2</th>'
+      + '<th style="'+th+';background:'+hex2rgba(c2,0.04)+';width:82px">Att.2</th>'
+      + '<th style="'+th+';background:'+hex2rgba(c2,0.12)+';width:80px;color:'+c2+'">Perf '+ri2+'</th>';
+  }
+  html += '<th style="'+th+';border-left:1px solid var(--bdr);width:84px"></th>'
+    + '<th style="'+th+'"></th>'
+    + '</tr></thead><tbody>';
+  var td = 'padding:7px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
+  var tdL = 'padding:7px 10px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600';
+  var inp = 'width:100%;padding:8px 6px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;font-weight:600;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield';
+  // Injecter une fois le style global qui retire les spin buttons des inputs number STOL
+  if (!document.getElementById('_stol-input-style')) {
+    var st = document.createElement('style');
+    st.id = '_stol-input-style';
+    st.textContent = '#comp-detail-body input[type=number]::-webkit-inner-spin-button,#comp-detail-body input[type=number]::-webkit-outer-spin-button,#home-detail-comp input[type=number]::-webkit-inner-spin-button,#home-detail-comp input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}#comp-detail-body input[type=number],#home-detail-comp input[type=number]{-moz-appearance:textfield;appearance:textfield}';
+    document.head.appendChild(st);
+  }
+  var inpFocus = ' onfocus="this.style.borderColor=\'var(--stol)\';this.style.background=\'rgba(0,87,255,.05)\'" onblur="this.style.borderColor=\'var(--bdr)\';this.style.background=\'rgba(255,255,255,.02)\'"';
+  // Tri automatique :
+  //  1) Par poule (A, B, C, D, vides en dernier)
+  //  2) Au sein de la poule : par Perf retenue croissante (la plus petite = meilleure)
+  //  3) Si pas de Perf retenue : par N° de dossard
+  var sortedLignes = (table.lignes||[]).map(function(l, i){ return { ligne: l, origIdx: i }; });
+  sortedLignes.sort(function(a, b){
+    var pa = (a.ligne.poule||'').toUpperCase();
+    var pb = (b.ligne.poule||'').toUpperCase();
+    if (!pa && pb) return 1;
+    if (pa && !pb) return -1;
+    if (pa !== pb) return pa.localeCompare(pb);
+    // Même poule → priorité à la Perf retenue (croissante)
+    var ra = _stolLigneRetenue(a.ligne, nbRuns);
+    var rb = _stolLigneRetenue(b.ligne, nbRuns);
+    if (ra > 0 && rb > 0) return ra - rb;
+    if (ra > 0 && rb === 0) return -1;
+    if (ra === 0 && rb > 0) return 1;
+    // Aucune perf retenue → trier par N° de dossard
+    var na = (a.ligne.num||'').toString().trim();
+    var nb = (b.ligne.num||'').toString().trim();
+    if (!na && !nb) return 0;
+    if (!na) return 1;
+    if (!nb) return -1;
+    var nai = parseInt(na, 10);
+    var nbi = parseInt(nb, 10);
+    if (!isNaN(nai) && !isNaN(nbi)) return nai - nbi;
+    return na.localeCompare(nb, undefined, { numeric: true, sensitivity: 'base' });
+  });
+  // Total colonnes pour le séparateur de poule
+  var totalCols = 4 + nbRuns * 5 + 2; // index + N° + Pilote + Poule + (4inputs+perf)*nbRuns + Retenue + Supprimer
+  // Séparateurs visuels entre poules
+  var prevPoule = null;
+  sortedLignes.forEach(function(item){
+    var ligne = item.ligne;
+    var idx = item.origIdx;
+    var curPoule = (ligne.poule||'').toUpperCase();
+    if (prevPoule !== null && curPoule !== prevPoule && (prevPoule || curPoule)) {
+      html += '<tr><td colspan="'+totalCols+'" style="padding:0;border:none"><div style="height:6px;background:linear-gradient(to right, transparent, rgba(0,87,255,.2), transparent)"></div></td></tr>';
+    }
+    prevPoule = curPoule;
+    var trBg = idx%2 ? 'background:rgba(255,255,255,.015)' : '';
+    var retenue = _stolLigneRetenue(ligne, nbRuns);
+    var fmt = function(v){ if (!v) return '—'; return (Math.round(v*10)/10).toString(); };
+    var pouleCol = curPoule==='A'?'#f59e0b':curPoule==='B'?'#3b82f6':curPoule==='C'?'#10b981':curPoule==='D'?'#7c3aed':'';
+    if (pouleCol) trBg += ';border-left:3px solid '+pouleCol;
+    html += '<tr style="'+trBg+'">'
+      + '<td style="'+td+';color:var(--txt3);font-weight:700">'+(idx+1)+'</td>'
+      + '<td style="'+td+'"><input type="text" value="'+_escapeHTML(ligne.num||'')+'" placeholder="—" oninput="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\'num\',null,this.value)" onblur="if(this.value){stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\'num\',null,this.value)}" style="'+inp+';font-weight:800;color:var(--stol)"'+inpFocus+'></td>'
+      + '<td style="'+tdL+'">'+_escapeHTML(((ligne.prenom||'')+' '+(ligne.nom||'')).trim()||'—')+'</td>'
+      + '<td style="'+td+'"><select onchange="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\'poule\',null,this.value)" style="'+inp+';padding:5px 2px"><option value=""'+(!ligne.poule?' selected':'')+'>—</option>'
+      + ['A','B','C','D'].map(function(p){ return '<option value="'+p+'"'+(ligne.poule===p?' selected':'')+'>'+p+'</option>'; }).join('') + '</select></td>';
+    // RUNs dynamiques
+    for (var ri3 = 1; ri3 <= nbRuns; ri3++) {
+      var runKey = 'run'+ri3;
+      var run = ligne[runKey] || { d1:'', a1:'', d2:'', a2:'' };
+      var rcol = colOf(ri3);
+      var bgCell = hex2rgba(rcol, 0.02);
+      var bgPerf = hex2rgba(rcol, 0.1);
+      var perfRi = _stolCalcPerf(run);
+      html += '<td style="'+td+';background:'+bgCell+';border-left:1px solid var(--bdr)"><input type="number" step="0.1" value="'+(run.d1||'')+'" onchange="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\''+runKey+'\',\'d1\',this.value)" style="'+inp+'"'+inpFocus+'></td>'
+        + '<td style="'+td+';background:'+bgCell+'"><input type="number" step="0.1" value="'+(run.a1||'')+'" onchange="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\''+runKey+'\',\'a1\',this.value)" style="'+inp+'"'+inpFocus+'></td>'
+        + '<td style="'+td+';background:'+bgCell+'"><input type="number" step="0.1" value="'+(run.d2||'')+'" onchange="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\''+runKey+'\',\'d2\',this.value)" style="'+inp+'"'+inpFocus+'></td>'
+        + '<td style="'+td+';background:'+bgCell+'"><input type="number" step="0.1" value="'+(run.a2||'')+'" onchange="stolUpdateCell(\''+compId+'\',\''+table.id+'\','+idx+',\''+runKey+'\',\'a2\',this.value)" style="'+inp+'"'+inpFocus+'></td>'
+        + '<td id="stol-perf'+ri3+'-'+table.id+'-'+idx+'" style="'+td+';background:'+bgPerf+';font-weight:800;color:'+rcol+'">'+fmt(perfRi)+'</td>';
+    }
+    html += '<td id="stol-retenue-'+table.id+'-'+idx+'" style="'+td+';background:rgba(0,87,255,.15);border-left:1px solid var(--bdr);font-weight:800;color:var(--stol);font-size:12.5px">'+fmt(retenue)+'</td>'
+      + '<td style="'+td+';padding:4px"><button onclick="stolDeleteLigne(\''+compId+'\',\''+table.id+'\','+idx+')" title="Retirer cet équipage" style="width:26px;height:26px;border:1px solid rgba(239,68,68,.3);border-radius:6px;background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function _renderStolTable(label, rows) {
+  if (!rows || !rows.length) return '';
+  var html = '<div style="margin-bottom:14px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;overflow:hidden">';
+  html += '<div style="padding:8px 14px;background:rgba(0,87,255,.08);font-size:12px;font-weight:800;letter-spacing:1px;color:var(--stol);border-bottom:1px solid var(--bdr)">'+label+'</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:760px">';
+  var th = 'padding:8px 6px;background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;border-bottom:1px solid var(--bdr)';
+  var thW = th + ';text-align:left;padding-left:12px';
+  html += '<thead><tr>'
+    + '<th style="'+th+';width:36px">#</th>'
+    + '<th style="'+thW+'">Pilote</th>'
+    + '<th style="'+th+';width:44px">Pts 25</th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.08);border-left:1px solid var(--bdr)" colspan="3">Essais libres</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.08);border-left:1px solid var(--bdr)" colspan="3">Qualifications</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr)" colspan="3">Finale</th>'
+    + '<th style="'+th+';width:54px;border-left:1px solid var(--bdr);color:var(--stol)">Points</th>'
+    + '</tr><tr>'
+    + '<th style="'+th+'"></th>'
+    + '<th style="'+th+'"></th>'
+    + '<th style="'+th+'"></th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);border-left:1px solid var(--bdr);width:34px">P</th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);width:48px">Rés.</th>'
+    + '<th style="'+th+';background:rgba(245,158,11,.04);width:36px">Pl.</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);border-left:1px solid var(--bdr);width:34px">P</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);width:48px">Rés.</th>'
+    + '<th style="'+th+';background:rgba(59,130,246,.04);width:36px">Pl.</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.06);border-left:1px solid var(--bdr);width:34px">P</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.06);width:48px">Rés.</th>'
+    + '<th style="'+th+';background:rgba(0,87,255,.06);width:36px">Pl.</th>'
+    + '<th style="'+th+';border-left:1px solid var(--bdr)"></th>'
+    + '</tr></thead><tbody>';
+  // Trier par place finale (1, 2, 3, …) puis par points
+  var sorted = rows.slice().sort(function(a,b){
+    var pa = a.finale && a.finale.place ? a.finale.place : 999;
+    var pb = b.finale && b.finale.place ? b.finale.place : 999;
+    return pa - pb;
+  });
+  var td = 'padding:7px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
+  var tdL = 'padding:7px 12px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600';
+  sorted.forEach(function(p, idx) {
+    var trBg = idx%2 ? 'background:rgba(255,255,255,.015)' : '';
+    var rank = p.finale && p.finale.place;
+    var rankBadge = '';
+    if (rank === 1)      rankBadge = '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#f59e0b;color:#fff;font-weight:900;line-height:24px">1</span>';
+    else if (rank === 2) rankBadge = '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:900;line-height:24px">2</span>';
+    else if (rank === 3) rankBadge = '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#cd7c2f;color:#fff;font-weight:900;line-height:24px">3</span>';
+    else if (rank)       rankBadge = '<span style="color:var(--txt2);font-weight:700">'+rank+'</span>';
+    else                 rankBadge = '<span style="color:var(--txt3)">—</span>';
+    html += '<tr style="'+trBg+'">'
+      + '<td style="'+td+';color:var(--txt2);font-weight:700">'+(p.num||'—')+'</td>'
+      + '<td style="'+tdL+'">'+_escapeHTML(p.nom||'')+'</td>'
+      + '<td style="'+td+';color:var(--txt3)">'+(p.ptsSaison||0)+'</td>'
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(245,158,11,.03)">'+(p.essais.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(245,158,11,.03)">'+(p.essais.res||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(245,158,11,.03);font-weight:700">'+(p.essais.place||'—')+'</td>'
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(59,130,246,.03)">'+(p.qualif.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(59,130,246,.03)">'+(p.qualif.res||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(59,130,246,.03);font-weight:700">'+(p.qualif.place||'—')+'</td>'
+      + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(0,87,255,.05)">'+(p.finale.poule||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(0,87,255,.05)">'+(p.finale.res||'—')+'</td>'
+      + '<td style="'+td+';background:rgba(0,87,255,.05)">'+rankBadge+'</td>'
+      + '<td style="'+td+';border-left:1px solid var(--bdr);color:var(--stol);font-weight:800">'+(p.ptsObtenus||0)+'</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function _escapeHTML(s) {
+  return (s||'').toString().replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; });
+}
+
+// Impression du classement général au format A4 paysage
+function printStolClassement(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  if (!cp) { toast('Compétition introuvable', 'err'); return; }
+  var data = (S.stolResults||{})[compId];
+  if (!data || (!data.multi.length && !data.pendu.length)) {
+    toast('Aucun résultat à imprimer — importez d\'abord le classeur STOL', 'err');
+    return;
+  }
+  var title = data.title || (cp.name||'') + ' — Classement Général';
+  var dateF = cp.dateFrom || '';
+  var dateT = cp.dateTo || cp.dateFrom || '';
+  var dateLbl = dateF + (dateT && dateT !== dateF ? ' — ' + dateT : '');
+  function tableHTML(label, rows) {
+    if (!rows || !rows.length) return '';
+    var sorted = rows.slice().sort(function(a,b){
+      var pa = a.finale && a.finale.place ? a.finale.place : 999;
+      var pb = b.finale && b.finale.place ? b.finale.place : 999;
+      return pa - pb;
+    });
+    var html = '<h2 style="font-size:14pt;margin:10pt 0 4pt;color:#003399;border-bottom:2px solid #003399;padding-bottom:3pt">'+label+'</h2>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:9pt">';
+    html += '<thead><tr style="background:#003399;color:#fff">'
+      + '<th style="padding:5pt;border:1px solid #001a66;width:6%">N°</th>'
+      + '<th style="padding:5pt;border:1px solid #001a66;width:22%;text-align:left">Pilote</th>'
+      + '<th style="padding:5pt;border:1px solid #001a66;width:7%">Pts 25</th>'
+      + '<th colspan="3" style="padding:5pt;border:1px solid #001a66;background:#e8a13a;color:#fff">Essais libres</th>'
+      + '<th colspan="3" style="padding:5pt;border:1px solid #001a66;background:#3b82f6">Qualifications</th>'
+      + '<th colspan="3" style="padding:5pt;border:1px solid #001a66;background:#001a66">Finale</th>'
+      + '<th style="padding:5pt;border:1px solid #001a66;background:#22c55e;width:7%">Points</th>'
+      + '</tr><tr style="background:#e8edf3;color:#333;font-size:8pt">'
+      + '<th style="padding:3pt;border:1px solid #ccc"></th>'
+      + '<th style="padding:3pt;border:1px solid #ccc"></th>'
+      + '<th style="padding:3pt;border:1px solid #ccc"></th>'
+      + '<th style="padding:3pt;border:1px solid #ccc">Poule</th><th style="padding:3pt;border:1px solid #ccc">Rés.</th><th style="padding:3pt;border:1px solid #ccc">Pl.</th>'
+      + '<th style="padding:3pt;border:1px solid #ccc">Poule</th><th style="padding:3pt;border:1px solid #ccc">Rés.</th><th style="padding:3pt;border:1px solid #ccc">Pl.</th>'
+      + '<th style="padding:3pt;border:1px solid #ccc">Poule</th><th style="padding:3pt;border:1px solid #ccc">Rés.</th><th style="padding:3pt;border:1px solid #ccc">Pl.</th>'
+      + '<th style="padding:3pt;border:1px solid #ccc"></th>'
+      + '</tr></thead><tbody>';
+    sorted.forEach(function(p, idx) {
+      var rank = p.finale && p.finale.place;
+      var rowBg = idx%2 ? 'background:#f8fafc' : 'background:#fff';
+      var rankCol = rank===1?'#f59e0b':rank===2?'#94a3b8':rank===3?'#cd7c2f':'';
+      html += '<tr style="'+rowBg+'">'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700">'+(p.num||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;font-weight:600">'+_escapeHTML(p.nom||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;color:#666">'+(p.ptsSaison||0)+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.essais.poule||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.essais.res||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700">'+(p.essais.place||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.qualif.poule||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.qualif.res||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:700">'+(p.qualif.place||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.finale.poule||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center">'+(p.finale.res||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;'+(rankCol?'color:#fff;background:'+rankCol:'')+'">'+(rank||'')+'</td>'
+        + '<td style="padding:4pt;border:1px solid #ccc;text-align:center;font-weight:800;color:#003399">'+(p.ptsObtenus||0)+'</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+  // Staff de la compétition
+  var staffArr = ((S.staff||{})[compId])||[];
+  var staffHTML = '';
+  if (staffArr.length) {
+    staffHTML += '<div style="margin-top:14pt;padding:8pt 10pt;background:#f1f5f9;border:1px solid #ccc;border-radius:4pt"><div style="font-size:9pt;font-weight:800;color:#003399;margin-bottom:4pt">ENCADREMENT</div>';
+    staffHTML += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4pt 14pt;font-size:8pt">';
+    staffArr.forEach(function(s){
+      var nm = ((s.prenom||'')+' '+(s.nom||'')).trim();
+      var role = s.role || '';
+      if (!nm) return;
+      staffHTML += '<div><span style="color:#666">'+_escapeHTML(role)+'</span> · <b>'+_escapeHTML(nm)+'</b></div>';
+    });
+    staffHTML += '</div></div>';
+  }
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Classement '+_escapeHTML(cp.name||'')+'</title>'
+    + '<style>@page{size:A4 landscape;margin:8mm} body{font-family:Arial,sans-serif;color:#222;margin:0;padding:0}'
+    + '@media print{button{display:none!important}}</style></head><body>'
+    + '<div style="padding:6pt 10pt">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #003399;padding-bottom:6pt;margin-bottom:8pt">'
+    + '<div><div style="font-size:9pt;color:#003399;font-weight:700;letter-spacing:1pt">FFPLUM · COMPÉTITION STOL</div>'
+    + '<div style="font-size:14pt;font-weight:800;color:#222;margin-top:2pt">'+_escapeHTML(cp.name||'')+'</div>'
+    + '<div style="font-size:9pt;color:#666;margin-top:2pt">'+_escapeHTML(dateLbl)+' · '+_escapeHTML(cp.lieu||cp.oaci||'')+(cp.region?' · '+_escapeHTML(cp.region):'')+'</div></div>'
+    + '<button onclick="window.print()" style="padding:8pt 16pt;background:#003399;color:#fff;border:none;border-radius:4pt;font-weight:700;cursor:pointer;font-size:10pt">🖨️ Imprimer</button>'
+    + '</div>'
+    + tableHTML('MULTIAXES', data.multi)
+    + tableHTML('PENDULAIRES', data.pendu)
+    + staffHTML
+    + '<div style="margin-top:10pt;font-size:7pt;color:#999;text-align:center">Fédération Française d\'ULM · 96 bis rue Marc Sangnier 94700 Maisons Alfort · Édité le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    + '</div></body></html>';
+  var w = window.open('', '_blank');
+  if (!w) { toast('Bloqueur de pop-up : autorisez les fenêtres pour ce site','err'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
 function importRunsAuto(input, compId) {
   var file = input && input.files && input.files[0];
   if (!file) return;
@@ -30352,6 +32339,185 @@ function openGanttModal(compId) {
 }
 
 // ── Ouvrir le Gantt global (toutes compétitions de la saison) ────
+// ═══════════════════════════════════════════════
+// ESPACES PARTAGÉS — OneDrive
+// ═══════════════════════════════════════════════
+function openEspacesPartages() {
+  // Fermer les autres overlays
+  var gg = document.getElementById('gantt-overlay');
+  if (gg && gg.style.display !== 'none') { gg.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:var(--navy);overflow:hidden;'; }
+  var ag = document.getElementById('agenda-overlay');
+  if (ag && ag.style.display !== 'none') { ag.style.cssText = 'display:none;position:fixed;inset:0;z-index:900;background:var(--navy);overflow:hidden;'; }
+
+  var ov = document.getElementById('espaces-overlay');
+  if (!ov) return;
+  // Position en fonction du contexte (sidebar DTN visible ou non)
+  var dtn = document.getElementById('page-dtn');
+  var fromDTN = !!(dtn && dtn.style.display !== 'none')
+             || document.body.classList.contains('has-comp-sidebar');
+  var sbHidden = document.body.classList.contains('dtn-sb-hidden');
+  ov.style.cssText = 'display:flex;flex-direction:column;position:fixed;'
+    + (sbHidden ? 'left:0;' : (fromDTN ? 'left:216px;' : 'left:0;'))
+    + 'top:0;right:0;bottom:0;z-index:2600;background:var(--navy);overflow:hidden;';
+  if (typeof _dtnSetActiveNav === 'function') _dtnSetActiveNav('espaces');
+  renderEspacesPartages();
+}
+
+function closeEspacesPartages() {
+  var ov = document.getElementById('espaces-overlay');
+  if (ov) ov.style.display = 'none';
+  // Retour au dashboard DTN si on était dedans
+  try {
+    var dtn = document.getElementById('page-dtn');
+    if (dtn && dtn.style.display !== 'none' && typeof _dtnGoHome === 'function') {
+      _dtnGoHome();
+    }
+  } catch(e) {}
+}
+
+function _getEspaces() {
+  if (!S.espacesPartages || !Array.isArray(S.espacesPartages)) S.espacesPartages = [];
+  return S.espacesPartages;
+}
+
+function renderEspacesPartages() {
+  var grid = document.getElementById('espaces-grid');
+  if (!grid) return;
+  var list = _getEspaces();
+  if (!list.length) {
+    grid.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;color:var(--txt3)">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="56" height="56" style="opacity:.4;margin-bottom:16px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--txt2);margin-bottom:6px">Aucun espace configuré</div>'
+      + '<div style="font-size:12px;max-width:380px;line-height:1.5">Cliquez sur <b style="color:var(--stol)">+ Nouvel espace</b> pour ajouter vos dossiers OneDrive partagés et y accéder en un clic.</div>'
+      + '</div>';
+    return;
+  }
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;max-width:1100px;margin:0 auto">';
+  list.forEach(function(esp, idx){
+    var ico = esp.icone || '📁';
+    var col = esp.couleur || '#0ea5e9';
+    var nom = (esp.nom || 'Espace').replace(/</g,'&lt;');
+    var url = esp.url || '';
+    html += '<div style="position:relative;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;padding:18px 14px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;display:flex;flex-direction:column;align-items:center;gap:10px"'
+         + ' onmouseover="this.style.borderColor=\''+col+'\';this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 18px rgba(0,0,0,.18)\'"'
+         + ' onmouseout="this.style.borderColor=\'var(--bdr)\';this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'"'
+         + ' onclick="_openEspaceURL('+idx+')">'
+      + '<div style="width:64px;height:64px;border-radius:14px;background:'+col+'1a;display:flex;align-items:center;justify-content:center;font-size:32px">'+ico+'</div>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--txt);text-align:center;line-height:1.3">'+nom+'</div>'
+      + (esp.description ? '<div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.4">'+esp.description.replace(/</g,'&lt;')+'</div>' : '')
+      + '<div style="display:flex;gap:4px;margin-top:6px">'
+      + '<button onclick="event.stopPropagation();editEspacePartage('+idx+')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+      + '<button onclick="event.stopPropagation();deleteEspacePartage('+idx+')" title="Supprimer" style="width:26px;height:26px;border:1px solid rgba(239,68,68,.3);border-radius:7px;background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+      + '</div>'
+      + '</div>';
+  });
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+function _openEspaceURL(idx) {
+  var esp = _getEspaces()[idx];
+  if (!esp || !esp.url) return;
+  window.open(esp.url, '_blank', 'noopener');
+}
+
+function addEspacePartage() {
+  _openEspaceDialog(null);
+}
+
+function editEspacePartage(idx) {
+  _openEspaceDialog(idx);
+}
+
+function deleteEspacePartage(idx) {
+  var esp = _getEspaces()[idx];
+  if (!esp) return;
+  if (!confirm('Supprimer l\'espace "'+(esp.nom||'')+'" ?')) return;
+  _getEspaces().splice(idx, 1);
+  saveState();
+  renderEspacesPartages();
+  if (typeof silentPush === 'function') silentPush();
+}
+
+function _openEspaceDialog(idx) {
+  var isEdit = (idx !== null && idx !== undefined);
+  var esp = isEdit ? _getEspaces()[idx] : {nom:'', url:'', icone:'📁', couleur:'#0ea5e9', description:''};
+  var icones = ['📁','📂','🗂️','📋','📊','📈','📉','📑','📚','📒','📕','📗','📘','📙','📔','🗃️','🗄️','💼','🏢','👥','🤝','🎯','🏆','✈️','🪂','🛬','🌍','🇫🇷','⚙️','🔧','🛠️','💡','🚀','⭐','❤️','🔔','📣','📢','📅','🗓️'];
+  var couleurs = ['#0ea5e9','#0057FF','#7c3aed','#22c55e','#f59e0b','#ef4444','#ec4899','#6366f1','#06b6d4','#10b981'];
+  var ov = document.createElement('div');
+  ov.id = '_espace-dlg';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2900;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var html = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)" onclick="event.stopPropagation()">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr)">'
+    + '<div style="font-size:15px;font-weight:800">'+(isEdit?'Modifier l\'espace':'Nouvel espace partagé')+'</div>'
+    + '<button onclick="document.getElementById(\'_espace-dlg\').remove()" style="width:30px;height:30px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;font-family:inherit">×</button>'
+    + '</div>'
+    + '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">'
+    // Nom
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nom *</label>'
+    + '<input id="_esp-nom" type="text" value="'+(esp.nom||'').replace(/"/g,'&quot;')+'" placeholder="Ex : Documents équipe" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box"></div>'
+    // URL
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Lien OneDrive *</label>'
+    + '<input id="_esp-url" type="url" value="'+(esp.url||'').replace(/"/g,'&quot;')+'" placeholder="https://1drv.ms/... ou https://onedrive.live.com/..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    // Description
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Description (optionnel)</label>'
+    + '<input id="_esp-desc" type="text" value="'+(esp.description||'').replace(/"/g,'&quot;')+'" placeholder="Courte description" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    // Icône
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Icône</label>'
+    + '<div id="_esp-icones" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;max-height:120px;overflow-y:auto">';
+  icones.forEach(function(i){
+    var sel = (esp.icone === i) ? 'background:var(--stol);border-color:var(--stol)' : 'background:transparent;border-color:transparent';
+    html += '<button onclick="document.querySelectorAll(\'#_esp-icones button\').forEach(function(b){b.style.background=\'transparent\';b.style.borderColor=\'transparent\'});this.style.background=\'var(--stol)\';this.style.borderColor=\'var(--stol)\';document.getElementById(\'_esp-dlg-data\').dataset.icone=\''+i+'\'" type="button" style="width:36px;height:36px;border:2px solid transparent;border-radius:8px;'+sel+';color:var(--txt);font-size:20px;cursor:pointer;font-family:inherit">'+i+'</button>';
+  });
+  html += '</div></div>'
+    // Couleur
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Couleur</label>'
+    + '<div id="_esp-couleurs" style="display:flex;gap:8px;flex-wrap:wrap">';
+  couleurs.forEach(function(c){
+    var sel2 = (esp.couleur === c) ? 'border:3px solid var(--txt);box-shadow:0 0 0 2px '+c : 'border:3px solid transparent';
+    html += '<button onclick="document.querySelectorAll(\'#_esp-couleurs button\').forEach(function(b){b.style.border=\'3px solid transparent\';b.style.boxShadow=\'none\'});this.style.border=\'3px solid var(--txt)\';this.style.boxShadow=\'0 0 0 2px '+c+'\';document.getElementById(\'_esp-dlg-data\').dataset.couleur=\''+c+'\'" type="button" style="width:30px;height:30px;border-radius:50%;background:'+c+';cursor:pointer;'+sel2+'"></button>';
+  });
+  html += '</div></div>'
+    + '<div id="_esp-dlg-data" data-icone="'+(esp.icone||'📁')+'" data-couleur="'+(esp.couleur||'#0ea5e9')+'" data-idx="'+(isEdit?idx:'')+'" style="display:none"></div>'
+    // Boutons
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">'
+    + '<button onclick="document.getElementById(\'_espace-dlg\').remove()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_saveEspaceDialog()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(isEdit?'Enregistrer':'Créer')+'</button>'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+  ov.innerHTML = html;
+  document.body.appendChild(ov);
+  setTimeout(function(){ var nm = document.getElementById('_esp-nom'); if (nm) nm.focus(); }, 50);
+}
+
+function _saveEspaceDialog() {
+  var nom  = (document.getElementById('_esp-nom')||{}).value || '';
+  var url  = (document.getElementById('_esp-url')||{}).value || '';
+  var desc = (document.getElementById('_esp-desc')||{}).value || '';
+  var meta = document.getElementById('_esp-dlg-data');
+  var icone = meta ? (meta.dataset.icone || '📁') : '📁';
+  var couleur = meta ? (meta.dataset.couleur || '#0ea5e9') : '#0ea5e9';
+  var idxStr = meta ? meta.dataset.idx : '';
+  nom = nom.trim(); url = url.trim();
+  if (!nom || !url) { alert('Le nom et le lien OneDrive sont obligatoires.'); return; }
+  // Ajouter https:// si absent
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  var espace = { nom: nom, url: url, description: desc.trim(), icone: icone, couleur: couleur };
+  var list = _getEspaces();
+  if (idxStr !== '' && idxStr !== undefined && idxStr !== null) {
+    list[parseInt(idxStr,10)] = espace;
+  } else {
+    list.push(espace);
+  }
+  saveState();
+  document.getElementById('_espace-dlg').remove();
+  renderEspacesPartages();
+  if (typeof silentPush === 'function') silentPush();
+}
+
 function openGlobalGantt() {
   _ganttState.compId     = null;
   _ganttState.filter     = '';
@@ -30361,6 +32527,9 @@ function openGlobalGantt() {
   if (ag && ag.style.display !== 'none') {
     ag.style.cssText = 'display:none;position:fixed;inset:0;z-index:2600;background:var(--navy);overflow:hidden;';
   }
+  // Fermer les espaces partagés s'ils sont ouverts
+  var esp = document.getElementById('espaces-overlay');
+  if (esp && esp.style.display !== 'none') esp.style.display = 'none';
   var ov = document.getElementById('gantt-overlay');
   if (ov) {
     var dtn = document.getElementById('page-dtn');
@@ -36146,6 +38315,8 @@ function _dtnCloseOverlays() {
   if (ag) ag.style.cssText = 'display:none;position:fixed;inset:0;z-index:900;background:var(--navy);overflow:hidden;';
   var gg = document.getElementById('gantt-overlay');
   if (gg) gg.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:var(--navy);overflow:hidden;';
+  var esp = document.getElementById('espaces-overlay');
+  if (esp) esp.style.display = 'none';
 }
 
 // ── Sidebar DTN : show / hide (niveau body, indépendant de page-dtn) ──
@@ -36647,7 +38818,7 @@ function _dtnToggleSidebar() {
 
 // ── Navigation DTN sidebar ─────────────────────────────────────────
 var _dtnActiveNav = 'home';
-var _dtnNavIds = ['home','comp','collectif','agenda','gantt','acces','formations','securite','territoires'];
+var _dtnNavIds = ['home','comp','collectif','agenda','gantt','espaces','acces','formations','securite','territoires'];
 
 function _dtnSetActiveNav(key) {
   _dtnActiveNav = key;
