@@ -22676,8 +22676,9 @@ async function loadFromSupabaseFirst() {
   // Applique les données cloud dans S (remplace tout sauf données strictement locales)
   // GARDE ANTI-PERTE : si le cloud a moins de données critiques que le local, on conserve le local
   function _applyCloudData(cloudData) {
-    var localUser     = S.user;
-    var localLicences = S.licenceDB;
+    var localUser         = S.user;
+    var localLicences     = S.licenceDB;
+    var localAgendaEvents = (S.agendaEvents || []).slice(); // sauvegarde avant écrasement
     var localAffiches = {};
     var localPhotos   = {};
     (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
@@ -22792,6 +22793,13 @@ async function loadFromSupabaseFirst() {
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
     if (savedPilots)  S.pilots = savedPilots;
+    // Fusionner les événements agenda locaux non présents dans le cloud
+    if (localAgendaEvents.length) {
+      if (!S.agendaEvents) S.agendaEvents = [];
+      localAgendaEvents.forEach(function(ev) {
+        if (!S.agendaEvents.find(function(x){ return x.id === ev.id; })) S.agendaEvents.push(ev);
+      });
+    }
     // ✅ Restaurer officialDocs locaux si présents (jamais écraser les images locales par cloud vide)
     if (savedOfficialDocs) {
       if (!S.officialDocs) S.officialDocs = {};
@@ -23041,6 +23049,7 @@ async function loadFromSupabaseFirst() {
     if (typeof renderCompetitions === 'function') { try { renderCompetitions(); } catch(e){} }
     if (typeof renderHome === 'function') { try { renderHome(); } catch(e){} }
     if (typeof updateHeader === 'function') { try { updateHeader(); } catch(e){} }
+    if (typeof _dtnRefreshStats === 'function') { try { _dtnRefreshStats(); } catch(e){} }
     return true;
   } catch(e) {
     console.warn('[GestSTOL] Supabase indisponible — cache local utilisé:', e.message);
@@ -39673,7 +39682,26 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── 2. Tâches Gantt (niveau tâche) dans les 30 jours ──
+  // ── 2. Événements du calendrier général dans les 30 jours ──
+  (S.agendaEvents || []).forEach(function(ev) {
+    if (!ev.dateFrom) return;
+    var evEnd = ev.dateTo || ev.dateFrom;
+    // Inclure si l'événement commence dans les 30 jours OU est en cours (commencé avant mais pas encore terminé)
+    if (evEnd < todayStr || ev.dateFrom > limitStr) return;
+    var timeLabel = ev.heureDebut ? ' · ' + ev.heureDebut + (ev.heureFin ? '–' + ev.heureFin : '') : '';
+    items.push({
+      date:    ev.dateFrom,
+      dateFin: ev.dateTo || ev.dateFrom,
+      title:   ev.titre || 'Événement',
+      sub:     (ev.desc ? ev.desc.slice(0,40) + (ev.desc.length > 40 ? '…' : '') : '') + timeLabel,
+      tag:     'Agenda',
+      tagCol:  ev.couleur || '#06b6d4',
+      ico:     '📅',
+      onClick: 'openAgenda()'
+    });
+  });
+
+  // ── 3. Tâches Gantt (niveau tâche) dans les 30 jours ──
   var gantt = S.ganttTasks || {};
   Object.keys(gantt).forEach(function(compId) {
     var comp  = (S.comps || []).find(function(c){ return c.id === compId; });
