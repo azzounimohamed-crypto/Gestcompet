@@ -502,6 +502,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   /* Quand sidebar cachée : étaler aussi les overlays gantt et agenda */
   body.dtn-sb-hidden #gantt-overlay{left:0!important;transition:left .22s ease}
   body.dtn-sb-hidden #agenda-overlay{left:0!important;transition:left .22s ease}
+  body.dtn-sb-hidden #ndf-overlay{left:0!important;transition:left .22s ease}
+  body.dtn-sb-hidden #ndf-detail-sheet{left:0!important;transition:left .22s ease}
+  body.dtn-sb-hidden #espaces-overlay{left:0!important;transition:left .22s ease}
+  #espaces-overlay{transition:left .22s ease}
+  #ndf-overlay{transition:left .22s ease}
+  #ndf-detail-sheet{transition:left .22s ease}
   body.dtn-sb-hidden #header-mobile-title{display:none!important}
   body.has-comp-sidebar #desktop-nav-rail{display:none!important}
   /* Cacher le rail quand le portail DTN est en cours d'affichage */
@@ -625,6 +631,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   #sheet-staff .sheet-body{overflow-y:visible}
 }
 @keyframes slideUpSheet { from { transform: translateY(100%); opacity:0; } to { transform: translateY(0); opacity:1; } }
+#ndf-list-body input[type=number]::-webkit-inner-spin-button,
+#ndf-list-body input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#ndf-list-body input[type=number]{-moz-appearance:textfield;appearance:textfield}
 </style>
 <script>
 // Auto-reload si nouvelle version publiée sur GitHub
@@ -2476,11 +2485,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       Planning général
     </button>
 
-    <button id="dtn-nav-espaces" onclick="openEspacesPartages()"
+    <button id="dtn-nav-espaces" onclick="(function(){var ov=document.getElementById('espaces-overlay');if(ov&&ov.style.display!=='none'){ov.style.display='none';}else{openEspacesPartages();}})()"
       style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
       onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnNavOut('espaces')">
       <svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       Espaces partagés
+    </button>
+
+    <button id="dtn-nav-ndf" onclick="(function(){var ov=document.getElementById('ndf-overlay');if(ov&&ov.style.display!=='none'){closeNDF();}else{openNDF();}})()"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
+      onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt2)'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="9" y2="15"/><line x1="11" y1="15" x2="16" y2="15"/></svg>
+      Note de frais
     </button>
 
   </nav>
@@ -2592,10 +2608,62 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 <div id="gantt-overlay" style="display:none;position:fixed;inset:0;z-index:2600;flex-direction:column;background:var(--navy);overflow:hidden"></div>
 
 <!-- ══════════ ESPACES PARTAGÉS ══════════ -->
+<div id="ndf-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="_dtnToggleSidebar()" title="Afficher/masquer le volet" style="width:34px;height:34px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);cursor:pointer;flex-shrink:0;padding:0">
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+      </button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="9" y2="15"/><line x1="11" y1="15" x2="16" y2="15"/></svg>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:var(--txt)">Notes de frais</div>
+        <div style="font-size:11px;color:var(--txt3)" id="ndf-subtitle">Gestion des notes de frais</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="_ndfAddRow()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        + Nouvelle dépense
+      </button>
+      <button onclick="printNDFAll()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimer
+      </button>
+      <button onclick="closeNDF()" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+  </div>
+  <div id="ndf-list-body" style="flex:1;overflow-y:auto;padding:20px 24px"></div>
+</div>
+
+<!-- Détail NDF (sheet) -->
+<div id="ndf-detail-sheet" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2700;background:var(--navy);overflow:hidden;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="closeNDFDetail()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="15 18 9 12 15 6"/></svg>
+        Retour
+      </button>
+      <div style="font-size:15px;font-weight:800;color:var(--txt)" id="ndf-detail-title">Note de frais</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="saveNDFDetail()" style="padding:8px 18px;border-radius:9px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>
+      <button id="ndf-detail-del-btn" onclick="deleteNDFLine()" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:none">Supprimer</button>
+    </div>
+  </div>
+  <div id="ndf-detail-body" style="flex:1;overflow-y:auto;padding:24px;max-width:700px;margin:0 auto;width:100%"></div>
+</div>
+
 <div id="espaces-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
     <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="_dtnToggleSidebar()" title="Afficher/masquer le volet" style="width:34px;height:34px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);cursor:pointer;flex-shrink:0;padding:0">
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+      </button>
       <svg viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
       <div>
         <div style="font-size:17px;font-weight:800;color:var(--txt)">Espaces partagés</div>
@@ -3679,6 +3747,8 @@ const LS_BUDGETS   = 'geststol_budgets';   // Sauvegarde dédiée du budget (jam
 const LS_TODOS     = 'geststol_todos';     // Sauvegarde dédiée des À faire (jamais stripée, jamais écrasée)
 const LS_ENROLL    = 'geststol_enroll';    // Sauvegarde dédiée compEnroll (filet anti-perte d'équipage)
 const LS_ENROLL_META = 'geststol_enroll_meta'; // Sauvegarde dédiée enrollMeta (podium + niveau — filet anti-perte)
+const LS_AGENDA_EVS  = 'geststol_agenda_events'; // Événements personnalisés agenda
+const LS_NDF         = 'geststol_notesfrais';   // Notes de frais (objet keyed par userId)
 
 // ── Régions & Pays — listes partagées ────────────────────────────────────
 var _FR_REGIONS = [
@@ -3865,6 +3935,21 @@ function _restoreCritical() {
         });
       }
     }
+    // Événements personnalisés agenda
+    var _agEvRaw = localStorage.getItem(LS_AGENDA_EVS);
+    if (_agEvRaw) {
+      try {
+        var _agEvParsed = JSON.parse(_agEvRaw);
+        if (Array.isArray(_agEvParsed)) {
+          if (!S.agendaEvents || !S.agendaEvents.length) S.agendaEvents = _agEvParsed;
+          else {
+            _agEvParsed.forEach(function(ev) {
+              if (!S.agendaEvents.find(function(x){ return x.id===ev.id; })) S.agendaEvents.push(ev);
+            });
+          }
+        }
+      } catch(e) {}
+    }
   } catch(e) {}
 }
 
@@ -3927,7 +4012,8 @@ var S = {
     bareme2Label: 'Compétiteur',
     bareme2Taux: 0.200
   },
-  ordresMission: []
+  ordresMission: [],
+  notesfrais: {}
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -4152,6 +4238,25 @@ async function loadState() {
         }
       }
     }
+    // 1b. Clé dédiée LS_NDF — fusionnée APRÈS Object.assign pour ne pas être écrasée
+    try {
+      var _ndfRaw = localStorage.getItem(LS_NDF);
+      if (_ndfRaw) {
+        var _ndfParsed = JSON.parse(_ndfRaw);
+        if (_ndfParsed && typeof _ndfParsed === 'object' && !Array.isArray(_ndfParsed)) {
+          if (!S.notesfrais || typeof S.notesfrais !== 'object' || Array.isArray(S.notesfrais)) S.notesfrais = {};
+          Object.keys(_ndfParsed).forEach(function(uid) {
+            if (!S.notesfrais[uid] || !S.notesfrais[uid].length) {
+              S.notesfrais[uid] = _ndfParsed[uid];
+            } else {
+              _ndfParsed[uid].forEach(function(n) {
+                if (!S.notesfrais[uid].find(function(x){ return x.id===n.id; })) S.notesfrais[uid].push(n);
+              });
+            }
+          });
+        }
+      }
+    } catch(e) {}
     // 2. IndexedDB : source principale pour les affiches / photos / licenceDB
     //    On ATTEND la fin du chargement avant de continuer (await)
     //    → plus de race condition avec saveState()
@@ -4188,6 +4293,29 @@ async function loadState() {
           }
         }
         if (idbData.licenceDB) S.licenceDB = idbData.licenceDB;
+        // Restaurer agendaEvents depuis IDB
+        if (idbData.agendaEvents && idbData.agendaEvents.length) {
+          if (!S.agendaEvents || !S.agendaEvents.length) {
+            S.agendaEvents = idbData.agendaEvents;
+          } else {
+            idbData.agendaEvents.forEach(function(ev) {
+              if (!S.agendaEvents.find(function(x){ return x.id === ev.id; })) S.agendaEvents.push(ev);
+            });
+          }
+        }
+        // Restaurer notesfrais depuis IDB (objet keyed par userId)
+        if (idbData.notesfrais && typeof idbData.notesfrais === 'object' && !Array.isArray(idbData.notesfrais)) {
+          if (!S.notesfrais || typeof S.notesfrais !== 'object') S.notesfrais = {};
+          Object.keys(idbData.notesfrais).forEach(function(uid) {
+            if (!S.notesfrais[uid] || !S.notesfrais[uid].length) {
+              S.notesfrais[uid] = idbData.notesfrais[uid];
+            } else {
+              idbData.notesfrais[uid].forEach(function(n) {
+                if (!S.notesfrais[uid].find(function(x){ return x.id === n.id; })) S.notesfrais[uid].push(n);
+              });
+            }
+          });
+        }
         // Restaurer images volumineuses strippées de localStorage
         if (idbData.officialDocs) {
           if (!S.officialDocs) S.officialDocs = {};
@@ -4282,7 +4410,7 @@ function clearLocalStorageQuota() {
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
-               'geststol_vibration', 'geststol_notif_sound'];
+               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
@@ -4393,7 +4521,9 @@ function _flushSaveState() {
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
-    _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{}
+    _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{},
+    agendaEvents:S.agendaEvents||[],
+    notesfrais:S.notesfrais||{}
   });
   try {
     localStorage.setItem(LS, JSON.stringify(_lsPayload));
@@ -4423,6 +4553,8 @@ function _flushSaveState() {
   try { if (S.homeTodosByComp) localStorage.setItem(LS_TODOS,     JSON.stringify(S.homeTodosByComp)); } catch(e) {}
   try { if (S.compEnroll)     localStorage.setItem(LS_ENROLL,     JSON.stringify(S.compEnroll)); } catch(e) {}
   try { if (S.enrollMeta)     localStorage.setItem(LS_ENROLL_META,JSON.stringify(S.enrollMeta||{})); } catch(e) {}
+  try { if (S.agendaEvents)   localStorage.setItem(LS_AGENDA_EVS, JSON.stringify(S.agendaEvents)); } catch(e) {}
+  try { if (S.notesfrais && Object.keys(S.notesfrais).length) localStorage.setItem(LS_NDF, JSON.stringify(S.notesfrais)); } catch(e) {}
 }
 // Flush immédiat avant fermeture de page pour éviter toute perte de données
 window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
@@ -4531,6 +4663,8 @@ function closeSheet(id) {
   }
   var wasOpen = el.classList.contains('open');
   el.classList.remove('open');
+  // Réinitialiser le z-index si élevé depuis l'agenda
+  if (id === 'sheet-comp') el.style.zIndex = '';
   _syncFsBtn();
   // Retour agenda si la fiche compétition a été ouverte depuis l'agenda
   if (wasOpen && (id === 'sheet-comp-detail' || id === 'sheet-comp') && _compFromAgenda) {
@@ -5580,6 +5714,13 @@ function openCompDetail(compId) {
       editBtn.onclick = function(){ editComp(compId); };
       actionsCont.appendChild(editBtn);
     }
+    (function(cid){
+      var icsBtn = document.createElement('button');
+      icsBtn.className = 'btn btn-sm btn-secondary';
+      icsBtn.innerHTML = '📅 Outlook';
+      icsBtn.onclick = function(){ _mailCompICS(cid); };
+      actionsCont.appendChild(icsBtn);
+    })(compId);
     if (canDelete()) {
       var delBtn = document.createElement('button');
       delBtn.className = 'btn btn-sm';
@@ -5976,6 +6117,39 @@ function canTechnical()   { return _hasDroit(['developpeur']); }
 function canInvite()      { return canManageUsers(); }
 
 function canEditComp() { return canModify(); }
+
+function _mailComp(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (!cp) return;
+  var fmtDate = function(d){ if(!d) return ''; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+  var subject = encodeURIComponent('[Compétition] ' + (cp.nom||cp.name||''));
+  var lines = [];
+  lines.push('🏆 ' + (cp.nom||cp.name||'Compétition'));
+  lines.push('');
+  if (cp.type)     lines.push('Type       : ' + cp.type);
+  if (cp.dateFrom) lines.push('Début      : ' + fmtDate(cp.dateFrom));
+  if (cp.dateTo)   lines.push('Fin        : ' + fmtDate(cp.dateTo));
+  if (cp.lieu)     lines.push('Lieu       : ' + cp.lieu);
+  if (cp.saison)   lines.push('Saison     : ' + cp.saison);
+  var staff = (S.staff||[]).filter(function(s){ return s.compId===compId; });
+  if (staff.length) {
+    lines.push('');
+    lines.push('Encadrants (' + staff.length + ') :');
+    staff.forEach(function(s){ lines.push('  • ' + (s.prenom||'') + ' ' + (s.nom||'')); });
+  }
+  var equip = (S.runs||[]).filter(function(r){ return r.compId===compId; });
+  if (equip.length) {
+    lines.push('');
+    lines.push('Équipages (' + equip.length + ') :');
+    equip.slice(0,10).forEach(function(r){ lines.push('  • ' + (r.piloteNom||r.nom||'')); });
+    if (equip.length > 10) lines.push('  … et ' + (equip.length-10) + ' autres');
+  }
+  if (cp.notes) { lines.push(''); lines.push('Notes : ' + cp.notes); }
+  lines.push('');
+  lines.push('— Envoyé depuis Gest\'DTN');
+  var body = encodeURIComponent(lines.join('\r\n'));
+  window.location.href = 'mailto:azzounimohamed@hotmail.com?subject=' + subject + '&body=' + body;
+}
 
 // Rafraîchir la visibilité des onglets Réglages selon les droits courants
 // Appelé à chaque ouverture de la page Réglages, même si déjà rendue
@@ -7016,8 +7190,33 @@ var _agendaTypeColor = {
   'entrainement':'#d97706','entrainement-national':'#d97706',
   'stage':'#059669'
 };
+// Calcule les colonnes pour des événements horodatés qui se chevauchent.
+// Ajoute _startH, _endH, _col, _totalCols sur chaque objet.
+function _agendaLayoutTimedEvts(evts) {
+  evts.forEach(function(c) {
+    var hd = c.heureDebut.split(':');
+    var hf = c.heureFin ? c.heureFin.split(':') : null;
+    c._startH = parseInt(hd[0]) + parseInt(hd[1])/60;
+    c._endH   = hf ? parseInt(hf[0]) + parseInt(hf[1])/60 : c._startH + 1;
+    if (c._endH <= c._startH) c._endH = c._startH + 0.5;
+  });
+  evts.sort(function(a,b){ return a._startH - b._startH; });
+  var cols = []; // cols[i] = _endH du dernier evt dans cette colonne
+  evts.forEach(function(c) {
+    var placed = false;
+    for (var i = 0; i < cols.length; i++) {
+      if (cols[i] <= c._startH + 0.001) { c._col = i; cols[i] = c._endH; placed = true; break; }
+    }
+    if (!placed) { c._col = cols.length; cols.push(c._endH); }
+  });
+  var total = cols.length || 1;
+  evts.forEach(function(c){ c._totalCols = total; });
+  return evts;
+}
+
 function _agendaColor(comp){
-  if (comp && comp._ganttSt) return '#7c3aed'; // sous-tâche planning → violet
+  if (comp && comp._ganttSt) return '#7c3aed';
+  if (comp && comp._customEvent) return comp._couleur || '#f59e0b';
   return _agendaTypeColor[(comp||{}).type] || '#6b7280';
 }
 
@@ -7201,6 +7400,7 @@ function _agendaDateAdd(dateStr, days) {
 }
 
 function openAgenda() {
+  closeNDF();
   var ov = document.getElementById('agenda-overlay');
   if (!ov) return;
 
@@ -7293,6 +7493,23 @@ function _agendaGetComps() {
       });
     });
   }
+
+  // ── Événements personnalisés ──
+  (S.agendaEvents || []).forEach(function(ev) {
+    if (!ev.dateFrom) return;
+    all.push({
+      _customEvent : true,
+      id           : ev.id,
+      name         : ev.titre || 'Événement',
+      dateFrom     : ev.dateFrom,
+      dateTo       : ev.dateTo || ev.dateFrom,
+      heureDebut   : ev.heureDebut || '',
+      heureFin     : ev.heureFin   || '',
+      type         : '_event',
+      _couleur     : ev.couleur || '#f59e0b',
+      _desc        : ev.desc || ''
+    });
+  });
 
   return all;
 }
@@ -7645,18 +7862,62 @@ function _agendaBuildTimeLayout(colCount) {
 
   // Zone événements + lignes horizontales
   var evArea = document.createElement('div');
-  evArea.style.cssText = 'flex:1;position:relative;height:100%;cursor:default';
-  // Double-clic — heure calculée via fraction de hauteur
-  evArea.addEventListener('dblclick', function(e) {
-    if (e.target !== evArea) return;
-    var offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY - evArea.getBoundingClientRect().top);
-    var frac   = offsetY / evArea.getBoundingClientRect().height;
-    var hourF  = _winSt + frac * _span;
-    var hour   = Math.min(23, Math.max(0, Math.floor(hourF)));
-    var minute = Math.round((hourF - Math.floor(hourF)) * 60 / 15) * 15;
-    if (minute >= 60) { hour = Math.min(23, hour + 1); minute = 0; }
-    _agendaCreateMenu(_agendaDayDate, hour, minute);
-  });
+  evArea.style.cssText = 'flex:1;position:relative;height:100%;cursor:crosshair';
+  // Drag-to-create : mousedown → mousemove → mouseup
+  (function(area, winSt, span, getDate){
+    var dragSel = null;
+    var startFrac = 0;
+    function fracToHM(frac) {
+      var hourF = winSt + Math.max(0, Math.min(1, frac)) * span;
+      var h = Math.min(23, Math.max(0, Math.floor(hourF)));
+      var m = Math.round((hourF - Math.floor(hourF)) * 60 / 15) * 15;
+      if (m >= 60) { h = Math.min(23, h+1); m = 0; }
+      return { h:h, m:m, str: (h<10?'0':'')+h+':'+(m<10?'0':'')+m };
+    }
+    area.addEventListener('mousedown', function(e) {
+      if (e.target !== area) return;
+      if (e.button !== 0) return;
+      var rect = area.getBoundingClientRect();
+      startFrac = (e.clientY - rect.top) / rect.height;
+      dragSel = document.createElement('div');
+      dragSel.style.cssText = 'position:absolute;left:0;right:0;background:rgba(0,87,255,.25);border:1.5px solid var(--stol);border-radius:4px;pointer-events:none;z-index:10';
+      var topPct = (startFrac * 100).toFixed(3) + '%';
+      dragSel.style.top = topPct;
+      dragSel.style.height = '2px';
+      area.appendChild(dragSel);
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!dragSel) return;
+      var rect = area.getBoundingClientRect();
+      var curFrac = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+      var f1 = Math.min(startFrac, curFrac), f2 = Math.max(startFrac, curFrac);
+      if (f2 - f1 < 0.01) f2 = f1 + 0.01;
+      dragSel.style.top    = (f1 * 100).toFixed(3) + '%';
+      dragSel.style.height = ((f2 - f1) * 100).toFixed(3) + '%';
+      var t1 = fracToHM(f1), t2 = fracToHM(f2);
+      dragSel.textContent = t1.str + ' → ' + t2.str;
+      dragSel.style.cssText += ';font-size:10px;font-weight:700;color:var(--stol);display:flex;align-items:center;justify-content:center;letter-spacing:.3px';
+    });
+    document.addEventListener('mouseup', function(e) {
+      if (!dragSel) return;
+      var rect = area.getBoundingClientRect();
+      var endFrac = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+      var f1 = Math.min(startFrac, endFrac), f2 = Math.max(startFrac, endFrac);
+      if (dragSel.parentNode) dragSel.parentNode.removeChild(dragSel);
+      dragSel = null;
+      if (f2 - f1 < 0.02) return; // micro-clic : ignorer, laisser dblclick gérer
+      var t1 = fracToHM(f1), t2 = fracToHM(f2);
+      _agendaNewItemMenu(getDate(), t1.str, t2.str);
+    });
+    area.addEventListener('dblclick', function(e) {
+      if (e.target !== area) return;
+      var rect = area.getBoundingClientRect();
+      var frac = (e.clientY - rect.top) / rect.height;
+      var t = fracToHM(frac);
+      _agendaNewItemMenu(getDate(), t.str, null);
+    });
+  })(evArea, _winSt, _span, function(){ return _agendaDayDate; });
   // Lignes horaires en pourcentage
   for (var _lh = _winSt; _lh < _winEd; _lh++) {
     var line = document.createElement('div');
@@ -7803,7 +8064,10 @@ function _agendaRenderMonth() {
           numEl.className = 'ag-day-num' + (day.date === today ? ' ag-today' : '');
           numEl.textContent = day.day;
           cell.appendChild(numEl);
-          (function(ds){ cell.onclick = function(){ _agendaSelectDate(ds); }; })(day.date);
+          (function(ds){
+            cell.onclick  = function(){ _agendaSelectDate(ds); };
+            cell.ondblclick = function(e){ e.stopPropagation(); _agendaNewItemMenu(ds); };
+          })(day.date);
           weekEl.appendChild(cell);
         });
 
@@ -7830,6 +8094,7 @@ function _agendaRenderMonth() {
           ev.onmouseout  = function(){ this.style.filter=''; };
           (function(comp){ ev.onclick = function(ev2){
             ev2.stopPropagation();
+            if (comp._customEvent) { _agendaOpenEventForm(comp.dateFrom, comp.id); return; }
             if (comp._ganttSt && comp._compId) {
               openGanttModal(comp._compId);
               _ganttState.fromAgenda = true;
@@ -7839,6 +8104,11 @@ function _agendaRenderMonth() {
               closeAgenda();
               openCompDetail(comp.id);
             }
+          };
+          ev.ondblclick = function(ev2){
+            ev2.stopPropagation();
+            if (comp._customEvent) { _agendaOpenEventForm(comp.dateFrom, comp.id); return; }
+            if (!comp._ganttSt && canEditComp()) { _compFromAgenda=true; closeAgenda(); editComp(comp.id); }
           }; })(e);
           weekEl.appendChild(ev);
         });
@@ -7944,7 +8214,8 @@ function _agendaRenderWeek() {
   var _allComps = _agendaGetComps();
   var wEvts = _allComps.filter(function(c){
     return (c.dateFrom||'') <= days[6].date && (c.dateTo||c.dateFrom||'') >= days[0].date
-      && !(c._ganttSt && c.heureDebut);  // timed gantt subtasks go to time grid, not all-day
+      && !(c._ganttSt && c.heureDebut)   // timed gantt subtasks → time grid
+      && !(c._customEvent && c.heureDebut); // timed custom events → time grid
   });
   wEvts.sort(function(a,b){
     var da=Math.round((new Date((a.dateTo||a.dateFrom)+'T00:00:00')-new Date(a.dateFrom+'T00:00:00'))/86400000);
@@ -8008,6 +8279,7 @@ function _agendaRenderWeek() {
     ev.onmouseout  = function(){ this.style.filter=''; };
     (function(c){ ev.onclick = function(ev2){
       ev2.stopPropagation();
+      if (c._customEvent) { _agendaOpenEventForm(c.dateFrom, c.id); return; }
       if (c._ganttSt && c._compId) {
         openGanttModal(c._compId);
         _ganttState.fromAgenda = true;
@@ -8017,6 +8289,11 @@ function _agendaRenderWeek() {
         closeAgenda();
         openCompDetail(c.id);
       }
+    };
+    ev.ondblclick = function(ev2){
+      ev2.stopPropagation();
+      if (c._customEvent) { _agendaOpenEventForm(c.dateFrom, c.id); return; }
+      if (!c._ganttSt && canEditComp()) { _compFromAgenda=true; closeAgenda(); editComp(c.id); }
     }; })(e);
     adRow.appendChild(ev);
   });
@@ -8072,19 +8349,58 @@ function _agendaRenderWeek() {
       line.style.cssText = 'position:absolute;left:1px;right:0;top:'+_hPct(_lh).toFixed(4)+'%;border-top:1px solid '+(_lh===_winStart?'transparent':_lh%6===0?HR_MJ:HR_MN);
       col.appendChild(line);
     }
-    // Double-clic → heure calculée via la hauteur réelle de la colonne
-    (function(dayDate) {
-      col.addEventListener('dblclick', function(e) {
-        if (e.target !== col) return;
-        var offsetY = e.offsetY !== undefined ? e.offsetY : (e.clientY - col.getBoundingClientRect().top);
-        var frac   = offsetY / col.getBoundingClientRect().height;
-        var hourF  = _winStart + frac * _span;
-        var hour   = Math.min(23, Math.max(0, Math.floor(hourF)));
-        var minute = Math.round((hourF - Math.floor(hourF)) * 60 / 15) * 15;
-        if (minute >= 60) { hour = Math.min(23, hour + 1); minute = 0; }
-        _agendaCreateMenu(dayDate, hour, minute);
+    // Drag-to-create sur la colonne semaine
+    (function(area, winSt, span, dayDate){
+      var dragSel = null, startFrac = 0;
+      function fracToHM(frac) {
+        var hourF = winSt + Math.max(0,Math.min(1,frac)) * span;
+        var h = Math.min(23,Math.max(0,Math.floor(hourF)));
+        var m = Math.round((hourF-Math.floor(hourF))*60/15)*15;
+        if(m>=60){h=Math.min(23,h+1);m=0;}
+        return {h:h,m:m,str:(h<10?'0':'')+h+':'+(m<10?'0':'')+m};
+      }
+      area.style.cursor = 'crosshair';
+      area.addEventListener('mousedown', function(e){
+        if(e.target!==area||e.button!==0) return;
+        var rect=area.getBoundingClientRect();
+        startFrac=(e.clientY-rect.top)/rect.height;
+        dragSel=document.createElement('div');
+        dragSel.style.cssText='position:absolute;left:0;right:0;background:rgba(0,87,255,.25);border:1.5px solid var(--stol);border-radius:4px;pointer-events:none;z-index:10;font-size:10px;font-weight:700;color:var(--stol);display:flex;align-items:center;justify-content:center';
+        dragSel.style.top=(startFrac*100).toFixed(3)+'%';
+        dragSel.style.height='2px';
+        area.appendChild(dragSel);
+        e.preventDefault();
       });
-    })(day.date);
+      document.addEventListener('mousemove', function(e){
+        if(!dragSel||!area.contains(dragSel)) return;
+        var rect=area.getBoundingClientRect();
+        var curFrac=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+        var f1=Math.min(startFrac,curFrac),f2=Math.max(startFrac,curFrac);
+        if(f2-f1<0.01)f2=f1+0.01;
+        dragSel.style.top=(f1*100).toFixed(3)+'%';
+        dragSel.style.height=((f2-f1)*100).toFixed(3)+'%';
+        var t1=fracToHM(f1),t2=fracToHM(f2);
+        dragSel.textContent=t1.str+' → '+t2.str;
+      });
+      document.addEventListener('mouseup', function(e){
+        if(!dragSel||!area.contains(dragSel)) return;
+        var rect=area.getBoundingClientRect();
+        var endFrac=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+        var f1=Math.min(startFrac,endFrac),f2=Math.max(startFrac,endFrac);
+        if(dragSel.parentNode)dragSel.parentNode.removeChild(dragSel);
+        dragSel=null;
+        if(f2-f1<0.02) return; // micro-clic : ignorer, laisser dblclick gérer
+        var t1=fracToHM(f1),t2=fracToHM(f2);
+        _agendaNewItemMenu(dayDate,t1.str,t2.str);
+      });
+      area.addEventListener('dblclick', function(e){
+        if(e.target!==area) return;
+        var rect=area.getBoundingClientRect();
+        var frac=(e.clientY-rect.top)/rect.height;
+        var t=fracToHM(frac);
+        _agendaNewItemMenu(dayDate,t.str,null);
+      });
+    })(col, _winStart, _span, day.date);
     if (day.isToday) todayColEl = col;
     dayColEls.push(col);
     scroll.appendChild(col);
@@ -8092,8 +8408,13 @@ function _agendaRenderWeek() {
 
   // ── Blocs horodatés sous-tâches Planning ──
   var wTimedEvts = _allComps.filter(function(c){
-    return c._ganttSt && c.heureDebut
+    return ((c._ganttSt || c._customEvent) && c.heureDebut)
       && (c.dateFrom||'') <= days[6].date && (c.dateFrom||'') >= days[0].date;
+  });
+  // Grouper par jour et calculer les colonnes anti-chevauchement
+  days.forEach(function(day) {
+    var dayEvtsT = wTimedEvts.filter(function(c){ return c.dateFrom === day.date; });
+    if (dayEvtsT.length) _agendaLayoutTimedEvts(dayEvtsT);
   });
   wTimedEvts.forEach(function(c){
     var dayIdx = days.findIndex(function(d){ return d.date === c.dateFrom; });
@@ -8101,23 +8422,25 @@ function _agendaRenderWeek() {
     var col2 = dayColEls[dayIdx];
     if (!col2) return;
     var color = _agendaColor(c);
-    var hd = c.heureDebut.split(':'), hf = c.heureFin ? c.heureFin.split(':') : null;
-    var startH = parseInt(hd[0]) + parseInt(hd[1])/60;
-    var endH   = hf ? (parseInt(hf[0]) + parseInt(hf[1])/60) : startH + 1;
-    if (endH <= startH) endH = startH + 0.5;
+    var startH = c._startH, endH = c._endH;
     var topPct  = _hPct(startH).toFixed(4) + '%';
     var hgtPct  = _dhPct(endH - startH).toFixed(4) + '%';
+    var colW    = 100 / c._totalCols;
+    var leftPct  = (c._col * colW).toFixed(2) + '%';
+    var rightPct = ((c._totalCols - c._col - 1) * colW).toFixed(2) + '%';
     var blk = document.createElement('div');
-    blk.style.cssText = 'position:absolute;left:2px;right:2px;top:'+topPct+';height:'+hgtPct
+    blk.style.cssText = 'position:absolute;left:calc('+leftPct+' + 1px);right:calc('+rightPct+' + 1px);top:'+topPct+';height:'+hgtPct
       +';background:'+color+';border-radius:5px;padding:3px 6px;cursor:pointer;z-index:3;overflow:hidden'
       +';box-shadow:0 1px 3px rgba(0,0,0,.2);transition:filter .12s;min-height:18px';
-    var _wBlkNm = (c.name||'') + (c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '');
-    blk.innerHTML = '<div style="font-size:10px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_agendaAbbrev(_wBlkNm)+'</div>';
+    var _wBlkNm = c._customEvent ? (c.name||'') : (c.name||'') + (c._compNom ? ' ('+c._compNom+')' : '');
+    blk.innerHTML = '<div style="font-size:10px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_agendaAbbrev(_wBlkNm)+'</div>'
+      +'<div style="font-size:9px;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.heureDebut+(c.heureFin?' – '+c.heureFin:'')+'</div>';
     blk.title = _wBlkNm+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
     blk.onmouseover = function(){ this.style.filter='brightness(1.12)'; };
     blk.onmouseout  = function(){ this.style.filter=''; };
     (function(ev){ blk.onclick = function(e2){
       e2.stopPropagation();
+      if (ev._customEvent) { _agendaOpenEventForm(ev.dateFrom, ev.id); return; }
       if (ev._compId){ openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
     }; })(c);
     col2.appendChild(blk);
@@ -8171,8 +8494,8 @@ function _agendaRenderDay() {
   var tl = _agendaBuildTimeLayout(1);
 
   // Séparer événements avec horaire (→ grille) et sans (→ all-day)
-  var timedEvts   = dayEvts.filter(function(c){ return c._ganttSt && c.heureDebut; });
-  var allDayEvts  = dayEvts.filter(function(c){ return !(c._ganttSt && c.heureDebut); });
+  var timedEvts   = dayEvts.filter(function(c){ return (c._ganttSt || c._customEvent) && c.heureDebut; });
+  var allDayEvts  = dayEvts.filter(function(c){ return !((c._ganttSt || c._customEvent) && c.heureDebut); });
 
   // Zone all-day : cartes des événements sans horaire
   if (allDayEvts.length) {
@@ -8233,25 +8556,30 @@ function _agendaRenderDay() {
   }
 
   // ── Événements horodatés : blocs positionnés dans la grille temporelle ──
+  _agendaLayoutTimedEvts(timedEvts);
   timedEvts.forEach(function(c) {
     var color = _agendaColor(c);
-    var hd = c.heureDebut.split(':'), hf = c.heureFin ? c.heureFin.split(':') : null;
-    var startH = parseInt(hd[0]) + parseInt(hd[1])/60;
-    var endH   = hf ? (parseInt(hf[0]) + parseInt(hf[1])/60) : startH + 1;
-    if (endH <= startH) endH = startH + 0.5;
+    var startH = c._startH, endH = c._endH;
     var topPct    = tl.hP(startH);
     var hgtPct    = tl.dhP(endH - startH);
+    var colW  = 100 / c._totalCols;
+    var leftPct  = (c._col * colW).toFixed(2) + '%';
+    var rightPct = ((c._totalCols - c._col - 1) * colW).toFixed(2) + '%';
     var blk = document.createElement('div');
-    blk.style.cssText = 'position:absolute;left:4px;right:4px;top:'+topPct+';height:'+hgtPct
+    blk.style.cssText = 'position:absolute;left:calc('+leftPct+' + 2px);right:calc('+rightPct+' + 2px);top:'+topPct+';height:'+hgtPct
       +';background:'+color+';border-radius:6px;padding:4px 8px;cursor:pointer;z-index:2;overflow:hidden'
       +';box-shadow:0 1px 4px rgba(0,0,0,.18);transition:filter .12s';
-    var _dBlkNm = (c.name||'') + (c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '');
+    var _dBlkNm = c._customEvent ? (c.name||'') : (c.name||'') + (c._compNom ? ' ('+c._compNom+')' : '');
+    var _dSub   = c._customEvent
+      ? c.heureDebut+(c.heureFin?' – '+c.heureFin:'')+(c._desc?' · '+c._desc:'')
+      : c.heureDebut+(c.heureFin?' – '+c.heureFin:'')+' · Planning';
     blk.innerHTML = '<div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(_agendaAbbrev(_dBlkNm))+'</div>'
-      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+c.heureDebut+(c.heureFin?' – '+c.heureFin:'')+' · Planning</div>';
-    blk.title = (c.name||'')+(c._ganttSt && c._compNom ? ' ('+c._compNom+')' : '')+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
+      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+_dSub+'</div>';
+    blk.title = _dBlkNm+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
     blk.onmouseover = function(){ this.style.filter='brightness(1.12)'; };
     blk.onmouseout  = function(){ this.style.filter=''; };
     (function(ev){ blk.onclick = function(){
+      if (ev._customEvent) { _agendaOpenEventForm(ev.dateFrom, ev.id); return; }
       if (ev._compId) { openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
     }; })(c);
     tl.evArea.appendChild(blk);
@@ -8466,6 +8794,299 @@ function _agendaAddComp(dateStr) {
     var saisonEl = document.getElementById('comp-saison');
     if (saisonEl) saisonEl.value = dateStr.substring(0,4);
   }, 200);
+}
+
+// ── Menu double-clic agenda : Nouvelle compétition / Nouvel événement ──────
+function _agendaNewItemMenu(dateStr, timeFrom, timeTo) {
+  var old = document.getElementById('ag-new-item-menu');
+  if (old) old.remove();
+  var JOURS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  var MOIS  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var d = new Date(dateStr+'T00:00:00');
+  var dlbl = JOURS[d.getDay()]+' '+d.getDate()+' '+MOIS[d.getMonth()]+' '+d.getFullYear();
+  var tlbl = timeFrom ? (timeFrom + (timeTo ? ' → ' + timeTo : '')) : '';
+
+  var ov = document.createElement('div');
+  ov.id = 'ag-new-item-menu';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2800;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
+  var panel = document.createElement('div');
+  panel.style.cssText = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:340px;overflow:hidden';
+  panel.onclick = function(e){ e.stopPropagation(); };
+
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--bdr)';
+  hdr.innerHTML = '<div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--txt)">📅 Créer</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+dlbl+'</div>'
+    +(tlbl ? '<div style="font-size:12px;font-weight:700;color:var(--stol);margin-top:3px">🕐 '+tlbl+'</div>' : '')
+    +'</div>'
+    +'<button onclick="document.getElementById(\'ag-new-item-menu\').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>';
+  panel.appendChild(hdr);
+
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px';
+
+  // Bouton Nouvelle compétition
+  var btnComp = document.createElement('button');
+  btnComp.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1px solid rgba(0,87,255,.3);background:rgba(0,87,255,.08);color:var(--txt);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;transition:background .14s';
+  btnComp.innerHTML = '<span style="font-size:22px;line-height:1">📅</span><div><div>Nouvelle compétition</div><div style="font-size:11px;color:var(--txt3);font-weight:500;margin-top:2px">Ajouter une compétition à cette date</div></div>';
+  btnComp.onmouseover = function(){ this.style.background='rgba(0,87,255,.16)'; };
+  btnComp.onmouseout  = function(){ this.style.background='rgba(0,87,255,.08)'; };
+  btnComp.onclick = function(){ ov.remove(); _agendaOpenCompForm(dateStr); };
+  body.appendChild(btnComp);
+
+  // Bouton Nouvel événement
+  var btnEv = document.createElement('button');
+  btnEv.style.cssText = 'width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:var(--txt);font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;transition:background .14s';
+  btnEv.innerHTML = '<span style="font-size:22px;line-height:1">🗓</span><div><div>Nouvel événement</div><div style="font-size:11px;color:var(--txt3);font-weight:500;margin-top:2px">'+(tlbl?tlbl:'Ajouter un événement au calendrier')+'</div></div>';
+  btnEv.onmouseover = function(){ this.style.background='rgba(245,158,11,.15)'; };
+  btnEv.onmouseout  = function(){ this.style.background='rgba(245,158,11,.07)'; };
+  btnEv.onclick = function(){ ov.remove(); _agendaOpenEventForm(dateStr, null, timeFrom, timeTo); };
+  body.appendChild(btnEv);
+
+  panel.appendChild(body);
+  ov.appendChild(panel);
+  document.body.appendChild(ov);
+}
+
+// ── Ouvre sheet-comp depuis l'agenda (sans fermer l'agenda) ─────────────────
+function _agendaOpenCompForm(dateStr) {
+  var sc = document.getElementById('sheet-comp');
+  if (sc) sc.style.zIndex = '2900';
+  openAddComp();
+  setTimeout(function(){
+    var fromEl = document.getElementById('comp-date-from');
+    var toEl   = document.getElementById('comp-date-to');
+    if (fromEl) fromEl.value = dateStr;
+    if (toEl)   toEl.value   = dateStr;
+  }, 150);
+}
+
+// ── Formulaire Nouvel événement (dans l'agenda) ─────────────────────────────
+function _agendaOpenEventForm(dateStr, evId, timeFrom, timeTo) {
+  var old = document.getElementById('ag-event-form');
+  if (old) old.remove();
+
+  var ev = evId ? (S.agendaEvents||[]).find(function(e){ return e.id===evId; }) : null;
+  var COULEURS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#64748b'];
+  var _inpStyle = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box;cursor:pointer';
+  var _inpFocus = "this.style.borderColor='var(--stol)'"
+  var _inpBlur  = "this.style.borderColor='var(--bdr)'";
+
+  var valHFrom = ev ? (ev.heureDebut||'') : (timeFrom||'');
+  var valHTo   = ev ? (ev.heureFin||'')   : (timeTo||'');
+
+  var ov = document.createElement('div');
+  ov.id = 'ag-event-form';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2800;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
+  var panel = document.createElement('div');
+  panel.style.cssText = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:420px;overflow:hidden;max-height:90vh;overflow-y:auto';
+  panel.onclick = function(e){ e.stopPropagation(); };
+
+  var title = evId ? 'Modifier l\'événement' : 'Nouvel événement';
+  panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--txt)">🗓 '+title+'</div>'
+    +'<button onclick="document.getElementById(\'ag-event-form\').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>'
+    +'</div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+
+    // Titre
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">TITRE *</label>'
+    +'<input id="ag-ev-titre" value="'+(ev?ev.titre||'':'')+'" placeholder="Nom de l\'événement" style="'+_inpStyle+'" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'"></div>'
+
+    // Date début / Date fin
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DATE DÉBUT</label>'
+    +'<input id="ag-ev-date-from" type="date" value="'+(ev?ev.dateFrom||dateStr:dateStr)+'" style="'+_inpStyle+'" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DATE FIN</label>'
+    +'<input id="ag-ev-date-to" type="date" value="'+(ev?ev.dateTo||dateStr:dateStr)+'" style="'+_inpStyle+'" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'"></div>'
+    +'</div>'
+
+    // Heure début / Heure fin
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">HEURE DÉBUT</label>'
+    +'<input id="ag-ev-heure-from" type="time" value="'+valHFrom+'" style="'+_inpStyle+'" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">HEURE FIN</label>'
+    +'<input id="ag-ev-heure-to" type="time" value="'+valHTo+'" style="'+_inpStyle+'" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'"></div>'
+    +'</div>'
+
+    // Couleur
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:7px">COULEUR</label>'
+    +'<div id="ag-ev-colors" style="display:flex;gap:8px;flex-wrap:wrap">'
+    +COULEURS.map(function(c){ var sel=(ev&&ev.couleur===c)||(!ev&&c==='#f59e0b'); return '<button onclick="document.querySelectorAll(\'#ag-ev-colors button\').forEach(function(b){b.removeAttribute(\'data-selected\');b.style.outline=\'none\'});this.dataset.selected=\'1\';this.style.outline=\'3px solid #fff\'" style="width:28px;height:28px;border-radius:50%;background:'+c+';border:none;cursor:pointer;outline:'+(sel?'3px solid #fff':'none')+'" data-color="'+c+'"'+(sel?' data-selected="1"':'')+' ></button>'; }).join('')
+    +'</div></div>'
+
+    // Description
+    +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DESCRIPTION</label>'
+    +'<textarea id="ag-ev-desc" placeholder="Notes, informations…" style="'+_inpStyle+';resize:vertical;min-height:60px" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'">'+(ev?ev.desc||'':'')+'</textarea></div>'
+
+    // Boutons
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">'
+    +(evId?'<button onclick="_agendaDeleteEvent(\''+evId+'\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:auto">Supprimer</button>':'')
+    +(evId?'<button onclick="_agendaExportICS(\''+evId+'\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);color:#34d399;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">📅 Outlook</button>':'')
+    +'<button onclick="document.getElementById(\'ag-event-form\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
+    +'<button onclick="_agendaSaveEvent(\''+dateStr+'\',\''+(evId||'')+'\',this)" style="padding:8px 18px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    +'</div></div>';
+
+  ov.appendChild(panel);
+  document.body.appendChild(ov);
+  setTimeout(function(){ var inp=document.getElementById('ag-ev-titre'); if(inp) inp.focus(); }, 100);
+}
+
+function _agendaSaveEvent(dateStr, evId, btn) {
+  var titre = (document.getElementById('ag-ev-titre')||{}).value||'';
+  if (!titre.trim()) { var t=document.getElementById('ag-ev-titre'); if(t){t.style.borderColor='#ef4444';t.focus();} return; }
+  var dateFrom   = (document.getElementById('ag-ev-date-from')||{}).value || dateStr;
+  var dateTo     = (document.getElementById('ag-ev-date-to')||{}).value   || dateFrom;
+  var heureDebut = (document.getElementById('ag-ev-heure-from')||{}).value||'';
+  var heureFin   = (document.getElementById('ag-ev-heure-to')||{}).value||'';
+  var desc       = (document.getElementById('ag-ev-desc')||{}).value||'';
+  var selBtn     = document.querySelector('#ag-ev-colors button[data-selected="1"]');
+  var couleur    = selBtn ? selBtn.getAttribute('data-color') : '#f59e0b';
+  if (!S.agendaEvents) S.agendaEvents = [];
+  if (evId) {
+    var idx = S.agendaEvents.findIndex(function(e){ return e.id===evId; });
+    if (idx>=0) S.agendaEvents[idx] = {id:evId, titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, _updatedAt:Date.now()};
+  } else {
+    S.agendaEvents.push({id:'ev'+Date.now().toString(36), titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, _updatedAt:Date.now()});
+  }
+  saveState();
+  document.getElementById('ag-event-form').remove();
+  _agendaRender();
+  toast('Événement enregistré ✓','ok');
+}
+
+function _agendaMailEvent(evId) {
+  var ev = (S.agendaEvents||[]).find(function(e){ return e.id===evId; });
+  if (!ev) return;
+  var fmtDate = function(d){ if(!d) return ''; var p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+  var subject = encodeURIComponent('[Agenda] ' + (ev.titre||'Événement'));
+  var lines = [];
+  lines.push('📅 ' + (ev.titre||'Événement'));
+  lines.push('');
+  lines.push('Date début : ' + fmtDate(ev.dateFrom));
+  if (ev.dateTo && ev.dateTo !== ev.dateFrom) lines.push('Date fin   : ' + fmtDate(ev.dateTo));
+  if (ev.heureDebut) lines.push('Heure début : ' + ev.heureDebut + (ev.heureFin ? '  →  ' + ev.heureFin : ''));
+  if (ev.desc) { lines.push(''); lines.push('Notes : ' + ev.desc); }
+  lines.push('');
+  lines.push('— Envoyé depuis Gest\'DTN');
+  var body = encodeURIComponent(lines.join('\r\n'));
+  window.location.href = 'mailto:azzounimohamed@hotmail.com?subject=' + subject + '&body=' + body;
+}
+
+function _icsDate(dateStr, timeStr) {
+  // dateStr = 'YYYY-MM-DD', timeStr = 'HH:MM' (optionnel)
+  var d = (dateStr||'').replace(/-/g,'');
+  if (timeStr) {
+    var t = timeStr.replace(':','') + '00';
+    return d + 'T' + t;
+  }
+  return d;
+}
+
+function _downloadICS(filename, content) {
+  var blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function _agendaExportICS(evId) {
+  var ev = (S.agendaEvents||[]).find(function(e){ return e.id===evId; });
+  if (!ev) return;
+  var uid = evId + '@gestdtn';
+  var now = new Date().toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';
+  var dtStart, dtEnd, allDay = false;
+  if (ev.heureDebut) {
+    dtStart = _icsDate(ev.dateFrom, ev.heureDebut);
+    dtEnd   = _icsDate(ev.dateTo||ev.dateFrom, ev.heureFin||ev.heureDebut);
+    if (dtEnd <= dtStart) {
+      var parts = (ev.heureFin||ev.heureDebut).split(':');
+      var endH = parseInt(parts[0]) + 1;
+      dtEnd = _icsDate(ev.dateTo||ev.dateFrom, (endH<10?'0':'')+endH+':'+(parts[1]||'00'));
+    }
+  } else {
+    allDay = true;
+    dtStart = _icsDate(ev.dateFrom);
+    // DATE fin ICS = lendemain pour les événements all-day
+    var endDate = ev.dateTo || ev.dateFrom;
+    var ed = new Date(endDate + 'T00:00:00');
+    ed.setDate(ed.getDate() + 1);
+    dtEnd = ed.toISOString().slice(0,10).replace(/-/g,'');
+  }
+  var desc = (ev.desc||'').replace(/\n/g,'\\n');
+  var lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//GestDTN//FR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:' + uid,
+    'DTSTAMP:' + now,
+    allDay ? 'DTSTART;VALUE=DATE:' + dtStart : 'DTSTART:' + dtStart,
+    allDay ? 'DTEND;VALUE=DATE:' + dtEnd     : 'DTEND:'   + dtEnd,
+    'SUMMARY:' + (ev.titre||'Événement'),
+    desc ? 'DESCRIPTION:' + desc : '',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(Boolean).join('\r\n');
+  _downloadICS((ev.titre||'evenement').replace(/[^a-z0-9]/gi,'_') + '.ics', lines);
+  toast('Fichier .ics téléchargé — double-cliquez pour l\'importer dans Outlook', 'ok');
+}
+
+function _mailCompICS(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (!cp) return;
+  var uid = compId + '@gestdtn';
+  var now = new Date().toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';
+  var dtStart = _icsDate(cp.dateFrom);
+  var ed = new Date((cp.dateTo||cp.dateFrom) + 'T00:00:00');
+  ed.setDate(ed.getDate() + 1);
+  var dtEnd = ed.toISOString().slice(0,10).replace(/-/g,'');
+  var staff  = (S.staff||[]).filter(function(s){ return s.compId===compId; });
+  var equip  = (S.runs||[]).filter(function(r){ return r.compId===compId; });
+  var descParts = [];
+  if (cp.type)       descParts.push('Type : ' + cp.type);
+  if (cp.lieu)       descParts.push('Lieu : ' + cp.lieu);
+  if (staff.length)  descParts.push('Encadrants : ' + staff.map(function(s){ return (s.prenom||'')+' '+(s.nom||''); }).join(', '));
+  if (equip.length)  descParts.push('Équipages : ' + equip.length);
+  if (cp.notes)      descParts.push('Notes : ' + cp.notes);
+  var desc = descParts.join('\\n');
+  var lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//GestDTN//FR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:' + uid,
+    'DTSTAMP:' + now,
+    'DTSTART;VALUE=DATE:' + dtStart,
+    'DTEND;VALUE=DATE:'   + dtEnd,
+    'SUMMARY:' + (cp.nom||cp.name||'Compétition'),
+    'LOCATION:' + (cp.lieu||''),
+    desc ? 'DESCRIPTION:' + desc : '',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(Boolean).join('\r\n');
+  var fname = (cp.nom||cp.name||'competition').replace(/[^a-z0-9]/gi,'_') + '.ics';
+  _downloadICS(fname, lines);
+  toast('Fichier .ics téléchargé — double-cliquez pour l\'importer dans Outlook', 'ok');
+}
+
+function _agendaDeleteEvent(evId) {
+  if (!S.agendaEvents) return;
+  S.agendaEvents = S.agendaEvents.filter(function(e){ return e.id!==evId; });
+  saveState();
+  document.getElementById('ag-event-form').remove();
+  _agendaRender();
+  toast('Événement supprimé','ok');
 }
 
 function renderBase() {
@@ -12814,8 +13435,9 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
 }
 
 function switchHomeDetailTab(tabId) {
+  if (tabId === 'resultats' && _homeDetailTab !== 'resultats') _stolViewPhase = 'classement';
   _homeDetailTab = tabId;
-  renderHomeDetailPanel(null); // auto-détecte le bon container
+  renderHomeDetailPanel(null);
 }
 
 var _infoMapO = null, _infoMapR = null;
@@ -14651,8 +15273,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _cid = cp.id;
     var _metaR = (S.enrollMeta || {})[_cid] || {};
     var _canEditR = canModify();
-    // À l'ouverture du volet Résultats : activer automatiquement la vue "Classement"
-    _stolViewPhase = 'classement';
+    // _stolViewPhase est géré par setStolViewPhase — ne pas écraser ici
     // ── Barre d'actions Résultats ──
     var _resGlass = 'display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);color:var(--txt2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s';
     var _resDl = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
@@ -32722,9 +33343,459 @@ function openGanttModal(compId) {
 
 // ── Ouvrir le Gantt global (toutes compétitions de la saison) ────
 // ═══════════════════════════════════════════════
+// NOTES DE FRAIS
+// ═══════════════════════════════════════════════
+var _ndfCurrentId = null;
+
+function _ndfUserId() { return S.user && S.user.id; }
+function _ndfUserList() {
+  var uid = _ndfUserId();
+  if (!uid) return [];
+  if (!S.notesfrais) S.notesfrais = {};
+  if (!S.notesfrais[uid]) S.notesfrais[uid] = [];
+  return S.notesfrais[uid];
+}
+
+function openNDF() {
+  if (!S.user || !S.user.id) { toast('Connectez-vous pour accéder aux notes de frais', 'err'); return; }
+  if (!S.notesfrais) S.notesfrais = {};
+  var ov = document.getElementById('ndf-overlay');
+  if (!ov) return;
+  var dtn = document.getElementById('page-dtn');
+  var fromDTN = !!(dtn && dtn.style.display !== 'none') || document.body.classList.contains('has-comp-sidebar');
+  var sbHidden = document.body.classList.contains('dtn-sb-hidden');
+  var left = (fromDTN || document.body.classList.contains('has-comp-sidebar')) ? (sbHidden ? '0' : '216px') : '0';
+  ov.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;left:'+left+';z-index:2600;background:var(--navy);overflow:hidden';
+  renderNDFList();
+}
+
+function closeNDF() {
+  var ov = document.getElementById('ndf-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function renderNDFList() {
+  var body = document.getElementById('ndf-list-body');
+  if (!body) return;
+  var list = _ndfUserList();
+  var user = S.user || {};
+  var sub = document.getElementById('ndf-subtitle');
+  var total = list.reduce(function(s,n){ return s+(n.total||0); }, 0);
+  if (sub) sub.textContent = list.length+' dépense'+(list.length!==1?'s':'')+' · Total : '+total.toFixed(2)+' €';
+
+  var iSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 8px;outline:none;box-sizing:border-box';
+  var iStRo = 'padding:5px 8px;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);font-size:11px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+  var lSt = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:3px;white-space:nowrap';
+  var fldFixed = function(lbl,id,val,ph,w){ return '<div style="width:'+w+';flex-shrink:0"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" onchange="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
+  var fldGrow = function(lbl,id,val,ph){ return '<div style="flex:1;min-width:120px"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" onchange="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
+  var cartouche = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:12px 16px;margin-bottom:16px">'
+    +'<div style="font-size:9px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Cartouche d\'impression</div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:nowrap">'
+    +fldFixed('Pôle','ndf-cart-pole',user.ndfPole||'Pôle sport','Pôle sport','120px')
+    +fldFixed('Missionné par','ndf-cart-misspar',user.ndfMisspar||'Le bureau directeur','Le bureau directeur','150px')
+    +fldGrow('Adresse','ndf-cart-adresse',user.ndfAdresse||'','Adresse')
+    +fldGrow('Lieu','ndf-cart-lieu',user.ndfLieu||'','Lieu de mission')
+    +fldGrow('Objet','ndf-cart-objet',user.ndfObjet||'','Objet de la note')
+    +'</div>'
+    +'</div>';
+
+  // Tableau inline éditable
+  var thSt = 'padding:6px 6px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--bdr);text-align:left';
+  var cellSt = 'padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.04)';
+  var cellNum = 'padding:3px 1px;border-bottom:1px solid rgba(255,255,255,.04)';
+  var numSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 3px;outline:none;box-sizing:border-box;text-align:right;-moz-appearance:textfield';
+
+  var sorted = list.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+
+  var rows = '';
+  sorted.forEach(function(n) {
+    var id = n.id;
+    var ch = function(f){ return 'onchange="_ndfRowChange(\''+id+'\',\''+f+'\',this.value)"'; };
+    var fo = 'onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
+    rows += '<tr>'
+      +'<td style="'+cellSt+'"><input type="date" value="'+(n.date||'')+'" '+ch('date')+' style="'+iSt+';width:130px" '+fo+'></td>'
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.objet||'')+'" placeholder="Objet" '+ch('objet')+' style="'+iSt+';width:100%" '+fo+'></td>'
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.lieuDe||'')+'" placeholder="De" '+ch('lieuDe')+' style="'+iSt+';width:100%" '+fo+'></td>'
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.lieuA||'')+'" placeholder="À" '+ch('lieuA')+' style="'+iSt+';width:100%" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.km||'')+'" placeholder="0" '+ch('km')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.taxi||'')+'" placeholder="0" '+ch('taxi')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.sncf||'')+'" placeholder="0" '+ch('sncf')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.repas||'')+'" placeholder="0" '+ch('repas')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.nbInvites||'')+'" placeholder="0" '+ch('nbInvites')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.hotel||'')+'" placeholder="0" '+ch('hotel')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellNum+'"><input type="number" value="'+(n.divers||'')+'" placeholder="0" '+ch('divers')+' style="'+numSt+'" '+fo+'></td>'
+      +'<td style="'+cellSt+';text-align:right;font-weight:800;color:#10b981;font-size:12px;white-space:nowrap;padding-right:8px" id="ndf-row-total-'+id+'">'+(n.total||0).toFixed(2)+' €</td>'
+      +'<td style="'+cellSt+';text-align:center">'
+      +'<button onclick="_ndfDeleteRow(\''+id+'\')" title="Supprimer" style="width:26px;height:26px;border:none;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:inherit">×</button>'
+      +'</td></tr>';
+  });
+
+  // Ligne totaux
+  var totTaxi=0,totSncf=0,totRepas=0,totHotel=0,totDivers=0;
+  list.forEach(function(n){ totTaxi+=n.taxi||0; totSncf+=n.sncf||0; totRepas+=n.repas||0; totHotel+=n.hotel||0; totDivers+=n.divers||0; });
+  var totSt = 'padding:7px 6px;font-size:11px;font-weight:800;color:var(--txt);border-top:2px solid var(--bdr);background:var(--navy2);text-align:right';
+  var totRow = '<tr>'
+    +'<td colspan="4" style="'+totSt+';text-align:left;color:var(--txt3)">TOTAUX</td>'
+    +'<td style="'+totSt+'">—</td>'
+    +'<td style="'+totSt+'">'+(totTaxi?totTaxi.toFixed(2)+' €':'—')+'</td>'
+    +'<td style="'+totSt+'">'+(totSncf?totSncf.toFixed(2)+' €':'—')+'</td>'
+    +'<td style="'+totSt+'">'+(totRepas?totRepas.toFixed(2)+' €':'—')+'</td>'
+    +'<td style="'+totSt+'">—</td>'
+    +'<td style="'+totSt+'">'+(totHotel?totHotel.toFixed(2)+' €':'—')+'</td>'
+    +'<td style="'+totSt+'">'+(totDivers?totDivers.toFixed(2)+' €':'—')+'</td>'
+    +'<td style="'+totSt+';color:#10b981;font-size:13px" id="ndf-grand-total">'+total.toFixed(2)+' €</td>'
+    +'<td style="'+totSt+'"></td></tr>';
+
+  var tableHtml = '<div style="overflow-x:auto;border:1px solid var(--bdr);border-radius:12px">'
+    +'<table style="width:100%;border-collapse:collapse;min-width:900px">'
+    +'<thead><tr>'
+    +'<th style="'+thSt+';width:130px">Date</th>'
+    +'<th style="'+thSt+';width:210px">Objet</th>'
+    +'<th style="'+thSt+';width:120px">Lieu de</th>'
+    +'<th style="'+thSt+';width:120px">Lieu à</th>'
+    +'<th style="'+thSt+';width:60px">Km<br><span style="font-size:8px;color:var(--txt3);font-weight:400">×'+((S.odmConfig&&S.odmConfig.bareme1Taux)||0.408)+' €</span></th>'
+    +'<th style="'+thSt+';width:70px">Taxi</th>'
+    +'<th style="'+thSt+';width:70px">SNCF</th>'
+    +'<th style="'+thSt+';width:70px">Repas</th>'
+    +'<th style="'+thSt+';width:50px">Inv.</th>'
+    +'<th style="'+thSt+';width:70px">Hôtel</th>'
+    +'<th style="'+thSt+';width:70px">Divers</th>'
+    +'<th style="'+thSt+';width:80px;text-align:right">Total</th>'
+    +'<th style="'+thSt+';width:32px"></th>'
+    +'</tr></thead>'
+    +'<tbody>'+(rows||'<tr><td colspan="12" style="padding:30px;text-align:center;color:var(--txt3);font-size:12px">Aucune dépense — cliquez sur <b>+ Nouvelle dépense</b></td></tr>')+'</tbody>'
+    +(list.length ? '<tfoot>'+totRow+'</tfoot>' : '')
+    +'</table></div>';
+
+  body.innerHTML = cartouche + tableHtml;
+}
+
+function _ndfAddRow() {
+  var uid = _ndfUserId();
+  if (!uid) { toast('Connectez-vous pour créer une dépense','err'); return; }
+  var newRec = { id:'ndf'+Date.now().toString(36), date:new Date().toISOString().slice(0,10), objet:'', lieuDe:'', lieuA:'', km:0, kmCost:0, taxi:0, sncf:0, repas:0, nbInvites:0, hotel:0, divers:0, total:0 };
+  _ndfUserList().push(newRec);
+  saveState();
+  renderNDFList();
+  setTimeout(function(){ var el=document.querySelector('#ndf-list-body tbody tr:last-child input[type="text"]'); if(el) el.focus(); },60);
+}
+
+function _ndfRowChange(id, field, value) {
+  var rec = _ndfUserList().find(function(x){ return x.id===id; });
+  if (!rec) return;
+  var numFields = ['taxi','sncf','repas','nbInvites','hotel','divers','km'];
+  if (numFields.indexOf(field)>=0) rec[field]=parseFloat(value)||0; else rec[field]=value;
+  var taux = (S.odmConfig&&S.odmConfig.bareme1Taux) || 0.408;
+  rec.kmCost = Math.round((rec.km||0) * taux * 100) / 100;
+  rec.total=(rec.taxi||0)+(rec.sncf||0)+(rec.repas||0)+(rec.hotel||0)+(rec.divers||0)+rec.kmCost;
+  var el=document.getElementById('ndf-row-total-'+id); if(el) el.textContent=rec.total.toFixed(2)+' €';
+  var list=_ndfUserList(); var t=list.reduce(function(s,n){ return s+(n.total||0); },0);
+  var gt=document.getElementById('ndf-grand-total'); if(gt) gt.textContent=t.toFixed(2)+' €';
+  var sub=document.getElementById('ndf-subtitle'); if(sub) sub.textContent=list.length+' dépense'+(list.length!==1?'s':'')+' · Total : '+t.toFixed(2)+' €';
+  saveState();
+}
+
+function _ndfDeleteRow(id) {
+  if (!confirm('Supprimer cette ligne ?')) return;
+  var uid=_ndfUserId(); if(!uid) return;
+  S.notesfrais[uid]=(S.notesfrais[uid]||[]).filter(function(x){ return x.id!==id; });
+  saveState(); renderNDFList();
+}
+
+function _ndfSaveCartouche() {
+  if (!S.user) return;
+  var gc = function(id){ var el=document.getElementById(id); return el?el.value:''; };
+  S.user.ndfPole    = gc('ndf-cart-pole');
+  S.user.ndfMisspar = gc('ndf-cart-misspar');
+  S.user.ndfAdresse = gc('ndf-cart-adresse');
+  S.user.ndfLieu    = gc('ndf-cart-lieu');
+  S.user.ndfObjet   = gc('ndf-cart-objet');
+  saveState();
+}
+
+function openNDFDetail(id) {
+  _ndfCurrentId = id;
+  var n = id ? _ndfUserList().find(function(x){ return x.id===id; }) : null;
+  var sheet = document.getElementById('ndf-detail-sheet');
+  if (!sheet) return;
+  var dtn = document.getElementById('page-dtn');
+  var sbHidden = document.body.classList.contains('dtn-sb-hidden');
+  var left = document.body.classList.contains('has-comp-sidebar') ? (sbHidden?'0':'216px') : '0';
+  sheet.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;left:'+left+';z-index:2700;background:var(--navy);overflow:hidden';
+  var title = document.getElementById('ndf-detail-title');
+  if (title) title.textContent = n ? 'Modifier la dépense' : 'Nouvelle dépense';
+  var delBtn = document.getElementById('ndf-detail-del-btn');
+  if (delBtn) delBtn.style.display = id ? 'block' : 'none';
+
+  var v = n || {};
+  var user = S.user || {};
+  var inp = function(id, label, type, val, placeholder) {
+    var s = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box';
+    return '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">'+label+'</label>'
+      +'<input id="ndf-'+id+'" type="'+(type||'text')+'" value="'+(val||'')+'" placeholder="'+(placeholder||'')+'" style="'+s+'" oninput="_ndfCalcTotal()" onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>';
+  };
+
+  var body = document.getElementById('ndf-detail-body');
+  body.innerHTML = '<div style="display:flex;flex-direction:column;gap:18px">'
+
+    // Infos générales
+    +'<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:18px">'
+    +'<div style="font-size:12px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Informations générales</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    +inp('date','DATE','date',v.date||new Date().toISOString().slice(0,10),'')
+    +inp('objet','OBJET','text',v.objet||'','Objet du déplacement')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'
+    +inp('lieu-de','LIEU DE','text',v.lieuDe||'','Ville de départ')
+    +inp('lieu-a','LIEU À','text',v.lieuA||'','Ville d\'arrivée')
+    +'</div>'
+    +'</div>'
+
+    // Frais
+    +'<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:18px">'
+    +'<div style="font-size:12px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Frais engagés (€)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'
+    +inp('taxi','TAXI','number',v.taxi||'','0.00')
+    +inp('sncf','SNCF','number',v.sncf||'','0.00')
+    +inp('repas','REPAS','number',v.repas||'','0.00')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">'
+    +inp('nb-invites','NB INVITÉS','number',v.nbInvites||'','0')
+    +inp('hotel','HÔTEL + PETIT DÉJ','number',v.hotel||'','0.00')
+    +inp('divers','DIVERS','number',v.divers||'','0.00')
+    +'</div>'
+    +'</div>'
+
+    // Total
+    +'<div style="background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.3);border-radius:12px;padding:18px;display:flex;align-items:center;justify-content:space-between">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--txt)">TOTAL</div>'
+    +'<div id="ndf-total-display" style="font-size:26px;font-weight:900;color:#10b981">0,00 €</div>'
+    +'</div>'
+
+    +'</div>';
+
+  _ndfCalcTotal();
+}
+
+function _ndfCalcTotal() {
+  var get = function(id){ return parseFloat(document.getElementById('ndf-'+id)&&document.getElementById('ndf-'+id).value||0)||0; };
+  var total = get('taxi') + get('sncf') + get('repas') + get('hotel') + get('divers');
+  var el = document.getElementById('ndf-total-display');
+  if (el) el.textContent = total.toFixed(2).replace('.',',') + ' €';
+}
+
+function saveNDFDetail() {
+  var get = function(id){ var el=document.getElementById('ndf-'+id); return el?el.value:''; };
+  var getN = function(id){ return parseFloat(get(id))||0; };
+  var total = getN('taxi') + getN('sncf') + getN('repas') + getN('hotel') + getN('divers');
+  var rec = {
+    id: _ndfCurrentId || ('ndf'+Date.now().toString(36)),
+    date: get('date'),
+    objet: get('objet'),
+    lieuDe: get('lieu-de'),
+    lieuA: get('lieu-a'),
+    taxi: getN('taxi'),
+    sncf: getN('sncf'),
+    repas: getN('repas'),
+    nbInvites: getN('nb-invites'),
+    hotel: getN('hotel'),
+    divers: getN('divers'),
+    total: total
+  };
+  var _ndfList = _ndfUserList();
+  if (_ndfCurrentId) {
+    var idx = _ndfList.findIndex(function(x){ return x.id===_ndfCurrentId; });
+    if (idx >= 0) _ndfList[idx] = rec; else _ndfList.push(rec);
+  } else {
+    _ndfList.push(rec);
+  }
+  saveState();
+  closeNDFDetail();
+  renderNDFList();
+  toast('Note de frais enregistrée ✓','ok');
+}
+
+function deleteNDFLine() {
+  if (!_ndfCurrentId) return;
+  if (!confirm('Supprimer cette note de frais ?')) return;
+  var uid = _ndfUserId(); if (!uid) return;
+  S.notesfrais[uid] = (S.notesfrais[uid]||[]).filter(function(x){ return x.id!==_ndfCurrentId; });
+  saveState();
+  closeNDFDetail();
+  renderNDFList();
+  toast('Note supprimée','ok');
+}
+
+function closeNDFDetail() {
+  var sheet = document.getElementById('ndf-detail-sheet');
+  if (sheet) sheet.style.display = 'none';
+  _ndfCurrentId = null;
+}
+
+function printNDFAll() {
+  var list = _ndfUserList().slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  var user  = S.user || {};
+  var logo  = _getAppLogo ? _getAppLogo() : '';
+  var esc   = function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var _fmtFR = function(s){
+    if (!s) return '';
+    var d = new Date(s+'T12:00:00');
+    if (isNaN(d)) return s;
+    var J=['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'];
+    var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    return J[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+  };
+
+  var prenom = esc(user.prenom||'');
+  var nom    = esc(user.nom||'');
+  var email  = esc(user.email||'');
+  var dateToday = new Date().toLocaleDateString('fr-FR');
+  var sigImg = (S.user&&S.user.signatureImage) ? S.user.signatureImage : (S.docSettings&&S.docSettings.userSignatureImage) ? S.docSettings.userSignatureImage : null;
+
+  var tauxKm = (S.odmConfig&&S.odmConfig.bareme1Taux) || 0.408;
+  var totalGeneral = 0, totalTaxi = 0, totalSncf = 0, totalRepas = 0, totalHotel = 0, totalDivers = 0;
+  var rows = '';
+  if (!list.length) {
+    for (var ei = 0; ei < 8; ei++) rows += '<tr style="height:24px"><td colspan="16" style="border:1px solid #7f9fc8"></td></tr>';
+  } else {
+    list.forEach(function(n, i) {
+      var bg = i % 2 === 0 ? '' : 'background:#f0f5ff';
+      var taxi  = n.taxi  || 0;
+      var sncf  = n.sncf  || 0;
+      var repas = n.repas || 0;
+      var hotel = n.hotel || 0;
+      var div   = n.divers|| 0;
+      var tot   = n.total || (taxi+sncf+repas+hotel+div);
+      totalTaxi += taxi; totalSncf += sncf; totalRepas += repas; totalHotel += hotel; totalDivers += div; totalGeneral += tot;
+      rows += '<tr style="height:24px;'+ bg +'">';
+      rows += '<td style="text-align:center;color:#777;font-size:8pt">'+(i+1)+'</td>';
+      rows += '<td style="text-align:center;white-space:nowrap;font-size:8pt">'+_fmtFR(n.date)+'</td>';
+      rows += '<td style="text-align:left;padding-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9pt">'+esc(n.objet||'')+'</td>';
+      rows += '<td></td>';
+      rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.lieuDe||'')+'</td>';
+      rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.lieuA||'')+'</td>';
+      rows += '<td></td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(taxi ? taxi.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(sncf ? sncf.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(repas ? repas.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:center;font-size:8pt">'+(n.nbInvites||'')+'</td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(hotel ? hotel.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(div ? div.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;font-weight:bold;background:#fffae0;font-size:9pt">'+(tot ? tot.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td></td><td></td>';
+      rows += '</tr>';
+    });
+  }
+
+  var _colgroup = '<colgroup><col style="width:14px"><col style="width:86px"><col style="width:180px"><col style="width:22px"><col style="width:62px"><col style="width:62px"><col style="width:28px"><col style="width:34px"><col style="width:38px"><col style="width:34px"><col style="width:22px"><col style="width:58px"><col style="width:44px"><col style="width:52px"><col style="width:48px"><col style="width:22px"></colgroup>';
+  var _thead = '<thead><tr>'
+    +'<th rowspan="2">N°</th>'
+    +'<th rowspan="2">DATE</th>'
+    +'<th rowspan="2">OBJET</th>'
+    +'<th rowspan="2">CBF*</th>'
+    +'<th colspan="3" style="border-bottom:1px solid #7f9fc8">LIEUX</th>'
+    +'<th rowspan="2">Taxi</th>'
+    +'<th rowspan="2">SNCF<br>2<sup>e</sup> cl.</th>'
+    +'<th rowspan="2">Repas</th>'
+    +'<th rowspan="2">Nb.<br>Inv.</th>'
+    +'<th rowspan="2">Hôtel<br>+pdéj.</th>'
+    +'<th rowspan="2">Divers</th>'
+    +'<th rowspan="2" style="background:#fffae0">TOTAL</th>'
+    +'<th rowspan="2">CODE<br>analytique</th>'
+    +'<th rowspan="2">🖼️</th>'
+    +'</tr><tr><th>de</th><th>à</th><th>Km</th></tr></thead>';
+
+  var _totalsRows = '<tr style="font-weight:bold;background:#dce6f1">'
+    +'<td colspan="6" style="text-align:right;padding-right:6px;font-size:8pt;color:#555">Totaux →</td>'
+    +'<td></td>'
+    +'<td style="text-align:right;color:#003875">'+(totalTaxi?totalTaxi.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;color:#003875">'+(totalSncf?totalSncf.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;font-weight:bold;color:#003875">'+(totalRepas?totalRepas.toFixed(2)+' €':'')+'</td>'
+    +'<td></td>'
+    +'<td style="text-align:right;color:#003875">'+(totalHotel?totalHotel.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers?totalDivers.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+' €</td>'
+    +'<td style="background:#dce6f1"></td><td style="background:#dce6f1"></td>'
+    +'</tr>'
+    +'<tr><td colspan="13" style="border:none;background:transparent;padding:4px 0"></td>'
+    +'<td style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">'
+    +'<div style="font-size:13pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:4px 2px;background:#fffae0;text-align:center">'
+    +'<div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">TOTAL À PAYER</div>'
+    +'<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>'
+    +'</div></td><td style="border:none"></td><td style="border:none"></td></tr>';
+
+  var logoHtml = logo
+    ? '<img src="'+logo+'" style="max-width:100px;max-height:70px;object-fit:contain;display:block">'
+    : '<div style="width:80px;height:55px;display:flex;align-items:center;justify-content:center;background:#003875;color:#fff;font-size:7pt;font-weight:bold;border-radius:3px;text-align:center;padding:2px">LOGO</div>';
+
+  var iRow = function(l1,v1,l2,v2){
+    var r='<tr>';
+    r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:8.5pt">'+l1+' :</td>';
+    r+='<td style="padding:2px 5px;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:9pt">'+v1+'</td>';
+    if (l2!==undefined){
+      r+='<td style="padding:2px 5px;font-weight:bold;white-space:nowrap;border-right:1px solid #c9d6e8;border-bottom:1px solid #c9d6e8;font-size:8.5pt">'+l2+' :</td>';
+      r+='<td style="padding:2px 5px;border-bottom:1px solid #c9d6e8;background:#fffae0;font-size:9pt">'+v2+'</td>';
+    } else { r+='<td colspan="2" style="border-bottom:1px solid #c9d6e8"></td>'; }
+    return r+'</tr>';
+  };
+
+  var _sigBlock = '<div class="sig-wrap"><table class="sig-table"><tr>'
+    +'<td><div class="sig-title">Signature du demandeur<span class="sig-sub">(certifiée sincère et véritable)</span></div>'+(sigImg?'<div style="padding:4px;text-align:center"><img src="'+sigImg+'" style="max-height:80px;max-width:100%;object-fit:contain"></div>':'')+'</td>'
+    +'<td><div class="sig-title">Signature du responsable du pôle</div></td>'
+    +'<td><div class="sig-title">Signature du trésorier</div></td>'
+    +'<td><div class="sig-title">Signature de la Présidente</div></td>'
+    +'</tr></table></div>';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">';
+  html += '<title>Notes de Frais</title>';
+  html += '<style>';
+  html += '@page{size:A4 landscape;margin:8mm 10mm}';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111}';
+  html += '.print-btn{position:fixed;top:10px;right:10px;padding:8px 20px;background:#003875;color:#fff;border:none;border-radius:7px;font-size:11pt;font-weight:bold;cursor:pointer;font-family:inherit;box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:999}';
+  html += '@media print{.print-btn{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '.tbl-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:5px}';
+  html += 'table.main{width:100%;border-collapse:collapse;font-size:8.5pt}';
+  html += 'table.main th,table.main td{border:1px solid #7f9fc8;padding:1px 2px}';
+  html += 'table.main th{background:#c5d9f1;font-weight:bold;text-align:center;font-size:8pt}';
+  html += '.sig-wrap{border:1px solid #003875;border-radius:6px;overflow:hidden;margin-top:2mm;page-break-inside:avoid;page-break-before:avoid}';
+  html += '.sig-table{width:100%;border-collapse:collapse}';
+  html += '.sig-table td{border:1px solid #003875;padding:4px 5px;width:25%;vertical-align:top;height:100px}';
+  html += '.sig-title{font-size:8pt;font-weight:bold;text-align:center;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:2px;margin-bottom:2px}';
+  html += '.sig-sub{font-size:7pt;color:#555;font-style:italic;text-align:center;display:block}';
+  html += '</style></head><body>';
+  html += '<button class="print-btn" onclick="window.print()">🖨 Imprimer</button>';
+  html += '<div style="background:#003875;color:#fff;text-align:center;font-size:13pt;font-weight:bold;padding:5px;letter-spacing:2px;text-transform:uppercase">NOTE DE FRAIS</div>';
+  html += '<table style="width:100%;border:1px solid #003875;border-top:none;border-collapse:collapse"><tr>';
+  html += '<td style="width:90px;border-right:1px solid #003875;padding:4px;vertical-align:middle;text-align:center">'+logoHtml+'</td>';
+  html += '<td style="padding:0;vertical-align:top"><table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:80px"><col><col style="width:72px"><col style="width:33%"></colgroup>';
+  html += iRow('Nom / Prénom', (prenom+' '+nom).trim(), 'Adresse', esc(user.ndfAdresse||''));
+  html += iRow('Pôle', esc(user.ndfPole||'Pôle sport'), 'Email', email);
+  html += iRow('Missionné par', esc(user.ndfMisspar||'Le bureau directeur'), 'Lieu', esc(user.ndfLieu||''));
+  html += iRow('Objet', esc(user.ndfObjet||'Notes de frais'), 'Date', dateToday);
+  html += '</table></td>';
+  html += '<td style="width:90px;border-left:1px solid #003875;padding:6px;text-align:center;vertical-align:middle">';
+  html += '<div style="font-size:6pt;font-weight:bold;color:#003875;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Taux km</div>';
+  html += '<div style="font-size:14pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:4px;padding:3px 4px">'+tauxKm.toFixed(3)+'<br><span style="font-size:8pt">€/km</span></div>';
+  html += '</td></tr></table>';
+  html += '<div class="tbl-wrap"><table class="main">'+_colgroup+_thead+'<tbody>'+rows+_totalsRows+'</tbody></table></div>';
+  html += _sigBlock;
+  html += '<script>window.addEventListener("load",function(){var sig=document.querySelector(".sig-wrap");if(!sig)return;var ph=Math.round((210-16)/25.4*96);if(document.body.scrollHeight<=ph){sig.style.position="fixed";sig.style.bottom="0";sig.style.left="0";sig.style.right="0";sig.style.margin="0";}});<\/script>';
+  html += '</body></html>';
+
+  var w = window.open('', '_blank', 'width=1200,height=850');
+  if (!w) { toast('Autorisez les popups pour imprimer', 'err'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 700);
+}
+
+// ═══════════════════════════════════════════════
 // ESPACES PARTAGÉS — OneDrive
 // ═══════════════════════════════════════════════
 function openEspacesPartages() {
+  closeNDF();
   // Fermer les autres overlays
   var gg = document.getElementById('gantt-overlay');
   if (gg && gg.style.display !== 'none') { gg.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:var(--navy);overflow:hidden;'; }
@@ -32901,6 +33972,7 @@ function _saveEspaceDialog() {
 }
 
 function openGlobalGantt() {
+  closeNDF();
   _ganttState.compId     = null;
   _ganttState.filter     = '';
   _ganttState.globalMode = true;
@@ -39230,6 +40302,7 @@ function _dtnNavOut(key) {
 }
 
 function _dtnGoHome() {
+  closeNDF();
   // Refermer agenda/gantt et volets compétition s'ils sont ouverts
   _dtnCloseOverlays();
   // Si on vient des pages compétition : revenir au portail DTN
@@ -39302,6 +40375,7 @@ function _dtnShowPanel(module) {
 }
 
 function openDTNModule(module) {
+  closeNDF();
   _fromDTN = true;
   _dtnCloseOverlays(); // ferme agenda/gantt avant tout changement de contexte
 
