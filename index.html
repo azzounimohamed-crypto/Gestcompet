@@ -24,6 +24,7 @@
 <style>
 :root{
   --navy:#0a0f1e;--navy2:#111827;--navy3:#1c2333;--navy4:#252d3d;
+  --bg:#0d1117;
   --txt:#f1f5f9;--txt2:#94a3b8;--txt3:#475569;
   --bdr:#1e293b;--card:#111827;
   --blue:#3b82f6;--blue-l:#60a5fa;
@@ -35,7 +36,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--navy);color:var(--txt);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;overflow:hidden}
 /* THÈME CLAIR */
-body.theme-light{--navy:#f0f4f8;--navy2:#ffffff;--navy3:#e8edf3;--navy4:#dde3ec;--txt:#0f172a;--txt2:#475569;--txt3:#94a3b8;--bdr:#cbd5e1;--card:#ffffff}
+body.theme-light{--navy:#f0f4f8;--navy2:#ffffff;--navy3:#e8edf3;--navy4:#dde3ec;--bg:#e8edf3;--txt:#0f172a;--txt2:#475569;--txt3:#94a3b8;--bdr:#cbd5e1;--card:#ffffff}
 body.theme-light #nav{background:#fff;border-color:#e2e8f0}
 body.theme-light .sheet{background:#fff}
 body.theme-light #header{background:#fff;border-color:#e2e8f0}
@@ -3749,6 +3750,7 @@ const LS_ENROLL    = 'geststol_enroll';    // Sauvegarde dédiée compEnroll (fi
 const LS_ENROLL_META = 'geststol_enroll_meta'; // Sauvegarde dédiée enrollMeta (podium + niveau — filet anti-perte)
 const LS_AGENDA_EVS  = 'geststol_agenda_events'; // Événements personnalisés agenda
 const LS_NDF         = 'geststol_notesfrais';   // Notes de frais (objet keyed par userId)
+const LS_SECURITE_EVS= 'geststol_securite_events'; // Événements de sécurité — clé dédiée anti-perte
 
 // ── Régions & Pays — listes partagées ────────────────────────────────────
 var _FR_REGIONS = [
@@ -3945,6 +3947,21 @@ function _restoreCritical() {
           else {
             _agEvParsed.forEach(function(ev) {
               if (!S.agendaEvents.find(function(x){ return x.id===ev.id; })) S.agendaEvents.push(ev);
+            });
+          }
+        }
+      } catch(e) {}
+    }
+    // Événements de sécurité — clé dédiée
+    var _sevRaw = localStorage.getItem(LS_SECURITE_EVS);
+    if (_sevRaw) {
+      try {
+        var _sevParsed = JSON.parse(_sevRaw);
+        if (Array.isArray(_sevParsed)) {
+          if (!S.securiteEvents || !S.securiteEvents.length) S.securiteEvents = _sevParsed;
+          else {
+            _sevParsed.forEach(function(ev) {
+              if (!S.securiteEvents.find(function(x){ return x.id===ev.id; })) S.securiteEvents.push(ev);
             });
           }
         }
@@ -4303,6 +4320,16 @@ async function loadState() {
             });
           }
         }
+        // Restaurer securiteEvents depuis IDB
+        if (idbData.securiteEvents && idbData.securiteEvents.length) {
+          if (!S.securiteEvents || !S.securiteEvents.length) {
+            S.securiteEvents = idbData.securiteEvents;
+          } else {
+            idbData.securiteEvents.forEach(function(ev) {
+              if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
+            });
+          }
+        }
         // Restaurer notesfrais depuis IDB (objet keyed par userId)
         if (idbData.notesfrais && typeof idbData.notesfrais === 'object' && !Array.isArray(idbData.notesfrais)) {
           if (!S.notesfrais || typeof S.notesfrais !== 'object') S.notesfrais = {};
@@ -4410,7 +4437,7 @@ function clearLocalStorageQuota() {
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
-               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF];
+               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
@@ -4523,7 +4550,8 @@ function _flushSaveState() {
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
     _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{},
     agendaEvents:S.agendaEvents||[],
-    notesfrais:S.notesfrais||{}
+    notesfrais:S.notesfrais||{},
+    securiteEvents:S.securiteEvents||[]
   });
   try {
     localStorage.setItem(LS, JSON.stringify(_lsPayload));
@@ -4555,6 +4583,7 @@ function _flushSaveState() {
   try { if (S.enrollMeta)     localStorage.setItem(LS_ENROLL_META,JSON.stringify(S.enrollMeta||{})); } catch(e) {}
   try { if (S.agendaEvents)   localStorage.setItem(LS_AGENDA_EVS, JSON.stringify(S.agendaEvents)); } catch(e) {}
   try { if (S.notesfrais && Object.keys(S.notesfrais).length) localStorage.setItem(LS_NDF, JSON.stringify(S.notesfrais)); } catch(e) {}
+  try { if (S.securiteEvents && S.securiteEvents.length) localStorage.setItem(LS_SECURITE_EVS, JSON.stringify(S.securiteEvents)); } catch(e) {}
 }
 // Flush immédiat avant fermeture de page pour éviter toute perte de données
 window.addEventListener('beforeunload', function(){ if(_saveStateTimer){ clearTimeout(_saveStateTimer); _flushSaveState(); } });
@@ -7495,8 +7524,10 @@ function _agendaGetComps() {
   }
 
   // ── Événements personnalisés ──
+  var _curUid = S.user && S.user.id;
   (S.agendaEvents || []).forEach(function(ev) {
     if (!ev.dateFrom) return;
+    if (ev.privateUserId && ev.privateUserId !== _curUid) return;
     all.push({
       _customEvent : true,
       id           : ev.id,
@@ -8924,6 +8955,13 @@ function _agendaOpenEventForm(dateStr, evId, timeFrom, timeTo) {
     +'<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DESCRIPTION</label>'
     +'<textarea id="ag-ev-desc" placeholder="Notes, informations…" style="'+_inpStyle+';resize:vertical;min-height:60px" onfocus="'+_inpFocus+'" onblur="'+_inpBlur+'">'+(ev?ev.desc||'':'')+'</textarea></div>'
 
+    // Visibilité privée
+    +'<label style="display:flex;align-items:center;gap:9px;cursor:pointer;padding:9px 12px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3)">'
+    +'<input type="checkbox" id="ag-ev-private"'+(ev&&ev.privateUserId?' checked':'')+' style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol)">'
+    +'<span style="font-size:12px;font-weight:600;color:var(--txt2)">Visible uniquement pour moi</span>'
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">🔒</span>'
+    +'</label>'
+
     // Boutons
     +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">'
     +(evId?'<button onclick="_agendaDeleteEvent(\''+evId+'\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:auto">Supprimer</button>':'')
@@ -8947,12 +8985,14 @@ function _agendaSaveEvent(dateStr, evId, btn) {
   var desc       = (document.getElementById('ag-ev-desc')||{}).value||'';
   var selBtn     = document.querySelector('#ag-ev-colors button[data-selected="1"]');
   var couleur    = selBtn ? selBtn.getAttribute('data-color') : '#f59e0b';
+  var privChk    = document.getElementById('ag-ev-private');
+  var privateUserId = (privChk && privChk.checked && S.user && S.user.id) ? S.user.id : null;
   if (!S.agendaEvents) S.agendaEvents = [];
   if (evId) {
     var idx = S.agendaEvents.findIndex(function(e){ return e.id===evId; });
-    if (idx>=0) S.agendaEvents[idx] = {id:evId, titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, _updatedAt:Date.now()};
+    if (idx>=0) S.agendaEvents[idx] = {id:evId, titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, privateUserId:privateUserId, _updatedAt:Date.now()};
   } else {
-    S.agendaEvents.push({id:'ev'+Date.now().toString(36), titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, _updatedAt:Date.now()});
+    S.agendaEvents.push({id:'ev'+Date.now().toString(36), titre:titre.trim(), dateFrom:dateFrom, dateTo:dateTo, heureDebut:heureDebut, heureFin:heureFin, couleur:couleur, desc:desc, privateUserId:null, _updatedAt:Date.now()});
   }
   saveState();
   document.getElementById('ag-event-form').remove();
@@ -22202,6 +22242,9 @@ async function pushToCloud() {
     enrollMeta:           S.enrollMeta           || {},
     espacesPartages:      S.espacesPartages      || [],
     stolResults:          S.stolResults          || {},
+    notesfrais:           S.notesfrais           || {},
+    securiteEvents:       S.securiteEvents       || [],
+    agendaEvents:         S.agendaEvents         || [],
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -22783,6 +22826,10 @@ async function loadFromSupabaseFirst() {
     var savedDeletedEnroll = S._deletedEnroll ? Object.assign({}, S._deletedEnroll) : null;
     var savedDeletedStaff  = S._deletedStaff  ? Object.assign({}, S._deletedStaff)  : null;
     var savedDeletedComps  = S._deletedComps  ? S._deletedComps.slice() : null;
+    // ✅ GARDE NOTESFRAIS : toujours préserver les NDF locales (jamais dans le cloud avant ce fix)
+    var savedNotesfrais = (S.notesfrais && typeof S.notesfrais === 'object' && !Array.isArray(S.notesfrais) && Object.keys(S.notesfrais).length) ? JSON.parse(JSON.stringify(S.notesfrais)) : null;
+    // ✅ GARDE SECURITEEVENTS : toujours préserver les événements sécurité locaux
+    var savedSecuriteEvents = (S.securiteEvents && S.securiteEvents.length) ? S.securiteEvents.slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -22798,6 +22845,26 @@ async function loadFromSupabaseFirst() {
       if (!S.agendaEvents) S.agendaEvents = [];
       localAgendaEvents.forEach(function(ev) {
         if (!S.agendaEvents.find(function(x){ return x.id === ev.id; })) S.agendaEvents.push(ev);
+      });
+    }
+    // ✅ Fusionner notesfrais locales avec cloud (union par id — aucune perte possible)
+    if (savedNotesfrais) {
+      if (!S.notesfrais || typeof S.notesfrais !== 'object') S.notesfrais = {};
+      Object.keys(savedNotesfrais).forEach(function(uid) {
+        if (!S.notesfrais[uid] || !S.notesfrais[uid].length) {
+          S.notesfrais[uid] = savedNotesfrais[uid];
+        } else {
+          savedNotesfrais[uid].forEach(function(n) {
+            if (!S.notesfrais[uid].find(function(x){ return x.id === n.id; })) S.notesfrais[uid].push(n);
+          });
+        }
+      });
+    }
+    // ✅ Fusionner securiteEvents locaux avec cloud (union par id)
+    if (savedSecuriteEvents) {
+      if (!S.securiteEvents) S.securiteEvents = [];
+      savedSecuriteEvents.forEach(function(ev) {
+        if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
       });
     }
     // ✅ Restaurer officialDocs locaux si présents (jamais écraser les images locales par cloud vide)
@@ -39608,12 +39675,10 @@ function _dtnRenderToday() {
   html += '<div style="font-size:21px;font-weight:900;color:var(--txt);letter-spacing:-.5px;line-height:1">' + dayStr + '</div>';
   html += '</div>';
   // KPIs
-  html += '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding-bottom:2px">';
+  html += '<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding-bottom:2px">';
   html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:var(--stol);line-height:1">' + totalComps + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">compétitions</div></div>';
-  html += '<div style="width:1px;height:28px;background:var(--bdr)"></div>';
   html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:#10b981;line-height:1">' + totalPilotes + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">inscriptions</div></div>';
   if (overdueCount > 0) {
-    html += '<div style="width:1px;height:28px;background:var(--bdr)"></div>';
     html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:#f43f5e;line-height:1">' + overdueCount + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">en retard</div></div>';
   }
   html += '</div>';
@@ -39683,8 +39748,10 @@ function _dtnRenderProchaines() {
   });
 
   // ── 2. Événements du calendrier général dans les 30 jours ──
+  var _uid = S.user && S.user.id;
   (S.agendaEvents || []).forEach(function(ev) {
     if (!ev.dateFrom) return;
+    if (ev.privateUserId && ev.privateUserId !== _uid) return;
     var evEnd = ev.dateTo || ev.dateFrom;
     // Inclure si l'événement commence dans les 30 jours OU est en cours (commencé avant mais pas encore terminé)
     if (evEnd < todayStr || ev.dateFrom > limitStr) return;
@@ -39768,9 +39835,6 @@ function _dtnRenderProchaines() {
           + 'style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;border-radius:5px;transition:background .1s" '
           + 'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" '
           + 'onmouseout="this.style.background=\'\'">';
-
-    // Barre colorée type
-    html += '<div style="width:3px;height:13px;border-radius:2px;background:'+item.tagCol+';flex-shrink:0"></div>';
 
     // Date
     html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+'</span>';
@@ -40333,21 +40397,22 @@ function _dtnGoHome() {
   closeNDF();
   // Refermer agenda/gantt et volets compétition s'ils sont ouverts
   _dtnCloseOverlays();
-  // Si on vient des pages compétition : revenir au portail DTN
+  // Toujours s'assurer que #app est masqué et page-dtn visible
   var dtnPage = document.getElementById('page-dtn');
   var app = document.getElementById('app');
-  if (dtnPage && dtnPage.style.display === 'none') {
-    // Fermer les sous-volets comp + layout shift
-    var sub = document.getElementById('dtn-comp-sub');
-    if (sub) sub.style.display = 'none';
-    _dtnSubSetActive(null);
-    document.body.classList.remove('has-comp-sidebar');
-    var lbl = document.getElementById('dtn-saison-label');
-    if (lbl) lbl.textContent = 'Performances';
-    // Revenir au portail
-    dtnPage.style.display = 'flex';
-    if (app) app.style.display = 'none';
-  }
+  var sub = document.getElementById('dtn-comp-sub');
+  if (sub) sub.style.display = 'none';
+  _dtnSubSetActive(null);
+  document.body.classList.remove('has-comp-sidebar');
+  var lbl = document.getElementById('dtn-saison-label');
+  if (lbl) lbl.textContent = 'Performances';
+  if (dtnPage) dtnPage.style.display = 'flex';
+  if (app) app.style.display = 'none';
+  // Fermer aussi home-col-left s'il était ouvert (évite le volet fantôme)
+  var hcl = document.getElementById('home-col-left');
+  if (hcl) { hcl.classList.remove('open'); }
+  var hdp = document.getElementById('home-detail-panel');
+  if (hdp) hdp.style.cssText = 'display:none';
   // Restaurer le workspace home
   var wb = document.getElementById('dtn-workspace-body');
   if (wb) wb.innerHTML = '<div style="padding:28px 32px 52px">'
@@ -40394,6 +40459,18 @@ function _dtnShowPanel(module) {
   if (!p) return;
   var wb = document.getElementById('dtn-workspace-body');
   if (!wb) return;
+  if (module === 'securite') {
+    wb.innerHTML = '<div style="padding:28px 32px 52px">'
+      + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding-top:60px;color:var(--txt3)">'
+      + p.icon
+      + '<div style="font-size:17px;font-weight:800;color:var(--txt)">' + p.title + '</div>'
+      + '<div style="font-size:13px;text-align:center;line-height:1.7;max-width:360px;color:var(--txt2);margin-bottom:8px">Gestion de la prévention et des événements de sécurité des pratiques ULM.</div>'
+      + '<button onclick="openSecuriteEvents(\'registre\')" style="display:flex;align-items:center;gap:9px;padding:11px 24px;border:none;border-radius:10px;background:#10b981;color:#fff;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,.35)">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+      + 'Événements</button>'
+      + '</div></div>';
+    return;
+  }
   wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding-top:80px;color:var(--txt3)">'
     + p.icon
@@ -40402,6 +40479,1180 @@ function _dtnShowPanel(module) {
     + '</div></div>';
 }
 
+// ═══════════════════════════════════════════════════════════
+// SÉCURITÉ — ÉVÉNEMENTS
+// ═══════════════════════════════════════════════════════════
+var _SEV_TYPES = {
+  'presque-accident': 'Presque-accident',
+  'incident':         'Incident',
+  'accident':         'Accident',
+  'defaut-materiel':  'Défaut matériel',
+  'infraction':       'Infraction réglementaire',
+  'autre':            'Autre'
+};
+var _SEV_GRAVITE = ['','Mineur','Modéré','Sérieux','Grave','Critique'];
+var _SEV_STATUT  = {ouvert:'Ouvert', 'en-cours':'En cours', clos:'Clos'};
+
+var _BEA_REFS = [
+  'Aérodrome',
+  'Airprox/Avertissement TCAS/Perte d\'espacement/Collision/Quasi-collision en vol',
+  'ATM/CNS',
+  'Atterrissage trop court/trop long',
+  'Autre',
+  'Cisaillement du vent ou orage',
+  'Collision au sol',
+  'Collision avec des obstacles lors du décollage et de l\'atterrissage',
+  'Contact anormal avec la piste',
+  'Décollage par inadvertance dans des CMVI',
+  'Erreurs de navigation',
+  'Évacuation',
+  'Événements liés à la sécurité des cabines',
+  'Événements liés au remorquage de planeur',
+  'Événements liés aux charges externes',
+  'Faune',
+  'Givrage',
+  'Impact sans perte de contrôle',
+  'Incendie/Fumée (après impact)',
+  'Incendie/Fumée (sans impact)',
+  'Inconnu ou Indéterminé',
+  'Incursion sur piste',
+  'Manœuvre brusque',
+  'Manutention au sol',
+  'Médical',
+  'Oiseau',
+  'Panne ou mauvais fonctionnement d\'un circuit ou d\'un composant (faisant partie du groupe motopropulseur)',
+  'Panne ou mauvais fonctionnement d\'un circuit ou d\'un composant (ne faisant pas partie du groupe motopropulseur)',
+  'Passage dans une zone de turbulence',
+  'Perte de contrôle - au sol',
+  'Perte de contrôle - en vol',
+  'Perte des conditions de levage en route',
+  'Problèmes reliés à la sécurité',
+  'Problèmes reliés au carburant',
+  'Sortie de piste',
+  'Vol à basse altitude'
+];
+
+function openSecuriteEvents(volet) {
+  volet = volet || 'stats';
+  var wb = document.getElementById('dtn-workspace-body');
+  if (!wb) return;
+  _dtnSetActiveNav('securite');
+
+  var navHtml = '<div style="display:flex;gap:3px;margin-bottom:22px;padding:3px;background:var(--navy3);border-radius:10px;width:fit-content">';
+  [['stats','📊 Statistiques'],['registre','🗋 Registre Événement'],['refs','📋 Références BEA']].forEach(function(n) {
+    var isA = volet === n[0];
+    navHtml += '<button onclick="openSecuriteEvents(\''+n[0]+'\')" style="padding:7px 18px;border:none;border-radius:8px;background:'+(isA?'var(--navy)':'transparent')+';color:'+(isA?'var(--txt)':'var(--txt3)')+';font-size:12px;font-weight:'+(isA?'800':'600')+';font-family:inherit;cursor:pointer;transition:all .15s">'+n[1]+'</button>';
+  });
+  navHtml += '</div>';
+
+  var content = volet === 'stats' ? _renderSecuriteStats() : volet === 'refs' ? _renderReferencesBEA() : _renderRegistreEvenement();
+
+  wb.innerHTML = '<div style="padding:24px 32px 52px">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+    + '<button onclick="_dtnGoHome()" title="Accueil" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid var(--bdr);border-radius:7px;background:transparent;color:var(--txt2);cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="15 18 9 12 15 6"/></svg>Accueil</button>'
+    + '<div style="font-size:16px;font-weight:900;color:var(--txt)">⚠️ Événements de sécurité</div>'
+    + '</div>'
+    + navHtml + content + '</div>';
+
+  if (volet === 'stats') setTimeout(_initSevLeafletMap, 80);
+}
+
+function _initSevLeafletMap() {
+  var el = document.getElementById('sev-leaflet-map');
+  if (!el) return;
+  if (typeof L === 'undefined') { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--txt3);font-size:13px">Leaflet non chargé — connexion requise</div>'; return; }
+
+  if (el._sevMap) { try { el._sevMap.remove(); } catch(e){} }
+
+  var map = L.map(el, { zoomControl: true, attributionControl: true });
+  el._sevMap = map;
+
+  // Vue initiale sur la France métropolitaine — sera ajustée si des marqueurs existent
+  map.setView([46.5, 2.5], 6);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
+  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
+
+  var deptMap = {};
+  (S.securiteEvents||[]).forEach(function(e){
+    var raw = (e.dept||'').toString().trim();
+    // Essayer la valeur brute, puis sans zéros initiaux
+    var d = _DEPT_COORDS[raw] ? raw : _DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null;
+    if (!d) return;
+    var coord = _DEPT_COORDS[d];
+    if (!deptMap[d]) deptMap[d] = { lat: coord[0], lon: coord[1], n: 0, mort: 0, corp: 0, labels: [] };
+    deptMap[d].n++;
+    if (_isMort(e)) deptMap[d].mort++;
+    else if (_isCorp(e)) deptMap[d].corp++;
+    if (e.lieu) deptMap[d].labels.push(e.lieu);
+  });
+
+  // Séparer métropole (lat 41-52, lon -6 à 10) et DOM-TOM
+  var metroBounds = [], allKeys = Object.keys(deptMap);
+  allKeys.forEach(function(d) {
+    var pt = deptMap[d];
+    var col = pt.mort > 0 ? '#ef4444' : pt.corp > 0 ? '#f59e0b' : '#64748b';
+    var r = Math.max(7, Math.min(20, 6 + pt.n * 2));
+    var marker = L.circleMarker([pt.lat, pt.lon], {
+      radius: r, color: 'rgba(0,0,0,0.6)', weight: 1.5,
+      fillColor: col, fillOpacity: 0.85
+    }).addTo(map);
+    var lbl = '<b style="color:'+col+'">'+pt.n+' événement'+(pt.n>1?'s':'')+'</b>'
+      + (pt.mort ? '<br>⚫ '+pt.mort+' mortel'+(pt.mort>1?'s':'') : '')
+      + (pt.corp ? '<br>🟡 '+pt.corp+' corporel'+(pt.corp>1?'s':'') : '')
+      + (pt.labels.length ? '<br><span style="color:#64748b;font-size:11px">'+pt.labels.slice(0,3).join(', ')+'</span>' : '');
+    marker.bindPopup(lbl);
+    // N'inclure dans les bounds que la métropole
+    if (pt.lat >= 41 && pt.lat <= 52 && pt.lon >= -6 && pt.lon <= 10) {
+      metroBounds.push([pt.lat, pt.lon]);
+    }
+  });
+
+  if (metroBounds.length) {
+    map.fitBounds(metroBounds, { padding: [28, 28], maxZoom: 9 });
+  }
+}
+
+function _renderRegistreEvenement() {
+  if (!S.securiteEvents) S.securiteEvents = [];
+  var evs = S.securiteEvents.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var _gravCol = ['','#22c55e','#84cc16','#f59e0b','#ef4444','#7f1d1d'];
+  var _statCol = {ouvert:'#ef4444','en-cours':'#f59e0b',clos:'#10b981'};
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">'
+    + '<div style="font-size:13px;color:var(--txt3)">'+evs.length+' événement'+(evs.length!==1?'s':'')+' enregistré'+(evs.length!==1?'s':'')+' au registre</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<label title="Importer un fichier Excel (.xlsx/.xls/.csv)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--bdr);border-radius:9px;background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    + 'Importer Excel'
+    + '<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importSecuriteEvents(this)">'
+    + '</label>'
+    + '<button onclick="openSecuriteEventForm(null)" style="display:flex;align-items:center;gap:7px;padding:8px 16px;border:none;border-radius:9px;background:#ef4444;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    + '+ Nouveau</button>'
+    + '</div></div>';
+
+  if (!evs.length) {
+    html += '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">🛡️</div>Aucun événement enregistré.<br>Cliquez sur "+ Nouveau" pour déclarer un événement.</div>';
+    return html;
+  }
+
+  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden;overflow-x:auto">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">'
+    + '<thead><tr style="background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Date</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Lieu</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Appareil</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Premiers éléments</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);color:#6366f1">Réf. BEA</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Statut</th>'
+    + '<th style="padding:9px 8px;border-bottom:1px solid var(--bdr)"></th>'
+    + '</tr></thead><tbody>';
+
+  evs.forEach(function(ev, i) {
+    var d = ev.date ? ev.date.split('-').reverse().join('/') : '—';
+    var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
+    var sc = _statCol[ev.statut] || '#64748b';
+    var statutLabel = _SEV_STATUT[ev.statut] || ev.statut || '—';
+    var nbBlesses = parseInt(ev.nbBlesses||0);
+    var nbTues    = parseInt(ev.nbTues||0);
+    var isCorp = ev.isCorporel || nbBlesses > 0;
+    var isMort = ev.isMortel   || nbTues    > 0;
+    var corpCell = isCorp
+      ? '<span style="display:inline-flex;align-items:center;justify-content:center;gap:4px;font-weight:700;color:#f59e0b">'+(nbBlesses>0?nbBlesses:'✓')+'</span>'
+      : '<span style="color:var(--txt3)">—</span>';
+    var mortCell = isMort
+      ? '<span style="display:inline-flex;align-items:center;justify-content:center;gap:4px;font-weight:700;color:#ef4444">'+(nbTues>0?nbTues:'✓')+'</span>'
+      : '<span style="color:var(--txt3)">—</span>';
+    var descCourt = (ev.description||'').slice(0,80)+(ev.description&&ev.description.length>80?'…':'');
+    html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr);transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(i%2===0?'':'rgba(255,255,255,.02)')+'\'">'+
+      '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap">'+d+'</td>'+
+      '<td style="padding:8px 10px;color:var(--txt2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.lieu||'—')+'</td>'+
+      '<td style="padding:8px 10px;color:var(--txt2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.appareil||'—')+'</td>'+
+      '<td style="padding:8px 10px;color:var(--txt2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.description||'').replace(/"/g,"&quot;")+'">'+descCourt+'</td>'+
+      '<td style="padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.refBEA||'').replace(/"/g,"&quot;")+'">'+(ev.refBEA?'<span style="font-size:10px;color:#6366f1;font-weight:600">'+ev.refBEA+'</span>':'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'+
+      '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+statutLabel+'</span></td>'+
+      '<td style="padding:8px 8px;text-align:center">'+
+        '<button onclick="openSecuriteEventForm(\''+ev.id+'\')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:6px;background:transparent;color:var(--txt3);cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">✎</button>'+
+      '</td></tr>';
+  });
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function _renderReferencesBEA() {
+  if (!S.securiteEvents) S.securiteEvents = [];
+  var evs = S.securiteEvents.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var optBEAHtml = '<option value="">— Non classifié —</option>'
+    + _BEA_REFS.map(function(r){ return '<option value="'+r.replace(/"/g,'&quot;')+'">'+r+'</option>'; }).join('');
+
+  var _sel = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 8px;cursor:pointer;outline:none';
+
+  var html = '<div style="margin-bottom:14px">'
+    + '<div style="font-size:13px;color:var(--txt3)">Associer une référence BEA à chaque événement · <b style="color:var(--txt)">'+evs.length+'</b> événements</div>'
+    + '<div style="font-size:11px;color:var(--txt3);margin-top:4px">Les références validées alimentent le graphique Origines et sont modifiables ici ou dans le formulaire.</div>'
+    + '</div>';
+
+  if (!evs.length) {
+    html += '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">📋</div>Aucun événement à référencer.<br>Déclarez des événements dans le Registre.</div>';
+    return html;
+  }
+
+  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden;overflow-x:auto">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">'
+    + '<thead><tr style="background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);width:90px">Date</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Premiers éléments</th>'
+    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);color:#6366f1;width:360px">Référence BEA</th>'
+    + '</tr></thead><tbody>';
+
+  evs.forEach(function(ev, i) {
+    var d = ev.date ? ev.date.split('-').reverse().join('/') : '—';
+    var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
+    var descCourt = (ev.description||'').slice(0,120) + (ev.description&&ev.description.length>120?'…':'');
+    var opts = optBEAHtml.replace('value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'"', 'value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'" selected');
+
+    html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr)">'
+      + '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap;vertical-align:top">'+d+'</td>'
+      + '<td style="padding:8px 10px;color:var(--txt2);vertical-align:top;line-height:1.5">'+descCourt+'</td>'
+      + '<td style="padding:6px 8px;vertical-align:top">'
+      + '<select style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value)">'
+      + opts
+      + '</select>'
+      + (ev.refBEA?'<div style="font-size:9px;color:#6366f1;margin-top:3px;padding-left:2px">✓ validé</div>':'')
+      + '</td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function _sevSaveRefBEA(evId, val) {
+  if (!S.securiteEvents) return;
+  var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
+  if (!ev) return;
+  ev.refBEA = val || null;
+  ev._updatedAt = Date.now();
+  saveState();
+  // Rafraîchir juste la ligne "validé" sans recharger le volet entier
+  var sel = document.querySelector('select[onchange="_sevSaveRefBEA(\''+evId+'\',this.value)"]');
+  if (sel) {
+    var badge = sel.nextSibling;
+    if (badge && badge.tagName === 'DIV') badge.remove();
+    if (val) {
+      var div = document.createElement('div');
+      div.style.cssText = 'font-size:9px;color:#6366f1;margin-top:3px;padding-left:2px';
+      div.textContent = '✓ validé';
+      sel.parentNode.appendChild(div);
+    }
+  }
+}
+
+// ── Coordonnées centroides des départements (lat, lon) ──
+var _DEPT_COORDS = {
+  '1':[46.08,5.34],'2':[49.42,3.56],'3':[46.34,3.33],'4':[44.10,6.23],'5':[44.66,6.34],
+  '6':[43.94,7.11],'7':[44.75,4.49],'8':[49.70,4.70],'9':[42.93,1.55],'10':[48.29,4.18],
+  '11':[43.11,2.35],'12':[44.36,2.57],'13':[43.41,5.13],'14':[49.08,-0.36],'15':[45.04,2.54],
+  '16':[45.67,0.16],'17':[45.75,-0.86],'18':[47.08,2.40],'19':[45.38,1.88],'21':[47.32,4.83],
+  '22':[48.44,-2.97],'23':[45.98,2.17],'24':[45.02,0.74],'25':[47.10,6.41],'26':[44.72,5.04],
+  '27':[49.10,0.87],'28':[48.37,1.29],'29':[48.20,-4.08],'30':[44.02,4.16],'31':[43.38,1.42],
+  '32':[43.73,0.59],'33':[44.84,-0.52],'34':[43.64,3.51],'35':[48.10,-1.67],'36':[46.71,1.57],
+  '37':[47.24,0.67],'38':[45.24,5.64],'39':[46.72,5.69],'40':[43.94,-0.66],'41':[47.65,1.36],
+  '42':[45.63,4.17],'43':[45.08,3.88],'44':[47.35,-1.59],'45':[47.96,2.13],'46':[44.61,1.66],
+  '47':[44.21,0.62],'48':[44.53,3.50],'49':[47.37,-0.57],'50':[49.08,-1.31],'51':[49.00,4.23],
+  '52':[48.11,5.29],'53':[48.07,-0.78],'54':[48.73,6.18],'55':[48.93,5.32],'56':[47.85,-2.78],
+  '57':[49.02,6.56],'58':[47.06,3.66],'59':[50.47,3.12],'60':[49.41,2.44],'61':[48.57,0.10],
+  '62':[50.52,2.16],'63':[45.77,3.08],'64':[43.30,-0.37],'65':[43.07,0.22],'66':[42.61,2.54],
+  '67':[48.57,7.56],'68':[47.84,7.22],'69':[45.74,4.84],'70':[47.62,6.16],'71':[46.59,4.51],
+  '72':[47.99,0.21],'73':[45.47,6.43],'74':[46.00,6.42],'75':[48.86,2.35],'76':[49.56,1.10],
+  '77':[48.63,2.93],'78':[48.78,1.90],'79':[46.57,-0.30],'80':[49.90,2.27],'81':[43.84,2.14],
+  '82':[44.00,1.22],'83':[43.43,6.22],'84':[43.99,5.08],'85':[46.67,-1.41],'86':[46.58,0.34],
+  '87':[45.84,1.28],'88':[48.17,6.36],'89':[47.80,3.60],'90':[47.63,6.86],'91':[48.50,2.24],
+  '92':[48.83,2.23],'93':[48.91,2.47],'94':[48.78,2.45],'95':[49.07,2.09],
+  '971':[16.18,-61.31],'972':[14.64,-61.02],'973':[4.00,-53.00],'974':[-21.11,55.53],'976':[-12.83,45.15]
+};
+
+function _renderSecuriteStats() {
+  if (!S.securiteEvents) S.securiteEvents = [];
+  var _allEvs = S.securiteEvents;
+
+  if (!_allEvs.length) {
+    return '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">'
+      + '<div style="font-size:32px;margin-bottom:10px">📊</div>Aucune donnée à analyser.<br>Déclarez des événements dans le Registre ou importez un fichier Excel.</div>';
+  }
+
+  // Filtre par année (persisté dans window._sevStatYear)
+  if (typeof window._sevStatYear === 'undefined') window._sevStatYear = '';
+  var filterYear = window._sevStatYear || '';
+  var evs = filterYear
+    ? _allEvs.filter(function(e){ return (e.date||'').slice(0,4) === filterYear; })
+    : _allEvs;
+
+  // Années disponibles (sur la totalité du registre, pas du filtre)
+  var _allYrsSet = {};
+  _allEvs.forEach(function(e){ var y=(e.date||'').slice(0,4); if(y.length===4) _allYrsSet[y]=1; });
+  var _allYrsList = Object.keys(_allYrsSet).sort();
+
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0||(parseInt(e.gravite||0)>=4&&e.type==='accident'); };
+  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
+
+  var _PAL = ['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#ec4899','#ef4444','#f97316'];
+  var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px';
+
+  var _card = function(title, content, span) {
+    return '<div style="'+_cSt+';padding:14px;display:flex;flex-direction:column'+(span?';grid-column:span '+span:'')+'">'
+      +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:11px;flex-shrink:0">'+title+'</div>'
+      +'<div style="flex:1;display:flex;flex-direction:column">'+content+'</div>'
+      +'</div>';
+  };
+
+  // Barre horizontale style app
+  var _bRow = function(lbl, n, mx, tot, col) {
+    var w=mx>0?Math.round(n/mx*100):0, pct=tot>0?Math.round(n/tot*100):0;
+    return '<div style="margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +'<div style="width:3px;height:12px;border-radius:2px;background:'+col+'"></div>'
+      +'<span style="font-size:11px;font-weight:600;color:var(--txt)">'+lbl+'</span></div>'
+      +'<span style="font-size:12px;font-weight:800;color:'+col+'">'+n
+      +'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:3px">'+pct+'%</span></span></div>'
+      +'<div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">'
+      +'<div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div></div>';
+  };
+
+  // Donut SVG (identique au reste de l'app)
+  var _donut = function(segs, cols, cx, cy, r, sw) {
+    var tot=segs.reduce(function(s,d){return s+(d.v||0);},0); if(!tot) return '';
+    var C=2*Math.PI*r, cum=0, out='';
+    out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="'+sw+'"/>';
+    segs.forEach(function(d,i){
+      if(!(d.v>0)) return;
+      var frac=d.v/tot, dl=frac*C, off=C*(1-cum);
+      out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+cols[i%cols.length]+'" stroke-width="'+sw+'" stroke-dasharray="'+dl+' '+(C-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+cx+' '+cy+')" stroke-linecap="round"/>';
+      cum+=frac;
+    });
+    return out;
+  };
+
+  // ── Compteurs ──
+  var total = evs.length;
+  var nMort = evs.filter(_isMort).length;
+  var nCorp = evs.filter(function(e){return !_isMort(e)&&_isCorp(e);}).length;
+  var nMat  = total-nMort-nCorp;
+  var nTues = evs.reduce(function(s,e){return s+parseInt(e.nbTues||0);},0);
+  var nBless= evs.reduce(function(s,e){return s+parseInt(e.nbBlesses||0);},0);
+  var allYrs={}; evs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length===4)allYrs[y]=1;});
+  var nYears=Object.keys(allYrs).length;
+
+  // ── Statistiques d'âge ──
+  var ages = evs.map(function(e){
+    var a = parseInt(e.agePilote)||null;
+    if (!a) {
+      var m = (e.pilote||'').match(/[Ââ]ge\s*:\s*(\d+)/);
+      if (m) a = parseInt(m[1])||null;
+    }
+    return (a && a > 10 && a < 120) ? a : null;
+  }).filter(function(a){ return a !== null; });
+  var ageMoy = ages.length ? Math.round(ages.reduce(function(s,a){return s+a;},0)/ages.length) : null;
+  var ageMax = ages.length ? Math.max.apply(null,ages) : null;
+  var ageMin = ages.length ? Math.min.apply(null,ages) : null;
+
+  // ── Période couverte ──
+  var yrsArr = Object.keys(allYrs).sort();
+  var minYear = yrsArr.length ? yrsArr[0] : '';
+  var maxYear = yrsArr.length ? yrsArr[yrsArr.length-1] : '';
+  var periodeStr = minYear && maxYear ? (minYear === maxYear ? minYear : minYear+' – '+maxYear) : '';
+
+  var html='';
+
+  // ── Sélecteur d'année ──
+  var selStyle = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;padding:7px 14px 7px 10px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'
+    + '<div style="position:relative;display:inline-flex;align-items:center">'
+    + '<select onchange="window._sevStatYear=this.value;openSecuriteEvents(\'stats\')" style="'+selStyle+';padding-right:28px">'
+    + '<option value="">Toutes saisons</option>'
+    + _allYrsList.map(function(y){ return '<option value="'+y+'"'+(filterYear===y?' selected':'')+'>'+y+'</option>'; }).join('')
+    + '</select>'
+    + '<svg style="position:absolute;right:8px;pointer-events:none" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="var(--txt3)" stroke-width="2" stroke-linecap="round"><polyline points="2,4 6,8 10,4"/></svg>'
+    + '</div>'
+    + (filterYear
+        ? '<span style="font-size:12px;color:var(--txt3);padding:6px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px">'
+          + '<b style="color:var(--txt)">' + evs.length + '</b> / ' + _allEvs.length + ' événements'
+          + '</span>'
+          + '<button onclick="window._sevStatYear=\'\';openSecuriteEvents(\'stats\')" title="Réinitialiser le filtre" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕ Tout afficher</button>'
+        : '<span style="font-size:12px;color:var(--txt3)">' + _allEvs.length + ' événements · ' + _allYrsList.length + ' saison' + (_allYrsList.length > 1 ? 's' : '') + '</span>')
+    + '</div>';
+
+  // ── KPI tiles ──
+  var kpis=[
+    {val:periodeStr||'—', lbl:'Période', col:'#334155', sub:nYears+' an'+(nYears>1?'s':'')},
+    {val:total, lbl:'Événements',  col:'#0891b2', sub:'recensés'},
+    {val:nMort,  lbl:'Mortels',    col:'#ef4444',  sub:nTues+' tué'+(nTues!==1?'s':'')},
+    {val:nCorp,  lbl:'Corporels',  col:'#f59e0b',  sub:nBless+' blessé'+(nBless!==1?'s':'')},
+    {val:nMat,   lbl:'Matériels',  col:'#64748b',  sub:'sans victime'},
+  ];
+  if (ageMoy !== null) {
+    kpis.push({val:ageMoy+' ans', lbl:'Âge moyen', col:'#8b5cf6', sub:'min '+ageMin+' · max '+ageMax});
+  }
+  html+='<div style="display:grid;grid-template-columns:repeat('+(kpis.length)+',1fr);gap:10px;margin-bottom:14px">';
+  kpis.forEach(function(k){
+    html+='<div style="'+_cSt+';padding:12px 14px 10px;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+k.col+';border-radius:12px 12px 0 0"></div>'
+      +(k.top?'<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:3px;letter-spacing:.3px">'+k.top+'</div>':'')
+      +'<div style="font-size:28px;font-weight:900;color:'+k.col+';line-height:1;margin-bottom:4px;letter-spacing:-.5px">'+k.val+'</div>'
+      +'<div style="font-size:9px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.9px;margin-bottom:2px">'+k.lbl+'</div>'
+      +'<div style="font-size:10px;color:var(--txt3)">'+k.sub+'</div></div>';
+  });
+  html+='</div>';
+
+  // ── Grille 4 colonnes × 2 lignes ──
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch">';
+
+  // ── Card 1 : Par année ──
+  (function(){
+    var byY={};
+    evs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
+    var yrs=Object.keys(byY).sort();
+    if(!yrs.length){html+=_card('Par année','<div style="padding:20px 0;text-align:center;color:var(--txt3);font-size:11px">—</div>');return;}
+    var W=260,H=155,pL=24,pR=6,pT=6,pB=24;
+    var cW=W-pL-pR,cH=H-pT-pB;
+    var maxV=0; yrs.forEach(function(y){maxV=Math.max(maxV,byY[y].c+byY[y].m);}); maxV=Math.ceil(maxV/5)*5||5;
+    var bW=Math.min(28,Math.floor(cW/yrs.length)-3), gap=(cW-bW*yrs.length)/(yrs.length+1);
+    var yStep=maxV<=5?1:maxV<=10?2:5;
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">';
+    for(var yv=0;yv<=maxV;yv+=yStep){var cy=pT+cH-(yv/maxV)*cH;
+      s+='<line x1="'+pL+'" y1="'+cy+'" x2="'+(W-pR)+'" y2="'+cy+'" stroke="rgba(255,255,255,.06)" stroke-width="1"/>';
+      s+='<text x="'+(pL-2)+'" y="'+(cy+3)+'" text-anchor="end" font-family="inherit" font-size="8" fill="#64748b">'+yv+'</text>';}
+    s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
+    yrs.forEach(function(yr,i){var x=pL+gap+i*(bW+gap),yB=pT+cH;
+      var hC=byY[yr].c>0?(byY[yr].c/maxV)*cH:0,hM=byY[yr].m>0?(byY[yr].m/maxV)*cH:0;
+      if(hC>0)s+='<rect x="'+x+'" y="'+(yB-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="2"/>';
+      if(hM>0)s+='<rect x="'+x+'" y="'+(yB-hC-hM)+'" width="'+bW+'" height="'+hM+'" fill="#ef4444" rx="2"/>';
+      var tot=byY[yr].c+byY[yr].m;
+      if(tot>0)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC-hM-2)+'" text-anchor="middle" font-family="inherit" font-size="8" font-weight="700" fill="#e2e8f0">'+tot+'</text>';
+      s+='<text x="'+(x+bW/2)+'" y="'+(yB+14)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+yr.slice(2)+'</text>';
+    });
+    s+='<rect x="'+pL+'" y="'+(H-7)+'" width="7" height="5" fill="#f59e0b" rx="1"/>'
+      +'<text x="'+(pL+10)+'" y="'+(H-3)+'" font-family="inherit" font-size="7" fill="#94a3b8">Corp.</text>'
+      +'<rect x="'+(pL+42)+'" y="'+(H-7)+'" width="7" height="5" fill="#ef4444" rx="1"/>'
+      +'<text x="'+(pL+52)+'" y="'+(H-3)+'" font-family="inherit" font-size="7" fill="#94a3b8">Mort.</text>';
+    s+='</svg>';
+    html+=_card('Par année',s);
+  })();
+
+  // ── Card 2 : Par mois ──
+  (function(){
+    var MN=['J','F','M','A','M','J','J','A','S','O','N','D'];
+    var byM={}; for(var i=1;i<=12;i++) byM[i]={c:0,m:0};
+    evs.forEach(function(e){var m=parseInt((e.date||'').slice(5,7));if(!m||m<1||m>12)return;if(_isMort(e))byM[m].m++;else if(_isCorp(e))byM[m].c++;});
+    var W=260,H=155,pL=20,pR=4,pT=6,pB=22;
+    var cW=W-pL-pR,cH=H-pT-pB;
+    var maxV=0; for(var mi=1;mi<=12;mi++) maxV=Math.max(maxV,byM[mi].c+byM[mi].m); maxV=Math.ceil(maxV/5)*5||5;
+    var bW=Math.floor(cW/12)-2,gap=(cW-bW*12)/13;
+    var yStep=maxV<=5?1:maxV<=10?2:5;
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">';
+    for(var yv=0;yv<=maxV;yv+=yStep){var cy=pT+cH-(yv/maxV)*cH;
+      s+='<line x1="'+pL+'" y1="'+cy+'" x2="'+(W-pR)+'" y2="'+cy+'" stroke="rgba(255,255,255,.06)" stroke-width="1"/>';
+      if(yv>0) s+='<text x="'+(pL-2)+'" y="'+(cy+3)+'" text-anchor="end" font-family="inherit" font-size="8" fill="#64748b">'+yv+'</text>';}
+    s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
+    for(var mi2=1;mi2<=12;mi2++){var xM=pL+gap+(mi2-1)*(bW+gap),yBM=pT+cH;
+      var hC=byM[mi2].c>0?(byM[mi2].c/maxV)*cH:0,hM2=byM[mi2].m>0?(byM[mi2].m/maxV)*cH:0;
+      if(hC>0)s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="1"/>';
+      if(hM2>0)s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="#ef4444" rx="1"/>';
+      s+='<text x="'+(xM+bW/2)+'" y="'+(yBM+13)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+MN[mi2-1]+'</text>';}
+    s+='</svg>';
+    html+=_card('Par mois',s);
+  })();
+
+  // ── Card 3 : Corporel / Mortel (donut — mortels + corporels uniquement) ──
+  (function(){
+    var cols3=['#ef4444','#f59e0b'];
+    var segs3=[{v:nMort,l:'Mortels'},{v:nCorp,l:'Corporels'}];
+    var totMC=nMort+nCorp;
+    var svgD3='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:140px;display:block;margin:0 auto">';
+    svgD3+=_donut(segs3,cols3,70,70,52,20);
+    var pctMort3=totMC>0?Math.round(nMort/totMC*100):0;
+    svgD3+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="26" font-weight="900" fill="var(--txt)">'+pctMort3+'%</text>';
+    svgD3+='<text x="70" y="80" text-anchor="middle" font-family="inherit" font-size="9" fill="var(--txt3)">mortels</text>';
+    svgD3+='</svg>';
+    var leg3='<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">';
+    segs3.forEach(function(s,i){
+      var pct=totMC>0?Math.round(s.v/totMC*100):0;
+      leg3+='<div style="display:flex;align-items:center;gap:7px">'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:'+cols3[i]+';flex-shrink:0"></div>'
+        +'<span style="font-size:11px;color:var(--txt);flex:1">'+s.l+'</span>'
+        +'<b style="font-size:12px;font-weight:800;color:'+cols3[i]+'">'+s.v+'</b>'
+        +'<span style="font-size:9px;color:var(--txt3);width:28px;text-align:right">'+pct+'%</span>'
+        +'</div>';
+    });
+    leg3+='</div>';
+    html+=_card('Corporel / Mortel','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD3+leg3+'</div>');
+  })();
+
+  // ── Card 4 : Classes ULM (donut) ──
+  (function(){
+    var counts={};
+    evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';counts[c]=(counts[c]||0)+1;});
+    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7);
+    var cols=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488'];
+    var segs=items.map(function(k,i){return {v:counts[k],col:cols[i%cols.length]};});
+    var svgD='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:130px;display:block;margin:0 auto">';
+    svgD+=_donut(segs,cols,70,70,52,20);
+    svgD+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="26" font-weight="900" fill="var(--txt)">'+items.length+'</text>';
+    svgD+='<text x="70" y="82" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">classes</text>';
+    svgD+='</svg>';
+    var leg='';
+    items.forEach(function(k,i){
+      var pct=total>0?Math.round(counts[k]/total*100):0;
+      leg+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:'+cols[i%cols.length]+';flex-shrink:0"></div>'
+        +'<span style="font-size:11px;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+k+'</span>'
+        +'<b style="font-size:11px;color:'+cols[i%cols.length]+'">'+counts[k]+'</b>'
+        +'<span style="font-size:9px;color:var(--txt3);width:26px;text-align:right">'+pct+'%</span>'
+        +'</div>';
+    });
+    html+=_card('Classes ULM','<div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">'+svgD+'<div style="margin-top:10px">'+leg+'</div></div>');
+  })();
+
+  // ── Card 5 : Type de vol (bRow) ──
+  (function(){
+    var counts={};
+    evs.forEach(function(e){var tv=(e.typeVol||'Non renseigné').trim()||'Non renseigné';counts[tv]=(counts[tv]||0)+1;});
+    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];});
+    var mx=counts[items[0]]||1, s='';
+    items.forEach(function(k,i){s+=_bRow(k,counts[k],mx,total,_PAL[i%_PAL.length]);});
+    html+=_card('Type de vol',s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>');
+  })();
+
+  // ── Card 6 : Origines — BEA refs en priorité, mots-clés en fallback ──
+  (function(){
+    var PAL_O=['#ef4444','#f97316','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#10b981','#64748b','#ec4899','#0891b2'];
+    var counts={};
+    var hasBEA = evs.some(function(e){ return !!e.refBEA; });
+
+    if (hasBEA) {
+      // Mode BEA : utiliser refBEA quand disponible, mots-clés sinon
+      var OL_FB=['Panne moteur','Facteur humain','Météo','Défaut matériel','Perte de contrôle','Collision','Procédure','Autre'];
+      var OK_FB=[['panne','moteur','mécanique','carburateur','hélice'],['humain','pilote','fatigue','erreur','inattention'],['météo','vent','orage','icing','visibilité','turbulence'],['défaut','matériel','structure','cellule','commande'],['perte','contrôle','décrochage','vrille'],['collision','abordage','obstacle','câble','oiseau'],['procédure','réglementation','aérodrome'],[]];
+      evs.forEach(function(e){
+        if (e.refBEA) {
+          counts[e.refBEA] = (counts[e.refBEA]||0) + 1;
+        } else {
+          var txt=((e.description||'')+(e.mesures||'')+(e.origines||'')).toLowerCase();
+          var matched=false;
+          for(var oi=0;oi<OL_FB.length-1;oi++){if(OK_FB[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL_FB[oi]]=(counts[OL_FB[oi]]||0)+1;matched=true;break;}}
+          if(!matched) counts['Autre']=(counts['Autre']||0)+1;
+        }
+      });
+    } else {
+      // Mode mots-clés pur
+      var OL=['Panne moteur','Facteur humain','Météo','Défaut mat.','Perte contrôle','Collision','Procédure','Autre'];
+      var OK=[['panne','moteur','mécanique','carburateur','hélice'],['humain','pilote','fatigue','erreur','inattention'],['météo','vent','orage','icing','visibilité','turbulence'],['défaut','matériel','structure','cellule','commande'],['perte','contrôle','décrochage','vrille'],['collision','abordage','obstacle','câble','oiseau'],['procédure','réglementation','aérodrome'],[]];
+      OL.forEach(function(l){counts[l]=0;});
+      evs.forEach(function(e){
+        var txt=((e.description||'')+(e.mesures||'')+(e.origines||'')).toLowerCase();
+        var matched=false;
+        for(var oi=0;oi<OL.length-1;oi++){if(OK[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL[oi]]++;matched=true;}}
+        if(!matched) counts['Autre']++;
+      });
+    }
+
+    var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
+    var mx=items.length?counts[items[0]]:1;
+    var s='';
+    items.forEach(function(l,i){
+      var lbl=l.length>32?l.slice(0,30)+'…':l;
+      s+=_bRow(lbl,counts[l],mx,total,PAL_O[i%PAL_O.length]);
+    });
+    var footer=hasBEA?'<div style="font-size:9px;color:#6366f1;margin-top:8px;text-align:right">Réf. BEA</div>':'';
+    html+=_card('Origines',(s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>')+footer);
+  })();
+
+  // ── Card 7 : Instructeur à bord (donut) ──
+  (function(){
+    var nOui=0,nNon=0;
+    evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')nOui++;else nNon++;});
+    var tot=nOui+nNon, pctNon=tot>0?Math.round(nNon/tot*100):0;
+    var svgD='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:140px;display:block;margin:0 auto">';
+    svgD+=_donut([{v:nOui},{v:nNon}],['#10b981','#ef4444'],70,70,52,20);
+    svgD+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="28" font-weight="900" fill="var(--txt)">'+pctNon+'%</text>';
+    svgD+='<text x="70" y="82" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">sans instructeur</text>';
+    svgD+='</svg>';
+    var leg='<div style="display:flex;justify-content:center;gap:20px;margin-top:10px">'
+      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#10b981"></div>'
+      +'<span style="font-size:11px;color:var(--txt2)">Avec · <b style="color:#10b981">'+nOui+'</b></span></div>'
+      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#ef4444"></div>'
+      +'<span style="font-size:11px;color:var(--txt2)">Sans · <b style="color:#ef4444">'+nNon+'</b></span></div>'
+      +'</div>';
+    html+=_card('Instructeur à bord','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD+leg+'</div>');
+  })();
+
+  // ── Card 8 : Carte Leaflet ──
+  html+=_card('Carte des événements','<div id="sev-leaflet-map" style="height:260px;border-radius:8px;overflow:hidden;background:var(--navy)"></div>');
+
+  html+='</div>';
+  return html;
+}
+
+function openSecuriteEventForm(evId) {
+  var ev = evId ? (S.securiteEvents||[]).find(function(e){ return e.id===evId; }) : null;
+  var _inp = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box';
+  var _sel = _inp + ';cursor:pointer';
+  var _foc = "this.style.borderColor='var(--stol)'" , _blr = "this.style.borderColor='var(--bdr)'";
+
+  var existing = document.getElementById('sev-form-ov'); if(existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'sev-form-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
+  var panel = document.createElement('div');
+  panel.style.cssText = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:460px;overflow:hidden;max-height:92vh;overflow-y:auto';
+  panel.onclick = function(e){ e.stopPropagation(); };
+
+  var optTypes = Object.keys(_SEV_TYPES).map(function(k){ return '<option value="'+k+'"'+(ev&&ev.type===k?' selected':'')+'>'+_SEV_TYPES[k]+'</option>'; }).join('');
+  var optGrav  = [1,2,3,4,5].map(function(g){ return '<option value="'+g+'"'+(ev&&parseInt(ev.gravite)===g?' selected':'')+'>'+g+' — '+_SEV_GRAVITE[g]+'</option>'; }).join('');
+  var optStat  = Object.keys(_SEV_STATUT).map(function(k){ return '<option value="'+k+'"'+(ev?ev.statut===k?' selected':'':k==='ouvert'?' selected':'')+'>'+_SEV_STATUT[k]+'</option>'; }).join('');
+  var optBEA   = _BEA_REFS.map(function(r){ return '<option value="'+r.replace(/"/g,'&quot;')+'"'+(ev&&ev.refBEA===r?' selected':'')+'>'+r+'</option>'; }).join('');
+
+  panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1">'
+    + '<div style="font-size:14px;font-weight:800;color:var(--txt)">⚠️ '+(evId?'Modifier':'Nouveau')+' événement</div>'
+    + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:18px;cursor:pointer">×</button>'
+    + '</div>'
+    + '<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DATE *</label>'
+    + '<input id="sev-date" type="date" value="'+(ev?ev.date||'':new Date().toISOString().slice(0,10))+'" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">TYPE *</label>'
+    + '<select id="sev-type" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'"><option value="">— Choisir —</option>'+optTypes+'</select></div>'
+    + '</div>'
+
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">GRAVITÉ (1–5)</label>'
+    + '<select id="sev-gravite" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'"><option value="">— Choisir —</option>'+optGrav+'</select></div>'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">STATUT</label>'
+    + '<select id="sev-statut" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'">'+optStat+'</select></div>'
+    + '</div>'
+
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">LIEU / AÉRODROME</label>'
+    + '<input id="sev-lieu" type="text" value="'+(ev?ev.lieu||'':'')+'" placeholder="Ex : LFCR, Belmont/Rance…" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">PILOTE</label>'
+    + '<input id="sev-pilote" type="text" value="'+(ev?ev.pilote||'':'')+'" placeholder="Nom prénom" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">APPAREIL</label>'
+    + '<input id="sev-appareil" type="text" value="'+(ev?ev.appareil||'':'')+'" placeholder="Marque / immat." style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '</div>'
+
+    + '<div style="display:grid;grid-template-columns:120px 1fr;gap:10px">'
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">ÂGE PILOTE</label>'
+    + '<input id="sev-age" type="number" min="14" max="110" value="'+(ev&&ev.agePilote?ev.agePilote:'')+'" placeholder="ans" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '<div style="display:flex;align-items:center;padding-top:20px"><span style="font-size:11px;color:var(--txt3)">Âge du pilote au moment de l\'événement</span></div>'
+    + '</div>'
+
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">DESCRIPTION *</label>'
+    + '<textarea id="sev-desc" placeholder="Description des circonstances de l\'événement…" style="'+_inp+';resize:vertical;min-height:70px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.description||'':'')+'</textarea></div>'
+
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    + '<div><label style="font-size:11px;font-weight:700;color:#f59e0b;display:block;margin-bottom:5px">CORPOREL — NB BLESSÉS</label>'
+    + '<input id="sev-blesses" type="number" min="0" value="'+(ev?ev.nbBlesses||0:0)+'" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '<div><label style="font-size:11px;font-weight:700;color:#ef4444;display:block;margin-bottom:5px">MORTEL — NB TUÉS</label>'
+    + '<input id="sev-tues" type="number" min="0" value="'+(ev?ev.nbTues||0:0)+'" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+    + '</div>'
+
+    + '<div><label style="font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px">MESURES PRISES</label>'
+    + '<textarea id="sev-mesures" placeholder="Actions correctives, enquête, suivi…" style="'+_inp+';resize:vertical;min-height:55px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.mesures||'':'')+'</textarea></div>'
+
+    + '<div><label style="font-size:11px;font-weight:700;color:#6366f1;display:block;margin-bottom:5px">RÉFÉRENCE BEA</label>'
+    + '<select id="sev-refbea" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'"><option value="">— Non classifié —</option>'+optBEA+'</select></div>'
+
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">'
+    + (evId?'<button onclick="_securiteEventDelete(\''+evId+'\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:auto">Supprimer</button>':'')
+    + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
+    + '<button onclick="_securiteEventSave(\''+( evId||''  )+'\')" style="padding:8px 18px;border-radius:8px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    + '</div></div>';
+
+  ov.appendChild(panel);
+  document.body.appendChild(ov);
+  setTimeout(function(){ var el=document.getElementById('sev-date'); if(el) el.focus(); }, 80);
+}
+
+function _securiteEventSave(evId) {
+  var date  = (document.getElementById('sev-date')||{}).value||'';
+  var type  = (document.getElementById('sev-type')||{}).value||'';
+  var desc  = (document.getElementById('sev-desc')||{}).value||'';
+  if (!date||!type||!desc.trim()) { toast('Date, type et description sont obligatoires','err'); return; }
+  if (!S.securiteEvents) S.securiteEvents = [];
+  var nbBlesses = parseInt((document.getElementById('sev-blesses')||{}).value||0)||0;
+  var nbTues    = parseInt((document.getElementById('sev-tues')||{}).value||0)||0;
+  var _ageVal = parseInt((document.getElementById('sev-age')||{}).value||'')||null;
+  var rec = {
+    date:        date,
+    type:        type,
+    gravite:     (document.getElementById('sev-gravite')||{}).value||'',
+    statut:      (document.getElementById('sev-statut')||{}).value||'ouvert',
+    lieu:        ((document.getElementById('sev-lieu')||{}).value||'').trim(),
+    pilote:      ((document.getElementById('sev-pilote')||{}).value||'').trim(),
+    agePilote:   _ageVal,
+    appareil:    ((document.getElementById('sev-appareil')||{}).value||'').trim(),
+    description: desc.trim(),
+    mesures:     ((document.getElementById('sev-mesures')||{}).value||'').trim(),
+    refBEA:      ((document.getElementById('sev-refbea')||{}).value||'').trim()||null,
+    nbBlesses:   nbBlesses,
+    nbTues:      nbTues,
+    isCorporel:  nbBlesses > 0 || type === 'accident',
+    isMortel:    nbTues > 0,
+    _updatedAt:  Date.now()
+  };
+  if (evId) {
+    var idx = S.securiteEvents.findIndex(function(e){ return e.id===evId; });
+    if (idx>=0) { rec.id=evId; rec._createdAt=S.securiteEvents[idx]._createdAt||Date.now(); S.securiteEvents[idx]=rec; }
+  } else {
+    rec.id = 'sev'+Date.now().toString(36);
+    rec._createdAt = Date.now();
+    S.securiteEvents.push(rec);
+  }
+  saveState();
+  var ov = document.getElementById('sev-form-ov'); if(ov) ov.remove();
+  openSecuriteEvents('registre');
+  toast('Événement enregistré ✓','ok');
+}
+
+// ── Helpers d'interactivité du dialogue d'import ──
+function _sevImpToggle(i){
+  if(!window._sevImport)return;
+  window._sevImport.sel[i]=!window._sevImport.sel[i];
+  var r=document.getElementById('sev-irow-'+i);if(r)r.style.opacity=window._sevImport.sel[i]?'1':'0.32';
+  _sevImpCount();
+}
+function _sevImpToggleAll(v){
+  if(!window._sevImport)return;
+  var n=window._sevImport.dataRows.length;
+  for(var i=0;i<n;i++){
+    window._sevImport.sel[i]=v;
+    var r=document.getElementById('sev-irow-'+i);if(r)r.style.opacity=v?'1':'0.32';
+    var cb=document.getElementById('sev-icb-'+i);if(cb)cb.checked=v;
+  }
+  _sevImpCount();
+}
+function _sevImpUpdateCol(field,val){
+  if(!window._sevImport)return;
+  window._sevImport.C[field]=parseInt(val);
+}
+function _sevImpCount(){
+  if(!window._sevImport)return;
+  var tot=window._sevImport.dataRows.length,n=0;
+  for(var i=0;i<tot;i++)if(window._sevImport.sel[i])n++;
+  var btn=document.getElementById('sev-imp-btn');if(btn)btn.textContent='Importer ('+n+')';
+  var lbl=document.getElementById('sev-imp-cnt');if(lbl)lbl.textContent=n+' / '+tot;
+  var all=document.getElementById('sev-imp-all');
+  if(all){all.indeterminate=n>0&&n<tot;all.checked=n===tot&&tot>0;}
+}
+function _sevImpConfirm(){
+  if(!window._sevImport)return;
+  var ov=document.getElementById('sev-import-ov');if(ov)ov.remove();
+  try{window._sevImport._do();}catch(e){console.error('[_doImport]',e);toast('Erreur import : '+e.message,'err');}
+}
+
+function importSecuriteEvents(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  var file = input.files[0];
+  input.value = '';
+  var ext = file.name.split('.').pop().toLowerCase();
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(ext === 'csv' ? e.target.result : new Uint8Array(e.target.result),
+                         { type: ext === 'csv' ? 'string' : 'array', cellDates: true });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, dateNF: 'yyyy-mm-dd' });
+      if (!rows || rows.length < 2) { toast('Fichier vide ou sans données', 'err'); return; }
+      console.log('[importSev] rows:', rows.length, 'file:', file.name);
+
+      // ── Trouver la ligne d'en-tête (contient "Date" ou "MOIS") ──
+      var hIdx = 0;
+      for (var hi = 0; hi < Math.min(6, rows.length); hi++) {
+        var rowStr = (rows[hi] || []).join('|').toLowerCase();
+        if (rowStr.indexOf('date') !== -1 || rowStr.indexOf('mois') !== -1 || rowStr.indexOf('commune') !== -1) { hIdx = hi; break; }
+      }
+      var hdrs = Array.from(rows[hIdx] || []).map(function(h){ return h!=null ? h.toString().toLowerCase().trim() : ''; });
+
+      // ── Détection des colonnes par mots-clés sur en-tête ──
+      var _col = function(keys) {
+        for (var i = 0; i < keys.length; i++) {
+          for (var j = 0; j < hdrs.length; j++) {
+            if (hdrs[j].indexOf(keys[i]) !== -1) return j;
+          }
+        }
+        return -1;
+      };
+      // Colonnes format ACCIDENTOLOGIE MALGH / FFPLUM
+      // 'dcd' couvre la colonne DCD du fichier 2025 (= tués)
+      var C = {
+        mois:     _col(['mois']),
+        date:     _col(['date']),
+        dept:     _col(['dept']),
+        commune:  _col(['commune']),
+        typeUlm:  _col(['type']),         // "TYPE D'AVION" vs "TYPE" ULM — prend le premier 'type'
+        tues:     _col(['tué','tue','dcd','mort','fatal','décé']),
+        blesses:  _col(['bless']),
+        indemnes: _col(['indemn']),
+        materiel: _col(['matér','mater']),
+        corporel: _col(['corporel']),
+        mortel:   _col(['mortel']),
+        nbPers:   _col(['nb pers','nombre']),
+        agePilote:_col(['âge du p','age du p']),
+        instBord: _col(['age de l’inst','âge de l’inst','age de l\'inst','âge de l\'inst']),
+        licence:  _col(['licence','brevet']),
+        avion:    _col(['type d av','avion','aéronef']),
+        immat:    _col(['immat']),
+        natVol:   _col(['nature']),
+        desc:     _col(['premiers','circonstance','description']),
+        dgac:     _col(['dgac','retenu']),
+        comments: _col(['commentaire','comment'])
+      };
+
+      // Fallback : colonnes fixes si fichier ACCIDENTOLOGIE 2026 standard (L2 = en-tête, L3+ = données)
+      // 2026: 0=MOIS,1=Date,2=DEPT,3=COMMUNE,4=TYPE,5=TUES,6=BLESSES,7=INDEMNES,
+      //  8=MATERIEL,9=CORPOREL,10=MORTEL,11=NB PERS,12=SEXES/AGES,13=âgePilote,14=âgeInst,15=licence,
+      //  16=TYPE AVION,17=IMMAT,18=NATIONALITE,19=natureVol,20=premiers éléments,21=retenuDGAC,22=commentaires
+      // 2025: date=col1,dept=2,commune=3,typeUlm=4,dcd(tues)=7,blesses=8,indemnes=9,
+      //  materiel=10,corporel=11,mortel=12,agePilote=15,instBord=16,licence=17,avion=21,immat=23,natVol=25,desc=26
+      var _std = function(key, fallback) { return (C[key] !== undefined && C[key] !== -1) ? C[key] : fallback; };
+      C.date    = _std('date',    1);
+      C.dept    = _std('dept',    2);
+      C.commune = _std('commune', 3);
+      C.typeUlm = _std('typeUlm', 4);
+      C.tues    = _std('tues',    5);
+      C.blesses = _std('blesses', 6);
+      C.indemnes= _std('indemnes',7);
+      C.materiel= _std('materiel',8);
+      C.corporel= _std('corporel',9);
+      C.mortel  = _std('mortel',  10);
+      C.agePilote=_std('agePilote',13);
+      C.instBord= _std('instBord',-1);
+      C.licence = _std('licence', 15);
+      C.avion   = _std('avion',   16);
+      C.immat   = _std('immat',   17);
+      C.natVol  = _std('natVol',  19);
+      C.desc    = _std('desc',    20);
+      C.dgac    = _std('dgac',    21);
+      C.comments= _std('comments',22);
+
+      // Lignes de données (scope externe, pour le dialogue)
+      var dataRows = rows.slice(hIdx + 1).filter(function(r){
+        return r && Array.from(r).some(function(c){ return c !== null && c !== undefined && c.toString().trim(); });
+      });
+      if (!dataRows.length) { toast('Aucune ligne de données trouvée', 'err'); return; }
+
+      // ── Initialisation de l'état partagé du dialogue d'import ──
+      window._sevImport = { C: {}, dataRows: dataRows, sel: {}, _do: null };
+      // Copie de C modifiable par l'utilisateur via les menus
+      var _IC = window._sevImport.C;
+      Object.keys(C).forEach(function(k){ _IC[k] = C[k]; });
+      // Toutes les lignes sélectionnées par défaut
+      for (var _si = 0; _si < dataRows.length; _si++) window._sevImport.sel[_si] = true;
+
+      // Options de colonnes pour les <select> (colonnes avec en-tête non vide, ≤ col 60)
+      var _hdrOpts = '<option value="-1">— Non mappé —</option>';
+      hdrs.forEach(function(h, i) { if (h && i <= 60) _hdrOpts += '<option value="'+i+'">'+h+' (col '+i+')</option>'; });
+
+      // Champs éditables du mapping
+      var _mFields = [
+        ['date',      'Date *'],
+        ['dept',      'Département'],
+        ['commune',   'Commune'],
+        ['typeUlm',   'Classe ULM'],
+        ['tues',      'Tués / DCD'],
+        ['blesses',   'Blessés'],
+        ['corporel',  'Corporel'],
+        ['mortel',    'Mortel (flag)'],
+        ['agePilote', 'Âge pilote'],
+        ['instBord',  'Âge instructeur'],
+        ['natVol',    'Nature du vol'],
+        ['desc',      'Premiers éléments *'],
+        ['dgac',      'Retenu DGAC'],
+        ['comments',  'Commentaires'],
+      ];
+      var _inpSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:4px 6px;cursor:pointer;appearance:none;-webkit-appearance:none';
+      var _mappingHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">';
+      _mFields.forEach(function(f) {
+        var cur = _IC[f[0]];
+        var sel = '<select onchange="_sevImpUpdateCol(\''+f[0]+'\',this.value)" style="'+_inpSt+'">'
+          + _hdrOpts.replace('value="'+(cur>=0?cur:'-1')+'"','value="'+(cur>=0?cur:'-1')+'" selected')
+          + '</select>';
+        _mappingHtml += '<div style="margin-bottom:4px">'
+          + '<div style="font-size:9px;font-weight:700;color:'+(cur>=0?'var(--txt3)':'#f59e0b')+';margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px">'
+          + (cur<0?'⚠ ':'')+f[1]+'</div>'+sel+'</div>';
+      });
+      _mappingHtml += '</div>';
+
+      // Aperçu des lignes avec cases à cocher (max 200)
+      var _pvMax = Math.min(dataRows.length, 200);
+      var _pvHtml = '';
+      for (var _pvi = 0; _pvi < _pvMax; _pvi++) {
+        var _pvRow = dataRows[_pvi];
+        var _pvRaw = _IC.date >= 0 ? _pvRow[_IC.date] : '';
+        var _pvDate = _pvRaw instanceof Date ? _pvRaw.toISOString().slice(0,10)
+                    : _pvRaw ? _pvRaw.toString().slice(0,10) : '?';
+        var _pvDept = _IC.dept >= 0 ? (_pvRow[_IC.dept] || '') : '';
+        var _pvDesc = _IC.desc >= 0 ? (_pvRow[_IC.desc] || '') : '';
+        if (_pvDesc) _pvDesc = _pvDesc.toString().slice(0,72);
+        var _pvMort = _IC.tues >= 0 && _pvRow[_IC.tues] > 0;
+        var _pvCorp = _IC.blesses >= 0 && _pvRow[_IC.blesses] > 0;
+        var _pvDot  = _pvMort ? '#ef4444' : _pvCorp ? '#f59e0b' : '#64748b';
+        _pvHtml += '<div id="sev-irow-'+_pvi+'" style="display:flex;align-items:flex-start;gap:8px;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;cursor:pointer" onclick="_sevImpToggle('+_pvi+')">'
+          + '<input type="checkbox" id="sev-icb-'+_pvi+'" checked style="margin-top:2px;flex-shrink:0;cursor:pointer" onclick="event.stopPropagation();_sevImpToggle('+_pvi+')">'
+          + '<span style="color:'+_pvDot+';font-size:7px;margin-top:4px;flex-shrink:0">●</span>'
+          + '<span style="color:var(--txt3);white-space:nowrap;min-width:80px;flex-shrink:0">'+_pvDate+'</span>'
+          + '<span style="color:var(--txt3);white-space:nowrap;min-width:28px;flex-shrink:0;font-size:10px">'+_pvDept+'</span>'
+          + '<span style="color:var(--txt2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(_pvDesc||'—')+'</span>'
+          + '</div>';
+      }
+      if (dataRows.length > _pvMax) _pvHtml += '<div style="padding:6px 10px;font-size:10px;color:var(--txt3);text-align:center">… et '+(dataRows.length-_pvMax)+' lignes supplémentaires (toutes sélectionnées)</div>';
+
+      var _doImport = function() {
+      // Appliquer le mapping éventuellement modifié par l'utilisateur
+      if (window._sevImport && window._sevImport.C) {
+        Object.keys(window._sevImport.C).forEach(function(k){ C[k] = window._sevImport.C[k]; });
+      }
+      // ── Helpers ──
+      var _v = function(row, ci) {
+        if (ci < 0 || ci >= row.length) return '';
+        var v = row[ci];
+        if (v === null || v === undefined) return '';
+        return v.toString().trim();
+      };
+      var _n = function(row, ci) { var v=parseFloat(_v(row,ci)); return isNaN(v)?0:v; };
+
+      // Convertir date Excel (serial ou Date JS) → 'YYYY-MM-DD'
+      var _normDate = function(raw) {
+        if (!raw && raw !== 0) return '';
+        if (raw instanceof Date) {
+          var y=raw.getFullYear(), m=String(raw.getMonth()+1).padStart(2,'0'), d=String(raw.getDate()).padStart(2,'0');
+          return y+'-'+m+'-'+d;
+        }
+        var s = raw.toString().trim();
+        var m2 = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+        if (m2) return m2[3]+'-'+m2[2]+'-'+m2[1];
+        m2 = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (m2) return s.replace(/\//g,'-').slice(0,10);
+        // Numérique serial Excel
+        if (/^\d{5}$/.test(s)) {
+          var d2 = new Date(Math.round((parseInt(s)-25569)*86400*1000));
+          return d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0')+'-'+String(d2.getDate()).padStart(2,'0');
+        }
+        return s.slice(0,10);
+      };
+
+      // Déterminer le type d'événement depuis les colonnes MATÉRIEL / CORPOREL / MORTEL / TUÉS
+      var _typeEv = function(row) {
+        var mortel = _n(row, C.mortel), tues = _n(row, C.tues), corp = _n(row, C.corporel);
+        var bles = _n(row, C.blesses), mat = _n(row, C.materiel);
+        if (mortel > 0 || tues > 0) return 'accident'; // mortel
+        if (corp > 0 || bles > 0) return 'accident';   // corporel
+        if (mat > 0) return 'incident';                 // dégâts matériels uniquement
+        return 'incident';
+      };
+
+      // Gravité : 1=mineur → 5=critique
+      var _gravite = function(row) {
+        var mortel = _n(row, C.mortel), tues = _n(row, C.tues);
+        var corp = _n(row, C.corporel), bles = _n(row, C.blesses), mat = _n(row, C.materiel);
+        if (tues > 1) return '5';
+        if (tues > 0 || mortel > 0) return '4';
+        if (corp > 0 && bles > 1) return '4';
+        if (corp > 0 || bles > 0) return '3';
+        if (mat > 0) return '2';
+        return '1';
+      };
+
+      // Statut : "retenu par la DGAC = oui" → en cours d'enquête
+      var _statut = function(row) {
+        var v = _v(row, C.dgac).toLowerCase();
+        if (v.indexOf('oui') !== -1) return 'en-cours';
+        if (v.indexOf('non') !== -1) return 'clos';
+        return 'ouvert';
+      };
+
+      // Filtrer uniquement les lignes cochées dans le dialogue
+      var _allDataRows = (window._sevImport && window._sevImport.dataRows) ? window._sevImport.dataRows : dataRows;
+      var _importRows;
+      if (window._sevImport && window._sevImport.sel) {
+        _importRows = _allDataRows.filter(function(_,i){ return !!window._sevImport.sel[i]; });
+      } else {
+        _importRows = _allDataRows;
+      }
+
+      if (!_importRows.length) { toast('Aucune ligne sélectionnée', 'err'); return; }
+      if (!S.securiteEvents) S.securiteEvents = [];
+
+      var added = 0, skipped = 0;
+      _importRows.forEach(function(row) {
+        var rawDate = C.date >= 0 ? row[C.date] : '';
+        var date = _normDate(rawDate);
+        var desc = _v(row, C.desc);
+        if (!date && !desc) { skipped++; return; }
+        // Anti-doublon
+        var dup = S.securiteEvents.find(function(e){ return e.date === date && e.description === desc && desc.length > 5; });
+        if (dup) { skipped++; return; }
+
+        var dept    = _v(row, C.dept);
+        var commune = _v(row, C.commune);
+        var lieu    = commune + (dept && commune ? ' ('+dept+')' : dept);
+        var typeUlm = _v(row, C.typeUlm);
+        var avion   = _v(row, C.avion);
+        var immat   = _v(row, C.immat);
+        var appareilParts = [typeUlm, avion, immat].filter(Boolean);
+        var appareil = appareilParts.join(' · ');
+
+        var agePil  = _v(row, C.agePilote);
+        var agePilNum = parseInt(agePil)||null;
+        var licence = _v(row, C.licence);
+        var natVol  = _v(row, C.natVol);
+        var piloteInfo = [agePil ? 'Âge : '+agePil : '', licence ? 'Licence : '+licence : '', natVol ? natVol : ''].filter(Boolean).join(' | ');
+
+        var comments = _v(row, C.comments);
+
+        var nbTues    = _n(row, C.tues);
+        var nbBlesses = _n(row, C.blesses);
+        var isMortel  = _n(row, C.mortel) > 0 || nbTues > 0;
+        var isCorporel= _n(row, C.corporel) > 0 || nbBlesses > 0;
+
+        // Normalisation classe ULM
+        var _normClasse = function(t) {
+          if(!t) return 'Inconnu';
+          var tl=t.toLowerCase();
+          if(tl.indexOf('pendulaire')>=0||tl==='1') return 'Pendulaire';
+          if(tl.indexOf('multiaxe')>=0||tl.indexOf('multi')>=0||tl==='2') return 'Multiaxes';
+          if(tl.indexOf('autogire')>=0||tl==='3') return 'Autogire';
+          if(tl.indexOf('paramoteur')>=0||tl==='4') return 'Paramoteur';
+          if(tl.indexOf('para')>=0||tl==='5') return 'Parachute motorisé';
+          if(tl.indexOf('planeur')>=0||tl.indexOf('ulmplaneur')>=0||tl==='6') return 'Planeur ULM';
+          if(tl.indexOf('hélico')>=0||tl.indexOf('helico')>=0||tl==='7') return 'Hélicoptère ULM';
+          return t;
+        };
+        // Normalisation type de vol (col 19 = natVol)
+        var _normVol = function(t) {
+          if(!t) return 'Non renseigné';
+          var tl=t.toLowerCase();
+          if(tl.indexOf('découverte')>=0||tl.indexOf('decouverte')>=0||tl.indexOf('initiation')>=0) return 'Vol découverte';
+          if(tl.indexOf('instruction')>=0||tl.indexOf('formation')>=0||tl.indexOf('solo')>=0) return 'Instruction';
+          if(tl.indexOf('travail')>=0||tl.indexOf('aérien')>=0) return 'Travail aérien';
+          if(tl.indexOf('privé')>=0||tl.indexOf('prive')>=0||tl.indexOf('loisir')>=0||tl.indexOf('personnel')>=0) return 'Privé / Loisir';
+          return 'Autre';
+        };
+        // Instructeur à bord : présence d'un âge instructeur = instructeur à bord
+        var instrCell = C.instBord >= 0 ? _v(row, C.instBord) : '';
+        var instructeurBord = (instrCell && instrCell.toString().trim().length > 0) ? 'oui' : 'non';
+
+        S.securiteEvents.push({
+          id:             'sev'+Date.now().toString(36)+'_'+added,
+          date:           date,
+          type:           _typeEv(row),
+          gravite:        _gravite(row),
+          statut:         _statut(row),
+          lieu:           lieu,
+          dept:           (dept||'').toString().replace(/^0+/,''),
+          pilote:         piloteInfo,
+          appareil:       appareil,
+          classeUlm:      _normClasse(typeUlm),
+          agePilote:      agePilNum,
+          instructeurBord:instructeurBord,
+          typeVol:        _normVol(natVol),
+          description:    desc,
+          mesures:        comments,
+          nbTues:         nbTues,
+          nbBlesses:      nbBlesses,
+          isMortel:       isMortel,
+          isCorporel:     isCorporel,
+          _src:           'ACCIDENTOLOGIE',
+          _createdAt:     Date.now(),
+          _updatedAt:     Date.now()
+        });
+        added++;
+      });
+
+      saveState();
+      openSecuriteEvents('registre');
+      var msg = added+' accident'+(added>1?'s':'')+' importé'+(added>1?'s':'');
+      if (skipped) msg += ' ('+skipped+' doublon'+(skipped>1?'s':'')+' ignoré'+(skipped>1?'s':'')+')';
+      toast(msg, added>0?'ok':'err');
+      }; // end _doImport
+      window._sevImport._do = _doImport;
+
+      // ── Dialogue enrichi : mapping + sélection des lignes ──
+      var _ov = document.createElement('div');
+      _ov.id = 'sev-import-ov';
+      _ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9900;display:flex;align-items:center;justify-content:center;padding:16px';
+      var _btnSt = 'padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer';
+      _ov.innerHTML = ''
+        + '<div style="background:var(--navy);border:1px solid var(--bdr);border-radius:14px;width:640px;max-width:97vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.5)">'
+        // ── Header
+        + '<div style="padding:18px 20px 12px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+        + '<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:2px">Import · '+file.name+'</div>'
+        + '<div style="font-size:11px;color:var(--txt3)"><span id="sev-imp-cnt">'+dataRows.length+' / '+dataRows.length+'</span> lignes sélectionnées · <span style="color:var(--txt3)">'+(hdrs.length)+' colonnes</span></div>'
+        + '</div>'
+        // ── Corps défilable
+        + '<div style="overflow-y:auto;flex:1;padding:16px 20px">'
+        // Section 1 : mapping
+        + '<div style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">Correspondance des colonnes</div>'
+        + _mappingHtml
+        // Section 2 : sélection des lignes
+        + '<div style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase;margin:14px 0 6px">Lignes à importer</div>'
+        + '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;overflow:hidden">'
+        // En-tête colonne
+        + '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--bdr);font-size:10px;color:var(--txt3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">'
+        + '<input type="checkbox" id="sev-imp-all" checked style="cursor:pointer" onclick="_sevImpToggleAll(this.checked)">'
+        + '<span style="min-width:14px"></span>'
+        + '<span style="min-width:80px;flex-shrink:0">Date</span>'
+        + '<span style="min-width:28px;flex-shrink:0">Dpt</span>'
+        + '<span style="flex:1">Description</span>'
+        + '</div>'
+        // Lignes
+        + '<div style="max-height:260px;overflow-y:auto">' + _pvHtml + '</div>'
+        + '</div>'
+        + '</div>'
+        // ── Footer
+        + '<div style="padding:14px 20px;border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0">'
+        + '<span style="font-size:11px;color:var(--txt3)">Rouge = mortel · Jaune = blessé</span>'
+        + '<div style="display:flex;gap:10px">'
+        + '<button onclick="document.getElementById(\'sev-import-ov\').remove()" style="'+_btnSt+';border:1px solid var(--bdr);background:var(--navy2);color:var(--txt2)">Annuler</button>'
+        + '<button id="sev-imp-btn" onclick="_sevImpConfirm()" style="'+_btnSt+';border:none;background:#0891b2;color:#fff">Importer ('+dataRows.length+')</button>'
+        + '</div></div>'
+        + '</div>';
+      document.body.appendChild(_ov);
+    } catch(err) {
+      console.error('[importSecuriteEvents]', err);
+      toast('Erreur lecture fichier : '+err.message, 'err');
+    }
+  };
+  if (ext === 'csv') reader.readAsText(file, 'UTF-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function _securiteEventDelete(evId) {
+  if (!confirm('Supprimer cet événement du registre ?')) return;
+  S.securiteEvents = (S.securiteEvents||[]).filter(function(e){ return e.id!==evId; });
+  saveState();
+  var ov = document.getElementById('sev-form-ov'); if(ov) ov.remove();
+  openSecuriteEvents('registre');
+  toast('Événement supprimé','ok');
+}
+
+// ═══════════════════════════════════════════════════════════
 function openDTNModule(module) {
   closeNDF();
   _fromDTN = true;
@@ -40453,8 +41704,12 @@ function openDTNModule(module) {
       if (_appEl2) _appEl2.style.display = 'none';
       _dtnShowSidebar();
     }
-    _dtnShowPanel(module);
-    _dtnSetActiveNav(module);
+    if (module === 'securite') {
+      openSecuriteEvents('stats');
+    } else {
+      _dtnShowPanel(module);
+      _dtnSetActiveNav(module);
+    }
   }
 }
 
