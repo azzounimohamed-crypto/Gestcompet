@@ -22244,6 +22244,7 @@ async function pushToCloud() {
     stolResults:          S.stolResults          || {},
     notesfrais:           S.notesfrais           || {},
     securiteEvents:       S.securiteEvents       || [],
+    securiteHistorique:   S.securiteHistorique   || {},
     agendaEvents:         S.agendaEvents         || [],
     _pushAt:              Date.now()
   };
@@ -22830,6 +22831,8 @@ async function loadFromSupabaseFirst() {
     var savedNotesfrais = (S.notesfrais && typeof S.notesfrais === 'object' && !Array.isArray(S.notesfrais) && Object.keys(S.notesfrais).length) ? JSON.parse(JSON.stringify(S.notesfrais)) : null;
     // ✅ GARDE SECURITEEVENTS : toujours préserver les événements sécurité locaux
     var savedSecuriteEvents = (S.securiteEvents && S.securiteEvents.length) ? S.securiteEvents.slice() : null;
+    // ✅ GARDE SECURITEHISTORIQUE : toujours préserver l'historique importé localement
+    var savedSecuriteHistorique = (S.securiteHistorique && Object.keys(S.securiteHistorique).length) ? Object.assign({}, S.securiteHistorique) : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -22866,6 +22869,10 @@ async function loadFromSupabaseFirst() {
       savedSecuriteEvents.forEach(function(ev) {
         if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
       });
+    }
+    // ✅ Fusionner securiteHistorique local avec cloud (le cloud prévaut en cas de conflit sur une même année)
+    if (savedSecuriteHistorique) {
+      S.securiteHistorique = Object.assign({}, savedSecuriteHistorique, S.securiteHistorique || {});
     }
     // ✅ Restaurer officialDocs locaux si présents (jamais écraser les images locales par cloud vide)
     if (savedOfficialDocs) {
@@ -40532,6 +40539,66 @@ var _BEA_REFS = [
   'Vol à basse altitude'
 ];
 
+// ── Mots-clés associés à chaque référence BEA, pour suggestion automatique à partir des "premiers éléments" ──
+var _BEA_KEYWORDS = {
+  'Aérodrome': ['aerodrome','plateforme','taxiway','parking avion'],
+  'Airprox/Avertissement TCAS/Perte d\'espacement/Collision/Quasi-collision en vol': ['airprox','tcas','quasi-collision','perte d espacement','conflit aerien','proximite','rapprochement'],
+  'ATM/CNS': ['controle aerien','frequence','communication radio','clairance','atc'],
+  'Atterrissage trop court/trop long': ['atterrissage long','atterrissage court','depassement de piste','hard landing','atterrissage dur','vache courte','vache longue'],
+  'Cisaillement du vent ou orage': ['vent','rafale','orage','cisaillement','grain','bourrasque','meteo','tempete'],
+  'Collision au sol': ['collision au sol','heurte','heurté','percute','percuté','choc au sol'],
+  'Collision avec des obstacles lors du décollage et de l\'atterrissage': ['obstacle','ligne electrique','poteau','arbre','fil electrique','antenne'],
+  'Contact anormal avec la piste': ['contact anormal','rebond','atterrissage dur','hard landing','train casse','train d atterrissage'],
+  'Décollage par inadvertance dans des CMVI': ['cmvi','ifr involontaire','conditions meteo de vol aux instruments'],
+  'Erreurs de navigation': ['navigation','desoriente','perdu','egare','route','gps','cap errone'],
+  'Évacuation': ['evacuation','evacue'],
+  'Événements liés à la sécurité des cabines': ['cabine','harnais','ceinture','casque non porte'],
+  'Événements liés au remorquage de planeur': ['remorquage','planeur','treuil'],
+  'Événements liés aux charges externes': ['charge externe','parachutiste','largage','saut'],
+  'Faune': ['oiseau','faune','animal','volatile','rapace'],
+  'Givrage': ['givrage','givre','glace','gel','carburateur givre'],
+  'Impact sans perte de contrôle': ['impact','collision avec le sol','cfit','vol controle vers le relief','relief'],
+  'Incendie/Fumée (après impact)': ['incendie apres','feu apres','fumee apres impact','embrase apres'],
+  'Incendie/Fumée (sans impact)': ['feu en vol','fumee en vol','incendie moteur','incendie en vol','fumee cockpit'],
+  'Inconnu ou Indéterminé': ['inconnu','indetermine','cause non determinee','cause inconnue'],
+  'Incursion sur piste': ['incursion','croisement de piste','intrusion piste'],
+  'Manœuvre brusque': ['manoeuvre brusque','virage serre','decrochage en virage','ressource brutale'],
+  'Manutention au sol': ['manutention','remisage','deplacement au sol','hangar','poussage','tractage au sol'],
+  'Médical': ['malaise','medical','cardiaque','inconscience','sante','perte de connaissance'],
+  'Oiseau': ['oiseau','volatile','impact oiseau'],
+  'Panne ou mauvais fonctionnement d\'un circuit ou d\'un composant (faisant partie du groupe motopropulseur)': ['panne moteur','moteur','motopropulseur','carburateur','arret moteur','rupture courroie','panne mecanique moteur'],
+  'Panne ou mauvais fonctionnement d\'un circuit ou d\'un composant (ne faisant pas partie du groupe motopropulseur)': ['panne electrique','instrument','helice','panne systeme','rupture cable','panne radio','panne de l electronique'],
+  'Passage dans une zone de turbulence': ['turbulence','trou d air','remous','onde'],
+  'Perte de contrôle - au sol': ['perte de controle au sol','derapage','sortie de trajectoire','ground loop','cheval de bois'],
+  'Perte de contrôle - en vol': ['decrochage','vrille','perte de controle','autorotation','perte de portance en vol'],
+  'Perte des conditions de levage en route': ['fermeture voile','twist','perte de portance','suspentes','voile'],
+  'Problèmes reliés à la sécurité': ['securite','defaillance de securite'],
+  'Problèmes reliés au carburant': ['carburant','essence','panne seche','vapor lock','manque de carburant'],
+  'Sortie de piste': ['sortie de piste','depassement de piste','hors piste'],
+  'Vol à basse altitude': ['basse altitude','basse hauteur','rase-mottes','rase mottes','tres basse altitude']
+};
+
+function _beaNorm(s) {
+  return (s||'').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/['’]/g,' ');
+}
+
+// Suggère jusqu'à `max` références BEA pertinentes à partir d'un texte libre (ex. "premiers éléments")
+function _beaSuggest(text, max) {
+  max = max || 3;
+  var n = _beaNorm(text);
+  if (!n.trim()) return [];
+  var scored = [];
+  Object.keys(_BEA_KEYWORDS).forEach(function(ref) {
+    var score = 0;
+    _BEA_KEYWORDS[ref].forEach(function(kw){ if (n.indexOf(kw) !== -1) score++; });
+    if (score > 0) scored.push({ ref: ref, score: score });
+  });
+  scored.sort(function(a,b){ return b.score - a.score; });
+  return scored.slice(0, max).map(function(s){ return s.ref; });
+}
+
 function openSecuriteEvents(volet) {
   volet = volet || 'stats';
   var wb = document.getElementById('dtn-workspace-body');
@@ -40551,7 +40618,7 @@ function openSecuriteEvents(volet) {
     + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
     + '<button onclick="_dtnGoHome()" title="Accueil" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid var(--bdr);border-radius:7px;background:transparent;color:var(--txt2);cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="15 18 9 12 15 6"/></svg>Accueil</button>'
-    + '<div style="font-size:16px;font-weight:900;color:var(--txt)">⚠️ Événements de sécurité</div>'
+    + '<div style="font-size:16px;font-weight:900;color:var(--txt)">⚠️ RECUEIL ACCIDENTOLOGIE ET SÉCURITÉ ULM - RASU</div>'
     + '</div>'
     + navHtml + content + '</div>';
 
@@ -40578,8 +40645,14 @@ function _initSevLeafletMap() {
   var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
   var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
 
+  var _sevMapYear = window._sevStatYear || '';
+  var _sevMapEvs = (_sevMapYear
+    ? (S.securiteEvents||[]).filter(function(e){ return (e.date||'').slice(0,4) === _sevMapYear; })
+    : (S.securiteEvents||[])
+  ).filter(function(e){ return _isMort(e) || _isCorp(e); });
+
   var deptMap = {};
-  (S.securiteEvents||[]).forEach(function(e){
+  _sevMapEvs.forEach(function(e){
     var raw = (e.dept||'').toString().trim();
     // Essayer la valeur brute, puis sans zéros initiaux
     var d = _DEPT_COORDS[raw] ? raw : _DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null;
@@ -40719,23 +40792,46 @@ function _renderReferencesBEA() {
   evs.forEach(function(ev, i) {
     var d = ev.date ? ev.date.split('-').reverse().join('/') : '—';
     var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
-    var descCourt = (ev.description||'').slice(0,120) + (ev.description&&ev.description.length>120?'…':'');
+    var descCourt = ev.description || '';
     var opts = optBEAHtml.replace('value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'"', 'value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'" selected');
+    var selId = 'sev-beasel-'+ev.id;
+
+    var suggestions = _beaSuggest(ev.description, 3).filter(function(r){ return r !== ev.refBEA; });
+    var suggHtml = suggestions.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'
+        + suggestions.map(function(r){
+            return '<button type="button" onclick="_sevApplyBeaSuggestion(\''+ev.id+'\',\''+r.replace(/'/g,"\\'")+'\',\''+selId+'\')" title="Appliquer cette suggestion" style="font-size:9px;padding:3px 8px;border-radius:99px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-family:inherit;cursor:pointer;white-space:nowrap">💡 '+r+'</button>';
+          }).join('')
+        + '</div>'
+      : '';
 
     html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr)">'
       + '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap;vertical-align:top">'+d+'</td>'
       + '<td style="padding:8px 10px;color:var(--txt2);vertical-align:top;line-height:1.5">'+descCourt+'</td>'
       + '<td style="padding:6px 8px;vertical-align:top">'
-      + '<select style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value)">'
+      + '<select id="'+selId+'" style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value)">'
       + opts
       + '</select>'
       + (ev.refBEA?'<div style="font-size:9px;color:#6366f1;margin-top:3px;padding-left:2px">✓ validé</div>':'')
+      + suggHtml
       + '</td>'
       + '</tr>';
   });
 
   html += '</tbody></table></div>';
   return html;
+}
+
+function _sevApplyBeaSuggestion(evId, ref, selId) {
+  var sel = document.getElementById(selId);
+  if (sel) sel.value = ref;
+  if (!S.securiteEvents) return;
+  var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
+  if (!ev) return;
+  ev.refBEA = ref || null;
+  ev._updatedAt = Date.now();
+  saveState();
+  openSecuriteEvents('refs');
 }
 
 function _sevSaveRefBEA(evId, val) {
@@ -40782,6 +40878,86 @@ var _DEPT_COORDS = {
   '92':[48.83,2.23],'93':[48.91,2.47],'94':[48.78,2.45],'95':[49.07,2.09],
   '971':[16.18,-61.31],'972':[14.64,-61.02],'973':[4.00,-53.00],'974':[-21.11,55.53],'976':[-12.83,45.15]
 };
+
+// Données nationales historiques (Tués/DCD et Blessés) issues du registre FFPLUM, pour compléter le graphique "Par année" sur les années non couvertes par S.securiteEvents
+var _SEV_HISTO = {
+  '2017':{m:25,c:23},'2018':{m:27,c:22},'2019':{m:8,c:19},'2020':{m:12,c:14},
+  '2021':{m:10,c:19},'2022':{m:18,c:25},'2023':{m:6,c:25},'2024':{m:6,c:8}
+};
+
+// Fusion : valeurs importées par l'utilisateur (S.securiteHistorique) prioritaires sur les valeurs par défaut ci-dessus
+// Filtre défensif : ignore toute clé qui ne serait pas une année plausible (corruption d'import passée)
+function _sevHisto() {
+  var merged = Object.assign({}, _SEV_HISTO, S.securiteHistorique || {});
+  var out = {}, now = new Date().getFullYear();
+  Object.keys(merged).forEach(function(y){ var yi=parseInt(y,10); if(/^\d{4}$/.test(y) && yi>=1990 && yi<=now+1) out[y]=merged[y]; });
+  return out;
+}
+
+function _sevImportHisto(inp) {
+  if (!inp.files || !inp.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      var norm = function(s) {
+        return (s || '').toString().trim().toUpperCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '');
+      };
+
+      var headerRowIdx = 0;
+      for (var i = 0; i < Math.min(5, rows.length); i++) {
+        var r = rows[i];
+        if (r && r.some(function(c){ var n=norm(c); return n==='DATE'||n.indexOf('ANNEE')!==-1||n.indexOf('ANNÉE')!==-1; })) { headerRowIdx = i; break; }
+      }
+      var headerRow = rows[headerRowIdx] || [];
+      var dataRows = rows.slice(headerRowIdx + 1).filter(function(r){ return r && r.some(function(c){ return (c||'').toString().trim(); }); });
+
+      // Détection d'un registre détaillé (1 ligne par événement, ex. ACCIDENTOLOGIE xxxx.xlsx) plutôt qu'un récapitulatif par année
+      var looksLikeRegistre = headerRow.some(function(h){ var n=norm(h); return n==='DEPT'||n==='COMMUNE'||n.indexOf('MORTEL')!==-1||n.indexOf('CORPOREL')!==-1; });
+      if (looksLikeRegistre) {
+        alert('Ce fichier ressemble à un registre détaillé d\'événements (1 ligne par accident), pas à un récapitulatif annuel.\n\nUtilisez plutôt le bouton "Importer Excel" dans l\'onglet Registre pour importer ces événements individuellement.');
+        inp.value = '';
+        return;
+      }
+
+      var col = function(keywords) {
+        var idx = -1;
+        headerRow.forEach(function(h, i) { if (idx===-1 && keywords.some(function(k){ return norm(h).indexOf(k)!==-1; })) idx = i; });
+        return idx;
+      };
+      var cYear = col(['DATE','ANNEE','ANNÉE']); if (cYear<0) cYear=0;
+      var cMort = col(['TUE','DCD']);            if (cMort<0) cMort=1;
+      var cCorp = col(['BLESS']);                if (cCorp<0) cCorp=2;
+
+      var nowYr = new Date().getFullYear();
+      var histo = {};
+      dataRows.forEach(function(r) {
+        var y = (r[cYear]||'').toString().trim().slice(0,4);
+        if (!/^\d{4}$/.test(y)) return;
+        var yi = parseInt(y,10);
+        if (yi < 1990 || yi > nowYr+1) return;
+        histo[y] = { m: parseInt(r[cMort])||0, c: parseInt(r[cCorp])||0 };
+      });
+      if (!Object.keys(histo).length) { alert('Aucune ligne valide trouvée (colonnes attendues : Année, Tués/DCD, Blessés).'); return; }
+
+      // Nettoie au passage les éventuelles années aberrantes déjà importées par erreur
+      var cleaned = {};
+      Object.keys(S.securiteHistorique||{}).forEach(function(y){ var yi=parseInt(y,10); if(/^\d{4}$/.test(y)&&yi>=1990&&yi<=nowYr+1) cleaned[y]=S.securiteHistorique[y]; });
+      S.securiteHistorique = Object.assign({}, cleaned, histo);
+      saveState();
+      alert(Object.keys(histo).length + ' année(s) importée(s) : ' + Object.keys(histo).sort().join(', '));
+      openSecuriteEvents('stats');
+    } catch (err) {
+      alert('Erreur de lecture du fichier : ' + err.message);
+    }
+    inp.value = '';
+  };
+  reader.readAsArrayBuffer(inp.files[0]);
+}
 
 function _renderSecuriteStats() {
   if (!S.securiteEvents) S.securiteEvents = [];
@@ -40892,7 +41068,8 @@ function _renderSecuriteStats() {
           + '</span>'
           + '<button onclick="window._sevStatYear=\'\';openSecuriteEvents(\'stats\')" title="Réinitialiser le filtre" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕ Tout afficher</button>'
         : '<span style="font-size:12px;color:var(--txt3)">' + _allEvs.length + ' événements · ' + _allYrsList.length + ' saison' + (_allYrsList.length > 1 ? 's' : '') + '</span>')
-    + '<button onclick="_sevPrintStats()" style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer" title="Imprimer le bilan A4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimer A4</button>'
+    + '<label style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer" title="Importer un fichier .xlsx (Année / Tués / Blessés) pour compléter les années antérieures"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importer historique<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="_sevImportHisto(this)"></label>'
+    + '<button onclick="_sevPrintStats()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer" title="Imprimer le bilan A4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimer A4</button>'
     + '</div>';
 
   // ── KPI tiles ──
@@ -40920,10 +41097,11 @@ function _renderSecuriteStats() {
   // ── Grille 4 colonnes × 2 lignes ──
   html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch">';
 
-  // ── Card 1 : Par année ──
+  // ── Card 1 : Par année (toujours toutes les saisons, indépendamment du filtre) ──
   (function(){
     var byY={};
-    evs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
+    _allEvs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
+    var _histo=_sevHisto(); Object.keys(_histo).forEach(function(y){ if(!byY[y]) byY[y]={c:0,m:0}; byY[y].c+=_histo[y].c; byY[y].m+=_histo[y].m; });
     var yrs=Object.keys(byY).sort();
     if(!yrs.length){html+=_card('Par année','<div style="padding:20px 0;text-align:center;color:var(--txt3);font-size:11px">—</div>');return;}
     var W=260,H=155,pL=24,pR=6,pT=6,pB=24;
@@ -40938,8 +41116,10 @@ function _renderSecuriteStats() {
     s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
     yrs.forEach(function(yr,i){var x=pL+gap+i*(bW+gap),yB=pT+cH;
       var hC=byY[yr].c>0?(byY[yr].c/maxV)*cH:0,hM=byY[yr].m>0?(byY[yr].m/maxV)*cH:0;
-      if(hC>0)s+='<rect x="'+x+'" y="'+(yB-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="2"/>';
-      if(hM>0)s+='<rect x="'+x+'" y="'+(yB-hC-hM)+'" width="'+bW+'" height="'+hM+'" fill="#ef4444" rx="2"/>';
+      if(hC>0){s+='<rect x="'+x+'" y="'+(yB-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="2"/>';
+        if(hC>=7)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC/2+3)+'" text-anchor="middle" font-family="inherit" font-size="7" font-weight="700" fill="#1f2937">'+byY[yr].c+'</text>';}
+      if(hM>0){s+='<rect x="'+x+'" y="'+(yB-hC-hM)+'" width="'+bW+'" height="'+hM+'" fill="#ef4444" rx="2"/>';
+        if(hM>=7)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC-hM/2+3)+'" text-anchor="middle" font-family="inherit" font-size="7" font-weight="700" fill="#fff">'+byY[yr].m+'</text>';}
       var tot=byY[yr].c+byY[yr].m;
       if(tot>0)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC-hM-2)+'" text-anchor="middle" font-family="inherit" font-size="8" font-weight="700" fill="#e2e8f0">'+tot+'</text>';
       s+='<text x="'+(x+bW/2)+'" y="'+(yB+14)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+yr.slice(2)+'</text>';
@@ -40952,8 +41132,8 @@ function _renderSecuriteStats() {
     html+=_card('Par année',s);
   })();
 
-  // ── Card 2 : Par mois ──
-  (function(){
+  // ── Card 2 : Par mois (uniquement pertinent quand une saison précise est sélectionnée) ──
+  if (filterYear) (function(){
     var MN=['J','F','M','A','M','J','J','A','S','O','N','D'];
     var byM={}; for(var i=1;i<=12;i++) byM[i]={c:0,m:0};
     evs.forEach(function(e){var m=parseInt((e.date||'').slice(5,7));if(!m||m<1||m>12)return;if(_isMort(e))byM[m].m++;else if(_isCorp(e))byM[m].c++;});
@@ -40969,8 +41149,10 @@ function _renderSecuriteStats() {
     s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
     for(var mi2=1;mi2<=12;mi2++){var xM=pL+gap+(mi2-1)*(bW+gap),yBM=pT+cH;
       var hC=byM[mi2].c>0?(byM[mi2].c/maxV)*cH:0,hM2=byM[mi2].m>0?(byM[mi2].m/maxV)*cH:0;
-      if(hC>0)s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="1"/>';
-      if(hM2>0)s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="#ef4444" rx="1"/>';
+      if(hC>0){s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="1"/>';
+        if(hC>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC/2+2.5)+'" text-anchor="middle" font-family="inherit" font-size="6" font-weight="700" fill="#1f2937">'+byM[mi2].c+'</text>';}
+      if(hM2>0){s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="#ef4444" rx="1"/>';
+        if(hM2>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC-hM2/2+2.5)+'" text-anchor="middle" font-family="inherit" font-size="6" font-weight="700" fill="#fff">'+byM[mi2].m+'</text>';}
       s+='<text x="'+(xM+bW/2)+'" y="'+(yBM+13)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+MN[mi2-1]+'</text>';}
     s+='</svg>';
     html+=_card('Par mois',s);
@@ -41036,48 +41218,23 @@ function _renderSecuriteStats() {
     html+=_card('Type de vol',s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>');
   })();
 
-  // ── Card 6 : Origines — BEA refs en priorité, mots-clés en fallback ──
+  // ── Card 6 : Origines — uniquement les événements avec une référence BEA ──
   (function(){
     var PAL_O=['#ef4444','#f97316','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#10b981','#64748b','#ec4899','#0891b2'];
     var counts={};
-    var hasBEA = evs.some(function(e){ return !!e.refBEA; });
-
-    if (hasBEA) {
-      // Mode BEA : utiliser refBEA quand disponible, mots-clés sinon
-      var OL_FB=['Panne moteur','Facteur humain','Météo','Défaut matériel','Perte de contrôle','Collision','Procédure','Autre'];
-      var OK_FB=[['panne','moteur','mécanique','carburateur','hélice'],['humain','pilote','fatigue','erreur','inattention'],['météo','vent','orage','icing','visibilité','turbulence'],['défaut','matériel','structure','cellule','commande'],['perte','contrôle','décrochage','vrille'],['collision','abordage','obstacle','câble','oiseau'],['procédure','réglementation','aérodrome'],[]];
-      evs.forEach(function(e){
-        if (e.refBEA) {
-          counts[e.refBEA] = (counts[e.refBEA]||0) + 1;
-        } else {
-          var txt=((e.description||'')+(e.mesures||'')+(e.origines||'')).toLowerCase();
-          var matched=false;
-          for(var oi=0;oi<OL_FB.length-1;oi++){if(OK_FB[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL_FB[oi]]=(counts[OL_FB[oi]]||0)+1;matched=true;break;}}
-          if(!matched) counts['Autre']=(counts['Autre']||0)+1;
-        }
-      });
-    } else {
-      // Mode mots-clés pur
-      var OL=['Panne moteur','Facteur humain','Météo','Défaut mat.','Perte contrôle','Collision','Procédure','Autre'];
-      var OK=[['panne','moteur','mécanique','carburateur','hélice'],['humain','pilote','fatigue','erreur','inattention'],['météo','vent','orage','icing','visibilité','turbulence'],['défaut','matériel','structure','cellule','commande'],['perte','contrôle','décrochage','vrille'],['collision','abordage','obstacle','câble','oiseau'],['procédure','réglementation','aérodrome'],[]];
-      OL.forEach(function(l){counts[l]=0;});
-      evs.forEach(function(e){
-        var txt=((e.description||'')+(e.mesures||'')+(e.origines||'')).toLowerCase();
-        var matched=false;
-        for(var oi=0;oi<OL.length-1;oi++){if(OK[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL[oi]]++;matched=true;}}
-        if(!matched) counts['Autre']++;
-      });
-    }
-
+    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
+      counts[e.refBEA] = (counts[e.refBEA]||0) + 1;
+    });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
     var mx=items.length?counts[items[0]]:1;
+    var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
     var s='';
     items.forEach(function(l,i){
       var lbl=l.length>32?l.slice(0,30)+'…':l;
       s+=_bRow(lbl,counts[l],mx,total,PAL_O[i%PAL_O.length]);
     });
-    var footer=hasBEA?'<div style="font-size:9px;color:#6366f1;margin-top:8px;text-align:right">Réf. BEA</div>':'';
-    html+=_card('Origines',(s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>')+footer);
+    var footer='<div style="font-size:9px;color:#6366f1;margin-top:8px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
+    html+=_card('Origines',(s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>')+footer);
   })();
 
   // ── Card 7 : Instructeur à bord (donut) ──
@@ -41166,7 +41323,8 @@ function _sevPrintStats() {
   // ── Graphique Barre par année ──
   var _svgAnne = (function(){
     var byY={};
-    evs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
+    _allEvs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
+    var _histo=_sevHisto(); Object.keys(_histo).forEach(function(y){ if(!byY[y]) byY[y]={c:0,m:0}; byY[y].c+=_histo[y].c; byY[y].m+=_histo[y].m; });
     var yrs=Object.keys(byY).sort(); if(!yrs.length) return '<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:11px">—</div>';
     var W=320,H=160,pL=24,pR=6,pT=10,pB=28;
     var cW=W-pL-pR,cH=H-pT-pB;
@@ -41181,8 +41339,10 @@ function _sevPrintStats() {
     s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="#cbd5e1" stroke-width="1"/>';
     yrs.forEach(function(yr,i){var x=pL+gap+i*(bW+gap),yB=pT+cH;
       var hC=byY[yr].c>0?(byY[yr].c/maxV)*cH:0,hM=byY[yr].m>0?(byY[yr].m/maxV)*cH:0;
-      if(hC>0)s+='<rect x="'+x+'" y="'+(yB-hC)+'" width="'+bW+'" height="'+hC+'" fill="'+C.corp+'" rx="2"/>';
-      if(hM>0)s+='<rect x="'+x+'" y="'+(yB-hC-hM)+'" width="'+bW+'" height="'+hM+'" fill="'+C.mort+'" rx="2"/>';
+      if(hC>0){s+='<rect x="'+x+'" y="'+(yB-hC)+'" width="'+bW+'" height="'+hC+'" fill="'+C.corp+'" rx="2"/>';
+        if(hC>=7)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC/2+3)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="#fff">'+byY[yr].c+'</text>';}
+      if(hM>0){s+='<rect x="'+x+'" y="'+(yB-hC-hM)+'" width="'+bW+'" height="'+hM+'" fill="'+C.mort+'" rx="2"/>';
+        if(hM>=7)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC-hM/2+3)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="#fff">'+byY[yr].m+'</text>';}
       var tot2=byY[yr].c+byY[yr].m;
       if(tot2>0)s+='<text x="'+(x+bW/2)+'" y="'+(yB-hC-hM-3)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#374151">'+tot2+'</text>';
       s+='<text x="'+(x+bW/2)+'" y="'+(yB+16)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#64748b">'+yr.slice(2)+'</text>';
@@ -41213,8 +41373,10 @@ function _sevPrintStats() {
     s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="#cbd5e1" stroke-width="1"/>';
     for(var mi2=1;mi2<=12;mi2++){var xM=pL+gap+(mi2-1)*(bW+gap),yBM=pT+cH;
       var hC=byM[mi2].c>0?(byM[mi2].c/maxV)*cH:0,hM2=byM[mi2].m>0?(byM[mi2].m/maxV)*cH:0;
-      if(hC>0)s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="'+C.corp+'" rx="1"/>';
-      if(hM2>0)s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="'+C.mort+'" rx="1"/>';
+      if(hC>0){s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="'+C.corp+'" rx="1"/>';
+        if(hC>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC/2+2.5)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="6" font-weight="700" fill="#fff">'+byM[mi2].c+'</text>';}
+      if(hM2>0){s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="'+C.mort+'" rx="1"/>';
+        if(hM2>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC-hM2/2+2.5)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="6" font-weight="700" fill="#fff">'+byM[mi2].m+'</text>';}
       s+='<text x="'+(xM+bW/2)+'" y="'+(yBM+15)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#64748b">'+MN[mi2-1]+'</text>';}
     s+='</svg>';
     return s;
@@ -41270,37 +41432,21 @@ function _sevPrintStats() {
     return items.map(function(k,i){return _barRow(k,counts[k],mx,total,cols3[i%cols3.length]);}).join('');
   })();
 
-  // ── Bars Origines ──
+  // ── Bars Origines (uniquement les événements avec une référence BEA) ──
   var _barsOrig = (function(){
-    var OL=['Panne moteur','Facteur humain','Météo','Défaut mat.','Perte contrôle','Collision','Procédure','Autre'];
-    var OK=[['panne','moteur','mécanique','carburateur'],['humain','pilote','fatigue','erreur'],['météo','vent','orage','visibilité'],['défaut','matériel','structure','cellule'],['perte','contrôle','décrochage','vrille'],['collision','abordage','obstacle','câble'],['procédure','réglementation'],[]];
-    var counts={}; OL.forEach(function(l){counts[l]=0;});
-    var hasBEA=evs.some(function(e){return !!e.refBEA;});
-    if(hasBEA){
-      evs.forEach(function(e){
-        if(e.refBEA){counts[e.refBEA]=(counts[e.refBEA]||0)+1;return;}
-        var txt=((e.description||'')+(e.origines||'')).toLowerCase();
-        var matched=false;
-        for(var oi=0;oi<OL.length-1;oi++){if(OK[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL[oi]]++;matched=true;break;}}
-        if(!matched)counts['Autre']++;
-      });
-    } else {
-      evs.forEach(function(e){
-        var txt=((e.description||'')+(e.origines||'')).toLowerCase();
-        var matched=false;
-        for(var oi=0;oi<OL.length-1;oi++){if(OK[oi].some(function(kw){return txt.indexOf(kw)>=0;})){counts[OL[oi]]++;matched=true;}}
-        if(!matched)counts['Autre']++;
-      });
-    }
+    var counts={};
+    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
+      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
+    });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,8);
     var cols3=[C.mort,'#d97706',C.p1,C.p2,C.p3,C.p5,C.p6,C.p7];
     var mx=items.length?counts[items[0]]:1;
     return items.map(function(k,i){return _barRow(k.length>30?k.slice(0,28)+'…':k,counts[k],mx,total,cols3[i%cols3.length]);}).join('');
   })();
 
-  // ── Carte : agréger par département pour Leaflet dans la fenêtre impression ──
+  // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
   var _printDeptMap = {};
-  evs.forEach(function(e) {
+  evs.filter(function(e){ return _isMort(e) || _isCorp(e); }).forEach(function(e) {
     var raw = (e.dept||'').toString().trim();
     var d = _DEPT_COORDS[raw] ? raw : (_DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null);
     if (!d) return;
@@ -41342,13 +41488,14 @@ function _sevPrintStats() {
   };
 
   var printDate = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
-  var titleLabel = filterYear ? 'Bilan sécurité — Année '+filterYear : 'Bilan sécurité des pratiques';
+  var logo = (typeof _getAppLogo === 'function' ? _getAppLogo() : '') || 'https://ffplum.fr/templates/ffplum/images/logo.png';
+  var titleLabel = filterYear ? 'RASU — Année '+filterYear : 'RECUEIL ACCIDENTOLOGIE ET SÉCURITÉ ULM - RASU';
   var subLabel = filterYear ? total+' événements en '+filterYear+' · '+nYears+' mois couverts' : total+' événements · '+periodeStr+(nYears?' · '+nYears+' an'+(nYears>1?'s':''):'');
 
   var w = window.open('','_blank','width=900,height=1200');
   if (!w) { alert('Veuillez autoriser les popups pour imprimer.'); return; }
   w.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
-    +'<title>Bilan Sécurité FFPLUM</title>'
+    +'<title>RASU — FFPLUM</title>'
     +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0}'
@@ -41376,6 +41523,7 @@ function _sevPrintStats() {
 
     // ── Header ──
     +'<div class="hdr">'
+    +(logo?'<img src="'+logo+'" style="height:64px;width:auto;max-width:140px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
     +'<div>'
     +'<div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px">FFPLUM · Direction Technique Nationale</div>'
     +'<div style="font-size:20px;font-weight:900;color:#1e3a5f;letter-spacing:-.3px">'+titleLabel+'</div>'
@@ -41391,11 +41539,10 @@ function _sevPrintStats() {
     // ── KPI ──
     + kpiHtml
 
-    // ── Row 1 : Par année + Par mois ──
-    +'<div class="row row-2" style="margin-bottom:10px">'
-    + _sec('Événements par année', _svgAnne)
-    + _sec('Répartition par mois', _svgMois)
-    +'</div>'
+    // ── Row 1 : Par année (+ Par mois si une saison précise est sélectionnée) ──
+    + (filterYear
+        ? '<div class="row row-2" style="margin-bottom:10px">' + _sec('Événements par année', _svgAnne) + _sec('Répartition par mois', _svgMois) + '</div>'
+        : '<div class="row" style="margin-bottom:10px">' + _sec('Événements par année', _svgAnne) + '</div>')
 
     // ── Row 2 : 3 donuts ──
     +'<div class="row row-3" style="margin-bottom:10px">'
