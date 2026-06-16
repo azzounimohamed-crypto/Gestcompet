@@ -40614,13 +40614,17 @@ function openSecuriteEvents(volet) {
 
   var content = volet === 'stats' ? _renderSecuriteStats() : volet === 'refs' ? _renderReferencesBEA() : _renderRegistreEvenement();
 
-  wb.innerHTML = '<div style="padding:24px 32px 52px">'
-    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+  wb.innerHTML = '<div style="display:flex;flex-direction:column;height:100%">'
+    + '<div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:20px 32px 0;flex-shrink:0">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
     + '<button onclick="_dtnGoHome()" title="Accueil" style="display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid var(--bdr);border-radius:7px;background:transparent;color:var(--txt2);cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="15 18 9 12 15 6"/></svg>Accueil</button>'
     + '<div style="font-size:16px;font-weight:900;color:var(--txt)">⚠️ RECUEIL ACCIDENTOLOGIE ET SÉCURITÉ ULM - RASU</div>'
     + '</div>'
-    + navHtml + content + '</div>';
+    + navHtml
+    + '</div>'
+    + '<div style="padding:16px 32px 52px;flex:1;overflow-y:auto">' + content + '</div>'
+    + '</div>';
 
   if (volet === 'stats') setTimeout(_initSevLeafletMap, 80);
 }
@@ -40693,14 +40697,40 @@ function _initSevLeafletMap() {
 
 function _renderRegistreEvenement() {
   if (!S.securiteEvents) S.securiteEvents = [];
-  var evs = S.securiteEvents.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if (typeof window._sevRegYear === 'undefined') window._sevRegYear = '';
 
-  var _gravCol = ['','#22c55e','#84cc16','#f59e0b','#ef4444','#7f1d1d'];
+  var _all = S.securiteEvents.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   var _statCol = {ouvert:'#ef4444','en-cours':'#f59e0b',clos:'#10b981'};
 
+  // Années disponibles pour le filtre
+  var _yrsSet = {};
+  _all.forEach(function(e){ var y=(e.date||'').slice(0,4); if(y.length===4) _yrsSet[y]=1; });
+  var _yrsList = Object.keys(_yrsSet).sort().reverse();
+
+  // Filtre année
+  var filterY = window._sevRegYear || '';
+  var evs = filterY ? _all.filter(function(e){ return (e.date||'').slice(0,4)===filterY; }) : _all;
+
+  var selStyle = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 28px 6px 10px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none';
+
   var html = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">'
-    + '<div style="font-size:13px;color:var(--txt3)">'+evs.length+' événement'+(evs.length!==1?'s':'')+' enregistré'+(evs.length!==1?'s':'')+' au registre</div>'
+    + '<div style="display:flex;align-items:center;gap:10px">'
+    + '<div style="font-size:13px;color:var(--txt3)">'+(filterY?evs.length+' / ':'')+_all.length+' événement'+(_all.length!==1?'s':'')+' au registre</div>'
+    + (_yrsList.length > 1
+        ? '<div style="position:relative;display:inline-flex;align-items:center">'
+          + '<select onchange="window._sevRegYear=this.value;openSecuriteEvents(\'registre\')" style="'+selStyle+'">'
+          + '<option value="">Toutes années</option>'
+          + _yrsList.map(function(y){ return '<option value="'+y+'"'+(filterY===y?' selected':'')+'>'+y+'</option>'; }).join('')
+          + '</select>'
+          + '<svg style="position:absolute;right:8px;pointer-events:none" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="var(--txt3)" stroke-width="2" stroke-linecap="round"><polyline points="2,4 6,8 10,4"/></svg>'
+          + '</div>'
+        : '')
+    + (filterY ? '<button onclick="window._sevRegYear=\'\';openSecuriteEvents(\'registre\')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕ Tout afficher</button>' : '')
+    + '</div>'
     + '<div style="display:flex;gap:8px">'
+    + '<button onclick="_sevDeduplicateRegistre()" title="Supprimer les doublons détectés (même date + mêmes premiers éléments)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid rgba(239,68,68,.3);border-radius:9px;background:rgba(239,68,68,.06);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>'
+    + 'Supprimer doublons</button>'
     + '<label title="Importer un fichier Excel (.xlsx/.xls/.csv)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--bdr);border-radius:9px;background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
     + 'Importer Excel'
@@ -40711,22 +40741,24 @@ function _renderRegistreEvenement() {
     + '+ Nouveau</button>'
     + '</div></div>';
 
-  if (!evs.length) {
+  if (!_all.length) {
     html += '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">'
       + '<div style="font-size:32px;margin-bottom:10px">🛡️</div>Aucun événement enregistré.<br>Cliquez sur "+ Nouveau" pour déclarer un événement.</div>';
     return html;
   }
 
-  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden;overflow-x:auto">'
+  var _thSt = 'padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:2;background:var(--navy3)';
+  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
+    + '<div style="overflow-x:auto;max-height:calc(100vh - 310px);overflow-y:auto">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">'
-    + '<thead><tr style="background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Date</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Lieu</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Appareil</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Premiers éléments</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);color:#6366f1">Réf. BEA</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Statut</th>'
-    + '<th style="padding:9px 8px;border-bottom:1px solid var(--bdr)"></th>'
+    + '<thead><tr style="color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
+    + '<th style="'+_thSt+';width:90px">Date</th>'
+    + '<th style="'+_thSt+'">Lieu</th>'
+    + '<th style="'+_thSt+'">Appareil</th>'
+    + '<th style="'+_thSt+'">Premiers éléments</th>'
+    + '<th style="'+_thSt+';color:#6366f1">Réf. BEA</th>'
+    + '<th style="'+_thSt+'">Statut</th>'
+    + '<th style="'+_thSt+';width:70px"></th>'
     + '</tr></thead><tbody>';
 
   evs.forEach(function(ev, i) {
@@ -40734,17 +40766,8 @@ function _renderRegistreEvenement() {
     var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
     var sc = _statCol[ev.statut] || '#64748b';
     var statutLabel = _SEV_STATUT[ev.statut] || ev.statut || '—';
-    var nbBlesses = parseInt(ev.nbBlesses||0);
-    var nbTues    = parseInt(ev.nbTues||0);
-    var isCorp = ev.isCorporel || nbBlesses > 0;
-    var isMort = ev.isMortel   || nbTues    > 0;
-    var corpCell = isCorp
-      ? '<span style="display:inline-flex;align-items:center;justify-content:center;gap:4px;font-weight:700;color:#f59e0b">'+(nbBlesses>0?nbBlesses:'✓')+'</span>'
-      : '<span style="color:var(--txt3)">—</span>';
-    var mortCell = isMort
-      ? '<span style="display:inline-flex;align-items:center;justify-content:center;gap:4px;font-weight:700;color:#ef4444">'+(nbTues>0?nbTues:'✓')+'</span>'
-      : '<span style="color:var(--txt3)">—</span>';
     var descCourt = (ev.description||'').slice(0,80)+(ev.description&&ev.description.length>80?'…':'');
+    var _btnSt = 'width:26px;height:26px;border:1px solid var(--bdr);border-radius:6px;background:transparent;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center';
     html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr);transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(i%2===0?'':'rgba(255,255,255,.02)')+'\'">'+
       '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap">'+d+'</td>'+
       '<td style="padding:8px 10px;color:var(--txt2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.lieu||'—')+'</td>'+
@@ -40752,12 +40775,17 @@ function _renderRegistreEvenement() {
       '<td style="padding:8px 10px;color:var(--txt2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.description||'').replace(/"/g,"&quot;")+'">'+descCourt+'</td>'+
       '<td style="padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.refBEA||'').replace(/"/g,"&quot;")+'">'+(ev.refBEA?'<span style="font-size:10px;color:#6366f1;font-weight:600">'+ev.refBEA+'</span>':'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'+
       '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+statutLabel+'</span></td>'+
-      '<td style="padding:8px 8px;text-align:center">'+
-        '<button onclick="openSecuriteEventForm(\''+ev.id+'\')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:6px;background:transparent;color:var(--txt3);cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center">✎</button>'+
+      '<td style="padding:8px 8px;text-align:center;white-space:nowrap">'+
+        '<div style="display:flex;gap:4px;align-items:center;justify-content:center">'+
+          '<button onclick="openSecuriteEventForm(\''+ev.id+'\')" title="Modifier" style="'+_btnSt+';color:var(--txt3)">✎</button>'+
+          '<button id="sev-del-'+ev.id+'" onclick="_securiteEventDelete(\''+ev.id+'\')" title="Supprimer" style="'+_btnSt+';color:#ef4444;border-color:rgba(239,68,68,.3)">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>'+
+          '</button>'+
+        '</div>'+
       '</td></tr>';
   });
 
-  html += '</tbody></table></div>';
+  html += '</tbody></table></div></div>';
   return html;
 }
 
@@ -40781,12 +40809,14 @@ function _renderReferencesBEA() {
     return html;
   }
 
-  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden;overflow-x:auto">'
+  var _thB = 'padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:2;background:var(--navy3)';
+  html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
+    + '<div style="overflow-x:auto;max-height:calc(100vh - 280px);overflow-y:auto">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">'
-    + '<thead><tr style="background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);width:90px">Date</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr)">Premiers éléments</th>'
-    + '<th style="padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);color:#6366f1;width:360px">Référence BEA</th>'
+    + '<thead><tr style="color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
+    + '<th style="'+_thB+';width:90px">Date</th>'
+    + '<th style="'+_thB+'">Premiers éléments</th>'
+    + '<th style="'+_thB+';color:#6366f1;width:360px">Référence BEA</th>'
     + '</tr></thead><tbody>';
 
   evs.forEach(function(ev, i) {
@@ -40818,7 +40848,7 @@ function _renderReferencesBEA() {
       + '</tr>';
   });
 
-  html += '</tbody></table></div>';
+  html += '</tbody></table></div></div>';
   return html;
 }
 
@@ -40984,7 +41014,7 @@ function _renderSecuriteStats() {
   var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
 
   var _PAL = ['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#ec4899','#ef4444','#f97316'];
-  var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px';
+  var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;overflow:hidden;min-height:0';
 
   var _card = function(title, content, span) {
     return '<div style="'+_cSt+';padding:14px;display:flex;flex-direction:column'+(span?';grid-column:span '+span:'')+'">'
@@ -41094,8 +41124,8 @@ function _renderSecuriteStats() {
   });
   html+='</div>';
 
-  // ── Grille 4 colonnes × 2 lignes ──
-  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:stretch">';
+  // ── Grille 4 colonnes × 2 lignes — hauteur contrainte pour tenir dans le viewport ──
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:10px;height:calc(100vh - 370px);overflow:hidden">';
 
   // ── Card 1 : Par année (toujours toutes les saisons, indépendamment du filtre) ──
   (function(){
@@ -41257,7 +41287,7 @@ function _renderSecuriteStats() {
   })();
 
   // ── Card 8 : Carte Leaflet ──
-  html+=_card('Carte des événements','<div id="sev-leaflet-map" style="height:260px;border-radius:8px;overflow:hidden;background:var(--navy)"></div>');
+  html+=_card('Carte des événements','<div id="sev-leaflet-map" style="height:100%;min-height:120px;border-radius:8px;overflow:hidden;background:var(--navy)"></div>');
 
   html+='</div>';
   return html;
@@ -42127,8 +42157,43 @@ function importSecuriteEvents(input) {
   else reader.readAsArrayBuffer(file);
 }
 
+function _sevDeduplicateRegistre() {
+  if (!S.securiteEvents || !S.securiteEvents.length) { toast('Aucun événement dans le registre', 'ok'); return; }
+  var seen = {}, kept = [], removed = 0;
+  S.securiteEvents.forEach(function(e) {
+    var desc = (e.description||'').trim().slice(0,60);
+    var key = (e.date||'') + '|' + (desc.length > 5 ? desc : ((e.lieu||'') + '|' + (e.dept||'') + '|' + (e.nbTues||0) + '|' + (e.nbBlesses||0)));
+    if (seen[key]) { removed++; } else { seen[key] = true; kept.push(e); }
+  });
+  if (!removed) { toast('Aucun doublon détecté ✓', 'ok'); return; }
+  var btn = document.querySelector('[onclick="_sevDeduplicateRegistre()"]');
+  if (btn && btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.textContent = removed + ' doublon' + (removed > 1 ? 's' : '') + ' — Confirmer ?';
+    btn.style.background = 'rgba(239,68,68,.2)';
+    setTimeout(function(){ btn.dataset.confirm=''; openSecuriteEvents('registre'); }, 4000);
+    return;
+  }
+  S.securiteEvents = kept;
+  saveState();
+  openSecuriteEvents('registre');
+  toast(removed + ' doublon' + (removed > 1 ? 's' : '') + ' supprimé' + (removed > 1 ? 's' : '') + ' ✓', 'ok');
+}
+
 function _securiteEventDelete(evId) {
-  if (!confirm('Supprimer cet événement du registre ?')) return;
+  var btn = document.getElementById('sev-del-'+evId);
+  if (!btn) return;
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.innerHTML = '<span style="font-size:9px;font-weight:800;white-space:nowrap">Confirmer?</span>';
+    btn.style.width = 'auto';
+    btn.style.padding = '0 6px';
+    btn.style.color = '#fff';
+    btn.style.background = '#ef4444';
+    btn.style.borderColor = '#ef4444';
+    setTimeout(function(){ if(btn.dataset.confirm==='1'){btn.dataset.confirm='';btn.style.cssText='';btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';} }, 3000);
+    return;
+  }
   S.securiteEvents = (S.securiteEvents||[]).filter(function(e){ return e.id!==evId; });
   saveState();
   var ov = document.getElementById('sev-form-ov'); if(ov) ov.remove();
