@@ -33469,8 +33469,8 @@ function renderNDFList() {
   var iSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 8px;outline:none;box-sizing:border-box';
   var iStRo = 'padding:5px 8px;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt3);font-size:11px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
   var lSt = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:3px;white-space:nowrap';
-  var fldFixed = function(lbl,id,val,ph,w){ return '<div style="width:'+w+';flex-shrink:0"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" onchange="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
-  var fldGrow = function(lbl,id,val,ph){ return '<div style="flex:1;min-width:120px"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" onchange="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
+  var fldFixed = function(lbl,id,val,ph,w){ return '<div style="width:'+w+';flex-shrink:0"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" oninput="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
+  var fldGrow = function(lbl,id,val,ph){ return '<div style="flex:1;min-width:120px"><label style="'+lSt+'">'+lbl+'</label><input id="'+id+'" value="'+val+'" placeholder="'+ph+'" style="'+iSt+'" oninput="_ndfSaveCartouche()" onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"></div>'; };
   var cartouche = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:12px 16px;margin-bottom:16px">'
     +'<div style="font-size:9px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Cartouche d\'impression</div>'
     +'<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:nowrap">'
@@ -33493,7 +33493,7 @@ function renderNDFList() {
   var rows = '';
   sorted.forEach(function(n) {
     var id = n.id;
-    var ch = function(f){ return 'onchange="_ndfRowChange(\''+id+'\',\''+f+'\',this.value)"'; };
+    var ch = function(f){ return 'oninput="_ndfRowChange(\''+id+'\',\''+f+'\',this.value)"'; };
     var fo = 'onfocus="this.style.borderColor=\'#10b981\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
     rows += '<tr>'
       +'<td style="'+cellSt+'"><input type="date" value="'+(n.date||'')+'" '+ch('date')+' style="'+iSt+';width:130px" '+fo+'></td>'
@@ -40999,7 +40999,7 @@ function _renderSecuriteStats() {
   }
 
   // Filtre par année (persisté dans window._sevStatYear)
-  if (typeof window._sevStatYear === 'undefined') window._sevStatYear = '';
+  if (typeof window._sevStatYear === 'undefined') window._sevStatYear = new Date().getFullYear().toString();
   var filterYear = window._sevStatYear || '';
   var evs = filterYear
     ? _allEvs.filter(function(e){ return (e.date||'').slice(0,4) === filterYear; })
@@ -41213,29 +41213,17 @@ function _renderSecuriteStats() {
     html+=_card('Corporel / Mortel','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD3+leg3+'</div>');
   })();
 
-  // ── Card 4 : Classes ULM (donut) ──
+  // ── Card 4 : Classes ULM (barres horizontales) ──
   (function(){
     var counts={};
     evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';counts[c]=(counts[c]||0)+1;});
-    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7);
-    var cols=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488'];
-    var segs=items.map(function(k,i){return {v:counts[k],col:cols[i%cols.length]};});
-    var svgD='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:130px;display:block;margin:0 auto">';
-    svgD+=_donut(segs,cols,70,70,52,20);
-    svgD+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="26" font-weight="900" fill="var(--txt)">'+items.length+'</text>';
-    svgD+='<text x="70" y="82" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">classes</text>';
-    svgD+='</svg>';
-    var leg='';
-    items.forEach(function(k,i){
-      var pct=total>0?Math.round(counts[k]/total*100):0;
-      leg+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
-        +'<div style="width:8px;height:8px;border-radius:50%;background:'+cols[i%cols.length]+';flex-shrink:0"></div>'
-        +'<span style="font-size:11px;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+k+'</span>'
-        +'<b style="font-size:11px;color:'+cols[i%cols.length]+'">'+counts[k]+'</b>'
-        +'<span style="font-size:9px;color:var(--txt3);width:26px;text-align:right">'+pct+'%</span>'
-        +'</div>';
-    });
-    html+=_card('Classes ULM','<div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">'+svgD+'<div style="margin-top:10px">'+leg+'</div></div>');
+    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,8);
+    var cols=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#a855f7'];
+    var mx=items.length?counts[items[0]]:1;
+    var s=items.length
+      ? items.map(function(k,i){ return _bRow(k,counts[k],mx,total,cols[i%cols.length]); }).join('')
+      : '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>';
+    html+=_card('Classes ULM',s);
   })();
 
   // ── Card 5 : Type de vol (bRow) ──
@@ -41248,23 +41236,76 @@ function _renderSecuriteStats() {
     html+=_card('Type de vol',s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>');
   })();
 
-  // ── Card 6 : Origines — uniquement les événements avec une référence BEA ──
+  // ── Card 6 : Origines — Treemap SVG (réf. BEA uniquement) ──
   (function(){
     var PAL_O=['#ef4444','#f97316','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#10b981','#64748b','#ec4899','#0891b2'];
     var counts={};
     evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
-      counts[e.refBEA] = (counts[e.refBEA]||0) + 1;
+      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
     });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
-    var mx=items.length?counts[items[0]]:1;
     var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
-    var s='';
-    items.forEach(function(l,i){
-      var lbl=l.length>32?l.slice(0,30)+'…':l;
-      s+=_bRow(lbl,counts[l],mx,total,PAL_O[i%PAL_O.length]);
+    var footer='<div style="font-size:9px;color:#6366f1;margin-top:6px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
+    if(!items.length){
+      html+=_card('Origines','<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer);
+      return;
+    }
+    // Treemap slice-and-dice
+    var W=240,H=155,sum=items.reduce(function(a,k){return a+counts[k];},0);
+    var rects=[],rem=items.slice(),x=0,y=0,rw=W,rh=H,horiz=true;
+    while(rem.length){
+      var batch=rem.splice(0,Math.max(1,Math.ceil(rem.length/2)));
+      var bSum=batch.reduce(function(a,k){return a+counts[k];},0);
+      var cx=x,cy=y;
+      if(horiz){
+        var bh=Math.round(bSum/sum*rh);
+        var bx=cx;
+        batch.forEach(function(k,i){
+          var bw=Math.round(counts[k]/bSum*rw);
+          if(i===batch.length-1) bw=cx+rw-bx;
+          rects.push({x:bx,y:cy,w:bw,h:bh,k:k,v:counts[k]});
+          bx+=bw;
+        });
+        y+=bh; rh-=bh;
+      } else {
+        var bw2=Math.round(bSum/sum*rw);
+        var by=cy;
+        batch.forEach(function(k,i){
+          var bh2=Math.round(counts[k]/bSum*rh);
+          if(i===batch.length-1) bh2=cy+rh-by;
+          rects.push({x:cx,y:by,w:bw2,h:bh2,k:k,v:counts[k]});
+          by+=bh2;
+        });
+        x+=bw2; rw-=bw2;
+      }
+      horiz=!horiz;
+    }
+    var BLUES=['#1e3a8a','#1e40af','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#dbeafe','#eff6ff'];
+    var TXTS =['#fff','#fff','#fff','#fff','#fff','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a'];
+    var defs='<defs>'+rects.map(function(r,i){return '<clipPath id="cp'+i+'"><rect x="'+(r.x+1)+'" y="'+(r.y+1)+'" width="'+Math.max(r.w-3,0)+'" height="'+Math.max(r.h-3,0)+'"/></clipPath>';}).join('')+'</defs>';
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;overflow:hidden">'+defs;
+    rects.forEach(function(r,i){
+      var col=BLUES[i%BLUES.length], tc=TXTS[i%TXTS.length];
+      s+='<rect x="'+r.x+'" y="'+r.y+'" width="'+Math.max(r.w-1,0)+'" height="'+Math.max(r.h-1,0)+'" fill="'+col+'" rx="2"/>';
+      if(r.w<12||r.h<10) return;
+      var fs=Math.max(5,Math.min(7,Math.floor(r.w/10),Math.floor(r.h/4.5)));
+      var charsPerLine=Math.floor((r.w-4)/(fs*0.58));
+      var lbl=r.k.length>charsPerLine?r.k.slice(0,Math.max(2,charsPerLine-1))+'…':r.k;
+      var showVal=r.h>fs*3.5&&r.w>14;
+      var showLbl=r.w>12&&r.h>fs*1.8;
+      s+='<g clip-path="url(#cp'+i+')">';
+      if(showLbl){
+        var ty=r.y+r.h/2+(showVal?-fs*0.8:0);
+        s+='<text x="'+(r.x+r.w/2)+'" y="'+ty+'" text-anchor="middle" font-family="inherit" font-size="'+fs+'" fill="'+tc+'" dominant-baseline="middle">'+lbl+'</text>';
+      }
+      if(showVal){
+        var vy=r.y+r.h/2+(showLbl?fs*1.2:0);
+        s+='<text x="'+(r.x+r.w/2)+'" y="'+vy+'" text-anchor="middle" font-family="inherit" font-size="'+(fs+1)+'" font-weight="700" fill="'+tc+'" dominant-baseline="middle">'+r.v+'</text>';
+      }
+      s+='</g>';
     });
-    var footer='<div style="font-size:9px;color:#6366f1;margin-top:8px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
-    html+=_card('Origines',(s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>')+footer);
+    s+='</svg>';
+    html+=_card('Origines',s+footer);
   })();
 
   // ── Card 7 : Instructeur à bord (donut) ──
@@ -41421,22 +41462,13 @@ function _sevPrintStats() {
     return s;
   })();
 
-  // ── Donut Classes ULM ──
+  // ── Barres horizontales Classes ULM ──
   var _svgD2 = (function(){
     var counts={}; evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';counts[c]=(counts[c]||0)+1;});
     var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7);
     var cols2=[C.p1,C.p2,C.p3,C.p4,C.p5,C.p6,C.p7];
-    var segs2=items.map(function(k){return {v:counts[k]};});
-    var s='<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg" style="width:110px;height:110px;display:block;margin:0 auto"><rect width="130" height="130" fill="#fff"/>';
-    s+=_donutP(segs2,cols2,48,16,65,65,'classes',items.length);
-    s+='</svg>';
-    return s+'<div style="margin-top:6px">'+items.slice(0,5).map(function(k,i){
-      return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">'
-        +'<div style="width:7px;height:7px;border-radius:50%;background:'+cols2[i%cols2.length]+';flex-shrink:0"></div>'
-        +'<span style="font-size:9px;color:#374151;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+k+'</span>'
-        +'<b style="font-size:9px;color:'+cols2[i%cols2.length]+'">'+counts[k]+'</b>'
-        +'</div>';
-    }).join('')+'</div>';
+    var mx=items.length?counts[items[0]]:1;
+    return items.map(function(k,i){return _barRow(k.length>24?k.slice(0,22)+'…':k,counts[k],mx,total,cols2[i%cols2.length]);}).join('');
   })();
 
   // ── Donut Instructeur ──
@@ -41462,16 +41494,55 @@ function _sevPrintStats() {
     return items.map(function(k,i){return _barRow(k,counts[k],mx,total,cols3[i%cols3.length]);}).join('');
   })();
 
-  // ── Bars Origines (uniquement les événements avec une référence BEA) ──
+  // ── Treemap Origines (uniquement les événements avec une référence BEA) ──
   var _barsOrig = (function(){
     var counts={};
-    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
-      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
+    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){ counts[e.refBEA]=(counts[e.refBEA]||0)+1; });
+    var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
+    if(!items.length) return '';
+    var cols3=[C.mort,'#d97706',C.p1,C.p2,C.p3,C.p5,C.p6,C.p7,'#0891b2','#ec4899'];
+    var W=290,H=130,sum=items.reduce(function(a,k){return a+counts[k];},0);
+    var rects=[],rem=items.slice(),x=0,y=0,rw=W,rh=H,horiz=true;
+    while(rem.length){
+      var batch=rem.splice(0,Math.max(1,Math.ceil(rem.length/2)));
+      var bSum=batch.reduce(function(a,k){return a+counts[k];},0);
+      var cx=x,cy=y;
+      if(horiz){
+        var bh=Math.round(bSum/sum*rh),bx=cx;
+        batch.forEach(function(k,i){var bw=Math.round(counts[k]/bSum*rw);if(i===batch.length-1)bw=cx+rw-bx;rects.push({x:bx,y:cy,w:bw,h:bh,k:k,v:counts[k]});bx+=bw;});
+        y+=bh;rh-=bh;
+      } else {
+        var bw2=Math.round(bSum/sum*rw),by=cy;
+        batch.forEach(function(k,i){var bh2=Math.round(counts[k]/bSum*rh);if(i===batch.length-1)bh2=cy+rh-by;rects.push({x:cx,y:by,w:bw2,h:bh2,k:k,v:counts[k]});by+=bh2;});
+        x+=bw2;rw-=bw2;
+      }
+      horiz=!horiz;
+    }
+    var BLUES2=['#1e3a8a','#1e40af','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#dbeafe','#eff6ff'];
+    var TXTS2 =['#fff','#fff','#fff','#fff','#fff','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a'];
+    var defs2='<defs>'+rects.map(function(r,i){return '<clipPath id="pcp'+i+'"><rect x="'+(r.x+1)+'" y="'+(r.y+1)+'" width="'+Math.max(r.w-3,0)+'" height="'+Math.max(r.h-3,0)+'"/></clipPath>';}).join('')+'</defs>';
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:4px;overflow:hidden">'+defs2;
+    rects.forEach(function(r,i){
+      var col=BLUES2[i%BLUES2.length], tc=TXTS2[i%TXTS2.length];
+      s+='<rect x="'+r.x+'" y="'+r.y+'" width="'+Math.max(r.w-1,0)+'" height="'+Math.max(r.h-1,0)+'" fill="'+col+'" rx="2"/>';
+      if(r.w<12||r.h<10) return;
+      var fs=Math.max(5,Math.min(7,Math.floor(r.w/10),Math.floor(r.h/4.5)));
+      var charsPerLine=Math.floor((r.w-4)/(fs*0.58));
+      var lbl=r.k.length>charsPerLine?r.k.slice(0,Math.max(2,charsPerLine-1))+'…':r.k;
+      var showVal=r.h>fs*3.5&&r.w>14;
+      var showLbl=r.w>12&&r.h>fs*1.8;
+      s+='<g clip-path="url(#pcp'+i+')">';
+      if(showLbl){
+        var ty=r.y+r.h/2+(showVal?-fs*0.8:0);
+        s+='<text x="'+(r.x+r.w/2)+'" y="'+ty+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="'+fs+'" fill="'+tc+'" dominant-baseline="middle">'+lbl+'</text>';
+      }
+      if(showVal){
+        var vy=r.y+r.h/2+(showLbl?fs*1.2:0);
+        s+='<text x="'+(r.x+r.w/2)+'" y="'+vy+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="'+(fs+1)+'" font-weight="700" fill="'+tc+'" dominant-baseline="middle">'+r.v+'</text>';
+      }
+      s+='</g>';
     });
-    var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,8);
-    var cols3=[C.mort,'#d97706',C.p1,C.p2,C.p3,C.p5,C.p6,C.p7];
-    var mx=items.length?counts[items[0]]:1;
-    return items.map(function(k,i){return _barRow(k.length>30?k.slice(0,28)+'…':k,counts[k],mx,total,cols3[i%cols3.length]);}).join('');
+    return s+'</svg>';
   })();
 
   // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
@@ -41585,16 +41656,19 @@ function _sevPrintStats() {
     + _sec('Instructeur à bord', _svgD3)
     +'</div>'
 
-    // ── Row 3 : Type de vol + Origines ──
+    // ── Row 3 : Type de vol + Carte des événements ──
     +'<div class="row row-2b" style="margin-bottom:10px">'
     + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
-    + _sec('Origines détectées', _barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
-    +'</div>'
-
-    // ── Row 4 : Carte des événements ──
     +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
     +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France métropolitaine</div>'
     +'<div id="prt-map"></div>'
+    +'</div>'
+    +'</div>'
+
+    // ── Row 4 : Origines détectées (Treemap pleine largeur) ──
+    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;margin-bottom:10px">'
+    +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
+    +(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')
     +'</div>'
 
     +'</div></div>'
