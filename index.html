@@ -506,7 +506,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   body.dtn-sb-hidden #ndf-overlay{left:0!important;transition:left .22s ease}
   body.dtn-sb-hidden #ndf-detail-sheet{left:0!important;transition:left .22s ease}
   body.dtn-sb-hidden #espaces-overlay{left:0!important;transition:left .22s ease}
+  body.dtn-sb-hidden #budget-overlay{left:0!important;transition:left .22s ease}
   #espaces-overlay{transition:left .22s ease}
+  #budget-overlay{transition:left .22s ease}
   #ndf-overlay{transition:left .22s ease}
   #ndf-detail-sheet{transition:left .22s ease}
   body.dtn-sb-hidden #header-mobile-title{display:none!important}
@@ -1914,10 +1916,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <div class="card" style="margin:12px 12px 0;font-size:13px;color:var(--txt2);line-height:1.9">
           <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px">🔐 Processus d'accès</div>
           <ol style="padding-left:18px;margin:0 0 10px;line-height:2">
-            <li>Réception du lien d'invitation par e-mail</li>
-            <li>Complétion du profil (nom, prénom, téléphone)</li>
-            <li>Validation par le gestionnaire de l'application</li>
-            <li>Activation des droits selon le statut attribué</li>
+            <li>Le gestionnaire crée l'utilisateur et génère un <b>code d'invitation</b></li>
+            <li>Le code est transmis à l'utilisateur (SMS, WhatsApp, email…)</li>
+            <li>L'utilisateur clique sur <b>Rejoindre avec un code</b> sur l'écran de connexion</li>
+            <li>Il saisit son email, le code et choisit son mot de passe</li>
           </ol>
           <div style="font-size:11px;color:var(--txt3);border-top:1px solid var(--bdr);padding-top:8px">
             ℹ️ Le compte d'accès est indépendant des fiches Encadrement et Équipage — un utilisateur peut exister sans y être référencé, et inversement.
@@ -1944,7 +1946,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
                 <option value="developpeur">⚙️ Développeur</option>
               </select>
             </div>
-            <button onclick="createAndInviteUser()" style="width:100%;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📧 Créer et envoyer l'invitation</button>
+            <button onclick="generateInviteCode()" style="width:100%;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔑 Générer le code d'invitation</button>
+            <div id="util-invite-code-result" style="display:none;margin-top:12px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.35);border-radius:10px;padding:14px"></div>
           </div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
@@ -2033,26 +2036,26 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <span class="nav-lbl nav-lbl-mobile">Accueil</span>
       <span class="nav-lbl nav-lbl-desktop">Stats</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-pilots" aria-label="Compétiteurs" title="Compétiteurs" onclick="showPage('page-pilots')">
+    <button class="nav-btn nav-desktop-only" id="nav-pilots" aria-label="Compétiteurs" title="Compétiteurs" onclick="closeBudget();showPage('page-pilots')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7.5 7.5 0 0113 0"/><path d="M19 11l1.5 1.5L23 10"/></svg></span><span class="nav-lbl">Compétiteurs</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-staff" aria-label="Staff" title="Staff" onclick="showPage('page-staff')">
+    <button class="nav-btn nav-desktop-only" id="nav-staff" aria-label="Staff" title="Staff" onclick="closeBudget();showPage('page-staff')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a5 5 0 015-5h4a5 5 0 015 5v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg></span><span class="nav-lbl">Staff</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-moyens" aria-label="Moyens" title="Moyens matériels" onclick="showPage('page-moyens')">
+    <button class="nav-btn nav-desktop-only" id="nav-moyens" aria-label="Moyens" title="Moyens matériels" onclick="closeBudget();showPage('page-moyens')">
       <span class="nav-pip"></span>
       <span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5"/></svg></span>
       <span class="nav-lbl">Moyens</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-acteurs" aria-label="Acteurs" title="Acteurs & partenaires" onclick="showPage('page-acteurs')">
+    <button class="nav-btn nav-desktop-only" id="nav-acteurs" aria-label="Acteurs" title="Acteurs & partenaires" onclick="closeBudget();showPage('page-acteurs')">
       <span class="nav-pip"></span>
       <span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
       <span class="nav-lbl">Acteurs</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-sites" aria-label="Sites sportifs" title="Sites sportifs" onclick="showPage('page-sites')">
+    <button class="nav-btn nav-desktop-only" id="nav-sites" aria-label="Sites sportifs" title="Sites sportifs" onclick="closeBudget();showPage('page-sites')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></span><span class="nav-lbl">Sites</span>
     </button>
-    <button class="nav-btn nav-desktop-only" id="nav-settings" aria-label="Gestion" title="Gestion" onclick="showPage('page-settings')">
+    <button class="nav-btn nav-desktop-only" id="nav-settings" aria-label="Gestion" title="Gestion" onclick="closeBudget();showPage('page-settings')">
       <span class="nav-pip"></span><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span><span class="nav-lbl">Gestion</span>
     </button>
 
@@ -2493,6 +2496,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       Espaces partagés
     </button>
 
+    <button id="dtn-nav-budget" onclick="(function(){var ov=document.getElementById('budget-overlay');if(ov&&ov.style.display!=='none'){closeBudget();}else{openBudget();}})()"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
+      onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt2)'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Budget
+    </button>
+
     <button id="dtn-nav-ndf" onclick="(function(){var ov=document.getElementById('ndf-overlay');if(ov&&ov.style.display!=='none'){closeNDF();}else{openNDF();}})()"
       style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
       onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='transparent';this.style.color='var(--txt2)'">
@@ -2654,6 +2664,37 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
   </div>
   <div id="ndf-detail-body" style="flex:1;overflow-y:auto;padding:24px;max-width:700px;margin:0 auto;width:100%"></div>
+</div>
+
+<!-- Budget Prévisionnel / Réalisé -->
+<div id="budget-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="_dtnToggleSidebar()" title="Afficher/masquer le volet" style="width:34px;height:34px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);cursor:pointer;flex-shrink:0;padding:0">
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+        <span style="display:block;width:16px;height:2px;background:var(--txt2);border-radius:2px"></span>
+      </button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <div>
+        <div style="font-size:17px;font-weight:800;color:var(--txt)">Budget</div>
+        <div style="font-size:11px;color:var(--txt3)" id="budget-subtitle">Budget prévisionnel et réalisé</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="_budgetAddRow(_budgetCurrentTab)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;border:none;background:#f59e0b;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Ajouter une ligne
+      </button>
+      <button onclick="closeBudget()" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+  </div>
+  <!-- Onglets -->
+  <div style="display:flex;gap:8px;padding:12px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
+    <button id="budget-tab-previsionnel" onclick="_budgetSetTab('previsionnel')" style="padding:7px 18px;border-radius:8px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Budget Prévisionnel</button>
+    <button id="budget-tab-realise" onclick="_budgetSetTab('realise')" style="padding:7px 18px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Budget Réalisé</button>
+  </div>
+  <div id="budget-body" style="flex:1;overflow-y:auto;padding:20px 24px"></div>
 </div>
 
 <div id="espaces-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
@@ -4030,7 +4071,8 @@ var S = {
     bareme2Taux: 0.200
   },
   ordresMission: [],
-  notesfrais: {}
+  notesfrais: {},
+  budgetDTN: {previsionnel:[], realise:[]}
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -4551,7 +4593,8 @@ function _flushSaveState() {
     _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{},
     agendaEvents:S.agendaEvents||[],
     notesfrais:S.notesfrais||{},
-    securiteEvents:S.securiteEvents||[]
+    securiteEvents:S.securiteEvents||[],
+    budgetDTN:S.budgetDTN||{previsionnel:[],realise:[]}
   });
   try {
     localStorage.setItem(LS, JSON.stringify(_lsPayload));
@@ -4771,6 +4814,7 @@ function warmupSecondaryPages() {
 }
 
 function _deskNav(page, btnId) {
+  closeBudget();
   document.querySelectorAll('#desktop-nav-rail .dnr-btn').forEach(function(b){ b.classList.remove('active'); });
   var btn = document.getElementById(btnId);
   if (btn) btn.classList.add('active');
@@ -7429,7 +7473,7 @@ function _agendaDateAdd(dateStr, days) {
 }
 
 function openAgenda() {
-  closeNDF();
+  closeNDF(); closeBudget();
   var ov = document.getElementById('agenda-overlay');
   if (!ov) return;
 
@@ -19524,8 +19568,17 @@ function renderSettingsCompte() {
     html += '<div id="sc-conn-status" style="font-size:11px;color:' + (_proto==='file:'?'#f59e0b':'var(--txt3)') + ';margin-bottom:8px;text-align:center;line-height:1.5">' + _protoMsg + '</div>';
     if (_proto === 'file:') html += '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 12px;font-size:11px;color:#f59e0b;margin-bottom:10px;line-height:1.7"><b>Pour corriger :</b> ouvrez le Terminal et tapez :<br><code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;font-size:11px">cd ' + JSON.stringify(window.location.pathname.replace(/\/[^\/]*$/, '')) + ' &amp;&amp; python3 -m http.server 8080</code><br>puis ouvrez <b>http://localhost:8080</b> dans votre navigateur</div>';
     html += '<button class="btn btn-primary btn-full" style="margin-bottom:8px" onclick="scLogin()">🔑 Se connecter</button>';
-    html += '<button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="scSignup()">✉️ Créer un compte</button>';
-    html += '<button class="btn btn-secondary btn-full btn-sm" onclick="scReset()" style="font-size:12px;color:var(--txt3)">Mot de passe oublié ?</button>';
+    html += '<button class="btn btn-secondary btn-full btn-sm" onclick="scReset()" style="font-size:12px;color:var(--txt3);margin-bottom:16px">Mot de passe oublié ?</button>';
+    html += '<div style="border-top:1px solid var(--bdr);padding-top:14px">';
+    html += '<button onclick="_scToggleJoin()" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">🎟️ Rejoindre avec un code d\'invitation</button>';
+    html += '<div id="sc-join-form" style="display:none;margin-top:10px">';
+    html += '<div class="field"><label>Email</label><input type="email" id="join-email" placeholder="votre@email.fr" autocomplete="email"></div>';
+    html += '<div class="field"><label>Code d\'invitation</label><input type="text" id="join-code" placeholder="XXXXXXXX" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px;font-weight:700"></div>';
+    html += '<div class="field"><label>Choisir un mot de passe</label><input type="password" id="join-pw" placeholder="8 caractères minimum" autocomplete="new-password"></div>';
+    html += '<div class="field"><label>Confirmer le mot de passe</label><input type="password" id="join-pw2" placeholder="••••••••" autocomplete="new-password"></div>';
+    html += '<div id="join-error" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);border-radius:8px;padding:10px 12px;font-size:12px;color:#ef4444;margin-bottom:10px;line-height:1.5"></div>';
+    html += '<button class="btn btn-primary btn-full" onclick="joinWithCode()">✅ Créer mon compte</button>';
+    html += '</div></div>';
     html += '</div>';
     cont.innerHTML = html; return;
   }
@@ -21599,8 +21652,7 @@ function renderDroitsTab() {
   }).join('');
 }
 
-async function createAndInviteUser() {
-  // Seuls Gestionnaire et Développeur peuvent inviter
+function generateInviteCode() {
   if (!canInvite()) { toast('Droits insuffisants — Gestionnaire ou Développeur requis', 'err'); return; }
   var prenom = (document.getElementById('util-new-prenom')||{value:''}).value.trim();
   var nom    = (document.getElementById('util-new-nom')   ||{value:''}).value.trim();
@@ -21608,49 +21660,91 @@ async function createAndInviteUser() {
   var statut = (document.getElementById('util-new-statut')||{value:'utilisateur'}).value;
   if (!email) { toast('Email requis', 'err'); return; }
   if (!prenom && !nom) { toast('Prénom ou nom requis', 'err'); return; }
-  // Vérifier si déjà existant
-  if (S.pilots.some(function(p){ return (p.email||'').toLowerCase() === email; })) {
+  if (S.pilots.some(function(p){ return (p.email||'').toLowerCase() === email && !p.invitePending; })) {
     toast('Cet email est déjà enregistré', 'err'); return;
   }
-  // Créer le profil en attente
+  var code = (Math.random().toString(36).substr(2,4) + Math.random().toString(36).substr(2,4)).toUpperCase();
+  var expiry = Date.now() + 7 * 24 * 3600 * 1000;
   var pendingId = 'pending-' + Date.now();
-  var newUser = { id: pendingId, prenom: prenom, nom: nom, email: email, statut: statut, invitePending: true };
-  S.pilots.push(newUser);
-  saveState(); silentPush();
-  // Envoyer le lien de connexion via Supabase (magic link / OTP)
-  var sb = getSB ? getSB() : null;
-  if (sb) {
-    try {
-      var newEmail = email;
-      var { error: invErr } = await sb.auth.signInWithOtp({
-        email: newEmail,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: window.location.href
-        }
-      });
-      if (invErr) {
-        toast('Profil créé. Erreur envoi email : ' + invErr.message, 'err');
-      } else {
-        toast('Invitation envoyée à ' + newEmail + ' ✓', 'ok');
-        // Marquer invitation envoyée
-        var idx = S.pilots.findIndex(function(p){ return p.id === pendingId; });
-        if (idx >= 0) S.pilots[idx].inviteSent = true;
-        saveState(); silentPush();
-      }
-    } catch(e) { toast('Profil créé — vérifiez la connexion Supabase', ''); }
-  } else {
-    toast('Profil créé (hors ligne — invitation non envoyée)', '');
+  // Remplacer une invitation pendante existante pour le même email
+  S.pilots = S.pilots.filter(function(p){ return !((p.email||'').toLowerCase() === email && p.invitePending); });
+  S.pilots.push({ id: pendingId, prenom: prenom, nom: nom, email: email, statut: statut, invitePending: true, inviteCode: code, inviteCodeExpiry: expiry, inviteCodeUsed: false });
+  saveState(); if (typeof silentPush === 'function') silentPush();
+  var expiryDate = new Date(expiry).toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'});
+  var r = document.getElementById('util-invite-code-result');
+  if (r) {
+    r.style.display = '';
+    r.innerHTML = '<div style="font-size:12px;color:var(--txt2);margin-bottom:8px">Code d\'invitation pour <b>' + (prenom||nom) + '</b> (' + email + ')</div>'
+      + '<div style="font-size:26px;font-weight:900;letter-spacing:4px;color:var(--stol);font-family:monospace;text-align:center;padding:10px 0">' + code + '</div>'
+      + '<div style="font-size:11px;color:var(--txt3);text-align:center;margin-bottom:10px">Valide jusqu\'au ' + expiryDate + '</div>'
+      + '<div style="font-size:11px;color:var(--txt2);background:var(--navy3);border-radius:8px;padding:10px;line-height:1.6">'
+      + '📋 Transmettez ce code à l\'utilisateur (SMS, WhatsApp, email…)<br>'
+      + 'Il devra cliquer sur <b>Rejoindre avec un code</b> sur l\'écran de connexion<br>'
+      + 'et saisir son email, ce code, et choisir son mot de passe.'
+      + '</div>';
   }
-  // Fermer le formulaire et rafraîchir
-  var body = document.getElementById('util-create-body');
-  var ico  = document.getElementById('util-create-ico');
-  if (body) body.style.display = 'none';
-  if (ico)  ico.textContent = '▸';
-  ['util-new-prenom','util-new-nom','util-new-email'].forEach(function(id){
-    var el = document.getElementById(id); if (el) el.value = '';
+  toast('Code généré ✓', 'ok');
+}
+
+function _scToggleJoin() {
+  var f = document.getElementById('sc-join-form');
+  if (!f) return;
+  var open = f.style.display === 'none' || f.style.display === '';
+  f.style.display = (f.style.display === 'none') ? '' : 'none';
+}
+
+async function joinWithCode() {
+  var email = ((document.getElementById('join-email')||{value:''}).value.trim()).toLowerCase();
+  var code  = ((document.getElementById('join-code') ||{value:''}).value.trim()).toUpperCase();
+  var pw    = (document.getElementById('join-pw')    ||{value:''}).value;
+  var pw2   = (document.getElementById('join-pw2')   ||{value:''}).value;
+  var errEl = document.getElementById('join-error');
+  function showErr(msg) { if (errEl) { errEl.style.display=''; errEl.textContent=msg; } }
+  if (errEl) errEl.style.display = 'none';
+  if (!email) { showErr('Veuillez saisir votre email.'); return; }
+  if (!code)  { showErr('Veuillez saisir le code d\'invitation.'); return; }
+  if (!pw)    { showErr('Veuillez choisir un mot de passe.'); return; }
+  if (pw.length < 8) { showErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
+  if (pw !== pw2)    { showErr('Les mots de passe ne correspondent pas.'); return; }
+  // Trouver le profil invité correspondant
+  var pilot = S.pilots.find(function(p){
+    return (p.email||'').toLowerCase() === email
+      && p.inviteCode === code
+      && p.invitePending
+      && !p.inviteCodeUsed
+      && (p.inviteCodeExpiry||0) > Date.now();
   });
-  renderUtilisateursTab();
+  if (!pilot) {
+    var exists = S.pilots.find(function(p){ return (p.email||'').toLowerCase() === email && p.inviteCode === code; });
+    if (exists && exists.inviteCodeUsed) { showErr('Ce code a déjà été utilisé.'); }
+    else if (exists && (exists.inviteCodeExpiry||0) <= Date.now()) { showErr('Ce code a expiré. Demandez un nouveau code à l\'administrateur.'); }
+    else { showErr('Code ou email incorrect. Vérifiez les informations saisies.'); }
+    return;
+  }
+  var btn = document.querySelector('#sc-join-form .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Création en cours…'; }
+  var sb = getSB ? getSB() : null;
+  if (!sb) { showErr('Connexion au serveur impossible. Réessayez.'); if (btn) { btn.disabled=false; btn.textContent='✅ Créer mon compte'; } return; }
+  try {
+    var _a = await sb.auth.signUp({ email: email, password: pw });
+    var signUpError = _a.error;
+    if (signUpError) { showErr('Erreur : ' + signUpError.message); if (btn) { btn.disabled=false; btn.textContent='✅ Créer mon compte'; } return; }
+    // Marquer le code utilisé et activer le profil
+    var idx = S.pilots.findIndex(function(p){ return p.id === pilot.id; });
+    if (idx >= 0) {
+      S.pilots[idx].invitePending = false;
+      S.pilots[idx].inviteCodeUsed = true;
+      S.pilots[idx].inviteCodeUsedAt = Date.now();
+    }
+    saveState(); if (typeof silentPush === 'function') silentPush();
+    toast('Compte créé ! Vérifiez votre email pour confirmer.', 'ok');
+    // Revenir à l'écran de connexion
+    document.getElementById('sc-join-form').style.display = 'none';
+    ['join-email','join-code','join-pw','join-pw2'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  } catch(e) {
+    showErr('Erreur inattendue : ' + (e.message||e));
+    if (btn) { btn.disabled=false; btn.textContent='✅ Créer mon compte'; }
+  }
 }
 
 // ── Accordéon Réglages ──────────────────────────────────
@@ -33440,6 +33534,7 @@ function _ndfUserList() {
 }
 
 function openNDF() {
+  closeBudget();
   if (!S.user || !S.user.id) { toast('Connectez-vous pour accéder aux notes de frais', 'err'); return; }
   if (!S.notesfrais) S.notesfrais = {};
   var ov = document.getElementById('ndf-overlay');
@@ -33875,10 +33970,240 @@ function printNDFAll() {
 }
 
 // ═══════════════════════════════════════════════
+// BUDGET DTN — Prévisionnel / Réalisé
+// ═══════════════════════════════════════════════
+var _budgetCurrentTab = 'previsionnel';
+
+function openBudget() {
+  closeNDF(); closeEspacesPartages();
+  if (!S.budgetDTN) S.budgetDTN = {previsionnel:[], realise:[]};
+  var ov = document.getElementById('budget-overlay');
+  if (!ov) return;
+  var sbHidden = document.body.classList.contains('dtn-sb-hidden');
+  ov.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;left:'+(sbHidden?'0':'216px')+';z-index:2600;background:var(--navy);overflow:hidden';
+  _budgetSetTab(_budgetCurrentTab);
+}
+
+function closeBudget() {
+  var ov = document.getElementById('budget-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function _budgetSetTab(tab) {
+  _budgetCurrentTab = tab;
+  ['previsionnel','realise'].forEach(function(t) {
+    var btn = document.getElementById('budget-tab-'+t);
+    if (!btn) return;
+    var active = t === tab;
+    btn.style.background = active ? 'var(--stol)' : 'transparent';
+    btn.style.color = active ? '#fff' : 'var(--txt2)';
+    btn.style.borderColor = active ? 'var(--stol)' : 'var(--bdr)';
+  });
+  renderBudget();
+}
+
+function renderBudget() {
+  var body = document.getElementById('budget-body');
+  if (!body) return;
+  if (!S.budgetDTN) S.budgetDTN = {previsionnel:[], realise:[]};
+  var tab = _budgetCurrentTab;
+  var list = S.budgetDTN[tab] || [];
+  var isRealise = tab === 'realise';
+
+  var iSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none;box-sizing:border-box';
+  var numSt = iSt+';text-align:right;-moz-appearance:textfield';
+  var thSt = 'padding:8px 10px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--bdr);text-align:left;background:var(--navy2)';
+  var cellSt = 'padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:var(--txt)';
+  var fo = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
+  var ch = function(id,f){ return 'oninput="_budgetRowChange(\''+tab+'\',\''+id+'\',\''+f+'\',this.value)"'; };
+  var totSt = 'padding:8px 10px;font-size:12px;font-weight:800;border-top:2px solid var(--bdr);background:var(--navy2)';
+  var fmt = function(v){ return (v||0).toFixed(2)+' €'; };
+
+  // ── Tableau manuel (prévisionnel ou dépenses hors compétitions) ──────────
+  var rows = '';
+  list.forEach(function(n) {
+    var id = n.id;
+    rows += '<tr>'
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.categorie||'').replace(/"/g,'&quot;')+'" placeholder="Catégorie" '+ch(id,'categorie')+' style="'+iSt+';width:130px" '+fo+'></td>'
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.libelle||'').replace(/"/g,'&quot;')+'" placeholder="Libellé" '+ch(id,'libelle')+' style="'+iSt+'" '+fo+'></td>'
+      +'<td style="'+cellSt+'"><input type="number" value="'+(n.montant||'')+'" placeholder="0.00" min="0" step="0.01" '+ch(id,'montant')+' style="'+numSt+';width:110px" '+fo+'></td>'
+      +(isRealise ? '<td style="'+cellSt+'"><input type="text" value="'+(n.pieceJustif||'').replace(/"/g,'&quot;')+'" placeholder="N° pièce…" '+ch(id,'pieceJustif')+' style="'+iSt+';width:110px" '+fo+'></td>' : '')
+      +'<td style="'+cellSt+'"><input type="text" value="'+(n.observation||'').replace(/"/g,'&quot;')+'" placeholder="Observation" '+ch(id,'observation')+' style="'+iSt+'" '+fo+'></td>'
+      +'<td style="'+cellSt+';text-align:center"><button id="bgt-del-'+id+'" onclick="_budgetDeleteRow(\''+tab+'\',\''+id+'\')" title="Supprimer" style="width:26px;height:26px;border:none;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:inherit">×</button></td>'
+      +'</tr>';
+  });
+
+  var manualTotal = list.reduce(function(s,n){ return s+(parseFloat(n.montant)||0); }, 0);
+  var colspanEmpty = isRealise ? 6 : 5;
+  var emptyRow = '<tr><td colspan="'+colspanEmpty+'" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">Aucune ligne — cliquez sur <b>Ajouter une ligne</b></td></tr>';
+
+  var manualTotRow = list.length ? '<tfoot><tr>'
+    +'<td colspan="2" style="'+totSt+';color:var(--txt3);text-align:left">SOUS-TOTAL</td>'
+    +'<td style="'+totSt+';text-align:right;color:#f59e0b" id="budget-grand-total">'+fmt(manualTotal)+'</td>'
+    +(isRealise ? '<td style="'+totSt+'"></td>' : '')
+    +'<td style="'+totSt+'"></td><td style="'+totSt+'"></td>'
+    +'</tr></tfoot>' : '';
+
+  var manualTitle = isRealise ? 'Dépenses et recettes hors compétitions' : 'Budget Prévisionnel';
+  var manualHtml = '<div style="margin-bottom:24px">'
+    +'<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">'+manualTitle+'</div>'
+    +'<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto">'
+    +'<table style="width:100%;border-collapse:collapse;min-width:600px"><thead><tr>'
+    +'<th style="'+thSt+';width:130px">Catégorie</th>'
+    +'<th style="'+thSt+'">Libellé</th>'
+    +'<th style="'+thSt+';width:110px;text-align:right">Montant (€)</th>'
+    +(isRealise ? '<th style="'+thSt+';width:120px">Pièce justif.</th>' : '')
+    +'<th style="'+thSt+'">Observation</th>'
+    +'<th style="'+thSt+';width:36px"></th>'
+    +'</tr></thead>'
+    +'<tbody>'+(rows||emptyRow)+'</tbody>'
+    +manualTotRow
+    +'</table></div></div></div>';
+
+  // ── Synthèse compétitions (onglet Réalisé seulement) ─────────────────────
+  var compSyntheseHtml = '';
+  var totalCompDep = 0, totalCompRec = 0;
+
+  if (isRealise) {
+    var cc = function(l){ return (parseFloat(l.valeur)||0)*(parseFloat(l.nbjours)||1)*(parseFloat(l.qt)||1); };
+    var comps = (S.comps || []).slice().sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
+    var compData = [];
+    comps.forEach(function(cp) {
+      var bgt = (S.budgets||{})[cp.id];
+      if (!bgt) return;
+      var dep = (bgt.engagement||[]).reduce(function(s,l){ return s+cc(l); }, 0);
+      var rec = (bgt.ressources||[]).reduce(function(s,l){ return s+cc(l); }, 0);
+      if (dep===0 && rec===0) return;
+      totalCompDep += dep;
+      totalCompRec += rec;
+      compData.push({nom: cp.nom||cp.id, dep: dep, rec: rec, solde: rec-dep});
+    });
+
+    var cThSt = thSt;
+    var cCellSt = cellSt;
+    var soldeColor = function(v){ return v > 0 ? '#10b981' : v < 0 ? '#f87171' : 'var(--txt3)'; };
+
+    var cRows = '';
+    compData.forEach(function(r) {
+      var s = r.solde;
+      cRows += '<tr>'
+        +'<td style="'+cCellSt+';font-weight:600">'+r.nom+'</td>'
+        +'<td style="'+cCellSt+';text-align:right;color:#f87171">'+fmt(r.dep)+'</td>'
+        +'<td style="'+cCellSt+';text-align:right;color:#10b981">'+fmt(r.rec)+'</td>'
+        +'<td style="'+cCellSt+';text-align:right;font-weight:700;color:'+soldeColor(s)+'">'+fmt(s)+'</td>'
+        +'</tr>';
+    });
+
+    var totalCompSolde = totalCompRec - totalCompDep;
+    var cTotRow = compData.length ? '<tfoot><tr>'
+      +'<td style="'+totSt+';color:var(--txt3)">TOTAL COMPÉTITIONS</td>'
+      +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(totalCompDep)+'</td>'
+      +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(totalCompRec)+'</td>'
+      +'<td style="'+totSt+';text-align:right;font-weight:800;color:'+soldeColor(totalCompSolde)+'">'+fmt(totalCompSolde)+'</td>'
+      +'</tr></tfoot>' : '';
+
+    var noCompMsg = '<tr><td colspan="4" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">Aucune compétition avec budget saisi</td></tr>';
+
+    compSyntheseHtml = '<div style="margin-bottom:24px">'
+      +'<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Soldes des compétitions</div>'
+      +'<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto">'
+      +'<table style="width:100%;border-collapse:collapse;min-width:500px"><thead><tr>'
+      +'<th style="'+cThSt+'">Compétition</th>'
+      +'<th style="'+cThSt+';text-align:right;width:140px">Dépenses</th>'
+      +'<th style="'+cThSt+';text-align:right;width:140px">Recettes</th>'
+      +'<th style="'+cThSt+';text-align:right;width:130px">Solde</th>'
+      +'</tr></thead>'
+      +'<tbody>'+(cRows||noCompMsg)+'</tbody>'
+      +cTotRow
+      +'</table></div></div></div>';
+
+    // ── Bilan global ─────────────────────────────────────────────────────────
+    var globalDep = totalCompDep + manualTotal;
+    var globalRec = totalCompRec;
+    var globalSolde = globalRec - globalDep;
+    var kpiSt = 'flex:1;min-width:160px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:14px 18px';
+    compSyntheseHtml += '<div style="margin-bottom:24px">'
+      +'<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Bilan global</div>'
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
+      +'<div style="'+kpiSt+'">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Total dépenses</div>'
+        +'<div style="font-size:22px;font-weight:900;color:#f87171">'+fmt(globalDep)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-top:3px">Compétitions '+fmt(totalCompDep)+' + Hors comp. '+fmt(manualTotal)+'</div>'
+      +'</div>'
+      +'<div style="'+kpiSt+'">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Total recettes</div>'
+        +'<div style="font-size:22px;font-weight:900;color:#10b981">'+fmt(globalRec)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-top:3px">Issues des budgets de compétitions</div>'
+      +'</div>'
+      +'<div style="'+kpiSt+';border-color:'+(globalSolde>=0?'rgba(16,185,129,.4)':'rgba(248,113,113,.4)')+'">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Solde global</div>'
+        +'<div style="font-size:22px;font-weight:900;color:'+soldeColor(globalSolde)+'">'+fmt(globalSolde)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-top:3px">'+(globalSolde>=0?'Excédent':'Déficit')+'</div>'
+      +'</div>'
+      +'</div></div>';
+  }
+
+  var sub = document.getElementById('budget-subtitle');
+  if (sub) {
+    if (isRealise) {
+      sub.textContent = 'Dépenses totales : '+fmt(totalCompDep+manualTotal)+' · Recettes : '+fmt(totalCompRec);
+    } else {
+      sub.textContent = list.length+' ligne'+(list.length!==1?'s':'')+' · Total : '+fmt(manualTotal);
+    }
+  }
+
+  body.innerHTML = (isRealise ? compSyntheseHtml : '') + manualHtml;
+}
+
+function _budgetAddRow(tab) {
+  if (!S.budgetDTN) S.budgetDTN = {previsionnel:[], realise:[]};
+  if (!S.budgetDTN[tab]) S.budgetDTN[tab] = [];
+  S.budgetDTN[tab].push({id:'bgt'+Date.now().toString(36), categorie:'', libelle:'', montant:0, pieceJustif:'', observation:''});
+  saveState();
+  renderBudget();
+  setTimeout(function(){ var el=document.querySelector('#budget-body tbody tr:last-child input[type="text"]'); if(el) el.focus(); }, 60);
+}
+
+function _budgetRowChange(tab, id, field, value) {
+  if (!S.budgetDTN || !S.budgetDTN[tab]) return;
+  var rec = S.budgetDTN[tab].find(function(x){ return x.id===id; });
+  if (!rec) return;
+  rec[field] = field==='montant' ? (parseFloat(value)||0) : value;
+  var total = S.budgetDTN[tab].reduce(function(s,n){ return s+(parseFloat(n.montant)||0); }, 0);
+  var gtEl = document.getElementById('budget-grand-total');
+  if (gtEl) gtEl.textContent = total.toFixed(2)+' €';
+  var sub = document.getElementById('budget-subtitle');
+  var list = S.budgetDTN[tab];
+  if (sub) sub.textContent = list.length+' ligne'+(list.length!==1?'s':'')+' · Total : '+total.toFixed(2)+' €';
+  saveState();
+}
+
+function _budgetDeleteRow(tab, id) {
+  var btn = document.getElementById('bgt-del-'+id);
+  if (!btn) return;
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.innerHTML = '<span style="font-size:9px;font-weight:800;white-space:nowrap">OK?</span>';
+    btn.style.width = 'auto'; btn.style.padding = '0 6px';
+    btn.style.color = '#fff'; btn.style.background = '#ef4444';
+    setTimeout(function(){
+      if (btn.dataset.confirm==='1') {
+        btn.dataset.confirm='0'; btn.innerHTML='×';
+        btn.style.cssText='width:26px;height:26px;border:none;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:inherit';
+      }
+    }, 3000);
+    return;
+  }
+  if (!S.budgetDTN || !S.budgetDTN[tab]) return;
+  S.budgetDTN[tab] = S.budgetDTN[tab].filter(function(x){ return x.id!==id; });
+  saveState(); renderBudget(); toast('Ligne supprimée','ok');
+}
+
+// ═══════════════════════════════════════════════
 // ESPACES PARTAGÉS — OneDrive
 // ═══════════════════════════════════════════════
 function openEspacesPartages() {
-  closeNDF();
+  closeNDF(); closeBudget();
   // Fermer les autres overlays
   var gg = document.getElementById('gantt-overlay');
   if (gg && gg.style.display !== 'none') { gg.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:var(--navy);overflow:hidden;'; }
@@ -34055,7 +34380,7 @@ function _saveEspaceDialog() {
 }
 
 function openGlobalGantt() {
-  closeNDF();
+  closeNDF(); closeBudget();
   _ganttState.compId     = null;
   _ganttState.filter     = '';
   _ganttState.globalMode = true;
@@ -39870,6 +40195,8 @@ function _dtnCloseOverlays() {
   if (gg) gg.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:var(--navy);overflow:hidden;';
   var esp = document.getElementById('espaces-overlay');
   if (esp) esp.style.display = 'none';
+  var bgt = document.getElementById('budget-overlay');
+  if (bgt) bgt.style.display = 'none';
 }
 
 // ── Sidebar DTN : show / hide (niveau body, indépendant de page-dtn) ──
@@ -40293,6 +40620,7 @@ function _compSbSetActive(pageId) {
 }
 
 function _compSbNav(pageId) {
+  closeBudget();
   showPage(pageId);
 }
 
