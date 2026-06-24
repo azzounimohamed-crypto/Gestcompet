@@ -22524,6 +22524,8 @@ async function pushToCloud() {
     _deletedBudgetLines:  S._deletedBudgetLines  || {},
     _deletedPartenaires:  S._deletedPartenaires  || {},
     _deletedDocuments:    S._deletedDocuments    || {},
+    _deletedCollectif:    S._deletedCollectif    || [],
+    _deletedNDF:          S._deletedNDF          || [],
     partenaireTypes:      S.partenaireTypes       || null,
     moyens:               S.moyens               || [],
     settings:             S.settings             || {},
@@ -23126,10 +23128,16 @@ async function loadFromSupabaseFirst() {
     var savedSecuriteEvents = (S.securiteEvents && S.securiteEvents.length) ? S.securiteEvents.slice() : null;
     // ✅ GARDE SECURITEHISTORIQUE : toujours préserver l'historique importé localement
     var savedSecuriteHistorique = (S.securiteHistorique && Object.keys(S.securiteHistorique).length) ? Object.assign({}, S.securiteHistorique) : null;
+    // ✅ GARDE COMPS : préserver les modifications locales des compétitions (fusion par _updatedAt)
+    var savedComps = (S.comps && S.comps.length) ? S.comps.slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
 
+    // ✅ Fusionner les compétitions locales avec le cloud (le plus récent _updatedAt gagne)
+    if (savedComps) {
+      S.comps = _mergeById(savedComps, S.comps || []);
+    }
     if (savedStaff)   S.staff           = savedStaff;
     if (savedPart)    S.partenaires     = savedPart;
     if (savedMat)     S.materiel        = savedMat;
@@ -23143,17 +23151,23 @@ async function loadFromSupabaseFirst() {
         if (!S.agendaEvents.find(function(x){ return x.id === ev.id; })) S.agendaEvents.push(ev);
       });
     }
-    // ✅ Fusionner notesfrais locales avec cloud (union par id — aucune perte possible)
+    // ✅ Fusionner notesfrais locales avec cloud (union par id — tombstones filtrent les suppressions)
     if (savedNotesfrais) {
       if (!S.notesfrais || typeof S.notesfrais !== 'object') S.notesfrais = {};
+      var _ndfTombs = {};
+      (S._deletedNDF||[]).forEach(function(x){ _ndfTombs[x.id||x] = true; });
       Object.keys(savedNotesfrais).forEach(function(uid) {
         if (!S.notesfrais[uid] || !S.notesfrais[uid].length) {
-          S.notesfrais[uid] = savedNotesfrais[uid];
+          S.notesfrais[uid] = (savedNotesfrais[uid]||[]).filter(function(n){ return !_ndfTombs[n.id]; });
         } else {
           savedNotesfrais[uid].forEach(function(n) {
-            if (!S.notesfrais[uid].find(function(x){ return x.id === n.id; })) S.notesfrais[uid].push(n);
+            if (!_ndfTombs[n.id] && !S.notesfrais[uid].find(function(x){ return x.id === n.id; })) S.notesfrais[uid].push(n);
           });
         }
+      });
+      // Appliquer les tombstones sur les NDF déjà en mémoire
+      Object.keys(S.notesfrais).forEach(function(uid){
+        S.notesfrais[uid] = (S.notesfrais[uid]||[]).filter(function(n){ return !_ndfTombs[n.id]; });
       });
     }
     // ✅ Fusionner securiteEvents locaux avec cloud (union par id)
@@ -23541,10 +23555,25 @@ async function pullFromCloud() {
   S.pilots        = _mergeById(S.pilots,        r.pilots);
   S.sitesSportifs = _mergeById(S.sitesSportifs, r.sitesSportifs);
   S.collectif     = _mergeById(S.collectif,     r.collectif);
-  // Appliquer les tombstones collectif
-  if (S._deletedCollectif && S._deletedCollectif.length) {
-    var _dcIds = {}; S._deletedCollectif.forEach(function(x){ _dcIds[x.id] = true; });
-    S.collectif = S.collectif.filter(function(m){ return !_dcIds[m.id]; });
+  // Fusionner et appliquer les tombstones collectif
+  var _remoteDelColl = r._deletedCollectif || [];
+  var _localDelColl  = S._deletedCollectif || [];
+  var _allDelColl = {};
+  _remoteDelColl.concat(_localDelColl).forEach(function(x){ if(x&&x.id) _allDelColl[x.id] = true; });
+  S._deletedCollectif = Object.keys(_allDelColl).map(function(id){ return {id:id}; });
+  if (Object.keys(_allDelColl).length) {
+    S.collectif = S.collectif.filter(function(m){ return !_allDelColl[m.id]; });
+  }
+  // Fusionner et appliquer les tombstones NDF
+  var _remoteDelNDF = r._deletedNDF || [];
+  var _localDelNDF  = S._deletedNDF  || [];
+  var _allDelNDF = {};
+  _remoteDelNDF.concat(_localDelNDF).forEach(function(x){ if(x&&x.id) _allDelNDF[x.id] = true; });
+  S._deletedNDF = Object.keys(_allDelNDF).map(function(id){ return {id:id}; });
+  if (Object.keys(_allDelNDF).length) {
+    Object.keys(S.notesfrais||{}).forEach(function(uid){
+      S.notesfrais[uid] = (S.notesfrais[uid]||[]).filter(function(n){ return !_allDelNDF[n.id]; });
+    });
   }
   S.documents     = _mergeById(S.documents,     r.documents);
   // Appliquer les tombstones documents
@@ -34717,6 +34746,8 @@ function _ndfDeleteFromList(ndfId) {
   clearTimeout(btn._resetTimer);
   var uid = _ndfUserId(); if (!uid) return;
   S.notesfrais[uid] = (S.notesfrais[uid]||[]).filter(function(x){ return x.id !== ndfId; });
+  if (!S._deletedNDF) S._deletedNDF = [];
+  if (!S._deletedNDF.find(function(x){ return (x.id||x) === ndfId; })) S._deletedNDF.push({ id: ndfId, deletedAt: Date.now() });
   saveState();
   renderNDFList();
   toast('NDF supprimée', 'ok');
@@ -34742,7 +34773,10 @@ function _ndfDeleteNDF() {
     setTimeout(function(){ if(btn.dataset.confirm){delete btn.dataset.confirm;btn.textContent=prev;btn.style.background='rgba(239,68,68,.07)';} },3000);
     return;
   }
-  S.notesfrais[uid]=(S.notesfrais[uid]||[]).filter(function(x){ return x.id!==_ndfCurrentId; });
+  var _ndfDelId = _ndfCurrentId;
+  S.notesfrais[uid]=(S.notesfrais[uid]||[]).filter(function(x){ return x.id!==_ndfDelId; });
+  if (!S._deletedNDF) S._deletedNDF = [];
+  if (!S._deletedNDF.find(function(x){ return (x.id||x) === _ndfDelId; })) S._deletedNDF.push({ id: _ndfDelId, deletedAt: Date.now() });
   saveState(); closeNDFDetail(); toast('NDF supprimée','ok');
 }
 
