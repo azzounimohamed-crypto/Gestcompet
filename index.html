@@ -2819,10 +2819,17 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <input type="hidden" id="aide-form-pilote-id">
           <input type="text" id="aide-form-pilote-nom" list="aide-pilotes-dl" autocomplete="off"
             placeholder="NOM Prénom…"
-            oninput="_aideHistRefresh()"
+            oninput="_aideHistRefresh();_aideFillLicence()"
             style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none"
             onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
           <datalist id="aide-pilotes-dl"></datalist>
+        </div>
+        <!-- N° Licence -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">N° Licence</label>
+          <input type="text" id="aide-form-licence" placeholder="Numéro de licence…" autocomplete="off"
+            style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none"
+            onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
         </div>
         <!-- Projet -->
         <div style="margin-bottom:12px">
@@ -2844,7 +2851,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <input type="number" id="aide-form-demandee" min="0" step="0.01" placeholder="0.00" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;box-sizing:border-box;text-align:right;outline:none" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
           </div>
           <div>
-            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Aide octroyée (€)</label>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Aide proposée (€)</label>
             <input type="number" id="aide-form-aide" min="0" step="0.01" placeholder="0.00" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;box-sizing:border-box;text-align:right;outline:none" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
           </div>
         </div>
@@ -34251,7 +34258,27 @@ function importLicenceFfplum(inp) {
       };
 
       // Indices de colonnes détectés dynamiquement, fallback sur format FFPLUM standard
-      var cLicence = _col(['LICENCE','NUM LIC','N LIC']); if (cLicence<0) cLicence=0;
+      // Chercher la colonne numéro de licence : termes précis en priorité, puis valider que la colonne contient des chiffres
+      // Stratégie : trouver la colonne contenant les NUMÉROS de licence (chiffres) et non le type ("Pilote")
+      // 1. Termes précis (inclut "LICENCIE" pour "N° Licencié" du fichier FFPLUM standard)
+      var cLicence = _col(['N LICENCIE','LICENCIE','NUM LICENCE','N° LICENCE','NUMERO LICENCE','NUM LIC','N LIC','NO LICENCE']);
+      // 2. Toute colonne contenant "LICENC" ET dont les valeurs contiennent des séquences de 5+ chiffres
+      if (cLicence < 0) {
+        headerRow.forEach(function(h, i) {
+          if (cLicence >= 0) return;
+          if (norm(h||'').indexOf('LICENC') === -1) return;
+          var sample = dataRows.slice(0, 10).filter(function(r){ return /\d{5,}/.test((r[i]||'').toString()); });
+          if (sample.length >= 3) cLicence = i;
+        });
+      }
+      // 3. Dernier recours : première colonne avec 5+ chiffres consécutifs dans au moins 5 lignes
+      if (cLicence < 0) {
+        for (var _ci = 0; _ci < headerRow.length && cLicence < 0; _ci++) {
+          var _s = dataRows.slice(0, 20).filter(function(r){ return /\d{5,}/.test((r[_ci]||'').toString()); });
+          if (_s.length >= 5) cLicence = _ci;
+        }
+      }
+      if (cLicence < 0) cLicence = 0;
       var cNom     = _col(['NOM']);                        if (cNom<0)     cNom=1;
       var cPrenom  = _col(['PRENOM']);                     if (cPrenom<0)  cPrenom=2;
       var cDdn     = _col(['NAISS','BIRTH','DDN']);        if (cDdn<0)     cDdn=3;
@@ -35203,7 +35230,8 @@ function renderAides() {
   html += '<div style="position:relative;display:inline-block">'
     +'<button onclick="var m=document.getElementById(\'aides-act-menu\');m.style.display=m.style.display===\'block\'?\'none\':\'block\';event.stopPropagation()" style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">Actions ▾</button>'
     +'<div id="aides-act-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:500;min-width:160px;padding:6px;white-space:nowrap">'
-      +'<button onclick="exportAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter</button>'
+      +'<button onclick="exportAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter JSON</button>'
+      +'<button onclick="exportAidesXlsx();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter Excel</button>'
       +'<button onclick="document.getElementById(\'aides-import-inp\').click();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬆ Importer</button>'
       +(S.aides.length ? '<button onclick="printAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Imprimer</button>' : '')
     +'</div>'
@@ -35260,14 +35288,14 @@ function renderAides() {
     html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden"><div style="overflow-x:auto">';
     var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
     html += '<table style="width:100%;border-collapse:collapse;min-width:820px"><thead><tr>';
-    html += '<th style="'+thSt+';width:50px">Année</th>';
+    html += '<th style="'+thSt+'">Pilote</th>';
+    html += '<th style="'+thSt+';width:70px">N° Licence</th>';
     html += '<th style="'+thSt+';width:80px">Date dem.</th>';
     html += '<th style="'+thSt+'">Dispositif</th>';
-    html += '<th style="'+thSt+'">Pilote</th>';
     html += '<th style="'+thSt+'">Projet</th>';
     html += '<th style="'+thSt+';text-align:right">Coût</th>';
     html += '<th style="'+thSt+';text-align:right">Demandée</th>';
-    html += '<th style="'+thSt+';text-align:right">Octroyée</th>';
+    html += '<th style="'+thSt+';text-align:right">Proposée</th>';
     html += '<th style="'+thSt+';text-align:right">Reste</th>';
     html += '<th style="'+thSt+'">Note</th>';
     html += '<th style="'+thSt+';width:64px"></th>';
@@ -35277,11 +35305,12 @@ function renderAides() {
       var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
       var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
       var rc=reste>0?'#f87171':reste<0?'#f59e0b':'var(--txt3)';
+      var _licDisp=(function(){var v=a.licence||'';if(v&&/\d/.test(v))return v;var p=(S.pilots||[]).find(function(x){return x.id===a.piloteId;});var pv=(p&&p.licence)||'';return(pv&&/\d/.test(pv))?pv:'—';})();
       html += '<tr>'
-        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3)">'+a.annee+'</td>'
+        +'<td style="'+cellSt+';font-weight:600">'+_escHtml(a.piloteNom||'—')+'</td>'
+        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3)">'+_escHtml(_licDisp)+'</td>'
         +'<td style="'+cellSt+';font-size:11px;color:var(--txt3);white-space:nowrap">'+_escHtml(fmtDate(a.dateDemande||''))+'</td>'
         +'<td style="'+cellSt+'"><span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
-        +'<td style="'+cellSt+';font-weight:600">'+_escHtml(a.piloteNom||'—')+'</td>'
         +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
         +'<td style="'+cellSt+';text-align:right">'+fmt(a.cout)+'</td>'
         +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
@@ -35323,7 +35352,7 @@ function printAides() {
   if (!S.aides || !S.aides.length) { toast('Aucune aide à imprimer','warn'); return; }
   var fmt = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
   var org = (S.docSettings && S.docSettings.orgBlock) || {};
-  var accent = org.accent || '#0057ff';
+  var accent = '#1a3a8f';
   var logoSrc = (S.officialDocs && S.officialDocs.header) || '';
   var nomOrg = org.nom || 'Organisation';
   var adresse = [org.adresse, (org.cp||'')+' '+(org.ville||'')].filter(Boolean).join(' — ');
@@ -35350,33 +35379,29 @@ function printAides() {
     grp.forEach(function(a){ gCout+=(parseFloat(a.cout)||0); gDem+=(parseFloat(a.aideDemandee)||0); gAide+=(parseFloat(a.aideOctroye)||0); });
     var gReste=gCout-gAide;
 
-    tRows += '<tr class="camp-hdr"><td colspan="10">'+_escHtml(camp)+'</td></tr>';
+    tRows += '<tr class="camp-hdr"><td colspan="9">'+_escHtml(camp)+'</td></tr>';
     grp.forEach(function(a){
       var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
-      var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+      var lic=a.licence||((S.pilots||[]).find(function(p){return p.id===a.piloteId;})||{}).licence||'—';
       tRows += '<tr>'
-        +'<td>'+a.annee+'</td>'
+        +'<td>'+_escHtml(a.piloteNom||'—')+'</td>'
+        +'<td>'+_escHtml(lic)+'</td>'
         +'<td class="note">'+_escHtml(fmtDateP(a.dateDemande||''))+'</td>'
         +'<td><span class="badge">'+_escHtml(disp)+'</span></td>'
-        +'<td>'+_escHtml(a.piloteNom||'—')+'</td>'
         +'<td class="note">'+_escHtml(a.projet||'')+'</td>'
         +'<td class="num">'+fmt(a.cout)+'</td>'
-        +'<td class="num amber">'+fmt(a.aideDemandee)+'</td>'
-        +'<td class="num green">'+fmt(a.aideOctroye)+'</td>'
-        +'<td class="num '+(reste>0?'red':'')+'">'+fmt(reste)+'</td>'
-        +'<td class="note">'+_escHtml(a.note||'')+'</td>'
+        +'<td class="num">'+fmt(a.aideDemandee)+'</td>'
+        +'<td class="num">'+fmt(a.aideOctroye)+'</td>'
+        +'<td style="font-size:8pt;color:#444;word-break:break-word">'+_escHtml(a.note||'')+'</td>'
         +'</tr>';
     });
-    if (grp.length > 1) {
-      tRows += '<tr class="subtot">'
-        +'<td colspan="5">Sous-total — '+_escHtml(camp)+'</td>'
-        +'<td class="num">'+fmt(gCout)+'</td>'
-        +'<td class="num amber">'+fmt(gDem)+'</td>'
-        +'<td class="num green">'+fmt(gAide)+'</td>'
-        +'<td class="num red">'+fmt(gReste)+'</td>'
-        +'<td></td>'
-        +'</tr>';
-    }
+    tRows += '<tr class="subtot">'
+      +'<td colspan="5">Sous-total — '+_escHtml(camp)+'</td>'
+      +'<td class="num">'+fmt(gCout)+'</td>'
+      +'<td class="num">'+fmt(gDem)+'</td>'
+      +'<td class="num">'+fmt(gAide)+'</td>'
+      +'<td></td>'
+      +'</tr>';
   });
 
   var grandCout=0,grandDem=0,grandAide=0;
@@ -35392,66 +35417,59 @@ function printAides() {
     +'.print-btn{position:fixed;top:12px;right:12px;padding:8px 18px;background:'+accent+';color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}'
     +'@media print{.print-btn{display:none}}'
     +'.header{display:flex;align-items:center;gap:16px;border-bottom:3px solid '+accent+';padding-bottom:10px;margin-bottom:14px}'
-    +'.logo{max-height:60px;max-width:110px;object-fit:contain}'
+    +'.logo{max-height:240px;max-width:440px;object-fit:contain}'
     +'.org-info h1{font-size:14pt;font-weight:900;color:'+accent+';margin-bottom:2px}'
     +'.org-info .sub{font-size:8pt;color:#555}'
     +'.doc-title{text-align:center;font-size:13pt;font-weight:900;color:#111;margin-bottom:3px}'
-    +'.doc-date{text-align:center;font-size:8pt;color:#777;margin-bottom:14px}'
+    +'@media print{.footer{position:fixed;bottom:0;right:0}}'
     +'table{width:100%;border-collapse:collapse;font-size:8.5pt}'
     +'th{background:'+accent+';color:#fff;padding:5px 7px;font-size:8pt;text-align:left;font-weight:700}'
     +'th.r{text-align:right}'
-    +'td{padding:4px 7px;border-bottom:1px solid #e5e7eb;vertical-align:top}'
+    +'td{padding:4px 7px;border-bottom:1px solid #e5e7eb;vertical-align:top;color:#111}'
     +'tr:nth-child(even) td{background:#f9fafb}'
-    +'.camp-hdr td{background:#f0f4ff;color:'+accent+';font-weight:800;font-size:9pt;padding:5px 7px;border-top:2px solid '+accent+'}'
-    +'.subtot td{background:#f5f5f5;font-weight:700;border-top:1px solid #ccc}'
-    +'.grandtot td{background:#111;color:#fff;font-weight:900;border-top:2px solid '+accent+'}'
-    +'.grandtot .amber{color:#fbbf24}.grandtot .green{color:#34d399}.grandtot .red{color:#f87171}'
-    +'.num{text-align:right;white-space:nowrap}'
-    +'.amber{color:#d97706;font-weight:700}'
-    +'.green{color:#059669;font-weight:700}'
-    +'.red{color:#dc2626}'
-    +'.note{color:#666;font-size:8pt;max-width:90px}'
+    +'.camp-hdr td{background:#dbeafe;color:'+accent+';font-weight:800;font-size:9pt;padding:5px 7px;border-top:2px solid '+accent+'}'
+    +'.subtot td{background:#f5f5f5;font-weight:700;border-top:1px solid #ccc;color:#111}'
+    +'.grandtot td{background:'+accent+';color:#fff;font-weight:900;border-top:2px solid #1e40af}'
+    +'.num{text-align:right;white-space:nowrap;color:#111}'
+    +'.blue{color:#1d4ed8;font-weight:700}'
+    +'.note{color:#444;font-size:8pt;max-width:90px}'
     +'.badge{display:inline-block;padding:1px 6px;border-radius:3px;background:#dbeafe;color:'+accent+';font-size:8pt;font-weight:700}'
     +'.kpi-row{display:flex;gap:10px;margin-top:14px}'
     +'.kpi{flex:1;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px}'
     +'.kpi .lbl{font-size:7pt;color:#888;text-transform:uppercase;font-weight:700;margin-bottom:2px}'
-    +'.kpi .val{font-size:13pt;font-weight:900}'
+    +'.kpi .val{font-size:13pt;font-weight:900;color:#111}'
     +'</style></head><body>'
     +'<button class="print-btn" onclick="window.print()">🖨️ Imprimer</button>'
     +'<div class="header">'
     +(logoSrc ? '<img class="logo" src="'+logoSrc+'" alt="logo">' : '')
-    +'<div class="org-info"><h1>'+_escHtml(nomOrg)+'</h1><div class="sub">'+_escHtml(adresse)+'</div></div>'
     +'</div>'
-    +'<div class="doc-title">Aides fédérales aux pilotes</div>'
-    +'<div class="doc-date">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+campOrder.length+' campagne'+(campOrder.length>1?'s':'')+'</div>'
+    +'<div style="text-align:center;font-size:15pt;font-weight:900;color:'+accent+';margin:14px 0 12px">Aides fédérales compétitions</div>'
     +'<table><thead><tr>'
-    +'<th style="width:36px">Année</th>'
+    +'<th>Pilote</th>'
+    +'<th style="width:70px">N° Licence</th>'
     +'<th style="width:62px">Date dem.</th>'
     +'<th>Dispositif</th>'
-    +'<th>Pilote</th>'
     +'<th>Projet</th>'
     +'<th class="r">Coût total</th>'
     +'<th class="r">Demandée</th>'
-    +'<th class="r">Octroyée</th>'
-    +'<th class="r">Reste</th>'
-    +'<th>Note</th>'
+    +'<th class="r">Proposée</th>'
+    +'<th style="min-width:120px">Note</th>'
     +'</tr></thead><tbody>'
     +tRows
     +'<tr class="grandtot">'
     +'<td colspan="5">TOTAL GÉNÉRAL</td>'
     +'<td class="num">'+fmt(grandCout)+'</td>'
-    +'<td class="num amber">'+fmt(grandDem)+'</td>'
-    +'<td class="num green">'+fmt(grandAide)+'</td>'
-    +'<td class="num red">'+fmt(grandReste)+'</td>'
+    +'<td class="num">'+fmt(grandDem)+'</td>'
+    +'<td class="num">'+fmt(grandAide)+'</td>'
     +'<td></td>'
     +'</tr>'
     +'</tbody></table>'
     +'<div class="kpi-row">'
     +'<div class="kpi"><div class="lbl">Coût total</div><div class="val">'+fmt(grandCout)+'</div></div>'
-    +'<div class="kpi"><div class="lbl">Aides demandées</div><div class="val amber">'+fmt(grandDem)+'</div></div>'
-    +'<div class="kpi"><div class="lbl">Aides octroyées</div><div class="val green">'+fmt(grandAide)+'</div></div>'
-    +'<div class="kpi"><div class="lbl">Reste à charge</div><div class="val red">'+fmt(grandReste)+'</div></div>'
+    +'<div class="kpi"><div class="lbl">Aides demandées</div><div class="val">'+fmt(grandDem)+'</div></div>'
+    +'<div class="kpi"><div class="lbl">Aides octroyées</div><div class="val">'+fmt(grandAide)+'</div></div>'
     +'</div>'
+    +'<div class="footer" style="margin-top:16px;text-align:right;font-size:7.5pt;color:#999">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+campOrder.length+' campagne'+(campOrder.length>1?'s':'')+'</div>'
     +'</body></html>';
 
   var w = window.open('','_blank','width=900,height=700');
@@ -35459,6 +35477,28 @@ function printAides() {
   w.document.write(html);
   w.document.close();
   setTimeout(function(){ w.print(); }, 700);
+}
+
+function exportAidesXlsx() {
+  if (!S.aides || !S.aides.length) { toast('Aucune aide à exporter', 'warn'); return; }
+  var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+  var headers=['Année','Date demande','Campagne','Dispositif','Pilote','N° Licence','Projet','Coût total (€)','Aide demandée (€)','Aide proposée (€)','Reste à charge (€)','Note'];
+  var sorted=S.aides.slice().sort(function(a,b){
+    var c=(a.campagne||'').localeCompare(b.campagne||''); if(c!==0)return c;
+    return (b.annee||0)-(a.annee||0);
+  });
+  var rows=sorted.map(function(a){
+    var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+    var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+    return [a.annee,fmtDate(a.dateDemande||''),a.campagne||'',disp,a.piloteNom||'',a.licence||'',a.projet||'',parseFloat(a.cout)||0,parseFloat(a.aideDemandee)||0,parseFloat(a.aideOctroye)||0,reste,a.note||''];
+  });
+  var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  // Largeurs colonnes
+  ws['!cols']=[{wch:6},{wch:12},{wch:28},{wch:12},{wch:22},{wch:12},{wch:28},{wch:14},{wch:14},{wch:14},{wch:14},{wch:30}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'Aides fédérales',ws);
+  XLSX.writeFile(wb,'aides_federales_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('Export Excel téléchargé — '+S.aides.length+' aide'+(S.aides.length>1?'s':''), 'ok');
 }
 
 function exportAides() {
@@ -35506,6 +35546,81 @@ function importAides(input) {
     }
   };
   reader.readAsText(file);
+}
+
+function _aideFillFromLicDB() {
+  var licEl   = document.getElementById('aide-form-licence');
+  var nomEl   = document.getElementById('aide-form-pilote-nom');
+  var pilIdEl = document.getElementById('aide-form-pilote-id');
+  if (!licEl) return;
+
+  // Même normalisation exacte que fillPilotManualFromLicence
+  var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+
+  // 1. Retrouver le pilote dans S.pilots (par ID en priorité, puis par nom)
+  var pilot = null;
+  var pilId = (pilIdEl ? pilIdEl.value : '').trim();
+  if (pilId) pilot = (S.pilots||[]).find(function(p){ return p.id === pilId; });
+  if (!pilot && nomEl && nomEl.value.trim()) {
+    var nq = norm(nomEl.value.trim());
+    pilot = (S.pilots||[]).find(function(p){
+      return norm((p.nom||'')+' '+(p.prenom||'')) === nq
+          || norm((p.prenom||'')+' '+(p.nom||'')) === nq;
+    });
+  }
+
+  // 2. Cherche dans licenceDB (même logique que fillPilotManualFromLicence)
+  if (!S.licenceDB || !Object.keys(S.licenceDB).length) {
+    toast('Aucun fichier licences chargé — saisissez le numéro manuellement ou importez le fichier FFPLUM', 'warn');
+    return;
+  }
+  var licVal = licEl.value.trim();
+  var rec = null;
+  if (licVal) {
+    rec = S.licenceDB['_lic_' + licVal] || null;
+    if (!rec) { toast('Licence «'+licVal+'» non trouvée dans le fichier licences', 'err'); return; }
+  } else if (pilot) {
+    var key = norm(pilot.nom||'') + '|' + norm(pilot.prenom||'');
+    rec = S.licenceDB[key] || S.licenceDB[norm(pilot.prenom||'')+'|'+norm(pilot.nom||'')] || null;
+  } else if (nomEl && nomEl.value.trim()) {
+    var parts = nomEl.value.trim().split(/\s+/);
+    var n0 = norm(parts[0]||''), n1 = norm(parts.slice(1).join(' '));
+    rec = S.licenceDB[n0+'|'+n1] || S.licenceDB[n1+'|'+n0] || null;
+  }
+  if (rec && rec.licence) {
+    licEl.value = rec.licence;
+    toast('✓ Licence complétée depuis le fichier FFPLUM', 'ok');
+    return;
+  }
+
+  var nomVal = (nomEl ? nomEl.value : '').trim();
+  toast(nomVal ? 'Aucun numéro de licence trouvé pour «'+nomVal+'»' : 'Saisissez d\'abord le nom du pilote', nomVal ? 'warn' : 'err');
+}
+
+function _aideFillLicence() {
+  var nomEl = document.getElementById('aide-form-pilote-nom');
+  var licEl = document.getElementById('aide-form-licence');
+  if (!nomEl || !licEl) return;
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); };
+  var nq = norm(nomEl.value);
+  if (!nq) { licEl.value = ''; return; }
+  // Cherche le pilote par nom complet exact, puis par nom seul
+  var isRealLicence = function(v){ return v && /\d/.test(v); };
+  var found = (S.pilots||[]).find(function(p){
+    var n1 = norm((p.nom||'')+' '+(p.prenom||''));
+    var n2 = norm((p.prenom||'')+' '+(p.nom||''));
+    return n1 === nq || n2 === nq;
+  });
+  if (!found) {
+    found = (S.pilots||[]).find(function(p){
+      return norm(p.nom||'') === nq || norm(p.prenom||'') === nq
+          || norm(p.nom||'').indexOf(nq) === 0 || nq.indexOf(norm(p.nom||'')) === 0;
+    });
+  }
+  var lic = found ? (found.licence || '') : '';
+  // Ignorer les valeurs texte non numériques (ex: "Pilote" importé par erreur)
+  if (!isRealLicence(lic)) lic = '';
+  licEl.value = lic;
 }
 
 function _aideDispChange() {
@@ -35567,6 +35682,20 @@ function _aideFormOpen(id) {
     dlP.innerHTML=projs.map(function(p){return '<option value="'+_escHtml(p)+'"></option>';}).join('');
   }
   var nomEl=document.getElementById('aide-form-pilote-nom'); if(nomEl) nomEl.value=aide?(aide.piloteNom||''):'';
+  var pilIdEl2=document.getElementById('aide-form-pilote-id'); if(pilIdEl2) pilIdEl2.value=aide?(aide.piloteId||''):'';
+  var licEl=document.getElementById('aide-form-licence');
+  if(licEl){
+    var _isRealLic=function(v){return v&&/\d/.test((v||'').toString());};
+    var _lic=aide?(aide.licence||''):'';
+    // Ignorer les valeurs non numériques ("Pilote", etc.) stockées par erreur
+    if(!_isRealLic(_lic)) _lic='';
+    if(!_lic && aide && aide.piloteId){
+      var _pp=(S.pilots||[]).find(function(p){return p.id===aide.piloteId;});
+      if(_pp&&_isRealLic(_pp.licence)) _lic=_pp.licence;
+    }
+    licEl.value=_lic;
+    if(!_lic) _aideFillLicence();
+  }
   var camEl=document.getElementById('aide-form-campagne'); if(camEl) camEl.value=aide?(aide.campagne||''):'';
   var projEl=document.getElementById('aide-form-projet'); if(projEl) projEl.value=aide?(aide.projet||''):'';
   var ddEl=document.getElementById('aide-form-datedemande'); if(ddEl) ddEl.value=aide?(aide.dateDemande||''):'';
@@ -35639,6 +35768,7 @@ function _aideFormSave() {
   var dEl   =document.getElementById('aide-form-dispositif');
   var aEl   =document.getElementById('aide-form-autre');
   var nomEl =document.getElementById('aide-form-pilote-nom');
+  var licEl =document.getElementById('aide-form-licence');
   var camEl =document.getElementById('aide-form-campagne');
   var projEl=document.getElementById('aide-form-projet');
   var ddEl  =document.getElementById('aide-form-datedemande');
@@ -35662,6 +35792,7 @@ function _aideFormSave() {
     projet:       (projEl?projEl.value:'').trim(),
     dispositif:   disp, autreDispositif: disp==='Autre'?(aEl?aEl.value.trim():''):'',
     piloteId:     pilObj.id, piloteNom: pilNom,
+    licence:      (licEl?licEl.value:'').trim()||(pilObj.licence||''),
     cout:         parseFloat(cEl?cEl.value:0)||0,
     aideDemandee: parseFloat(demEl?demEl.value:0)||0,
     aideOctroye:  parseFloat(aidEl?aidEl.value:0)||0,
