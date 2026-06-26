@@ -3708,165 +3708,197 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 </div>
 
 <!-- SAISIE MANUELLE PILOTE -->
-<div class="overlay" id="sheet-pilot-manual" onclick="closeOnBg(event,'sheet-pilot-manual')">
-<div class="sheet">
-  <div class="sheet-bar"></div>
-  <div class="sheet-head">
-    <div class="sheet-title" id="pilot-manual-title">Nouveau compétiteur</div>
-    <button class="sheet-close" onclick="closeSheet('sheet-pilot-manual')">×</button>
+<div class="overlay" id="sheet-pilot-manual" style="align-items:center;justify-content:center" onclick="closeOnBg(event,'sheet-pilot-manual')">
+<div style="background:var(--navy2);border-radius:14px;width:min(1040px,97vw);height:min(660px,92vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden">
+
+  <!-- En-tête -->
+  <div style="padding:16px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Compétiteur</div>
+      <div id="pilot-manual-title" style="font-size:17px;font-weight:800;color:var(--txt)">—</div>
+    </div>
+    <button onclick="closeSheet('sheet-pilot-manual')" style="background:none;border:none;color:var(--txt3);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
   </div>
-  <div class="sheet-body">
-    <input type="hidden" id="pm-edit-id">
-    <!-- Bouton compléter depuis licence -->
-    <button onclick="fillPilotManualFromLicence()" style="width:100%;margin-bottom:12px;padding:9px 14px;background:#0f4c81;border:1px solid #1e6fbe;border-radius:8px;color:#93c5fd;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📋 Compléter depuis licence FFPLUM</button>
-    <!-- Photo -->
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-      <div id="pm-photo-wrap" onclick="document.getElementById('pm-photo-inp').click()"
-        style="width:96px;height:96px;border-radius:50%;background:var(--navy3);border:2px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0">
-        <img id="pm-photo-img" style="display:none;width:100%;height:100%;object-fit:cover">
-        <span id="pm-photo-icon" style="font-size:32px">📷</span>
+
+  <input type="hidden" id="pm-edit-id">
+
+  <!-- Corps : sidebar + contenu -->
+  <div style="flex:1;display:flex;overflow:hidden;min-height:0">
+
+    <!-- Sidebar nav -->
+    <div style="width:170px;flex-shrink:0;background:var(--navy3);border-right:1px solid var(--bdr);padding:10px 0;display:flex;flex-direction:column;gap:2px">
+      <button id="pm-nav-etat-civil" onclick="_pmTab('etat-civil')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid var(--stol);background:rgba(255,255,255,.05);color:var(--txt);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
+        👤 État civil
+      </button>
+      <button id="pm-nav-licence" onclick="_pmTab('licence')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid transparent;background:transparent;color:var(--txt2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer">
+        📋 Licence &amp; Club
+      </button>
+      <button id="pm-nav-machine" onclick="_pmTab('machine')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid transparent;background:transparent;color:var(--txt2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer">
+        ✈️ ULM / Machine
+      </button>
+      <button id="pm-nav-historique" onclick="_pmTab('historique')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid transparent;background:transparent;color:var(--txt2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer">
+        📅 Historique
+      </button>
+      <button id="pm-nav-services" onclick="_pmTab('services')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid transparent;background:transparent;color:var(--txt2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer">
+        🍽 Services
+      </button>
+    </div>
+
+    <!-- Contenu -->
+    <div style="flex:1;overflow-y:auto;padding:20px 24px">
+
+      <!-- ── État civil ── -->
+      <div id="pm-content-etat-civil">
+        <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">État civil</div>
+        <div style="display:flex;gap:16px;align-items:flex-start">
+          <div style="flex:1">
+            <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:8px;margin-bottom:10px">
+              <div class="cf-row"><label class="cf-label">Genre</label>
+                <select class="cf-select" id="pm-genre">
+                  <option value="">—</option><option value="M.">M.</option><option value="Mme.">Mme.</option>
+                </select>
+              </div>
+              <div class="cf-row"><label class="cf-label">Prénom *</label><input class="cf-input" type="text" id="pm-prenom" placeholder="Prénom" oninput="_pmAutoFillLicenceDebounce()"></div>
+              <div class="cf-row"><label class="cf-label">Nom *</label><input class="cf-input" type="text" id="pm-nom" placeholder="NOM" oninput="_pmAutoFillLicenceDebounce()"></div>
+            </div>
+            <!-- Statut auto-fill licence -->
+            <div id="pm-licence-status" style="display:none;margin-bottom:8px;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:600"></div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+              <div class="cf-row"><label class="cf-label">Rôle</label>
+                <select class="cf-select" id="pm-role" onchange="pmToggleULM()">
+                  <option value="Pilote">Pilote</option><option value="Co-pilote">Co-pilote</option><option value="Passager">Passager</option>
+                </select>
+              </div>
+              <div class="cf-row"><label class="cf-label">Date de naissance</label><input class="cf-input" type="date" id="pm-ddn"></div>
+              <div class="cf-row"><label class="cf-label">Taille maillot</label>
+                <select class="cf-select" id="pm-maillot">
+                  <option value="">—</option><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option><option value="3XL">3XL</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Photo à droite -->
+          <div style="flex:0 0 100px;display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div id="pm-photo-wrap" onclick="document.getElementById('pm-photo-inp').click()"
+              style="width:100px;height:130px;border:2px dashed var(--bdr);border-radius:6px;overflow:hidden;cursor:pointer;background:var(--navy3);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px">
+              <img id="pm-photo-img" style="display:none;width:100%;height:100%;object-fit:cover">
+              <span id="pm-photo-icon" style="font-size:24px;color:var(--txt3)">📷</span>
+              <span style="font-size:9px;color:var(--txt3);text-align:center">Ajouter photo</span>
+            </div>
+            <input type="file" id="pm-photo-inp" accept="image/*" style="display:none" onchange="handlePMPhoto(this)">
+            <button type="button" id="pm-photo-del" onclick="pmDeletePhoto()" style="display:none;font-size:10px;color:var(--txt3);background:none;border:none;cursor:pointer;padding:0;font-family:inherit">Supprimer</button>
+          </div>
+        </div>
       </div>
-      <input type="file" id="pm-photo-inp" accept="image/*" style="display:none" onchange="handlePMPhoto(this)">
-      <div style="font-size:12px;color:var(--txt2)">
-        Photo du compétiteur<br>
-        <span style="font-size:11px;color:var(--txt3)">Appuyer sur le cercle pour changer</span><br>
-        <button type="button" id="pm-photo-del" onclick="pmDeletePhoto()" style="display:none;margin-top:6px;padding:3px 10px;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;font-size:11px;cursor:pointer;font-family:inherit">✕ Supprimer la photo</button>
+
+      <!-- ── Licence & Club ── -->
+      <div id="pm-content-licence" style="display:none">
+        <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Licence &amp; Club</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="cf-row"><label class="cf-label">Licence FFPLUM</label><input class="cf-input" type="text" id="pm-licence" placeholder="123456"></div>
+          <div class="cf-row"><label class="cf-label">Club / Aéroclub</label><input class="cf-input" type="text" id="pm-club" placeholder="Roland ULM…"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="cf-row"><label class="cf-label">Téléphone</label><input class="cf-input" type="tel" id="pm-tel" placeholder="+33 6 …"></div>
+          <div class="cf-row"><label class="cf-label">Email</label><input class="cf-input" type="email" id="pm-email" placeholder="optionnel"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="cf-row"><label class="cf-label">Adresse</label><input class="cf-input" type="text" id="pm-adresse" placeholder="Rue, CP Ville…" oninput="pmAutoRegion(this.value)"></div>
+          <div class="cf-row"><label class="cf-label">Région / Pays</label>
+            <select class="cf-select" id="pm-region">
+              <option value="">— Choisir —</option>
+              <optgroup label="Régions françaises">
+                <option>Auvergne-Rhône-Alpes</option><option>Bourgogne-Franche-Comté</option><option>Bretagne</option><option>Centre-Val de Loire</option><option>Corse</option><option>Grand Est</option><option>Hauts-de-France</option><option>Île-de-France</option><option>Normandie</option><option>Nouvelle-Aquitaine</option><option>Occitanie</option><option>Pays de la Loire</option><option>Provence-Alpes-Côte d'Azur</option><option>Guadeloupe</option><option>Guyane</option><option>La Réunion</option><option>Martinique</option><option>Mayotte</option>
+              </optgroup>
+              <optgroup label="Pays étrangers">
+                <option value="Étranger">Étranger (non précisé)</option><option>Albanie</option><option>Allemagne</option><option>Andorre</option><option>Autriche</option><option>Belgique</option><option>Biélorussie</option><option>Bosnie-Herzégovine</option><option>Bulgarie</option><option>Chypre</option><option>Croatie</option><option>Danemark</option><option>Espagne</option><option>Estonie</option><option>Finlande</option><option>Géorgie</option><option>Grèce</option><option>Hongrie</option><option>Irlande</option><option>Islande</option><option>Italie</option><option>Kosovo</option><option>Lettonie</option><option>Liechtenstein</option><option>Lituanie</option><option>Luxembourg</option><option>Macédoine du Nord</option><option>Malte</option><option>Moldavie</option><option>Monaco</option><option>Monténégro</option><option>Norvège</option><option>Pays-Bas</option><option>Pologne</option><option>Portugal</option><option>République tchèque</option><option>Roumanie</option><option>Royaume-Uni</option><option>Russie</option><option>Saint-Marin</option><option>Serbie</option><option>Slovaquie</option><option>Slovénie</option><option>Suède</option><option>Suisse</option><option>Turquie</option><option>Ukraine</option><option>Afrique du Sud</option><option>Algérie</option><option>Argentine</option><option>Australie</option><option>Brésil</option><option>Canada</option><option>Chili</option><option>Colombie</option><option>États-Unis</option><option>Japon</option><option>Maroc</option><option>Mexique</option><option>Nouvelle-Zélande</option><option>Pérou</option><option>Tunisie</option><option>Uruguay</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
       </div>
-    </div>
-    <!-- ── Identité ── -->
-    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">Identité</div>
-    <div style="display:grid;grid-template-columns:110px 1fr 1fr;gap:8px;margin-bottom:8px">
-      <div class="field" style="margin-bottom:0"><label>Genre</label>
-        <select id="pm-genre" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
-          <option value="">—</option><option value="M.">M.</option><option value="Mme.">Mme.</option>
-        </select>
+
+      <!-- ── ULM / Machine ── -->
+      <div id="pm-content-machine" style="display:none">
+        <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">ULM / Machine</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="cf-row"><label class="cf-label">Classe ULM</label>
+            <select class="cf-select" id="pm-classe" onchange="updatePMClasse()">
+              <option value="multiaxes">Multiaxes (classe 3)</option><option value="pendulaire">Pendulaire (classe 2)</option><option value="gyro">Autogire (classe 4)</option><option value="paramotor">Paramoteur (classe 1)</option>
+            </select>
+          </div>
+          <div class="cf-row"><label class="cf-label">Pratique</label>
+            <select class="cf-select" id="pm-pratique" onchange="updatePMClasse()">
+              <option value="">— Non précisé —</option><option value="microlight">Microlight</option><option value="paramoteur">Paramoteur</option><option value="multi">Multi-pratiques</option>
+            </select>
+          </div>
+        </div>
+        <div id="pm-ulm-pilot-only">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="cf-row"><label class="cf-label">Immatriculation</label><input class="cf-input" type="text" id="pm-immat" placeholder="F-JXXX" style="text-transform:uppercase"></div>
+            <div id="pm-aile-row" class="cf-row"><label class="cf-label">Type aile</label>
+              <select class="cf-select" id="pm-aile"><option value="haute">Aile haute</option><option value="basse">Aile basse</option></select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="cf-row"><label class="cf-label">Places</label>
+              <select class="cf-select" id="pm-places"><option value="mono">Monoplace</option><option value="bi">Biplace</option></select>
+            </div>
+            <div class="cf-row"><label class="cf-label">Catégorie compétition</label>
+              <select class="cf-select" id="pm-categorie" onchange="pmAutoSetClasse()">
+                <option value="">— Non précisé —</option><option value="classable">Classable</option><option value="access">Accès STOL (non classable)</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="cf-row"><label class="cf-label">Marque</label><input class="cf-input" type="text" id="pm-marque" placeholder="Zenith…"></div>
+            <div class="cf-row"><label class="cf-label">Modèle</label><input class="cf-input" type="text" id="pm-modele" placeholder="CH701…"></div>
+          </div>
+          <div class="cf-row"><label class="cf-label">Moteur</label><input class="cf-input" type="text" id="pm-moteur"></div>
+        </div>
       </div>
-      <div class="field" style="margin-bottom:0"><label>Prénom *</label><input type="text" id="pm-prenom"></div>
-      <div class="field" style="margin-bottom:0"><label>Nom *</label><input type="text" id="pm-nom"></div>
-    </div>
-    <div class="field" style="margin-bottom:8px"><label>Rôle</label>
-      <select id="pm-role" onchange="pmToggleULM()" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
-        <option value="Pilote">Pilote</option>
-        <option value="Co-pilote">Co-pilote</option>
-        <option value="Passager">Passager</option>
-      </select>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Date de naissance</label><input type="date" id="pm-ddn"></div>
-      <div class="field"><label>Taille maillot</label>
-        <select id="pm-maillot">
-          <option value="">—</option><option value="XS">XS</option><option value="S">S</option>
-          <option value="M">M</option><option value="L">L</option><option value="XL">XL</option>
-          <option value="XXL">XXL</option><option value="3XL">3XL</option>
-        </select>
+
+
+      <!-- ── Services ── -->
+      <div id="pm-content-services" style="display:none">
+        <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">Services</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px">
+            <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:4px">🖨 Facture repas</div>
+            <div style="font-size:11px;color:var(--txt3);margin-bottom:12px">Génère et imprime la facture de tous les repas du compétiteur sur l'ensemble des compétitions.</div>
+            <button onclick="(function(){var pid=document.getElementById('pm-edit-id').value;if(pid){closeSheet('sheet-pilot-manual');printRepasInvoice(pid);}})()" style="width:100%;padding:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#34d399;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+              🖨 Imprimer la facture repas
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-    <!-- ── Licences & Club ── -->
-    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">Licences &amp; Club</div>
-    <div class="grid2">
-      <div class="field"><label>Licence FFPLUM</label><input type="text" id="pm-licence" placeholder="123456"></div>
-      <div class="field"><label>Club / Aéroclub</label><input type="text" id="pm-club" placeholder="Roland ULM…"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Téléphone</label><input type="tel" id="pm-tel" placeholder="+33 6 …"></div>
-      <div class="field"><label>Email</label><input type="email" id="pm-email" placeholder="optionnel"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Adresse</label><input type="text" id="pm-adresse" placeholder="Rue, CP Ville…" oninput="pmAutoRegion(this.value)"></div>
-      <div class="field"><label>Région / Pays</label>
-        <select id="pm-region" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
-          <option value="">— Choisir —</option>
-          <optgroup label="Régions françaises">
-            <option>Auvergne-Rhône-Alpes</option><option>Bourgogne-Franche-Comté</option>
-            <option>Bretagne</option><option>Centre-Val de Loire</option><option>Corse</option>
-            <option>Grand Est</option><option>Hauts-de-France</option><option>Île-de-France</option>
-            <option>Normandie</option><option>Nouvelle-Aquitaine</option><option>Occitanie</option>
-            <option>Pays de la Loire</option><option>Provence-Alpes-Côte d'Azur</option>
-            <option>Guadeloupe</option><option>Guyane</option><option>La Réunion</option>
-            <option>Martinique</option><option>Mayotte</option>
-          </optgroup>
-          <optgroup label="Pays étrangers">
-            <option value="Étranger">Étranger (non précisé)</option>
-            <option>Albanie</option><option>Allemagne</option><option>Andorre</option>
-            <option>Autriche</option><option>Belgique</option><option>Biélorussie</option>
-            <option>Bosnie-Herzégovine</option><option>Bulgarie</option><option>Chypre</option>
-            <option>Croatie</option><option>Danemark</option><option>Espagne</option>
-            <option>Estonie</option><option>Finlande</option><option>Géorgie</option>
-            <option>Grèce</option><option>Hongrie</option><option>Irlande</option>
-            <option>Islande</option><option>Italie</option><option>Kosovo</option>
-            <option>Lettonie</option><option>Liechtenstein</option><option>Lituanie</option>
-            <option>Luxembourg</option><option>Macédoine du Nord</option><option>Malte</option>
-            <option>Moldavie</option><option>Monaco</option><option>Monténégro</option>
-            <option>Norvège</option><option>Pays-Bas</option><option>Pologne</option>
-            <option>Portugal</option><option>République tchèque</option><option>Roumanie</option>
-            <option>Royaume-Uni</option><option>Russie</option><option>Saint-Marin</option>
-            <option>Serbie</option><option>Slovaquie</option><option>Slovénie</option>
-            <option>Suède</option><option>Suisse</option><option>Turquie</option>
-            <option>Ukraine</option><option>Afrique du Sud</option><option>Algérie</option>
-            <option>Argentine</option><option>Australie</option><option>Brésil</option>
-            <option>Canada</option><option>Chili</option><option>Colombie</option>
-            <option>États-Unis</option><option>Japon</option><option>Maroc</option>
-            <option>Mexique</option><option>Nouvelle-Zélande</option><option>Pérou</option>
-            <option>Tunisie</option><option>Uruguay</option>
-          </optgroup>
-        </select>
+
+      <!-- ── Historique ── -->
+      <div id="pm-content-historique" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px">Historique compétitions</div>
+          <span id="pm-hist-count" style="font-size:11px;color:var(--txt3)"></span>
+        </div>
+        <div id="pm-hist-body">
+          <div style="text-align:center;padding:32px 0;color:var(--txt3);font-size:13px">Chargement…</div>
+        </div>
       </div>
-    </div>
-    <!-- ── ULM / Machine ── -->
-    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">ULM / Machine</div>
-    <!-- Classe + Immat toujours visibles -->
-    <div class="field"><label>Classe ULM</label>
-      <select id="pm-classe" onchange="updatePMClasse()">
-        <option value="multiaxes">Multiaxes (classe 3)</option>
-        <option value="pendulaire">Pendulaire (classe 2)</option>
-        <option value="gyro">Autogire (classe 4)</option>
-        <option value="paramotor">Paramoteur (classe 1)</option>
-      </select>
-    </div>
-    <div class="field"><label>Immatriculation</label><input type="text" id="pm-immat" placeholder="F-JXXX" style="text-transform:uppercase"></div>
-    <!-- Bloc masqué si rôle ≠ Pilote -->
-    <div id="pm-ulm-pilot-only">
-      <div class="field"><label>Pratique</label>
-        <select id="pm-pratique" onchange="updatePMClasse()" style="width:100%;padding:8px 10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px">
-          <option value="">— Non précisé —</option>
-          <option value="microlight">Microlight</option>
-          <option value="paramoteur">Paramoteur</option>
-          <option value="multi">Multi-pratiques</option>
-        </select>
-      </div>
-      <div id="pm-aile-row" class="field">
-        <label>Type aile</label>
-        <select id="pm-aile"><option value="haute">Aile haute</option><option value="basse">Aile basse</option></select>
-      </div>
-      <div class="field"><label>Places</label>
-        <select id="pm-places"><option value="mono">Monoplace</option><option value="bi">Biplace</option></select>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Marque</label><input type="text" id="pm-marque" placeholder="Zenith…"></div>
-        <div class="field"><label>Modèle</label><input type="text" id="pm-modele" placeholder="CH701…"></div>
-      </div>
-      <div class="field"><label>Moteur</label><input type="text" id="pm-moteur"></div>
-      <div class="field"><label>Catégorie compétition</label>
-        <select id="pm-categorie" onchange="pmAutoSetClasse()">
-          <option value="">— Non précisé —</option>
-          <option value="classable">Classable</option>
-          <option value="access">Accès STOL (non classable)</option>
-        </select>
-      </div>
-    </div>
-    <!-- ── Inscription ── -->
-    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:5px;margin-bottom:8px">Inscription</div>
-    <div class="field">
-      <label>Inscrire à une compétition (optionnel)</label>
-      <select id="pm-comp-enroll">
-        <option value="">— Aucune —</option>
-      </select>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn btn-secondary" style="flex:1" onclick="closeSheet('sheet-pilot-manual')">Annuler</button>
-      <button class="btn btn-primary" style="flex:1" onclick="savePilotManual()">💾 Enregistrer</button>
-    </div>
+
+    </div><!-- fin contenu -->
+  </div><!-- fin corps -->
+
+  <!-- Pied de page -->
+  <div style="display:flex;gap:0;padding:0;border-top:1px solid var(--bdr);flex-shrink:0">
+    <button onclick="closeSheet('sheet-pilot-manual')" style="flex:1;padding:14px;border:none;border-right:1px solid var(--bdr);background:none;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>
+    <button id="pm-btn-delete" onclick="_pmDeleteStep(this)" style="flex:0 0 110px;padding:14px 10px;border:none;border-right:1px solid var(--bdr);background:none;color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px" title="Supprimer ce compétiteur">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 2h4a1 1 0 0 0-2 0H6a1 1 0 0 0-2 0zm-2 1h8l-.8 9.6A1 1 0 0 1 10.2 14H5.8a1 1 0 0 1-1-.4L4 3zm2 2v6h1V5zm3 0v6h1V5z"/></svg>
+      Supprimer
+    </button>
+    <button onclick="fillPilotManualFromLicence()" style="flex:1;padding:14px;border:none;border-right:1px solid var(--bdr);background:none;color:#93c5fd;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📋 Compléter licence</button>
+    <button onclick="savePilotManual()" style="flex:1;padding:14px;border:none;background:linear-gradient(135deg,var(--stol),#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>
   </div>
+
 </div>
 </div>
 
@@ -15458,7 +15490,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var ini2 = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase();
         var avCol = 'var(--stol)';
         var _podMob = (((S.enrollMeta||{})[cid]||{})[pid]||{}).podium||'';
-        html5 += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'+bg+';border-bottom:1px solid var(--bdr);min-height:64px;position:relative;cursor:pointer" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" title="Voir / modifier le profil">';
+        html5 += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'+bg+';border-bottom:1px solid var(--bdr);min-height:64px;position:relative;cursor:pointer" onclick="editPilotManual(\''+pidE+'\')" title="Voir / modifier le profil">';
         var _photoMob = p.photo||'';
         html5 += '<div style="position:relative;width:40px;height:40px;flex-shrink:0">';
         html5 += '<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:'+avCol+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;border:2px solid '+avCol+'">';
@@ -15488,7 +15520,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var _missing = !p.genre || !p.pratique || !(p.classe||ulm.classe);
         var _rowBdr  = _missing ? 'border-left:2px solid #f59e0b;' : '';
         var _rowBg   = i%2===1 ? 'var(--navy3)' : 'var(--navy4)';
-        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 0;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer;'+_rowBdr+'" onclick="showPilotDetailModal(\''+pidE+'\',\''+cid+'\')" onmouseover="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\'var(--navy3)\'})" onmouseout="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\''+_rowBg+'\'})" title="Voir / modifier le profil">';
+        html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:4px 0;'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer;'+_rowBdr+'" onclick="editPilotManual(\''+pidE+'\')" onmouseover="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\'var(--navy3)\'})" onmouseout="this.querySelectorAll(\'[data-sc]\').forEach(function(e){e.style.background=\''+_rowBg+'\'})" title="Voir / modifier le profil">';
         var _avCol2 = 'var(--stol)';
         var _ini2   = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase()||'?';
         var _photo2 = p.photo||'';
@@ -16118,7 +16150,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var isEven = i%2===1;
         var pilotNameHtml = (pilot.prenom||'')+' '+(pilot.nom||'');
         if (nav2) pilotNameHtml += '<div style="font-size:10px;color:var(--txt3);font-weight:500;line-height:1.2">+ '+(nav2.prenom||'')+' '+(nav2.nom||'')+'</div>';
-        htmlR += '<div onclick="showPilotDetailModal(\''+pid+'\',\''+cp.id+'\')" title="Voir le profil" style="display:grid;'+COL+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
+        htmlR += '<div onclick="editPilotManual(\''+pid+'\')" title="Modifier le compétiteur" style="display:grid;'+COL+';gap:0;padding:6px 8px;background:'+(isEven?'var(--navy3)':'transparent')+';border-radius:5px;cursor:pointer;align-items:center">';
         htmlR += '<div style="font-size:12px;text-align:center">'+(medals2[i]||((i+1)+'.'))+'</div>';
         htmlR += '<div style="font-size:12px;font-weight:700;overflow:hidden;'+(nav2?'':'text-overflow:ellipsis;white-space:nowrap')+'">'+pilotNameHtml+'</div>';
         if (!_isMob) {
@@ -18851,7 +18883,7 @@ function renderPilots() {
       var row  = document.createElement('div');
       row.className = 'pilot-item';
       row.style.cursor = 'pointer';
-      row.onclick = (function(pid){ return function(){ showPilotDetailModal(pid, null); }; })(p.id);
+      row.onclick = (function(pid){ return function(){ editPilotManual(pid); }; })(p.id);
       var photoEl = document.createElement('div');
       photoEl.style.cssText = 'width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--navy3);display:flex;align-items:center;justify-content:center';
       if (p.photo) {
@@ -25205,11 +25237,69 @@ function updatePMClasse() {
   if (row) row.style.display = cls === 'multiaxes' ? '' : 'none';
 }
 
+function _pmDeleteStep(btn) {
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1';
+    btn.style.background = '#dc2626';
+    btn.style.color = '#fff';
+    btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 2h4a1 1 0 0 0-2 0H6a1 1 0 0 0-2 0zm-2 1h8l-.8 9.6A1 1 0 0 1 10.2 14H5.8a1 1 0 0 1-1-.4L4 3zm2 2v6h1V5zm3 0v6h1V5z"/></svg> Confirmer ?';
+    // Réinitialiser après 3s si pas de confirmation
+    btn._resetTimer = setTimeout(function() {
+      btn.dataset.confirm = '';
+      btn.style.background = 'none';
+      btn.style.color = '#f87171';
+      btn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 2h4a1 1 0 0 0-2 0H6a1 1 0 0 0-2 0zm-2 1h8l-.8 9.6A1 1 0 0 1 10.2 14H5.8a1 1 0 0 1-1-.4L4 3zm2 2v6h1V5zm3 0v6h1V5z"/></svg> Supprimer';
+    }, 3000);
+  } else {
+    clearTimeout(btn._resetTimer);
+    deletePilotManual();
+  }
+}
+
+function deletePilotManual() {
+  var pilotId = (document.getElementById('pm-edit-id')||{}).value || '';
+  if (!pilotId) { toast('Aucun compétiteur à supprimer', 'err'); return; }
+  var p = (S.pilots||[]).find(function(x){ return x.id === pilotId; });
+  var label = p ? ((p.prenom||'') + ' ' + (p.nom||'')).trim() : 'ce compétiteur';
+  S.pilots = (S.pilots||[]).filter(function(x){ return x.id !== pilotId; });
+  if (S.ulms) delete S.ulms[pilotId];
+  if (S.compEnroll) {
+    Object.keys(S.compEnroll).forEach(function(cid) {
+      S.compEnroll[cid] = (S.compEnroll[cid]||[]).filter(function(id){ return id !== pilotId; });
+    });
+  }
+  if (S.enrollMeta) {
+    Object.keys(S.enrollMeta).forEach(function(cid) {
+      if (S.enrollMeta[cid]) delete S.enrollMeta[cid][pilotId];
+    });
+  }
+  saveState();
+  silentPush();
+  closeSheet('sheet-pilot-manual');
+  renderPilots();
+  toast(label + ' supprimé ✓', 'ok');
+}
+
 function savePilotManual() {
   var prenom = document.getElementById('pm-prenom').value.trim();
   var nom    = document.getElementById('pm-nom').value.trim();
   if (!prenom || !nom) { toast('Prénom et nom requis', 'err'); return; }
   var editId = document.getElementById('pm-edit-id').value;
+  // ── Détection doublon à la création ──
+  if (!editId) {
+    var _norm = function(s){ return (s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+    var _doubles = (S.pilots||[]).filter(function(p){
+      return _norm(p.prenom)===_norm(prenom) && _norm(p.nom)===_norm(nom);
+    });
+    if (_doubles.length > 0) {
+      var _msg = 'Un pilote avec ce nom existe déjà :\n\n';
+      _doubles.forEach(function(p){
+        _msg += '• ' + (p.prenom||'') + ' ' + (p.nom||'') + (p.licence ? ' (licence '+p.licence+')' : '') + (p.club ? ' — '+p.club : '') + '\n';
+      });
+      _msg += '\nVoulez-vous quand même créer un nouvel enregistrement ?';
+      if (!window.confirm(_msg)) return;
+    }
+  }
   var pilotId = editId || 'manual_' + Date.now();
   var pmPhotoInp = document.getElementById('pm-photo-inp');
   var pmPhotoData = pmPhotoInp ? (pmPhotoInp._data || null) : null;
@@ -25255,13 +25345,6 @@ function savePilotManual() {
   if (!S.ulms[pilotId]) S.ulms[pilotId] = [];
   if (editId) S.ulms[pilotId] = [ulm]; // remplacer
   else S.ulms[pilotId].push(ulm);
-  // Inscrire à la compétition si sélectionnée
-  var compId = document.getElementById('pm-comp-enroll').value;
-  if (compId) {
-    if (!S.compEnroll) S.compEnroll = {};
-    if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
-    if (!S.compEnroll[compId].includes(pilotId)) S.compEnroll[compId].push(pilotId);
-  }
   saveState();
   closeSheet('sheet-pilot-manual');
   renderPilots();
@@ -25290,7 +25373,8 @@ function editPilotManual(pilotId) {
   var p = S.pilots.find(function(pl){ return pl.id === pilotId; });
   if (!p) return;
   document.getElementById('pm-edit-id').value = pilotId;
-  document.getElementById('pilot-manual-title').textContent = 'Modifier compétiteur';
+  document.getElementById('pilot-manual-title').textContent = (p.prenom||'') + ' ' + (p.nom||'');
+  _pmTab('etat-civil');
   document.getElementById('pm-genre').value   = p.genre   || '';
   document.getElementById('pm-prenom').value  = p.prenom  || '';
   document.getElementById('pm-nom').value     = p.nom     || '';
@@ -25331,19 +25415,159 @@ function editPilotManual(pilotId) {
   }
   updatePMClasse();
   pmToggleULM();
-  // Remplir compétitions
-  var sel = document.getElementById('pm-comp-enroll');
-  sel.innerHTML = '<option value="">— Aucune —</option>';
-  S.comps.forEach(function(c){
-    var enrolled = (S.compEnroll || {})[c.id] || [];
-    var isIn = enrolled.includes(pilotId);
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + (isIn ? ' ✓' : '');
-    if (isIn) opt.selected = true;
-    sel.appendChild(opt);
-  });
   openSheet('sheet-pilot-manual');
+}
+
+// ─── Auto-fill licence FFPLUM à la frappe (nom + prénom) ───
+var _pmAutoFillTimer = null;
+function _pmAutoFillLicenceDebounce() {
+  clearTimeout(_pmAutoFillTimer);
+  _pmAutoFillTimer = setTimeout(_pmAutoFillFromLicence, 380);
+}
+
+function _pmAutoFillFromLicence() {
+  var nom    = ((document.getElementById('pm-nom')   ||{}).value||'').trim();
+  var prenom = ((document.getElementById('pm-prenom')||{}).value||'').trim();
+  var statusEl = document.getElementById('pm-licence-status');
+
+  if (!statusEl) return;
+
+  // Pas assez de caractères
+  if (nom.length < 2 || prenom.length < 2) {
+    statusEl.style.display = 'none';
+    return;
+  }
+
+  // Base non chargée
+  if (!S.licenceDB || !Object.keys(S.licenceDB).length) {
+    statusEl.style.display = '';
+    statusEl.style.background = 'rgba(245,158,11,.1)';
+    statusEl.style.border = '1px solid rgba(245,158,11,.3)';
+    statusEl.style.color = '#f59e0b';
+    statusEl.textContent = '💡 Base FFPLUM non chargée — importez-la dans Réglages → "Import licences FFPLUM"';
+    return;
+  }
+
+  var _norm = function(s) {
+    return (s||'').toString().trim().toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'');
+  };
+  var k1 = _norm(nom)+'|'+_norm(prenom);
+  var k2 = _norm(prenom)+'|'+_norm(nom);
+  var rec = S.licenceDB[k1] || S.licenceDB[k2] || null;
+
+  if (!rec) {
+    statusEl.style.display = '';
+    statusEl.style.background = 'rgba(239,68,68,.08)';
+    statusEl.style.border = '1px solid rgba(239,68,68,.2)';
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = '✗ Non trouvé dans la base FFPLUM';
+    return;
+  }
+
+  // Remplir les champs depuis la base
+  var _set = function(id, val) { var el=document.getElementById(id); if(el && val) el.value=val; };
+  _set('pm-licence', rec.licence);
+  _set('pm-genre',   rec.genre);
+  _set('pm-ddn',     rec.ddn);
+  _set('pm-email',   rec.email);
+  _set('pm-tel',     rec.tel);
+  _set('pm-club',    rec.club);
+  _set('pm-adresse', rec.adresse);
+  if (rec.region) {
+    var regEl = document.getElementById('pm-region');
+    if (regEl) {
+      // Chercher l'option correspondante
+      var opts = Array.from(regEl.options);
+      var found = opts.find(function(o){ return o.value && _norm(o.value).indexOf(_norm(rec.region))>=0; });
+      if (found) regEl.value = found.value;
+    }
+  }
+  if (rec.pratique) {
+    var pratEl = document.getElementById('pm-pratique');
+    if (pratEl) pratEl.value = rec.pratique;
+    updatePMClasse();
+  }
+
+  statusEl.style.display = '';
+  statusEl.style.background = 'rgba(16,185,129,.1)';
+  statusEl.style.border = '1px solid rgba(16,185,129,.3)';
+  statusEl.style.color = '#34d399';
+  statusEl.textContent = '✓ Données FFPLUM chargées automatiquement' + (rec.licence ? ' — Licence '+rec.licence : '');
+}
+
+// ─── Navigation par onglets de la fiche pilote ───
+function _pmTab(tab) {
+  var tabs = ['etat-civil','licence','machine','historique','services'];
+  tabs.forEach(function(t) {
+    var btn = document.getElementById('pm-nav-'+t);
+    var pnl = document.getElementById('pm-content-'+t);
+    var active = (t === tab);
+    if (btn) {
+      btn.style.borderLeftColor = active ? 'var(--stol)' : 'transparent';
+      btn.style.background = active ? 'rgba(255,255,255,.05)' : 'transparent';
+      btn.style.color = active ? 'var(--txt)' : 'var(--txt2)';
+      btn.style.fontWeight = active ? '600' : '500';
+    }
+    if (pnl) pnl.style.display = active ? '' : 'none';
+  });
+  if (tab === 'historique') _pmFillHistorique();
+}
+
+// ─── Remplir l'onglet Historique de la fiche pilote ───
+function _pmFillHistorique() {
+  var pilotId = (document.getElementById('pm-edit-id')||{}).value || '';
+  var body = document.getElementById('pm-hist-body');
+  var cnt  = document.getElementById('pm-hist-count');
+  if (!body) return;
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var fmtDate = function(d){ if (!d) return ''; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; };
+  var podL = {'1':'🥇 1er','2':'🥈 2ème','3':'🥉 3ème'};
+  var compList = [];
+  if (pilotId) {
+    (S.comps||[]).forEach(function(cp) {
+      if (((S.compEnroll||{})[cp.id]||[]).indexOf(pilotId) >= 0) {
+        var meta = ((S.enrollMeta||{})[cp.id]||{})[pilotId] || {};
+        compList.push({
+          saison:   cp.saison   || '—',
+          nom:      cp.nom      || cp.name || '—',
+          lieu:     cp.lieu     || '',
+          dateFrom: cp.dateFrom || '',
+          dateTo:   cp.dateTo   || '',
+          pratique: cp.pratique || '',
+          podium:   meta.podium || '',
+          niveau:   meta.niveau || ''
+        });
+      }
+    });
+    compList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
+  }
+  if (cnt) cnt.textContent = compList.length ? compList.length + ' compétition' + (compList.length>1?'s':'') : '';
+  if (!compList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition enregistrée</div>';
+    return;
+  }
+  var pratL = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi',paramotor:'Paramoteur'};
+  var html = '<div style="display:flex;flex-direction:column;gap:8px">';
+  compList.forEach(function(c) {
+    var podStr = podL[String(c.podium)] || '';
+    var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
+    html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+      + '<div style="flex-shrink:0;width:44px;text-align:center">'
+      +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
+      +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
+      + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
+      +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
+      +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
+      +   '</div>'
+      + '</div>'
+      + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
+      + '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
 }
 
 // ─── Remplir formulaire pm-* depuis licenceDB ───
@@ -25804,7 +26028,7 @@ function cfEditMember(id) {
   if (!m.pilotId) { m.pilotId = pilot.id; saveState(); }
 
   _cfEditingFromId = id;
-  showPilotDetailModal(pilot.id, null, true);
+  editPilotManual(pilot.id);
 }
 
 var _cfePhotoData = '';
@@ -34293,6 +34517,21 @@ function importLicenceFfplum(inp) {
       var cVille   = _col(['VILLE','COMMUNE','CITY']);     if (cVille<0)   cVille=47;
       var cAdr1    = _col(['ADR1','ADRESSE 1','RUE','VOIE']); if (cAdr1<0) cAdr1=43;
       var cAdr2    = _col(['ADR2','ADRESSE 2','COMPL']);   if (cAdr2<0)    cAdr2=44;
+      // Colonnes pratique (chercher dans l'ordre pour éviter faux positifs)
+      var cPratParam = -1, cPratPend = -1, cPratMulti = -1, cPratGyro = -1;
+      headerRow.forEach(function(h,i){
+        var n = norm(h||'');
+        if (n.indexOf('PRATIQUANT')!==-1) {
+          if (n.indexOf('PARAM')!==-1 && cPratParam<0)  cPratParam=i;
+          else if (n.indexOf('PEND')!==-1 && cPratPend<0) cPratPend=i;
+          else if ((n.indexOf('MULTI')!==-1||n.indexOf('MULTIAX')!==-1) && cPratMulti<0) cPratMulti=i;
+          else if ((n.indexOf('AUTO')!==-1||n.indexOf('GYRO')!==-1) && cPratGyro<0)  cPratGyro=i;
+        }
+      });
+      if (cPratParam<0) cPratParam=11;
+      if (cPratPend<0)  cPratPend=14;
+      if (cPratMulti<0) cPratMulti=17;
+      if (cPratGyro<0)  cPratGyro=20;
 
       console.log('[LicenceDB] En-têtes ligne '+headerRowIdx+', colonnes :',
         {licence:cLicence, nom:cNom, prenom:cPrenom, region:cRegion, club:cClub, email:cEmail});
@@ -34361,6 +34600,12 @@ function importLicenceFfplum(inp) {
         var key = norm(r[cNom]) + '|' + norm(r[cPrenom]);
         if (key === '|') return;
         var licNum = (r[cLicence]||'').toString().trim();
+        var _isP = function(col){ return col>=0 && /pilote|oui|pratiq/i.test((r[col]||'').toString()); };
+        var _pratique = '';
+        var _nbPrat = (_isP(cPratParam)?1:0)+(_isP(cPratPend)?1:0)+(_isP(cPratMulti)?1:0)+(_isP(cPratGyro)?1:0);
+        if (_nbPrat > 1) _pratique = 'multi';
+        else if (_isP(cPratParam)) _pratique = 'paramoteur';
+        else if (_isP(cPratPend)||_isP(cPratMulti)||_isP(cPratGyro)) _pratique = 'microlight';
         var entry = {
           nom:     (r[cNom]||'').toString().trim().toUpperCase(),
           prenom:  (r[cPrenom]||'').toString().trim().toUpperCase(),
@@ -34371,7 +34616,8 @@ function importLicenceFfplum(inp) {
           tel:     (r[cTelPort]||'').toString().trim() || (r[cTelFix]||'').toString().trim(),
           club:    (r[cClub]||'').toString().trim(),
           region:  (r[cRegion]||'').toString().trim(),
-          adresse: buildAdresse(r)
+          adresse: buildAdresse(r),
+          pratique: _pratique
         };
         S.licenceDB[key] = entry;
         // Index secondaire par licence (lookup rapide sans scan)
