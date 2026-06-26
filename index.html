@@ -1313,6 +1313,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- Onglets -->
       <div class="class-tabs" id="pilots-class-tabs" style="margin:0 12px 4px">
         <button class="class-tab active" onclick="setPilotsClass('pilotes',this)">Pilotes</button>
+        <button class="class-tab" onclick="setPilotsClass('aides',this)">Aides</button>
         <button class="class-tab" onclick="setPilotsClass('divers',this)">Divers</button>
       </div>
       </div><!-- fin en-tête fixe -->
@@ -2764,6 +2765,113 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
 <input type="file" id="gantt-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importGantt(this)">
 
+<!-- AIDES FÉDÉRALES : dialog formulaire -->
+<div id="aides-dlg" style="display:none;position:fixed;inset:0;z-index:3100;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(3px)" onclick="if(event.target===this)_aideFormClose()">
+  <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(880px,98vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+    <!-- En-tête -->
+    <div style="padding:14px 18px 12px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div style="font-weight:800;font-size:14px;color:var(--txt)" id="aides-dlg-title">Nouvelle aide</div>
+      <button onclick="_aideFormClose()" style="width:28px;height:28px;border:none;background:none;color:var(--txt3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:6px;line-height:1">×</button>
+    </div>
+    <!-- Corps : 2 colonnes -->
+    <div style="flex:1;overflow:hidden;display:flex;min-height:0">
+      <!-- ─── Formulaire (gauche) ─── -->
+      <div style="flex:0 0 440px;overflow-y:auto;padding:16px 18px;border-right:1px solid var(--bdr)">
+        <input type="hidden" id="aide-form-id">
+        <!-- Ligne 1 : Année | Date demande | Dispositif -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Année</label>
+            <select id="aide-form-annee" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;outline:none"></select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Date demande</label>
+            <input type="date" id="aide-form-datedemande"
+              style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 8px;box-sizing:border-box;outline:none"
+              onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Dispositif</label>
+            <select id="aide-form-dispositif" onchange="_aideDispChange()" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;outline:none">
+              <option value="FFPLUM">FFPLUM</option>
+              <option value="Pôle Sport">Pôle Sport</option>
+              <option value="Autre">Autre…</option>
+            </select>
+          </div>
+        </div>
+        <!-- Dispositif libre -->
+        <div id="aide-autre-row" style="display:none;margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Préciser le dispositif</label>
+          <input type="text" id="aide-form-autre" placeholder="Nom du dispositif…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none">
+        </div>
+        <!-- Campagne -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Campagne</label>
+          <input type="text" id="aide-form-campagne" list="aide-campagnes-dl" autocomplete="off"
+            placeholder="ex. Championnat du Monde 2026, Stage DTN…"
+            style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none"
+            onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          <datalist id="aide-campagnes-dl"></datalist>
+        </div>
+        <!-- Pilote -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Pilote <span style="font-size:9px;color:var(--txt3);font-weight:400;text-transform:none">(saisie libre — créé si inconnu)</span></label>
+          <input type="hidden" id="aide-form-pilote-id">
+          <input type="text" id="aide-form-pilote-nom" list="aide-pilotes-dl" autocomplete="off"
+            placeholder="NOM Prénom…"
+            oninput="_aideHistRefresh()"
+            style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none"
+            onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          <datalist id="aide-pilotes-dl"></datalist>
+        </div>
+        <!-- Projet -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Projet</label>
+          <input type="text" id="aide-form-projet" list="aide-projets-dl" autocomplete="off"
+            placeholder="Nom du projet sportif…"
+            style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;outline:none"
+            onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          <datalist id="aide-projets-dl"></datalist>
+        </div>
+        <!-- Montants -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Coût total (€)</label>
+            <input type="number" id="aide-form-cout" min="0" step="0.01" placeholder="0.00" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;box-sizing:border-box;text-align:right;outline:none" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Aide demandée (€)</label>
+            <input type="number" id="aide-form-demandee" min="0" step="0.01" placeholder="0.00" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;box-sizing:border-box;text-align:right;outline:none" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Aide octroyée (€)</label>
+            <input type="number" id="aide-form-aide" min="0" step="0.01" placeholder="0.00" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;box-sizing:border-box;text-align:right;outline:none" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+          </div>
+        </div>
+        <!-- Note -->
+        <div>
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Note / Objet</label>
+          <textarea id="aide-form-note" rows="2" placeholder="Objet de cette aide…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;box-sizing:border-box;resize:vertical;outline:none"></textarea>
+        </div>
+      </div>
+      <!-- ─── Historique pilote (droite) ─── -->
+      <div id="aide-hist-panel" style="flex:1;min-width:0;overflow-y:auto;padding:14px 16px;background:var(--navy)">
+        <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Historique des aides — pilote</div>
+        <div id="aide-hist-body" style="color:var(--txt3);font-size:12px;text-align:center;padding:32px 8px">
+          Sélectionnez un pilote<br>pour voir son historique.
+        </div>
+      </div>
+    </div>
+    <!-- Pied -->
+    <div style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button onclick="_aideFormClose()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600">Annuler</button>
+      <button onclick="_aideFormSave()" style="padding:8px 16px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="aides-import-inp" accept=".json" style="display:none" onchange="importAides(this)">
+
 <!-- GANTT : dialog tâche -->
 <div id="gantt-task-dlg" style="display:none;position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)" onclick="if(event.target===this)_ganttCloseTaskDlg()">
   <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:900px;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column">
@@ -2773,6 +2881,30 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
     <div id="gantt-dlg-body" style="overflow:hidden"></div>
     <div id="gantt-dlg-footer" style="display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--bdr)"></div>
+  </div>
+</div>
+
+<!-- Modal Compte rendu de réunion -->
+<div id="gantt-cr-dlg" style="display:none;position:fixed;inset:0;z-index:2800;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
+  <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(90vh,92vw);height:min(90vh,92vw);max-width:none;box-shadow:0 8px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden">
+    <div id="gantt-cr-header" style="padding:14px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px"></div>
+    <div id="gantt-cr-body" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px"></div>
+    <div id="gantt-cr-footer" style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap"></div>
+  </div>
+</div>
+<!-- Modal relecture IA -->
+<div id="gantt-cr-ia-dlg" style="display:none;position:fixed;inset:0;z-index:2900;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px)" onclick="if(event.target===this)document.getElementById('gantt-cr-ia-dlg').style.display='none'">
+  <div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:700px;max-height:88vh;box-shadow:0 8px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+      <span style="font-size:14px;font-weight:800;color:var(--txt1)">✨ Relecture IA — Compte rendu</span>
+      <button onclick="document.getElementById('gantt-cr-ia-dlg').style.display='none'" style="width:28px;height:28px;border:none;border-radius:50%;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+    </div>
+    <div id="gantt-cr-ia-body" style="flex:1;overflow-y:auto;padding:18px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--txt1);font-family:inherit"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+      <button onclick="_crCopyIA()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit">📋 Copier</button>
+      <button id="gantt-cr-ia-apply" onclick="_crIAApply()" style="display:none;padding:7px 14px;border-radius:8px;border:none;background:#16a34a;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700">✅ Appliquer la correction</button>
+      <button onclick="document.getElementById('gantt-cr-ia-dlg').style.display='none'" style="padding:7px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;cursor:pointer;font-family:inherit">Fermer</button>
+    </div>
   </div>
 </div>
 
@@ -3833,6 +3965,7 @@ const LS_ENROLL_META = 'geststol_enroll_meta'; // Sauvegarde dédiée enrollMeta
 const LS_AGENDA_EVS  = 'geststol_agenda_events'; // Événements personnalisés agenda
 const LS_NDF         = 'geststol_notesfrais';   // Notes de frais (objet keyed par userId)
 const LS_SECURITE_EVS= 'geststol_securite_events'; // Événements de sécurité — clé dédiée anti-perte
+const LS_AIDES       = 'geststol_aides';           // Aides fédérales — clé dédiée anti-perte (jamais stripée)
 
 // ── Régions & Pays — listes partagées ────────────────────────────────────
 var _FR_REGIONS = [
@@ -4050,6 +4183,26 @@ function _restoreCritical() {
       } catch(e) {}
     }
   } catch(e) {}
+  // ── Aides fédérales — clé dédiée (filet de sécurité anti-perte absolu) ──
+  try {
+    var _aidesRaw = localStorage.getItem(LS_AIDES);
+    if (_aidesRaw) {
+      var _aidesParsed = JSON.parse(_aidesRaw);
+      if (Array.isArray(_aidesParsed) && _aidesParsed.length > 0) {
+        if (!S.aides || !S.aides.length) {
+          // État vide : restauration complète depuis la clé dédiée
+          S.aides = _aidesParsed;
+        } else {
+          // Fusion par id : les entrées absentes de S.aides sont rajoutées depuis la sauvegarde
+          var _aidesById = {};
+          S.aides.forEach(function(a){ if(a&&a.id) _aidesById[a.id]=true; });
+          _aidesParsed.forEach(function(a){
+            if(a&&a.id&&!_aidesById[a.id]) { S.aides.push(a); _aidesById[a.id]=true; }
+          });
+        }
+      }
+    }
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════════
@@ -4113,7 +4266,9 @@ var S = {
   },
   ordresMission: [],
   notesfrais: {},
-  budgetDTN: {previsionnel:[], realise:[]}
+  budgetDTN: {previsionnel:[], realise:[]},
+  aides: [],
+  _deletedAides: {}
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -4520,13 +4675,13 @@ function clearLocalStorageQuota() {
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
-               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS];
+               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS) {
+      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_AIDES) {
         localStorage.removeItem(k);
       }
     });
@@ -4635,8 +4790,12 @@ function _flushSaveState() {
     agendaEvents:S.agendaEvents||[],
     notesfrais:S.notesfrais||{},
     securiteEvents:S.securiteEvents||[],
-    budgetDTN:S.budgetDTN||{previsionnel:[],realise:[]}
+    budgetDTN:S.budgetDTN||{previsionnel:[],realise:[]},
+    aides:S.aides||[],
+    _deletedAides:S._deletedAides||{}
   });
+  // ── Clé dédiée aides (filet anti-perte — jamais strippée) ──
+  try { if (S.aides && S.aides.length) localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
   try {
     localStorage.setItem(LS, JSON.stringify(_lsPayload));
   } catch(e) {
@@ -18622,6 +18781,7 @@ function renderPilots() {
   updatePilotsToggleBtn();
   var cont = document.getElementById('pilots-list'); if (!cont) return;
   cont.innerHTML = '';
+  if (_pilotsClass === 'aides') { renderAides(); return; }
   if (_pilotsClass === 'divers') {
     var divEl = document.createElement('div');
     divEl.style.cssText = 'color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px';
@@ -22388,6 +22548,7 @@ function _withTimeout(promise, ms) {
 // Hash léger pour déduplication des pushes (signature des données critiques)
 function _stolPushSignature() {
   try {
+    var gtCount = Object.values(S.ganttTasks||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
     var sig = [
       (S.comps||[]).length,
       Object.keys(S.staff||{}).length,
@@ -22398,7 +22559,10 @@ function _stolPushSignature() {
       JSON.stringify(S.officialDocs||{}).length,
       JSON.stringify(S.stolResults||{}).length,
       (S._deletedComps||[]).length,
-      Object.keys(S._deletedEnroll||{}).length
+      Object.keys(S._deletedEnroll||{}).length,
+      gtCount,
+      (S.aides||[]).length,
+      (S.aides||[]).reduce(function(s,a){return s+(a._updatedAt||a._createdAt||0);},0)%1e9
     ].join(':');
     return sig;
   } catch(e) { return Date.now().toString(); }
@@ -22541,6 +22705,8 @@ async function pushToCloud() {
     securiteEvents:       S.securiteEvents       || [],
     securiteHistorique:   S.securiteHistorique   || {},
     agendaEvents:         S.agendaEvents         || [],
+    aides:                S.aides                || [],
+    _deletedAides:        S._deletedAides        || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -23130,6 +23296,10 @@ async function loadFromSupabaseFirst() {
     var savedSecuriteHistorique = (S.securiteHistorique && Object.keys(S.securiteHistorique).length) ? Object.assign({}, S.securiteHistorique) : null;
     // ✅ GARDE COMPS : préserver les modifications locales des compétitions (fusion par _updatedAt)
     var savedComps = (S.comps && S.comps.length) ? S.comps.slice() : null;
+    // ✅ GARDE GANTTTASKS : préserver les tâches du planning (fusion par _updatedAt/_createdAt)
+    var savedGanttTasks = (S.ganttTasks && Object.keys(S.ganttTasks).length) ? JSON.parse(JSON.stringify(S.ganttTasks)) : null;
+    // ✅ GARDE AIDES : préserver les aides fédérales locales
+    var savedAides = (S.aides && S.aides.length) ? S.aides.slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -23137,6 +23307,27 @@ async function loadFromSupabaseFirst() {
     // ✅ Fusionner les compétitions locales avec le cloud (le plus récent _updatedAt gagne)
     if (savedComps) {
       S.comps = _mergeById(savedComps, S.comps || []);
+    }
+    // ✅ Fusionner les tâches Gantt locales avec le cloud (last-write-wins sur _updatedAt/_createdAt)
+    if (savedGanttTasks) {
+      if (!S.ganttTasks) S.ganttTasks = {};
+      var _mergedGT = Object.assign({}, S.ganttTasks);
+      Object.keys(savedGanttTasks).forEach(function(cid) {
+        var localTasks  = Array.isArray(savedGanttTasks[cid]) ? savedGanttTasks[cid] : [];
+        var remoteTasks = Array.isArray(_mergedGT[cid]) ? _mergedGT[cid] : [];
+        var byId = {};
+        remoteTasks.forEach(function(t) { if (t && t.id) byId[t.id] = t; });
+        localTasks.forEach(function(t) {
+          if (!t || !t.id) return;
+          var ex = byId[t.id];
+          var tTs  = (t._updatedAt  || t._createdAt  || 0);
+          var exTs = ex ? (ex._updatedAt || ex._createdAt || 0) : -1;
+          if (!ex || tTs >= exTs) byId[t.id] = t;
+        });
+        var merged = Object.keys(byId).map(function(k){ return byId[k]; });
+        if (merged.length > 0) _mergedGT[cid] = merged;
+      });
+      S.ganttTasks = _mergedGT;
     }
     if (savedStaff)   S.staff           = savedStaff;
     if (savedPart)    S.partenaires     = savedPart;
@@ -23176,6 +23367,14 @@ async function loadFromSupabaseFirst() {
       savedSecuriteEvents.forEach(function(ev) {
         if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
       });
+    }
+    // ✅ Fusionner aides fédérales locales avec cloud (_updatedAt/_createdAt gagne)
+    if (savedAides) {
+      S.aides = _mergeById(savedAides, S.aides || []);
+    }
+    // Appliquer les tombstones _deletedAides (union local + cloud)
+    if (S._deletedAides && typeof S._deletedAides === 'object') {
+      S.aides = (S.aides||[]).filter(function(a){ return !S._deletedAides[a.id]; });
     }
     // ✅ Fusionner securiteHistorique local avec cloud (le cloud prévaut en cas de conflit sur une même année)
     if (savedSecuriteHistorique) {
@@ -23415,8 +23614,10 @@ async function loadFromSupabaseFirst() {
     _applyCloudData(cloudData);
     // ✅ Garde anti-écrasement : restaurer les saisies STOL locales si plus récentes que le cloud
     try { if (typeof _restoreStolBackup === 'function') _restoreStolBackup(); } catch(e) {}
+    // ✅ Filet aides : écrire la clé dédiée immédiatement après fusion cloud
+    try { if (S.aides && S.aides.length) localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
     saveState();
-    console.log('[GestSTOL] ✅ Données Supabase chargées —', (S.comps||[]).length, 'compétitions,', (S.pilots||[]).length, 'pilotes');
+    console.log('[GestSTOL] ✅ Données Supabase chargées —', (S.comps||[]).length, 'compétitions,', (S.pilots||[]).length, 'pilotes,', (S.aides||[]).length, 'aides');
     // Vérifier les affiches mises à jour (asynchrone, ne bloque pas le rendu)
     try {
       _pullMedias(sb).then(function() {
@@ -23579,6 +23780,19 @@ async function pullFromCloud() {
   // Appliquer les tombstones documents
   if (S._deletedDocuments && S.documents) {
     S.documents = S.documents.filter(function(d){ return !S._deletedDocuments[d.id]; });
+  }
+  // ── Aides fédérales : fusion + tombstones ──
+  S.aides = _mergeById(S.aides || [], r.aides || []);
+  // Fusionner les tombstones _deletedAides (union par id : le max des timestamps)
+  var rDA = (r._deletedAides && typeof r._deletedAides==='object') ? r._deletedAides : {};
+  var lDA = (S._deletedAides && typeof S._deletedAides==='object') ? S._deletedAides : {};
+  S._deletedAides = {};
+  Object.keys(Object.assign({}, lDA, rDA)).forEach(function(id) {
+    S._deletedAides[id] = Math.max(lDA[id]||0, rDA[id]||0);
+  });
+  // Appliquer les tombstones : supprimer les aides effacées
+  if (S._deletedAides && S.aides) {
+    S.aides = S.aides.filter(function(a){ return !S._deletedAides[a.id]; });
   }
   S.messages      = _mergeById(S.messages,      r.messages);
   // Objets indexés par compId dont les valeurs sont des tableaux : _mergeObjOfArrays
@@ -23881,7 +24095,8 @@ async function pullFromCloud() {
   // Mettre à jour les backups dédiés (filets de sécurité — synchronisés après chaque pull)
   try { if (S.compEnroll)  localStorage.setItem(LS_ENROLL,      JSON.stringify(S.compEnroll));     } catch(e) {}
   try { if (S.enrollMeta)  localStorage.setItem(LS_ENROLL_META, JSON.stringify(S.enrollMeta||{})); } catch(e) {}
-  console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length);
+  try { if (S.aides && S.aides.length) localStorage.setItem(LS_AIDES, JSON.stringify(S.aides));   } catch(e) {}
+  console.log('[GestSTOL] pullFromCloud (fusion) — comps:', S.comps.length, '| pilots:', S.pilots.length, '| aides:', (S.aides||[]).length);
 }
 
 async function _pullMedias(sb) {
@@ -34361,7 +34576,8 @@ function refreshAllFromLicenceDB() {
    GANTT — Planning des tâches par compétition
 ══════════════════════════════════════════════════════════════════ */
 
-var _ganttState = { compId: null, filter: '', globalMode: false, tmpCoequipiers: [], tmpSousTaches: [], tmpPartenaires: [], stEditIdx: -1, zoom: 28, fromAgenda: false };
+var _ganttState = { compId: null, filter: '', globalMode: false, tmpCoequipiers: [], tmpSousTaches: [], tmpPartenaires: [], stEditIdx: -1, zoom: 28, fromAgenda: false, currentTaskId: null, currentCompId: null, isNewTask: false };
+var _ganttExplicitSave = false; // true quand saveGanttTask() vient de s'exécuter → évite le double-save
 var _ganttDragSrcId = null, _ganttDragCid = null;
 
 // ── Helpers internes ──────────────────────────────────────────────
@@ -34968,6 +35184,524 @@ function _printNDFLines(list, titre, commentaires) {
 // ═══════════════════════════════════════════════
 // BUDGET DTN — Prévisionnel / Réalisé
 // ═══════════════════════════════════════════════
+// AIDES FÉDÉRALES
+// ═══════════════════════════════════════════════
+function renderAides() {
+  var cont = document.getElementById('pilots-list');
+  if (!cont) return;
+  if (!S.aides) S.aides = [];
+  var fmt = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
+  var thSt  = 'padding:8px 10px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--bdr);text-align:left;background:var(--navy2)';
+  var cellSt= 'padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:var(--txt);vertical-align:middle';
+  var totSt = 'padding:8px 10px;font-size:12px;font-weight:800;border-top:2px solid var(--bdr);background:var(--navy2)';
+
+  // ── Toolbar ────────────────────────────────────────────────────────────────
+  var html = '<div style="padding:12px 12px 0">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt)">'+(S.aides.length ? S.aides.length+' aide'+(S.aides.length>1?'s':'') : 'Aucune aide enregistrée')+'</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  html += '<div style="position:relative;display:inline-block">'
+    +'<button onclick="var m=document.getElementById(\'aides-act-menu\');m.style.display=m.style.display===\'block\'?\'none\':\'block\';event.stopPropagation()" style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">Actions ▾</button>'
+    +'<div id="aides-act-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:500;min-width:160px;padding:6px;white-space:nowrap">'
+      +'<button onclick="exportAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter</button>'
+      +'<button onclick="document.getElementById(\'aides-import-inp\').click();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬆ Importer</button>'
+      +(S.aides.length ? '<button onclick="printAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Imprimer</button>' : '')
+    +'</div>'
+  +'</div>';
+  html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter une aide</button>';
+  html += '</div></div></div>';
+  html += '<script>document.addEventListener("click",function(){var m=document.getElementById("aides-act-menu");if(m)m.style.display="none";});<\/script>';
+
+  if (!S.aides.length) {
+    html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Aucune aide enregistrée.<br><span style="font-size:12px">Cliquez sur <b>+ Ajouter une aide</b> pour commencer.</span></div>';
+    cont.innerHTML = html; return;
+  }
+
+  // ── Tri principal : Campagne (alpha), puis Année (desc), puis Pilote ──────
+  var sorted = S.aides.slice().sort(function(a,b){
+    var ca=(a.campagne||'').localeCompare(b.campagne||'');
+    if(ca!==0) return ca;
+    var ya=(b.annee||0)-(a.annee||0);
+    if(ya!==0) return ya;
+    return (a.piloteNom||'').localeCompare(b.piloteNom||'');
+  });
+
+  // Grouper par Campagne
+  var byCamp={}, campOrder=[];
+  sorted.forEach(function(a){
+    var k=a.campagne||'(Sans campagne)';
+    if(!byCamp[k]){byCamp[k]=[];campOrder.push(k);}
+    byCamp[k].push(a);
+  });
+
+  var grandCout=0,grandDem=0,grandAide=0;
+  sorted.forEach(function(a){
+    grandCout+=(parseFloat(a.cout)||0);
+    grandDem +=(parseFloat(a.aideDemandee)||0);
+    grandAide+=(parseFloat(a.aideOctroye)||0);
+  });
+
+  html += '<div style="padding:12px">';
+  campOrder.forEach(function(camp) {
+    var grp=byCamp[camp];
+    var gCout=grp.reduce(function(s,a){return s+(parseFloat(a.cout)||0);},0);
+    var gDem =grp.reduce(function(s,a){return s+(parseFloat(a.aideDemandee)||0);},0);
+    var gAide=grp.reduce(function(s,a){return s+(parseFloat(a.aideOctroye)||0);},0);
+    var gReste=gCout-gAide;
+
+    html += '<div style="margin-bottom:20px">';
+    html += '<div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    html += '<span>'+_escHtml(camp)+'</span>';
+    html += '<span style="font-size:10px;font-weight:400;color:var(--txt3)">'+grp.length+' aide'+(grp.length>1?'s':'')+'</span>';
+    html += '<span style="color:var(--txt3)">·</span><span style="font-size:11px;color:#f59e0b">Demandé : '+fmt(gDem)+'</span>';
+    html += '<span style="color:var(--txt3)">·</span><span style="font-size:11px;color:#10b981">Octroyé : '+fmt(gAide)+'</span>';
+    html += '</div>';
+
+    html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden"><div style="overflow-x:auto">';
+    var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+    html += '<table style="width:100%;border-collapse:collapse;min-width:820px"><thead><tr>';
+    html += '<th style="'+thSt+';width:50px">Année</th>';
+    html += '<th style="'+thSt+';width:80px">Date dem.</th>';
+    html += '<th style="'+thSt+'">Dispositif</th>';
+    html += '<th style="'+thSt+'">Pilote</th>';
+    html += '<th style="'+thSt+'">Projet</th>';
+    html += '<th style="'+thSt+';text-align:right">Coût</th>';
+    html += '<th style="'+thSt+';text-align:right">Demandée</th>';
+    html += '<th style="'+thSt+';text-align:right">Octroyée</th>';
+    html += '<th style="'+thSt+';text-align:right">Reste</th>';
+    html += '<th style="'+thSt+'">Note</th>';
+    html += '<th style="'+thSt+';width:64px"></th>';
+    html += '</tr></thead><tbody>';
+
+    grp.forEach(function(a) {
+      var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+      var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+      var rc=reste>0?'#f87171':reste<0?'#f59e0b':'var(--txt3)';
+      html += '<tr>'
+        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3)">'+a.annee+'</td>'
+        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3);white-space:nowrap">'+_escHtml(fmtDate(a.dateDemande||''))+'</td>'
+        +'<td style="'+cellSt+'"><span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
+        +'<td style="'+cellSt+';font-weight:600">'+_escHtml(a.piloteNom||'—')+'</td>'
+        +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
+        +'<td style="'+cellSt+';text-align:right">'+fmt(a.cout)+'</td>'
+        +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
+        +'<td style="'+cellSt+';text-align:right;color:#10b981;font-weight:700">'+fmt(a.aideOctroye)+'</td>'
+        +'<td style="'+cellSt+';text-align:right;color:'+rc+';font-weight:700">'+fmt(reste)+'</td>'
+        +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
+        +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
+          +'<button onclick="_aideFormOpen(\''+a.id+'\')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:5px;background:none;color:var(--stol);cursor:pointer;font-size:13px;margin-right:3px">✎</button>'
+          +'<button id="aide-del-'+a.id+'" onclick="_aideDelete(\''+a.id+'\')" title="Supprimer" style="width:26px;height:26px;border:none;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;font-weight:900;line-height:1">×</button>'
+        +'</td></tr>';
+    });
+    html += '</tbody>';
+    if (grp.length > 1) {
+      html += '<tfoot><tr>'
+        +'<td colspan="5" style="'+totSt+';color:var(--txt3)">TOTAL</td>'
+        +'<td style="'+totSt+';text-align:right">'+fmt(gCout)+'</td>'
+        +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(gDem)+'</td>'
+        +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(gAide)+'</td>'
+        +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(gReste)+'</td>'
+        +'<td colspan="2" style="'+totSt+'"></td></tr></tfoot>';
+    }
+    html += '</table></div></div></div>';
+  });
+
+  // ── KPIs globaux ────────────────────────────────────────────────────────
+  var grandReste=grandCout-grandAide;
+  var kSt='flex:1;min-width:130px;background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">';
+  html += '<div style="'+kSt+'"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Coût total</div><div style="font-size:20px;font-weight:900;color:var(--txt)">'+fmt(grandCout)+'</div></div>';
+  html += '<div style="'+kSt+';border-color:rgba(245,158,11,.3)"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Aides demandées</div><div style="font-size:20px;font-weight:900;color:#f59e0b">'+fmt(grandDem)+'</div></div>';
+  html += '<div style="'+kSt+';border-color:rgba(16,185,129,.3)"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Aides octroyées</div><div style="font-size:20px;font-weight:900;color:#10b981">'+fmt(grandAide)+'</div></div>';
+  html += '<div style="'+kSt+';border-color:rgba(248,113,113,.3)"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Reste à charge</div><div style="font-size:20px;font-weight:900;color:#f87171">'+fmt(grandReste)+'</div></div>';
+  html += '</div>';
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+function printAides() {
+  if (!S.aides || !S.aides.length) { toast('Aucune aide à imprimer','warn'); return; }
+  var fmt = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
+  var org = (S.docSettings && S.docSettings.orgBlock) || {};
+  var accent = org.accent || '#0057ff';
+  var logoSrc = (S.officialDocs && S.officialDocs.header) || '';
+  var nomOrg = org.nom || 'Organisation';
+  var adresse = [org.adresse, (org.cp||'')+' '+(org.ville||'')].filter(Boolean).join(' — ');
+  var dateGen = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Tri par campagne puis année
+  var sorted = (S.aides||[]).slice().sort(function(a,b){
+    var c=(a.campagne||'').localeCompare(b.campagne||'');
+    if(c!==0) return c;
+    return (b.annee||0)-(a.annee||0);
+  });
+  var byCamp={}, campOrder=[];
+  sorted.forEach(function(a){
+    var k=a.campagne||'(Sans campagne)';
+    if(!byCamp[k]){byCamp[k]=[];campOrder.push(k);}
+    byCamp[k].push(a);
+  });
+
+  var fmtDateP=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+  var tRows = '';
+  campOrder.forEach(function(camp){
+    var grp = byCamp[camp];
+    var gCout=0,gDem=0,gAide=0;
+    grp.forEach(function(a){ gCout+=(parseFloat(a.cout)||0); gDem+=(parseFloat(a.aideDemandee)||0); gAide+=(parseFloat(a.aideOctroye)||0); });
+    var gReste=gCout-gAide;
+
+    tRows += '<tr class="camp-hdr"><td colspan="10">'+_escHtml(camp)+'</td></tr>';
+    grp.forEach(function(a){
+      var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+      var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+      tRows += '<tr>'
+        +'<td>'+a.annee+'</td>'
+        +'<td class="note">'+_escHtml(fmtDateP(a.dateDemande||''))+'</td>'
+        +'<td><span class="badge">'+_escHtml(disp)+'</span></td>'
+        +'<td>'+_escHtml(a.piloteNom||'—')+'</td>'
+        +'<td class="note">'+_escHtml(a.projet||'')+'</td>'
+        +'<td class="num">'+fmt(a.cout)+'</td>'
+        +'<td class="num amber">'+fmt(a.aideDemandee)+'</td>'
+        +'<td class="num green">'+fmt(a.aideOctroye)+'</td>'
+        +'<td class="num '+(reste>0?'red':'')+'">'+fmt(reste)+'</td>'
+        +'<td class="note">'+_escHtml(a.note||'')+'</td>'
+        +'</tr>';
+    });
+    if (grp.length > 1) {
+      tRows += '<tr class="subtot">'
+        +'<td colspan="5">Sous-total — '+_escHtml(camp)+'</td>'
+        +'<td class="num">'+fmt(gCout)+'</td>'
+        +'<td class="num amber">'+fmt(gDem)+'</td>'
+        +'<td class="num green">'+fmt(gAide)+'</td>'
+        +'<td class="num red">'+fmt(gReste)+'</td>'
+        +'<td></td>'
+        +'</tr>';
+    }
+  });
+
+  var grandCout=0,grandDem=0,grandAide=0;
+  sorted.forEach(function(a){ grandCout+=(parseFloat(a.cout)||0); grandDem+=(parseFloat(a.aideDemandee)||0); grandAide+=(parseFloat(a.aideOctroye)||0); });
+  var grandReste=grandCout-grandAide;
+
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<title>Aides fédérales aux pilotes</title>'
+    +'<style>'
+    +'@page{size:A4;margin:12mm}'
+    +'*{box-sizing:border-box;margin:0;padding:0}'
+    +'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}'
+    +'.print-btn{position:fixed;top:12px;right:12px;padding:8px 18px;background:'+accent+';color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}'
+    +'@media print{.print-btn{display:none}}'
+    +'.header{display:flex;align-items:center;gap:16px;border-bottom:3px solid '+accent+';padding-bottom:10px;margin-bottom:14px}'
+    +'.logo{max-height:60px;max-width:110px;object-fit:contain}'
+    +'.org-info h1{font-size:14pt;font-weight:900;color:'+accent+';margin-bottom:2px}'
+    +'.org-info .sub{font-size:8pt;color:#555}'
+    +'.doc-title{text-align:center;font-size:13pt;font-weight:900;color:#111;margin-bottom:3px}'
+    +'.doc-date{text-align:center;font-size:8pt;color:#777;margin-bottom:14px}'
+    +'table{width:100%;border-collapse:collapse;font-size:8.5pt}'
+    +'th{background:'+accent+';color:#fff;padding:5px 7px;font-size:8pt;text-align:left;font-weight:700}'
+    +'th.r{text-align:right}'
+    +'td{padding:4px 7px;border-bottom:1px solid #e5e7eb;vertical-align:top}'
+    +'tr:nth-child(even) td{background:#f9fafb}'
+    +'.camp-hdr td{background:#f0f4ff;color:'+accent+';font-weight:800;font-size:9pt;padding:5px 7px;border-top:2px solid '+accent+'}'
+    +'.subtot td{background:#f5f5f5;font-weight:700;border-top:1px solid #ccc}'
+    +'.grandtot td{background:#111;color:#fff;font-weight:900;border-top:2px solid '+accent+'}'
+    +'.grandtot .amber{color:#fbbf24}.grandtot .green{color:#34d399}.grandtot .red{color:#f87171}'
+    +'.num{text-align:right;white-space:nowrap}'
+    +'.amber{color:#d97706;font-weight:700}'
+    +'.green{color:#059669;font-weight:700}'
+    +'.red{color:#dc2626}'
+    +'.note{color:#666;font-size:8pt;max-width:90px}'
+    +'.badge{display:inline-block;padding:1px 6px;border-radius:3px;background:#dbeafe;color:'+accent+';font-size:8pt;font-weight:700}'
+    +'.kpi-row{display:flex;gap:10px;margin-top:14px}'
+    +'.kpi{flex:1;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px}'
+    +'.kpi .lbl{font-size:7pt;color:#888;text-transform:uppercase;font-weight:700;margin-bottom:2px}'
+    +'.kpi .val{font-size:13pt;font-weight:900}'
+    +'</style></head><body>'
+    +'<button class="print-btn" onclick="window.print()">🖨️ Imprimer</button>'
+    +'<div class="header">'
+    +(logoSrc ? '<img class="logo" src="'+logoSrc+'" alt="logo">' : '')
+    +'<div class="org-info"><h1>'+_escHtml(nomOrg)+'</h1><div class="sub">'+_escHtml(adresse)+'</div></div>'
+    +'</div>'
+    +'<div class="doc-title">Aides fédérales aux pilotes</div>'
+    +'<div class="doc-date">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+campOrder.length+' campagne'+(campOrder.length>1?'s':'')+'</div>'
+    +'<table><thead><tr>'
+    +'<th style="width:36px">Année</th>'
+    +'<th style="width:62px">Date dem.</th>'
+    +'<th>Dispositif</th>'
+    +'<th>Pilote</th>'
+    +'<th>Projet</th>'
+    +'<th class="r">Coût total</th>'
+    +'<th class="r">Demandée</th>'
+    +'<th class="r">Octroyée</th>'
+    +'<th class="r">Reste</th>'
+    +'<th>Note</th>'
+    +'</tr></thead><tbody>'
+    +tRows
+    +'<tr class="grandtot">'
+    +'<td colspan="5">TOTAL GÉNÉRAL</td>'
+    +'<td class="num">'+fmt(grandCout)+'</td>'
+    +'<td class="num amber">'+fmt(grandDem)+'</td>'
+    +'<td class="num green">'+fmt(grandAide)+'</td>'
+    +'<td class="num red">'+fmt(grandReste)+'</td>'
+    +'<td></td>'
+    +'</tr>'
+    +'</tbody></table>'
+    +'<div class="kpi-row">'
+    +'<div class="kpi"><div class="lbl">Coût total</div><div class="val">'+fmt(grandCout)+'</div></div>'
+    +'<div class="kpi"><div class="lbl">Aides demandées</div><div class="val amber">'+fmt(grandDem)+'</div></div>'
+    +'<div class="kpi"><div class="lbl">Aides octroyées</div><div class="val green">'+fmt(grandAide)+'</div></div>'
+    +'<div class="kpi"><div class="lbl">Reste à charge</div><div class="val red">'+fmt(grandReste)+'</div></div>'
+    +'</div>'
+    +'</body></html>';
+
+  var w = window.open('','_blank','width=900,height=700');
+  if (!w) { toast('Veuillez autoriser les fenêtres pop-up','warn'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 700);
+}
+
+function exportAides() {
+  if (!S.aides || !S.aides.length) { toast('Aucune aide à exporter', 'warn'); return; }
+  var date = new Date().toISOString().slice(0,10);
+  var payload = { exportedAt: new Date().toISOString(), count: S.aides.length, aides: S.aides };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'aides_federales_' + date + '.json';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+  toast('Export téléchargé — ' + S.aides.length + ' aide' + (S.aides.length > 1 ? 's' : ''), 'ok');
+}
+
+function importAides(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      // Accepter : tableau direct, ou objet {aides:[...]}
+      var items = Array.isArray(data) ? data : (Array.isArray(data.aides) ? data.aides : null);
+      if (!items || !items.length) { toast('Fichier vide ou format invalide', 'err'); return; }
+      // Vérification basique : doit ressembler à des aides
+      var valid = items.filter(function(a){ return a && a.id && a.piloteNom; });
+      if (!valid.length) { toast('Aucune aide valide trouvée dans ce fichier', 'err'); return; }
+      if (!S.aides) S.aides = [];
+      // Fusion par id (last-write-wins sur _updatedAt) — jamais d'écrasement
+      var before = S.aides.length;
+      S.aides = _mergeById(S.aides, valid);
+      var added = S.aides.length - before;
+      var updated = valid.length - added;
+      // Sauvegarder immédiatement sur toutes les couches
+      try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(ex) {}
+      saveState();
+      if (typeof silentPush === 'function') silentPush();
+      renderAides();
+      toast(added + ' ajoutée(s), ' + updated + ' mise(s) à jour — import réussi ✓', 'ok');
+    } catch(err) {
+      toast('Erreur de lecture : fichier JSON invalide', 'err');
+      console.error('[importAides]', err);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function _aideDispChange() {
+  var v=(document.getElementById('aide-form-dispositif')||{}).value;
+  var r=document.getElementById('aide-autre-row'); if(r) r.style.display=v==='Autre'?'block':'none';
+}
+
+function _aideResolvePilot(nomSaisi) {
+  var q = (nomSaisi||'').trim();
+  if (!q) return null;
+  var norm = function(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); };
+  var nq = norm(q);
+  // Chercher dans S.pilots (toutes fiches, pas seulement statut='pilote')
+  var found = (S.pilots||[]).find(function(p){
+    var n1 = norm((p.nom||'')+' '+(p.prenom||''));
+    var n2 = norm((p.prenom||'')+' '+(p.nom||''));
+    return n1===nq || n2===nq;
+  });
+  if (found) return found;
+  // Créer une nouvelle fiche pilote
+  var parts = q.split(/\s+/);
+  var nom = parts[0].toUpperCase();
+  var prenom = parts.slice(1).map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase(); }).join(' ');
+  var np = { id:'pilot-aide-'+Date.now().toString(36), nom:nom, prenom:prenom, statut:'pilote', _createdAt:Date.now(), _updatedAt:Date.now() };
+  if (!S.pilots) S.pilots = [];
+  S.pilots.push(np);
+  toast('Nouvelle fiche pilote créée : '+nom+' '+prenom, 'ok');
+  return np;
+}
+
+function _aideFormOpen(id) {
+  var dlg=document.getElementById('aides-dlg'); if(!dlg) return;
+  if(!S.aides) S.aides=[];
+  var aide=id?(S.aides.find(function(a){return a.id===id;})):null;
+  var title=document.getElementById('aides-dlg-title'); if(title) title.textContent=aide?'Modifier l\'aide':'Nouvelle aide';
+  // Année
+  var anneeEl=document.getElementById('aide-form-annee');
+  if(anneeEl){ var curY=new Date().getFullYear(),opts=''; for(var y=curY+1;y>=curY-6;y--) opts+='<option value="'+y+'"'+(aide?(aide.annee===y?' selected':''):(y===curY?' selected':''))+'>'+y+'</option>'; anneeEl.innerHTML=opts; }
+  // Campagnes — datalist avec toutes les campagnes existantes
+  var dlC=document.getElementById('aide-campagnes-dl');
+  if(dlC){
+    var camps=[]; var seen={};
+    (S.aides||[]).forEach(function(a){ if(a.campagne&&!seen[a.campagne]){seen[a.campagne]=1;camps.push(a.campagne);} });
+    camps.sort();
+    dlC.innerHTML=camps.map(function(c){return '<option value="'+_escHtml(c)+'"></option>';}).join('');
+  }
+  // Pilote — datalist avec tous les pilotes connus
+  var dl=document.getElementById('aide-pilotes-dl');
+  if(dl){
+    var pils=(S.pilots||[]).slice().sort(function(a,b){return((a.nom||'')+(a.prenom||'')).localeCompare((b.nom||'')+(b.prenom||''));});
+    dl.innerHTML=pils.map(function(p){return '<option value="'+_escHtml((p.nom||'').toUpperCase()+' '+(p.prenom||''))+'"></option>';}).join('');
+  }
+  // Projets — datalist avec tous les projets existants
+  var dlP=document.getElementById('aide-projets-dl');
+  if(dlP){
+    var projs=[]; var seenP={};
+    (S.aides||[]).forEach(function(a){ if(a.projet&&!seenP[a.projet]){seenP[a.projet]=1;projs.push(a.projet);} });
+    projs.sort();
+    dlP.innerHTML=projs.map(function(p){return '<option value="'+_escHtml(p)+'"></option>';}).join('');
+  }
+  var nomEl=document.getElementById('aide-form-pilote-nom'); if(nomEl) nomEl.value=aide?(aide.piloteNom||''):'';
+  var camEl=document.getElementById('aide-form-campagne'); if(camEl) camEl.value=aide?(aide.campagne||''):'';
+  var projEl=document.getElementById('aide-form-projet'); if(projEl) projEl.value=aide?(aide.projet||''):'';
+  var ddEl=document.getElementById('aide-form-datedemande'); if(ddEl) ddEl.value=aide?(aide.dateDemande||''):'';
+  var idEl=document.getElementById('aide-form-id'); if(idEl) idEl.value=aide?aide.id:'';
+  var dEl=document.getElementById('aide-form-dispositif'); if(dEl) dEl.value=aide?(aide.dispositif||'FFPLUM'):'FFPLUM';
+  var aEl=document.getElementById('aide-form-autre'); if(aEl) aEl.value=aide?(aide.autreDispositif||''):'';
+  var cEl=document.getElementById('aide-form-cout'); if(cEl) cEl.value=aide&&aide.cout?aide.cout:'';
+  var demEl=document.getElementById('aide-form-demandee'); if(demEl) demEl.value=aide&&aide.aideDemandee?aide.aideDemandee:'';
+  var aidEl=document.getElementById('aide-form-aide'); if(aidEl) aidEl.value=aide&&aide.aideOctroye?aide.aideOctroye:'';
+  var nEl=document.getElementById('aide-form-note'); if(nEl) nEl.value=aide?(aide.note||''):'';
+  _aideDispChange();
+  // Historique pilote : initialiser avec le pilote de la fiche (si modification)
+  _aideHistRefresh(aide?aide.id:null);
+  dlg.style.display='flex';
+  setTimeout(function(){ var el=document.getElementById('aide-form-campagne'); if(el) el.focus(); },80);
+}
+
+function _aideFormClose() {
+  var dlg=document.getElementById('aides-dlg'); if(dlg) dlg.style.display='none';
+}
+
+function _aideHistRefresh(excludeId) {
+  var body=document.getElementById('aide-hist-body'); if(!body) return;
+  var nomEl=document.getElementById('aide-form-pilote-nom');
+  var nom=(nomEl?nomEl.value:'').trim();
+  if(!nom){
+    body.innerHTML='<div style="color:var(--txt3);font-size:12px;text-align:center;padding:32px 8px">Sélectionnez un pilote<br>pour voir son historique.</div>';
+    return;
+  }
+  var norm=function(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();};
+  var nq=norm(nom);
+  var hist=(S.aides||[]).filter(function(a){
+    if(a.id===excludeId) return false;
+    return norm(a.piloteNom)===nq;
+  }).sort(function(a,b){ return (b.annee||0)-(a.annee||0); });
+  if(!hist.length){
+    body.innerHTML='<div style="color:var(--txt3);font-size:12px;text-align:center;padding:32px 8px">Aucune aide antérieure<br>pour ce pilote.</div>';
+    return;
+  }
+  var fmt=function(v){return(parseFloat(v)||0).toFixed(2)+' €';};
+  var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+  var totDem=0,totOct=0;
+  hist.forEach(function(a){totDem+=(parseFloat(a.aideDemandee)||0);totOct+=(parseFloat(a.aideOctroye)||0);});
+  var html='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:8px">'+hist.length+' aide'+(hist.length>1?'s':'')+' antérieure'+(hist.length>1?'s':'')+' · Octroyé : <span style="color:#10b981">'+fmt(totOct)+'</span></div>';
+  hist.forEach(function(a){
+    var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+    var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+    var rcCol=reste>0?'#f87171':'#10b981';
+    html+='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+    html+='<span style="font-size:11px;font-weight:800;color:var(--txt)">'+a.annee+(a.campagne?' · <span style="color:var(--stol);font-weight:600">'+_escHtml(a.campagne)+'</span>':'')+'</span>';
+    html+='<span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span>';
+    html+='</div>';
+    if(a.projet) html+='<div style="font-size:11px;color:var(--txt2);margin-bottom:4px">📌 '+_escHtml(a.projet)+'</div>';
+    if(a.dateDemande) html+='<div style="font-size:10px;color:var(--txt3);margin-bottom:5px">Demande : '+fmtDate(a.dateDemande)+'</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11px">';
+    html+='<div><div style="color:var(--txt3);font-size:9px;text-transform:uppercase;font-weight:700">Demandée</div><div style="color:#f59e0b;font-weight:700">'+fmt(a.aideDemandee)+'</div></div>';
+    html+='<div><div style="color:var(--txt3);font-size:9px;text-transform:uppercase;font-weight:700">Octroyée</div><div style="color:#10b981;font-weight:700">'+fmt(a.aideOctroye)+'</div></div>';
+    html+='<div><div style="color:var(--txt3);font-size:9px;text-transform:uppercase;font-weight:700">Reste</div><div style="color:'+rcCol+';font-weight:700">'+fmt(reste)+'</div></div>';
+    html+='</div>';
+    if(a.note) html+='<div style="font-size:10px;color:var(--txt3);margin-top:5px;font-style:italic">'+_escHtml(a.note)+'</div>';
+    html+='</div>';
+  });
+  body.innerHTML=html;
+}
+
+function _aideFormSave() {
+  var idEl  =document.getElementById('aide-form-id');
+  var anneeEl=document.getElementById('aide-form-annee');
+  var dEl   =document.getElementById('aide-form-dispositif');
+  var aEl   =document.getElementById('aide-form-autre');
+  var nomEl =document.getElementById('aide-form-pilote-nom');
+  var camEl =document.getElementById('aide-form-campagne');
+  var projEl=document.getElementById('aide-form-projet');
+  var ddEl  =document.getElementById('aide-form-datedemande');
+  var cEl   =document.getElementById('aide-form-cout');
+  var demEl =document.getElementById('aide-form-demandee');
+  var aidEl =document.getElementById('aide-form-aide');
+  var nEl   =document.getElementById('aide-form-note');
+  var nomSaisi=(nomEl?nomEl.value:'').trim();
+  if(!nomSaisi){toast('Veuillez saisir le nom du pilote','warn');return;}
+  var pilObj=_aideResolvePilot(nomSaisi);
+  if(!pilObj){toast('Nom de pilote invalide','err');return;}
+  var pilNom=((pilObj.nom||'').toUpperCase()+' '+(pilObj.prenom||'')).trim();
+  var disp=dEl?dEl.value:'FFPLUM';
+  var id=idEl?idEl.value:'';
+  if(!S.aides) S.aides=[];
+  var now=Date.now();
+  var payload={
+    annee:        parseInt(anneeEl?anneeEl.value:new Date().getFullYear()),
+    dateDemande:  (ddEl?ddEl.value:'').trim(),
+    campagne:     (camEl?camEl.value:'').trim(),
+    projet:       (projEl?projEl.value:'').trim(),
+    dispositif:   disp, autreDispositif: disp==='Autre'?(aEl?aEl.value.trim():''):'',
+    piloteId:     pilObj.id, piloteNom: pilNom,
+    cout:         parseFloat(cEl?cEl.value:0)||0,
+    aideDemandee: parseFloat(demEl?demEl.value:0)||0,
+    aideOctroye:  parseFloat(aidEl?aidEl.value:0)||0,
+    note:         nEl?nEl.value.trim():''
+  };
+  if(id){
+    var rec=S.aides.find(function(a){return a.id===id;});
+    if(rec){ Object.assign(rec,payload); rec._updatedAt=now; }
+  } else {
+    S.aides.push(Object.assign({id:'aide-'+now.toString(36),_createdAt:now,_updatedAt:now},payload));
+  }
+  saveState(); if(typeof silentPush==='function') silentPush();
+  try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
+  _aideFormClose(); renderAides();
+  toast(id?'Aide modifiée ✓':'Aide enregistrée ✓','ok');
+}
+
+function _aideDelete(id) {
+  var btn=document.getElementById('aide-del-'+id); if(!btn) return;
+  if(btn.dataset.confirm!=='1'){
+    btn.dataset.confirm='1'; btn.innerHTML='<span style="font-size:9px;font-weight:800;white-space:nowrap">OK?</span>';
+    btn.style.width='auto'; btn.style.padding='0 6px'; btn.style.color='#fff'; btn.style.background='#ef4444';
+    setTimeout(function(){
+      if(btn.dataset.confirm==='1'){
+        btn.dataset.confirm='0'; btn.innerHTML='×';
+        btn.style.cssText='width:26px;height:26px;border:none;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;font-weight:900;line-height:1';
+      }
+    },3000); return;
+  }
+  if(!S.aides) return;
+  // Tombstone : mémoriser la suppression pour qu'elle survive aux merges cloud
+  if(!S._deletedAides) S._deletedAides={};
+  S._deletedAides[id]=Date.now();
+  S.aides=S.aides.filter(function(a){return a.id!==id;});
+  try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
+  saveState(); if(typeof silentPush==='function') silentPush();
+  renderAides(); toast('Aide supprimée','ok');
+}
+
+// ═══════════════════════════════════════════════
 var _budgetCurrentTab = 'previsionnel';
 
 function openBudget() {
@@ -35113,8 +35847,46 @@ function renderBudget() {
       +cTotRow
       +'</table></div></div></div>';
 
+    // ── Aides fédérales aux pilotes ───────────────────────────────────────────
+    var aidesData = (S.aides||[]).filter(function(a){ return (parseFloat(a.aideOctroye)||0)>0 || (parseFloat(a.aideDemandee)||0)>0; })
+      .slice().sort(function(a,b){ return (b.annee||0)-(a.annee||0)||(a.piloteNom||'').localeCompare(b.piloteNom||''); });
+    var aidesTot  = aidesData.reduce(function(s,a){ return s+(parseFloat(a.aideOctroye)||0); },0);
+    var aidesDemTot = aidesData.reduce(function(s,a){ return s+(parseFloat(a.aideDemandee)||0); },0);
+    if (aidesData.length) {
+      var aRows='';
+      aidesData.forEach(function(a){
+        var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+        aRows+='<tr>'
+          +'<td style="'+cellSt+';font-weight:600">'+a.annee+'</td>'
+          +'<td style="'+cellSt+'"><span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
+          +'<td style="'+cellSt+';font-weight:600">'+_escHtml(a.piloteNom||'—')+'</td>'
+          +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
+          +'<td style="'+cellSt+';text-align:right;color:#f87171;font-weight:700">'+fmt(a.aideOctroye)+'</td>'
+          +'<td style="'+cellSt+';color:var(--txt3);font-size:11px">'+_escHtml(a.note||'')+'</td>'
+          +'</tr>';
+      });
+      compSyntheseHtml += '<div style="margin-bottom:24px">'
+        +'<div style="font-size:11px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Aides fédérales aux pilotes</div>'
+        +'<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto">'
+        +'<table style="width:100%;border-collapse:collapse;min-width:580px"><thead><tr>'
+        +'<th style="'+thSt+';width:70px">Année</th>'
+        +'<th style="'+thSt+';width:120px">Dispositif</th>'
+        +'<th style="'+thSt+'">Pilote</th>'
+        +'<th style="'+thSt+';text-align:right;width:130px">Aide demandée</th>'
+        +'<th style="'+thSt+';text-align:right;width:130px">Dotation octroyée</th>'
+        +'<th style="'+thSt+'">Note</th>'
+        +'</tr></thead><tbody>'+aRows+'</tbody>'
+        +(aidesData.length>1?'<tfoot><tr>'
+          +'<td colspan="3" style="'+totSt+';color:var(--txt3)">TOTAL AIDES FÉDÉRALES</td>'
+          +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(aidesDemTot)+'</td>'
+          +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(aidesTot)+'</td>'
+          +'<td style="'+totSt+'"></td>'
+          +'</tr></tfoot>':'')
+        +'</table></div></div></div>';
+    }
+
     // ── Bilan global ─────────────────────────────────────────────────────────
-    var globalDep = totalCompDep + manualTotal;
+    var globalDep = totalCompDep + manualTotal + aidesTot;
     var globalRec = totalCompRec;
     var globalSolde = globalRec - globalDep;
     var kpiSt = 'flex:1;min-width:160px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:14px 18px';
@@ -35124,7 +35896,7 @@ function renderBudget() {
       +'<div style="'+kpiSt+'">'
         +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Total dépenses</div>'
         +'<div style="font-size:22px;font-weight:900;color:#f87171">'+fmt(globalDep)+'</div>'
-        +'<div style="font-size:10px;color:var(--txt3);margin-top:3px">Compétitions '+fmt(totalCompDep)+' + Hors comp. '+fmt(manualTotal)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-top:3px">Comp. '+fmt(totalCompDep)+' + Hors comp. '+fmt(manualTotal)+(aidesTot?' + Aides '+fmt(aidesTot):'')+'</div>'
       +'</div>'
       +'<div style="'+kpiSt+'">'
         +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Total recettes</div>'
@@ -35142,7 +35914,8 @@ function renderBudget() {
   var sub = document.getElementById('budget-subtitle');
   if (sub) {
     if (isRealise) {
-      sub.textContent = 'Dépenses totales : '+fmt(totalCompDep+manualTotal)+' · Recettes : '+fmt(totalCompRec);
+      var _aidesTotSub=(S.aides||[]).reduce(function(s,a){return s+(parseFloat(a.aideOctroye)||0);},0);
+      sub.textContent = 'Dépenses totales : '+fmt(totalCompDep+manualTotal+_aidesTotSub)+' · Recettes : '+fmt(totalCompRec);
     } else {
       sub.textContent = list.length+' ligne'+(list.length!==1?'s':'')+' · Total : '+fmt(manualTotal);
     }
@@ -35749,6 +36522,10 @@ function openGanttTaskDialog(compId, taskId) {
   _ganttState.tmpSousTaches  = (task.sousTaches||[]).map(function(s){ return Object.assign({},s); });
   _ganttState.tmpPartenaires = (task.tachePartenaires||[]).map(function(p){ return {id:p.id,nom:p.nom}; });
   _ganttState.stEditIdx = -1;
+  _ganttState.currentTaskId = taskId;
+  _ganttState.currentCompId = compId;
+  _ganttState.isNewTask = isNew;
+  _ganttExplicitSave = false;
 
   var staffList = (!S.staff || Array.isArray(S.staff)) ? [] : (S.staff[compId] || []);
   var partList  = (!S.partenaires || Array.isArray(S.partenaires)) ? [] : (S.partenaires[compId] || []);
@@ -35849,8 +36626,8 @@ function openGanttTaskDialog(compId, taskId) {
   right += '</select>';
   right += '<select id="gt-st-part" style="'+iSt+'">'+_stPartOpts+'</select>';
   right += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  right += '<div><label style="'+lSt+'">Date début</label><input id="gt-st-deb" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+' onchange="(function(){var f=document.getElementById(\'gt-st-fin\');if(f&&!f.value)f.value=this.value;}).call(this)"></div>';
-  right += '<div><label style="'+lSt+'">Date fin</label><input id="gt-st-fin" type="date" style="'+iSt+'"'+(task.dateDebut?' min="'+_gE2(task.dateDebut)+'"':'')+(task.dateFin?' max="'+_gE2(task.dateFin)+'"':'')+'></div>';
+  right += '<div><label style="'+lSt+'">Date début</label><input id="gt-st-deb" type="date" style="'+iSt+'" onchange="(function(){var f=document.getElementById(\'gt-st-fin\');if(f&&!f.value)f.value=this.value;}).call(this)"></div>';
+  right += '<div><label style="'+lSt+'">Date fin</label><input id="gt-st-fin" type="date" style="'+iSt+'"></div>';
   right += '</div>';
   right += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   right += '<div><label style="'+lSt+'">🕐 Horaire de</label><input id="gt-st-hdeb" type="time" style="'+iSt+'"></div>';
@@ -35890,7 +36667,32 @@ function openGanttTaskDialog(compId, taskId) {
   }, 0);
 }
 
+function _ganttAutoSaveTask() {
+  // Auto-sauvegarde silencieuse à la fermeture du dialogue (tâches existantes uniquement)
+  if (_ganttExplicitSave || _ganttState.isNewTask) return; // déjà sauvegardé ou tâche nouvelle sans titre
+  var compId = _ganttState.currentCompId;
+  var taskId = _ganttState.currentTaskId;
+  if (!compId || !taskId) return;
+  var tasks = (S.ganttTasks||{})[compId];
+  if (!Array.isArray(tasks)) return;
+  var task = tasks.find(function(t){ return t.id === taskId; });
+  if (!task) return; // tâche jamais enregistrée → ne pas forcer la création
+  // Lire les champs du formulaire (si encore dans le DOM)
+  var titreEl = document.getElementById('gt-titre');
+  if (titreEl && titreEl.value.trim()) task.titre = titreEl.value.trim();
+  var debEl = document.getElementById('gt-deb'); if (debEl && debEl.value) task.dateDebut = debEl.value;
+  var finEl = document.getElementById('gt-fin'); if (finEl && finEl.value) task.dateFin   = finEl.value;
+  var notEl = document.getElementById('gt-notes'); if (notEl) task.notes = notEl.value;
+  task.sousTaches       = (_ganttState.tmpSousTaches||[]).map(function(s){ return Object.assign({},s); });
+  task.coequipiers      = (_ganttState.tmpCoequipiers||[]).slice();
+  task.tachePartenaires = (_ganttState.tmpPartenaires||[]).slice();
+  task._updatedAt = Date.now();
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+}
+
 function _ganttCloseTaskDlg() {
+  _ganttAutoSaveTask(); // persiste les modifications même sans clic sur "💾 Enregistrer tout"
   var dlg = document.getElementById('gantt-task-dlg');
   if (dlg) dlg.style.display = 'none';
   _ganttState.tmpCoequipiers = [];
@@ -36057,6 +36859,10 @@ function _ganttRenderSousTaches() {
     if (st.partNom)   meta += ' · 🤝 '+_gEsc(st.partNom);
     html += '<div style="font-size:10px;color:var(--txt3)">'+meta+'</div>';
     html += '</div>';
+    if (/r[eé]union/i.test(st.titre||'')) {
+      var _hasCR = !!(st.compteRendu && (st.compteRendu.sujets||[]).length);
+      html += '<button onclick="_openReunionCR(\''+_gE2(_ganttState.currentCompId)+'\',\''+_gE2(_ganttState.currentTaskId)+'\','+i+')" title="Compte rendu de réunion" style="height:22px;padding:0 7px;border:none;border-radius:6px;background:'+(_hasCR?'rgba(16,185,129,.25)':'rgba(16,185,129,.1)')+';color:#34d399;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap;font-family:inherit;flex-shrink:0">📋'+(_hasCR?' CR':'')+'</button>';
+    }
     html += '<button onclick="_ganttEditSousTache('+i+')" title="Modifier" style="width:22px;height:22px;border:none;border-radius:6px;background:rgba(99,102,241,.2);color:#818cf8;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-family:inherit;flex-shrink:0">✏️</button>';
     html += '<button onclick="_ganttRemoveSousTache('+i+')" title="Supprimer" style="width:22px;height:22px;border:none;border-radius:6px;background:rgba(239,68,68,.15);color:#ef4444;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;font-family:inherit;flex-shrink:0">✕</button>';
     html += '</div>';
@@ -36120,6 +36926,14 @@ function _ganttAddSousTache() {
   titreEl.focus();
 }
 function saveGanttTask(compId, taskId, isNew) {
+  _ganttExplicitSave = true; // signale que l'utilisateur a cliqué "💾 Enregistrer tout" → pas de double-save à la fermeture
+  // ── Auto-flush : si une sous-tâche est en cours d'édition dans le formulaire, l'appliquer d'abord ──
+  if (_ganttState.stEditIdx >= 0) {
+    var _stTitreEl = document.getElementById('gt-st-titre');
+    if (_stTitreEl && (_stTitreEl.value||'').trim()) {
+      _ganttAddSousTache(); // valide la sous-tâche en cours avant de sauvegarder la tâche
+    }
+  }
   var titre        = (document.getElementById('gt-titre')||{}).value||'';
   var deb          = (document.getElementById('gt-deb')||{}).value||'';
   var fin          = (document.getElementById('gt-fin')||{}).value||'';
@@ -36156,7 +36970,14 @@ function saveGanttTask(compId, taskId, isNew) {
     S.ganttTasks[compId].push(rec);
   } else {
     var t = S.ganttTasks[compId].find(function(x){return x.id===taskId;});
-    if (t) { Object.assign(t, rec); t._updatedAt = Date.now(); }
+    if (t) {
+      Object.assign(t, rec); t._updatedAt = Date.now();
+    } else {
+      // La tâche a disparu de S.ganttTasks (sync entre-temps) — la recréer pour ne pas perdre les données
+      rec.id = taskId; rec._updatedAt = Date.now();
+      S.ganttTasks[compId].push(rec);
+      console.warn('[GestSTOL] saveGanttTask: tâche '+taskId+' introuvable dans S.ganttTasks — recréée');
+    }
   }
   var _wasFromAgenda = _ganttState.fromAgenda; // capturer avant que _ganttCloseTaskDlg le remette à false
   _ganttCloseTaskDlg();
@@ -36193,6 +37014,814 @@ function printGantt() {
   w.document.write('</body></html>');
   w.document.close();
   w.focus(); setTimeout(function(){ w.print(); },500);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ── COMPTE RENDU DE RÉUNION ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+var _crState = { compId: null, taskId: null, stIdx: -1, sujetEditIdx: -1, crTab: 'odj', data: { mode:'presentiel', lieu:'', participants:[], sujets:[] } };
+var _crIAState = { idx: -1, correctedTitre: '', correctedComm: '' };
+
+function _openReunionCR(compId, taskId, stIdx) {
+  if (!compId || !taskId) { toast('Enregistrez la tâche avant d\'ouvrir le compte rendu','err'); return; }
+  var tasks = (S.ganttTasks||{})[compId] || [];
+  var task  = tasks.find(function(t){ return t.id === taskId; });
+  if (!task) { toast('Enregistrez d\'abord la tâche (bouton 💾) avant d\'ouvrir le compte rendu','err'); return; }
+  // Cas : tâche sauvegardée mais sous-tâche absente de S (tmpSousTaches pas encore flushé) → utiliser tmp
+  var st = (task.sousTaches||[])[stIdx] || _ganttState.tmpSousTaches[stIdx];
+  if (!st) return;
+  _crState.compId      = compId;
+  _crState.taskId      = taskId;
+  _crState.stIdx       = stIdx;
+  _crState.sujetEditIdx = -1;
+  _crState.crTab       = 'odj';
+  _crState._tmpStatut  = null;
+  var saved = st.compteRendu || {};
+  _crState.data = {
+    mode:         saved.mode         || 'presentiel',
+    lieu:         saved.lieu         || '',
+    participants: (saved.participants || []).map(function(p){ return Object.assign({},p); }),
+    sujets:       (saved.sujets      || []).map(function(s){ return Object.assign({},s); })
+  };
+  _crRender();
+  var dlg = document.getElementById('gantt-cr-dlg');
+  if (dlg) dlg.style.display = 'flex';
+}
+
+function _crAutoSave() {
+  if (_crState.stIdx < 0) return;
+  _crReadTopForm();
+  var crData = JSON.parse(JSON.stringify(Object.assign({}, _crState.data, { updatedAt: Date.now() })));
+  var tmpSt = _ganttState.tmpSousTaches[_crState.stIdx];
+  if (tmpSt) tmpSt.compteRendu = crData;
+  var tasks = (S.ganttTasks||{})[_crState.compId] || [];
+  var task  = tasks.find(function(t){ return t.id === _crState.taskId; });
+  if (task) {
+    if (!task.sousTaches) task.sousTaches = [];
+    task.sousTaches = _ganttState.tmpSousTaches.map(function(s){ return JSON.parse(JSON.stringify(s)); });
+    task._updatedAt = Date.now();
+    saveState();
+    if (typeof silentPush === 'function') silentPush();
+  }
+}
+
+function _closeReunionCR() {
+  _crAutoSave();
+  var dlg = document.getElementById('gantt-cr-dlg');
+  if (dlg) dlg.style.display = 'none';
+}
+
+function _crGetContext() {
+  var tasks   = (S.ganttTasks||{})[_crState.compId] || [];
+  var task    = tasks.find(function(t){ return t.id === _crState.taskId; }) || {};
+  var st      = (task.sousTaches||[])[_crState.stIdx] || {};
+  var comp    = (S.comps||[]).find(function(c){ return c.id === _crState.compId; }) || {};
+  return { comp:comp, task:task, st:st };
+}
+
+function _crReadTopForm() {
+  var mEl = document.getElementById('cr-mode'); if (mEl) _crState.data.mode = mEl.value;
+  var lEl = document.getElementById('cr-lieu'); if (lEl) _crState.data.lieu = lEl.value;
+}
+
+function _crSwitchTab(tab) { _crReadTopForm(); _crState.crTab = tab; _crRender(); }
+
+function _crRender() {
+  var ctx = _crGetContext();
+  var comp = ctx.comp, task = ctx.task, st = ctx.st;
+  var iSt = 'width:100%;padding:8px 11px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt1);font-size:13px;font-family:inherit;box-sizing:border-box;outline:none';
+  var tab = _crState.crTab || 'odj';
+  var nPart = _crState.data.participants.length;
+  var nOdj  = _crState.data.sujets.length;
+
+  // ── Header ──
+  var hEl = document.getElementById('gantt-cr-header');
+  if (hEl) {
+    var _modeIcon = {presentiel:'🏢',visio:'💻',hybride:'🔀'}[_crState.data.mode]||'📍';
+    var _dateStr = st.dateDebut ? st.dateDebut : '';
+    if (st.dateFin && st.dateFin !== st.dateDebut) _dateStr += ' → ' + st.dateFin;
+    var _timeStr = st.heureDebut ? st.heureDebut + (st.heureFin ? ' – ' + st.heureFin : '') : '';
+
+    hEl.innerHTML =
+      // Ligne 1 : titre + close
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%">'
+      + '<div style="min-width:0">'
+      +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+      +     '<span style="font-size:15pt;font-weight:800;color:var(--txt1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_gEsc(st.titre||'Réunion')+'</span>'
+      +   '</div>'
+      +   '<div style="font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +     '<span>'+_gEsc(comp.name||'—')+'</span>'
+      +     (task.titre?'<span style="opacity:.4">›</span><span>'+_gEsc(task.titre)+'</span>':'')
+      +   '</div>'
+      + '</div>'
+      + '<button onclick="_closeReunionCR()" style="width:30px;height:30px;border:none;border-radius:50%;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0">✕</button>'
+      + '</div>'
+      // Ligne 2 : infos + mode + lieu
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--bdr);width:100%;margin-top:10px">'
+      +   (_dateStr?'<span style="font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:4px">📅 <strong>'+_gEsc(_dateStr)+'</strong></span>':'')
+      +   (_timeStr?'<span style="font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:4px">🕐 <strong>'+_gEsc(_timeStr)+'</strong></span>':'')
+      +   (st.piloteNom?'<span style="font-size:12px;color:var(--txt2)">👤 '+_gEsc(st.piloteNom)+'</span>':'')
+      +   '<div style="margin-left:auto;display:flex;gap:7px;align-items:center;flex-wrap:wrap">'
+      +     '<select id="cr-mode" onchange="_crReadTopForm()" style="padding:5px 9px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt1);font-size:12px;font-family:inherit;cursor:pointer">'
+      +       '<option value="presentiel"'+(_crState.data.mode==='presentiel'?' selected':'')+'>🏢 Présentiel</option>'
+      +       '<option value="visio"'+(_crState.data.mode==='visio'?' selected':'')+'>💻 Visio</option>'
+      +       '<option value="hybride"'+(_crState.data.mode==='hybride'?' selected':'')+'>🔀 Hybride</option>'
+      +     '</select>'
+      +     '<input id="cr-lieu" value="'+_gE2(_crState.data.lieu)+'" placeholder="Lieu / lien visio" style="padding:5px 9px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt1);font-size:12px;font-family:inherit;width:200px">'
+      +   '</div>'
+      + '</div>';
+    hEl.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;flex-direction:column;gap:0;flex-shrink:0';
+  }
+
+  // ── Tab bar ──
+  var tabBtnBase = 'padding:7px 18px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:6px';
+  var tabActive  = tabBtnBase+';background:rgba(37,99,235,.2);color:#60a5fa;box-shadow:inset 0 0 0 1px rgba(37,99,235,.4)';
+  var tabInact   = tabBtnBase+';background:transparent;color:var(--txt3)';
+  var badgeStyle = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:800;background:rgba(255,255,255,.1);color:inherit';
+
+  var html = '<div style="display:flex;gap:6px;padding:12px 20px 0;border-bottom:1px solid var(--bdr);flex-shrink:0;background:var(--navy2)">'
+    + '<button onclick="_crSwitchTab(\'participants\')" style="'+(tab==='participants'?tabActive:tabInact)+';padding-bottom:10px;border-radius:8px 8px 0 0">👥 Participants <span style="'+badgeStyle+'">'+nPart+'</span></button>'
+    + '<button onclick="_crSwitchTab(\'odj\')" style="'+(tab==='odj'?tabActive:tabInact)+';padding-bottom:10px;border-radius:8px 8px 0 0">📝 Ordre du jour <span style="'+badgeStyle+'">'+nOdj+'</span></button>'
+    + '</div>';
+
+  // ── Tab content ──
+  if (tab === 'participants') {
+    html += _crRenderParticipantsTab(iSt);
+  } else {
+    html += _crRenderOdjTab(iSt);
+  }
+
+  var bEl = document.getElementById('gantt-cr-body');
+  if (bEl) {
+    bEl.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0;gap:0;min-height:0';
+    bEl.innerHTML = html;
+    if (tab === 'participants') _crRenderParticipantChips();
+  }
+
+  // ── Footer ──
+  var fEl = document.getElementById('gantt-cr-footer');
+  if (fEl) {
+    fEl.innerHTML = ''
+      + '<button onclick="_crPrint()" title="Imprimer le compte rendu" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">🖨 Imprimer</button>'
+      + '<button onclick="_crSend()" title="Envoyer par e-mail" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">✉️ Envoyer</button>'
+      + '<div style="margin-left:auto;display:flex;gap:8px">'
+      +   '<button onclick="_closeReunionCR()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>'
+      +   '<button onclick="_crSave()" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px">💾 Enregistrer</button>'
+      + '</div>';
+    fEl.style.cssText = 'padding:12px 20px;border-top:1px solid var(--bdr);display:flex;align-items:center;flex-shrink:0;gap:8px';
+  }
+}
+
+function _crRenderParticipantsTab(iSt) {
+  var _crStaff = (!S.staff || Array.isArray(S.staff)) ? [] : (S.staff[_crState.compId] || []);
+  var _crOptHtml = '<option value="">— Choisir dans la liste —</option>';
+  var _crByRole = {}, _crRoles = [];
+  _crStaff.forEach(function(s,i){ var r=s.role||'Autre'; if(!_crByRole[r])_crByRole[r]=[]; _crByRole[r].push({s:s,i:i}); });
+  _crRoles = Object.keys(_crByRole);
+  _crRoles.forEach(function(role){
+    if (_crRoles.length>1) _crOptHtml += '<optgroup label="'+_gE2(role)+'">';
+    _crByRole[role].forEach(function(item){
+      var s=item.s, val=s.pilotId||('_staff_'+item.i);
+      _crOptHtml += '<option value="'+_gE2(val)+'">'+_gEsc((s.prenom||'')+' '+(s.nom||''))+(s.role?' — '+_gEsc(s.role):'')+'</option>';
+    });
+    if (_crRoles.length>1) _crOptHtml += '</optgroup>';
+  });
+
+  var nPresent = _crState.data.participants.filter(function(p){ return p.present !== false; }).length;
+  var nAbsent  = _crState.data.participants.length - nPresent;
+
+  var h = '<div style="flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px">';
+
+  // Résumé comptage
+  if (_crState.data.participants.length) {
+    h += '<div style="display:flex;align-items:center;gap:10px">'
+      +   '<span style="font-size:12px;color:var(--txt3)">'+nPresent+' présent'+(nPresent>1?'s':'')+' · '+nAbsent+' absent'+(nAbsent>1?'s':'')+'</span>'
+      +   '<span style="font-size:11px;color:var(--txt3);font-style:italic">(cliquez ✓/✗ pour changer la présence)</span>'
+      + '</div>';
+  }
+
+  // Liste des participants
+  h += '<div id="cr-part-chips" style="display:flex;flex-wrap:wrap;gap:8px;min-height:32px"></div>';
+
+  // Séparateur + formulaire ajout
+  h += '<div style="padding-top:14px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:8px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Ajouter un participant</div>';
+  h += '<div style="display:flex;gap:8px">';
+  h += '<select id="cr-part-select" style="'+iSt+';flex:1">'+_crOptHtml+(_crStaff.length?'':'<option value="" disabled>Aucun encadrant enregistré</option>')+'</select>';
+  h += '<button onclick="_crAddParticipantFromSelect()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.08);color:#34d399;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">+ Ajouter</button>';
+  h += '</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function _crRenderOdjTab(iSt) {
+  var _statutCfg = {
+    discuté:  {color:'#60a5fa', bg:'rgba(96,165,250,.12)', bdr:'rgba(96,165,250,.3)'},
+    décidé:   {color:'#34d399', bg:'rgba(52,211,153,.12)', bdr:'rgba(52,211,153,.3)'},
+    reporté:  {color:'#f59e0b', bg:'rgba(245,158,11,.12)', bdr:'rgba(245,158,11,.3)'},
+    action:   {color:'#a78bfa', bg:'rgba(167,139,250,.12)', bdr:'rgba(167,139,250,.3)'}
+  };
+  var _seIdx = _crState.sujetEditIdx;
+  var _editSujet = (_seIdx >= 0 && _crState.data.sujets[_seIdx]) ? _crState.data.sujets[_seIdx] : null;
+
+  var h = '<div style="flex:1;display:flex;flex-direction:column;min-height:0">';
+
+  // Liste des sujets (scrollable)
+  h += '<div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px">';
+  if (!_crState.data.sujets.length) {
+    h += '<div style="padding:32px 0;text-align:center;color:var(--txt3);font-size:13px;font-style:italic">Aucun point à l\'ordre du jour — ajoutez-en ci-dessous ↓</div>';
+  } else {
+    _crState.data.sujets.forEach(function(s,i) {
+      var cfg = _statutCfg[s.statut] || {color:'#94a3b8',bg:'rgba(148,163,184,.1)',bdr:'rgba(148,163,184,.3)'};
+      var isEditing = (i === _seIdx);
+      h += '<div style="padding:11px 14px;background:'+(isEditing?'rgba(99,102,241,.12)':'rgba(255,255,255,.03)')+';border-radius:10px;border:1px solid '+(isEditing?'rgba(99,102,241,.45)':'var(--bdr)')+';display:flex;gap:10px;align-items:flex-start">';
+      // Numéro
+      h += '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:'+cfg.bg+';border:1px solid '+cfg.bdr+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:'+cfg.color+';margin-top:1px">'+(i+1)+'</div>';
+      // Contenu
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+      h += '<span style="font-size:13px;font-weight:700;color:var(--txt1);flex:1;min-width:0">'+_gEsc(s.titre)+'</span>';
+      h += '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:'+cfg.bg+';color:'+cfg.color+';font-weight:700;border:1px solid '+cfg.bdr+';flex-shrink:0;white-space:nowrap">'+_gEsc(s.statut||'discuté')+'</span>';
+      h += '</div>';
+      if (s.commentaires) h += '<div style="font-size:12px;color:var(--txt2);line-height:1.65;margin-top:5px;white-space:pre-wrap;border-left:2px solid '+cfg.bdr+';padding-left:8px">'+_gEsc(s.commentaires)+'</div>';
+      h += '</div>';
+      // Actions
+      h += '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">';
+      h += '<button onclick="_crIASujet('+i+')" title="Assistance IA" style="padding:3px 7px;border:none;border-radius:6px;background:rgba(99,102,241,.15);color:#a78bfa;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">✨ IA</button>';
+      h += '<button onclick="_crEditSujet('+i+')" title="Modifier" style="padding:3px 7px;border:none;border-radius:6px;background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;cursor:pointer;font-family:inherit">✏️</button>';
+      h += '<button onclick="_crRemoveSujet('+i+')" title="Supprimer" style="padding:3px 7px;border:none;border-radius:6px;background:rgba(239,68,68,.12);color:#ef4444;font-size:11px;cursor:pointer;font-family:inherit">✕</button>';
+      h += '</div>';
+      h += '</div>';
+    });
+  }
+  h += '</div>';
+
+  // Formulaire ajout / édition (fixe en bas)
+  var _isEdit = !!_editSujet;
+  h += '<div style="border-top:1px solid var(--bdr);padding:14px 20px;background:var(--navy2);flex-shrink:0;display:flex;flex-direction:column;gap:9px">';
+  h += '<div style="font-size:10px;font-weight:700;color:'+(_isEdit?'#818cf8':'var(--txt3)')+';text-transform:uppercase;letter-spacing:.06em">';
+  h += _isEdit ? '✏️ Modifier le sujet #'+(_seIdx+1) : '+ Nouveau point';
+  h += '</div>';
+  h += '<input id="cr-new-sujet" placeholder="Intitulé du point *" value="'+(_editSujet?_gE2(_editSujet.titre):'')+'" autocomplete="off" style="'+iSt+'">';
+  h += '<textarea id="cr-new-comm" placeholder="Notes, décisions, actions…" rows="3" style="'+iSt+';resize:none">'+(_editSujet?_gEsc(_editSujet.commentaires||''):'')+'</textarea>';
+  // Statut pills cliquables
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  var _curStatut = _editSujet ? (_editSujet.statut||'discuté') : 'discuté';
+  ['discuté','décidé','reporté','action'].forEach(function(v){
+    var cfg = _statutCfg[v] || {color:'#94a3b8',bg:'rgba(148,163,184,.1)',bdr:'rgba(148,163,184,.3)'};
+    var active = (_curStatut === v);
+    h += '<label style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;border:1px solid '+(active?cfg.bdr:'var(--bdr)')+';background:'+(active?cfg.bg:'transparent')+';color:'+(active?cfg.color:'var(--txt3)')+';font-size:12px;font-weight:'+(active?'700':'500')+';cursor:pointer;user-select:none">'
+      + '<input type="radio" name="cr-statut" value="'+v+'"'+(active?' checked':'')+' style="display:none" onchange="_crState._tmpStatut=this.value">'+v.charAt(0).toUpperCase()+v.slice(1)+'</label>';
+  });
+  h += '</div>';
+  h += '<div style="display:flex;gap:7px">';
+  if (_isEdit) h += '<button onclick="_crCancelSujetEdit()" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit">✕ Annuler</button>';
+  h += '<button onclick="_crAddSujet()" style="flex:1;padding:8px;border-radius:8px;border:none;background:'+(_isEdit?'#2563eb':'rgba(99,102,241,.85)')+';color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'
+    + (_isEdit ? '✔ Enregistrer la modification' : '+ Ajouter ce point')+'</button>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+function _crRenderParticipantChips() {
+  var el = document.getElementById('cr-part-chips');
+  if (!el) return;
+  var parts = _crState.data.participants;
+  if (!parts.length) {
+    el.innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--txt3);font-size:13px;font-style:italic;width:100%">Aucun participant — ajoutez-en depuis la liste ci-dessous</div>';
+    return;
+  }
+  el.innerHTML = parts.map(function(p, i) {
+    var present = p.present !== false;
+    var bg  = present ? 'rgba(52,211,153,.12)' : 'rgba(239,68,68,.10)';
+    var bdr = present ? 'rgba(52,211,153,.35)' : 'rgba(239,68,68,.30)';
+    var ic  = present ? '✓' : '✗';
+    var icBg = present ? 'rgba(52,211,153,.25)' : 'rgba(239,68,68,.20)';
+    var icC = present ? '#34d399' : '#f87171';
+    var initials = (p.nom||'?').split(' ').map(function(w){ return w[0]||''; }).join('').toUpperCase().slice(0,2);
+    return '<div style="display:flex;align-items:center;gap:0;border-radius:28px;background:'+bg+';border:1px solid '+bdr+';overflow:hidden">'
+      // Avatar initiales
+      + '<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);font-size:11px;font-weight:800;color:var(--txt2);flex-shrink:0">'+initials+'</div>'
+      // Nom + rôle
+      + '<div style="padding:0 10px 0 6px;display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0">'
+      +   '<span style="font-size:13px;font-weight:600;color:var(--txt1);white-space:nowrap">'+_gEsc(p.nom)+'</span>'
+      +   (p.role?'<span style="font-size:10px;color:var(--txt3)">'+_gEsc(p.role)+'</span>':'')
+      + '</div>'
+      // Toggle présence
+      + '<button onclick="_crTogglePresent('+i+')" title="'+(present?'Marquer absent':'Marquer présent')+'" style="width:28px;height:34px;border:none;border-left:1px solid '+bdr+';background:'+icBg+';color:'+icC+';font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit;flex-shrink:0">'+ic+'</button>'
+      // Supprimer
+      + '<button onclick="_crRemoveParticipant('+i+')" title="Retirer" style="width:28px;height:34px;border:none;border-left:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit;flex-shrink:0">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function _crTogglePresent(idx) {
+  var p = _crState.data.participants[idx];
+  if (p) { p.present = (p.present === false) ? true : false; }
+  _crRenderParticipantChips();
+}
+
+function _crAddParticipantFromSelect() {
+  var sel = document.getElementById('cr-part-select');
+  if (!sel || !sel.value) { toast('Choisissez un encadrant dans la liste',''); return; }
+  var val = sel.value;
+  var nom = ((sel.options[sel.selectedIndex]||{}).text||val).replace(/\s—\s.+$/,'').trim();
+  var role = ((sel.options[sel.selectedIndex]||{}).text||'').replace(/^[^—]*—\s*/,'').trim();
+  if (_crState.data.participants.some(function(p){ return p.id === val; })) {
+    toast('Déjà dans la liste des participants',''); return;
+  }
+  _crState.data.participants.push({ id: val, nom: nom, role: role, present: true });
+  sel.value = '';
+  _crRenderParticipantChips();
+}
+
+function _crRemoveParticipant(idx) {
+  _crState.data.participants.splice(idx, 1);
+  _crRenderParticipantChips();
+}
+
+function _crAddSujet() {
+  _crReadTopForm();
+  var tEl = document.getElementById('cr-new-sujet');
+  var cEl = document.getElementById('cr-new-comm');
+  var titre = (tEl ? tEl.value.trim() : '');
+  if (!titre) { toast('Le sujet est obligatoire','err'); if(tEl) tEl.focus(); return; }
+  var comm   = cEl ? cEl.value.trim() : '';
+  // Lire le statut depuis les radio pills (ou fallback select si présent)
+  var statut = 'discuté';
+  var radios = document.querySelectorAll('input[name="cr-statut"]');
+  for (var ri = 0; ri < radios.length; ri++) { if (radios[ri].checked) { statut = radios[ri].value; break; } }
+  if (!statut && _crState._tmpStatut) statut = _crState._tmpStatut;
+  var editIdx = _crState.sujetEditIdx;
+  if (editIdx >= 0 && _crState.data.sujets[editIdx]) {
+    Object.assign(_crState.data.sujets[editIdx], { titre: titre, commentaires: comm, statut: statut });
+    _crState.sujetEditIdx = -1;
+  } else {
+    _crState.data.sujets.push({ id: 's'+Date.now(), titre: titre, commentaires: comm, statut: statut });
+  }
+  _crState._tmpStatut = null;
+  _crState.crTab = 'odj';
+  _crRender();
+}
+
+function _crEditSujet(idx) {
+  _crReadTopForm();
+  _crState.sujetEditIdx = idx;
+  _crState.crTab = 'odj';
+  _crState._tmpStatut = _crState.data.sujets[idx] ? (_crState.data.sujets[idx].statut || 'discuté') : 'discuté';
+  _crRender();
+  var t = document.getElementById('cr-new-sujet'); if(t) { t.focus(); t.select(); }
+}
+
+function _crCancelSujetEdit() {
+  _crState.sujetEditIdx = -1;
+  _crState._tmpStatut = null;
+  _crState.crTab = 'odj';
+  _crRender();
+}
+
+function _crRemoveSujet(idx) {
+  _crReadTopForm();
+  if (_crState.sujetEditIdx === idx) _crState.sujetEditIdx = -1;
+  else if (_crState.sujetEditIdx > idx) _crState.sujetEditIdx--;
+  _crState.data.sujets.splice(idx, 1);
+  _crRender();
+}
+
+// Appel LanguageTool (API française gratuite) et application des corrections
+async function _ltCorrect(text) {
+  if (!text || !text.trim()) return text;
+  var resp = await fetch('https://api.languagetool.org/v2/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'text=' + encodeURIComponent(text) + '&language=fr-FR&enabledOnly=false'
+  });
+  if (!resp.ok) throw new Error('LanguageTool HTTP ' + resp.status);
+  var data = await resp.json();
+  var matches = (data.matches || []).sort(function(a, b) { return b.offset - a.offset; });
+  var result = text;
+  matches.forEach(function(m) {
+    if (m.replacements && m.replacements.length > 0) {
+      result = result.substring(0, m.offset) + m.replacements[0].value + result.substring(m.offset + m.length);
+    }
+  });
+  return { text: result, matches: data.matches || [] };
+}
+
+// Mise en forme adaptée au contexte de compte rendu
+function _crFormatTitle(t) {
+  if (!t) return '';
+  return t.replace(/\s+/g, ' ').trim().replace(/^[a-z]/, function(c) { return c.toUpperCase(); });
+}
+
+function _crFormatBody(text, statut) {
+  if (!text || !text.trim()) return '';
+  // Normalise les fins de ligne et espaces
+  var paras = text.replace(/[ \t]+/g, ' ').split(/\n+/).map(function(p) { return p.trim(); }).filter(Boolean);
+  paras = paras.map(function(p) {
+    // Majuscule initiale
+    p = p.replace(/^[a-z]/, function(c) { return c.toUpperCase(); });
+    // Ponctuation finale si absente
+    if (p.length > 3 && !/[.!?:;]$/.test(p)) p += '.';
+    return p;
+  });
+  // Pour les points d'action : préfixe fléché si non présent
+  if (statut === 'action') {
+    paras = paras.map(function(p) {
+      return /^[→•\-]/.test(p) ? p : '→ ' + p;
+    });
+  }
+  // Réassemble en paragraphes (1 ligne par idée)
+  return paras.join('\n');
+}
+
+async function _crIASujet(idx) {
+  _crReadTopForm();
+  var s = _crState.data.sujets[idx];
+  if (!s) return;
+
+  _crIAState.idx = idx;
+
+  // Affiche le panneau IA avec état de chargement
+  var iaEl  = document.getElementById('gantt-cr-ia-body');
+  var apBtn = document.getElementById('gantt-cr-ia-apply');
+  var iaDlg = document.getElementById('gantt-cr-ia-dlg');
+  if (iaEl)  { iaEl.innerHTML = '<span style="color:var(--txt3);font-style:italic">⏳ Correction orthographique et grammaticale en cours…</span>'; }
+  if (apBtn) apBtn.style.display = 'none';
+  if (iaDlg) {
+    var titleSpan = iaDlg.querySelector('span');
+    if (titleSpan) titleSpan.textContent = '✨ Correction IA — Sujet #'+(idx+1);
+    iaDlg.style.display = 'flex';
+  }
+
+  var titreSrc = (s.titre        || '').trim();
+  var commSrc  = (s.commentaires || '').trim();
+  var statut   = s.statut || 'discuté';
+
+  try {
+    // Un seul appel LanguageTool avec les deux champs séparés (évite le rate-limit)
+    var separator = '\n\n';
+    var combined  = commSrc ? titreSrc + separator + commSrc : titreSrc;
+    var ltResult  = await _ltCorrect(combined);
+    var corrText  = ltResult.text;
+    var nbErrors  = ltResult.matches.length;
+
+    // Sépare titre et commentaires
+    var corrTitre, corrComm;
+    if (commSrc) {
+      var sepIdx = corrText.indexOf('\n\n');
+      if (sepIdx >= 0) {
+        corrTitre = _crFormatTitle(corrText.substring(0, sepIdx).trim());
+        corrComm  = _crFormatBody(corrText.substring(sepIdx + 2).trim(), statut);
+      } else {
+        corrTitre = _crFormatTitle(corrText.trim());
+        corrComm  = commSrc;
+      }
+    } else {
+      corrTitre = _crFormatTitle(corrText.trim());
+      corrComm  = '';
+    }
+
+    _crIAState.correctedTitre = corrTitre;
+    _crIAState.correctedComm  = corrComm;
+
+    var hasChange = (corrTitre !== titreSrc || corrComm !== commSrc);
+
+    // Construit l'affichage HTML dans le panneau
+    var html = '<div style="font-family:inherit">';
+    html += '<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">';
+    html += nbErrors > 0
+      ? '<span style="color:#f59e0b">⚠ ' + nbErrors + ' correction(s) détectée(s) via LanguageTool (fr-FR)</span>'
+      : '<span style="color:#22c55e">✓ Aucune faute détectée</span>';
+    html += '</div>';
+
+    if (!hasChange) {
+      html += '<div style="color:#22c55e;font-weight:700">✅ Texte déjà correct — aucune modification suggérée.</div>';
+    } else {
+      // Titre
+      html += '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Titre</div>';
+      if (corrTitre !== titreSrc) {
+        html += '<div style="background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:4px;font-size:12px;color:var(--txt2)">';
+        html += '<span style="font-size:10px;color:#ef4444;font-weight:700">AVANT</span><br>' + _escHtml(titreSrc) + '</div>';
+        html += '<div style="background:rgba(34,197,94,.08);border-left:3px solid #22c55e;padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:14px;font-size:12px;color:var(--txt1);font-weight:600">';
+        html += '<span style="font-size:10px;color:#22c55e;font-weight:700">APRÈS</span><br>' + _escHtml(corrTitre) + '</div>';
+      } else {
+        html += '<div style="color:var(--txt2);font-size:12px;margin-bottom:14px">✓ ' + _escHtml(titreSrc) + '</div>';
+      }
+
+      // Commentaires
+      html += '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Commentaires</div>';
+      if (corrComm !== commSrc) {
+        if (commSrc) {
+          html += '<div style="background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:4px;font-size:12px;color:var(--txt2);white-space:pre-wrap">';
+          html += '<span style="font-size:10px;color:#ef4444;font-weight:700">AVANT</span><br>' + _escHtml(commSrc) + '</div>';
+        }
+        html += '<div style="background:rgba(34,197,94,.08);border-left:3px solid #22c55e;padding:6px 10px;border-radius:0 6px 6px 0;font-size:12px;color:var(--txt1);white-space:pre-wrap;font-weight:600">';
+        html += '<span style="font-size:10px;color:#22c55e;font-weight:700">APRÈS</span><br>' + _escHtml(corrComm) + '</div>';
+      } else {
+        html += '<div style="color:var(--txt2);font-size:12px;white-space:pre-wrap">✓ ' + (_escHtml(commSrc) || '(vide)') + '</div>';
+      }
+    }
+    html += '</div>';
+
+    if (iaEl)  { iaEl.style.whiteSpace = 'normal'; iaEl.innerHTML = html; }
+    if (apBtn) apBtn.style.display = hasChange ? '' : 'none';
+
+  } catch(err) {
+    if (iaEl) {
+      iaEl.style.whiteSpace = 'pre-wrap';
+      iaEl.textContent = '⚠️ Service de correction indisponible.\nVérifiez votre connexion internet.\n\n' + err.message;
+    }
+    console.error('[_crIASujet]', err);
+  }
+}
+
+function _escHtml(t) {
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _crIAApply() {
+  var idx = _crIAState.idx;
+  if (idx < 0 || !_crState.data.sujets[idx]) return;
+  _crState.data.sujets[idx].titre        = _crIAState.correctedTitre;
+  _crState.data.sujets[idx].commentaires = _crIAState.correctedComm;
+  _crIAState.idx = -1;
+  document.getElementById('gantt-cr-ia-dlg').style.display = 'none';
+  _crState.crTab = 'odj';
+  _crRender();
+  toast('Texte corrigé et appliqué ✓', 'ok');
+}
+
+function _crSave() {
+  // Flush formulaire sujet en cours si le champ titre est rempli
+  var tEl = document.getElementById('cr-new-sujet');
+  if (tEl && (tEl.value || '').trim()) _crAddSujet();
+
+  _crReadTopForm();
+  var crData = JSON.parse(JSON.stringify(Object.assign({}, _crState.data, { updatedAt: Date.now() })));
+
+  var tmpSt = _ganttState.tmpSousTaches[_crState.stIdx];
+  if (tmpSt) tmpSt.compteRendu = crData;
+
+  var tasks = (S.ganttTasks||{})[_crState.compId] || [];
+  var task  = tasks.find(function(t){ return t.id === _crState.taskId; });
+  if (task) {
+    if (!task.sousTaches) task.sousTaches = [];
+    task.sousTaches = _ganttState.tmpSousTaches.map(function(s){ return JSON.parse(JSON.stringify(s)); });
+    task._updatedAt = Date.now();
+    saveState();
+    if (typeof silentPush === 'function') silentPush();
+  }
+
+  toast('Compte rendu enregistré ✓', 'ok');
+  // Fermeture directe (sans passer par _closeReunionCR pour éviter un double-save)
+  var dlg = document.getElementById('gantt-cr-dlg');
+  if (dlg) dlg.style.display = 'none';
+  _ganttRenderSousTaches();
+}
+
+function _crBuildText() {
+  var ctx = _crGetContext();
+  var comp = ctx.comp, task = ctx.task, st = ctx.st;
+  var d = _crState.data;
+  var now = new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  var lines = [];
+  lines.push('COMPTE RENDU DE RÉUNION');
+  lines.push('═'.repeat(50));
+  lines.push('Projet       : '+(comp.name||'—'));
+  lines.push('Tâche        : '+(task.titre||'—'));
+  lines.push('Réunion      : '+(st.titre||'—'));
+  if (st.dateDebut) lines.push('Date         : '+st.dateDebut+(st.dateFin&&st.dateFin!==st.dateDebut?' → '+st.dateFin:''));
+  if (st.heureDebut) lines.push('Horaire      : '+st.heureDebut+(st.heureFin?' → '+st.heureFin:''));
+  lines.push('Mode         : '+({presentiel:'Présentiel',visio:'Visio',hybride:'Hybride'}[d.mode]||d.mode));
+  if (d.lieu) lines.push('Lieu / lien  : '+d.lieu);
+  lines.push('Rédigé le    : '+now);
+  lines.push('');
+  lines.push('PARTICIPANTS ('+d.participants.length+')');
+  lines.push('─'.repeat(40));
+  if (!d.participants.length) { lines.push('  — Aucun participant renseigné'); }
+  else {
+    d.participants.forEach(function(p,i){
+      lines.push('  '+(i+1)+'. '+(p.present!==false?'✓':'✗')+' '+p.nom+(p.role?' ('+p.role+')':''));
+    });
+  }
+  lines.push('');
+  lines.push('ORDRE DU JOUR & DISCUSSION');
+  lines.push('─'.repeat(40));
+  if (!d.sujets.length) { lines.push('  — Aucun sujet renseigné'); }
+  else {
+    d.sujets.forEach(function(s,i){
+      lines.push('');
+      lines.push('  '+(i+1)+'. '+s.titre.toUpperCase()+' ['+( s.statut||'discuté')+']');
+      if (s.commentaires) {
+        s.commentaires.split('\n').forEach(function(l){ lines.push('     '+l); });
+      }
+    });
+  }
+  // Actions à retenir
+  var actions = d.sujets.filter(function(s){ return s.statut==='action'; });
+  if (actions.length) {
+    lines.push('');
+    lines.push('ACTIONS À RETENIR');
+    lines.push('─'.repeat(40));
+    actions.forEach(function(s,i){ lines.push('  □ '+(i+1)+'. '+s.titre+(s.commentaires?' — '+s.commentaires.split('\n')[0]:'')); });
+  }
+  lines.push('');
+  lines.push('─'.repeat(50));
+  lines.push('Document généré par Gest\'Appli');
+  return lines.join('\n');
+}
+
+function _crRelectureIA() {
+  _crReadTopForm();
+  var txt  = _crBuildText();
+  var d    = _crState.data;
+  var tips = [];
+  if (!d.participants.length)              tips.push('⚠️ Aucun participant renseigné');
+  if (!d.sujets.length)                    tips.push('⚠️ Aucun sujet à l\'ordre du jour');
+  var sansComm = d.sujets.filter(function(s){ return !s.commentaires; });
+  if (sansComm.length)                     tips.push('💡 '+sansComm.length+' sujet(s) sans commentaires : '+sansComm.map(function(s){ return '"'+s.titre+'"'; }).join(', '));
+  var absents = d.participants.filter(function(p){ return p.present===false; });
+  if (absents.length)                      tips.push('ℹ️ Absent(s) : '+absents.map(function(p){ return p.nom; }).join(', '));
+  var actions = d.sujets.filter(function(s){ return s.statut==='action'; });
+  if (actions.length)                      tips.push('✅ '+actions.length+' action(s) identifiée(s) — vérifiez qu\'un responsable est attribué');
+  if (!_crState.data.lieu)                 tips.push('💡 Lieu / lien de connexion non renseigné');
+  var review = '';
+  if (tips.length) { review = '\n\n✨ ANALYSE IA\n'+'─'.repeat(40)+'\n'+tips.join('\n'); }
+  else             { review = '\n\n✨ ANALYSE IA\n'+'─'.repeat(40)+'\n✅ Compte rendu complet — aucun point manquant détecté.'; }
+  var iaEl = document.getElementById('gantt-cr-ia-body');
+  if (iaEl) iaEl.textContent = txt + review;
+  var iaDlg = document.getElementById('gantt-cr-ia-dlg');
+  if (iaDlg) iaDlg.style.display = 'flex';
+}
+
+function _crCopyIA() {
+  var iaEl = document.getElementById('gantt-cr-ia-body');
+  if (!iaEl) return;
+  try {
+    navigator.clipboard.writeText(iaEl.textContent).then(function(){ toast('Copié ✓','ok'); }).catch(function(){ _crFallbackCopy(iaEl.textContent); });
+  } catch(e) { _crFallbackCopy(iaEl.textContent); }
+}
+function _crFallbackCopy(txt) {
+  var ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toast('Copié ✓','ok'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+function _crPrint() {
+  _crReadTopForm();
+  var ctx  = _crGetContext();
+  var comp = ctx.comp, task = ctx.task, st = ctx.st;
+  var d    = _crState.data;
+  var logo = (S.settings&&S.settings.logo) ? '<img src="'+S.settings.logo+'" style="height:44px;object-fit:contain">' : '';
+  var now  = new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  var _modeIcon = {presentiel:'⬡',visio:'◈',hybride:'◇'}[d.mode]||'◆';
+  var _modeStr  = {presentiel:'Présentiel',visio:'Visio',hybride:'Hybride'}[d.mode]||d.mode;
+
+  // ── Statut config ──
+  var _SC = {
+    discuté:  {bg:'#eff6ff',color:'#1d4ed8',label:'Discuté'},
+    décidé:   {bg:'#f0fdf4',color:'#15803d',label:'Décidé'},
+    reporté:  {bg:'#fffbeb',color:'#b45309',label:'Reporté'},
+    action:   {bg:'#faf5ff',color:'#7c3aed',label:'Action'}
+  };
+
+  // ── Participants ──
+  var presents = d.participants.filter(function(p){ return p.present!==false; });
+  var absents  = d.participants.filter(function(p){ return p.present===false; });
+  var partHTML = '';
+  if (presents.length) {
+    partHTML += presents.map(function(p){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#f0fdf4;border:1px solid #bbf7d0;font-size:8.5pt;color:#166534;margin:3px">'
+        + '<span style="color:#16a34a;font-weight:800;font-size:8pt">✓</span>'
+        + '<span style="font-weight:600">'+_gEsc(p.nom)+'</span>'
+        + (p.role?'<span style="color:#4b7c57;font-size:7.5pt"> · '+_gEsc(p.role)+'</span>':'')
+        + '</span>';
+    }).join('');
+  }
+  if (absents.length) {
+    partHTML += absents.map(function(p){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:#fff7f7;border:1px solid #fecaca;font-size:8.5pt;color:#991b1b;margin:3px;opacity:.75">'
+        + '<span style="color:#dc2626;font-size:8pt">✗</span>'
+        + '<span style="font-weight:500">'+_gEsc(p.nom)+'</span>'
+        + (p.role?'<span style="color:#9b7878;font-size:7.5pt"> · '+_gEsc(p.role)+'</span>':'')
+        + '</span>';
+    }).join('');
+  }
+  if (!partHTML) partHTML = '<span style="color:#94a3b8;font-size:9pt;font-style:italic">Aucun participant renseigné</span>';
+
+  // ── Sujets ──
+  var sujetsHTML = '';
+  d.sujets.forEach(function(s,i){
+    var cfg = _SC[s.statut] || {bg:'#f8fafc',color:'#475569',label:s.statut||'—'};
+    sujetsHTML += '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9;break-inside:avoid">';
+    // Numéro
+    sujetsHTML += '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:'+cfg.bg+';border:1px solid '+cfg.color+'33;display:flex;align-items:center;justify-content:center;font-size:8pt;font-weight:800;color:'+cfg.color+';">'+(i+1)+'</div>';
+    // Contenu
+    sujetsHTML += '<div style="flex:1;min-width:0">';
+    sujetsHTML += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(s.commentaires?'5px':'0')+'">';
+    sujetsHTML += '<span style="font-size:10pt;font-weight:700;color:#1e293b;flex:1">'+_gEsc(s.titre)+'</span>';
+    sujetsHTML += '<span style="display:inline-block;padding:2px 8px;border-radius:20px;background:'+cfg.bg+';color:'+cfg.color+';font-size:7.5pt;font-weight:700;border:1px solid '+cfg.color+'44;white-space:nowrap">'+cfg.label+'</span>';
+    sujetsHTML += '</div>';
+    if (s.commentaires) {
+      sujetsHTML += '<div style="font-size:9pt;color:#475569;line-height:1.6;white-space:pre-wrap;padding-left:2px;border-left:2px solid '+cfg.color+'44;padding-left:8px;margin-top:4px">'+_gEsc(s.commentaires)+'</div>';
+    }
+    sujetsHTML += '</div></div>';
+  });
+  if (!sujetsHTML) sujetsHTML = '<div style="color:#94a3b8;font-style:italic;font-size:9pt;padding:8px 0">Aucun sujet renseigné</div>';
+
+  // ── Actions synthèse ──
+  var actions = d.sujets.filter(function(s){ return s.statut==='action'; });
+  var actionsHTML = '';
+  if (actions.length) {
+    actionsHTML = actions.map(function(s,i){
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:#faf5ff;border-radius:8px;margin-bottom:6px;break-inside:avoid">'
+        + '<div style="flex-shrink:0;width:18px;height:18px;border:1.5px solid #7c3aed;border-radius:4px;margin-top:1px"></div>'
+        + '<div style="flex:1"><div style="font-size:9.5pt;font-weight:700;color:#4c1d95">'+_gEsc(s.titre)+'</div>'
+        + (s.commentaires?'<div style="font-size:8.5pt;color:#6d28d9;margin-top:2px">'+_gEsc(s.commentaires.split('\n')[0])+'</div>':'')
+        + '</div></div>';
+    }).join('');
+  }
+
+  var w = window.open('','_blank','width=900,height=700');
+  if (!w) return;
+
+  w.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+    + '<title>CR · '+_gEsc(st.titre||'Réunion')+'</title>'
+    + '<style>'
+    + '@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");'
+    + '@page{size:A4 portrait;margin:14mm 16mm 20mm}'
+    + '*{box-sizing:border-box}'
+    + 'body{font-family:"Inter",system-ui,-apple-system,sans-serif;font-size:10pt;color:#1e293b;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'h2{font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 10px;display:flex;align-items:center;gap:8px}'
+    + 'h2::before{content:"";display:block;width:3px;height:14px;border-radius:2px;background:currentColor;flex-shrink:0}'
+    + '.section{margin-bottom:18px}'
+    + '.chip-row{display:flex;flex-wrap:wrap;gap:0}'
+    + '@media print{.no-print{display:none}}'
+    + '</style></head><body>'
+
+    // ── HEADER ──
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:14px;margin-bottom:18px;border-bottom:1.5px solid #e2e8f0">'
+    +   '<div style="display:flex;align-items:center;gap:14px">'
+    +     (logo ? '<div>'+logo+'</div>' : '')
+    +     '<div>'
+    +       '<div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3b5bdb;margin-bottom:3px">Compte rendu de réunion</div>'
+    +       '<div style="font-size:16pt;font-weight:800;color:#0f172a;line-height:1.1">'+_gEsc(st.titre||'Réunion')+'</div>'
+    +       '<div style="font-size:9pt;color:#64748b;margin-top:4px">'+_gEsc(task.titre||'')+(comp.name?' · '+_gEsc(comp.name):'')+'</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="text-align:right;flex-shrink:0">'
+    +     '<div style="font-size:10pt;font-weight:700;color:#1e293b">'+now+'</div>'
+    +     (st.heureDebut?'<div style="font-size:9pt;color:#64748b;margin-top:2px">'+_gEsc(st.heureDebut)+(st.heureFin?' – '+_gEsc(st.heureFin):'')+'</div>':'')
+    +     '<div style="margin-top:6px;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;background:#eff6ff;border:1px solid #bfdbfe;font-size:8pt;font-weight:600;color:#1d4ed8">'+_modeIcon+' '+_modeStr+(d.lieu?' · '+_gEsc(d.lieu):'')+'</div>'
+    +   '</div>'
+    + '</div>'
+
+    // ── PARTICIPANTS ──
+    + '<div class="section">'
+    +   '<h2 style="color:#059669">Participants</h2>'
+    +   '<div class="chip-row">'+partHTML+'</div>'
+    + '</div>'
+
+    // ── ORDRE DU JOUR ──
+    + '<div class="section">'
+    +   '<h2 style="color:#3b5bdb">Ordre du jour & discussions</h2>'
+    +   sujetsHTML
+    + '</div>'
+
+    // ── ACTIONS ──
+    + (actionsHTML ? '<div class="section"><h2 style="color:#7c3aed">Plan d\'actions</h2>'+actionsHTML+'</div>' : '')
+
+    // ── SIGNATURES ──
+    + '<div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;break-inside:avoid">'
+    +   '<div style="border-top:1px solid #cbd5e1;padding-top:8px"><div style="font-size:8pt;color:#94a3b8;margin-bottom:20px">Rédacteur</div></div>'
+    +   '<div style="border-top:1px solid #cbd5e1;padding-top:8px"><div style="font-size:8pt;color:#94a3b8;margin-bottom:20px">Validation</div></div>'
+    + '</div>'
+
+    // ── FOOTER ──
+    + '<div style="position:fixed;bottom:0;left:16mm;right:16mm;padding:6px 0 4px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">'
+    +   '<span style="font-size:7.5pt;color:#94a3b8">'+_gEsc(comp.name||'')+'</span>'
+    +   '<span style="font-size:7.5pt;color:#cbd5e1">Gest\'Appli</span>'
+    +   '<span style="font-size:7.5pt;color:#94a3b8">'+now+'</span>'
+    + '</div>'
+
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>');
+  w.document.close();
+}
+
+function _crSend() {
+  _crReadTopForm();
+  var ctx  = _crGetContext();
+  var comp = ctx.comp, st = ctx.st;
+  var d    = _crState.data;
+  var subj = encodeURIComponent('CR — '+( st.titre||'Réunion')+(comp.name?' ('+comp.name+')':''));
+  var body = encodeURIComponent(_crBuildText());
+  window.open('mailto:?subject='+subj+'&body='+body);
 }
 
 /* ── Export / Import Gantt ── */
