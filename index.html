@@ -4621,21 +4621,11 @@ async function loadState() {
       var _stampRaw = localStorage.getItem(LS_STAMP);
       if (_stampRaw && !S.docSettings.stampImage) S.docSettings.stampImage = _stampRaw;
     } catch(e) {}
-    // 1b-bis. Clé dédiée LS_COLLECTIF — filet anti-perte Collectif France
+    // 1b-bis. LS_COLLECTIF — lu ici, appliqué APRÈS l'IDB (voir ci-dessous)
+    var _cfParsedLS = null;
     try {
       var _cfRaw = localStorage.getItem(LS_COLLECTIF);
-      if (_cfRaw) {
-        var _cfParsed = JSON.parse(_cfRaw);
-        if (Array.isArray(_cfParsed) && _cfParsed.length) {
-          if (!S.collectif || !S.collectif.length) {
-            S.collectif = _cfParsed;
-          } else {
-            _cfParsed.forEach(function(m) {
-              if (!S.collectif.find(function(x){ return x.id === m.id; })) S.collectif.push(m);
-            });
-          }
-        }
-      }
+      if (_cfRaw) { var _cfTmp = JSON.parse(_cfRaw); if (Array.isArray(_cfTmp) && _cfTmp.length) _cfParsedLS = _cfTmp; }
     } catch(e) {}
     // 1c. Clé dédiée LS_NDF — fusionnée APRÈS Object.assign pour ne pas être écrasée
     try {
@@ -4747,8 +4737,9 @@ async function loadState() {
             });
           }
         }
-        if (idbData.docSettings && idbData.docSettings.signatureImage && S.docSettings && !S.docSettings.signatureImage) {
-          S.docSettings.signatureImage = idbData.docSettings.signatureImage;
+        if (idbData.docSettings && S.docSettings) {
+          if (idbData.docSettings.signatureImage && !S.docSettings.signatureImage) S.docSettings.signatureImage = idbData.docSettings.signatureImage;
+          if (idbData.docSettings.stampImage     && !S.docSettings.stampImage)     S.docSettings.stampImage     = idbData.docSettings.stampImage;
         }
         // Restaurer les photos de justificatifs (achats + NDF réelles) depuis IDB
         // Elles sont strippées de localStorage pour ne pas saturer le quota
@@ -4782,12 +4773,15 @@ async function loadState() {
             });
           });
         }
-        // Restaurer collectif et SHN depuis IDB si absent en localStorage
+        // Restaurer collectif depuis IDB : ajouter membres manquants + restaurer photos
         if (idbData.collectif && Array.isArray(idbData.collectif) && idbData.collectif.length) {
-          if (!S.collectif || !S.collectif.length) S.collectif = idbData.collectif;
-          else {
+          if (!S.collectif || !S.collectif.length) {
+            S.collectif = idbData.collectif;
+          } else {
             idbData.collectif.forEach(function(m) {
-              if (!S.collectif.find(function(x){ return x.id === m.id; })) S.collectif.push(m);
+              var ex = S.collectif.find(function(x){ return x.id === m.id; });
+              if (!ex) { S.collectif.push(m); }
+              else if (m.photo && !ex.photo) { ex.photo = m.photo; } // IDB = seule source pour les photos
             });
           }
         }
@@ -4821,6 +4815,22 @@ async function loadState() {
       } else {
         // Aucune donnée localStorage — utiliser IDB intégralement
         Object.assign(S, idbData);
+      }
+    }
+    // ── LS_COLLECTIF : autorité finale pour les champs texte (photos = IDB uniquement) ──
+    if (_cfParsedLS) {
+      if (!S.collectif || !S.collectif.length) {
+        S.collectif = _cfParsedLS;
+      } else {
+        _cfParsedLS.forEach(function(m) {
+          var ex = S.collectif.find(function(x){ return x.id === m.id; });
+          if (!ex) { S.collectif.push(m); }
+          else {
+            var photoIDB = ex.photo; // préserver la photo chargée depuis IDB
+            Object.keys(m).forEach(function(k){ ex[k] = m[k]; });
+            if (photoIDB && !ex.photo) ex.photo = photoIDB;
+          }
+        });
       }
     }
     // ── Restauration depuis la clé critique (3e niveau de sauvegarde) ──
@@ -4923,6 +4933,10 @@ function _stripBigData(obj) {
     if (!p.photo || !p.photo.startsWith('data:')) return p;
     var pc = Object.assign({}, p); delete pc.photo; return pc;
   });
+  if (o.collectif) o.collectif = o.collectif.map(function(m){
+    if (!m.photo || !m.photo.startsWith('data:')) return m;
+    var mc = Object.assign({}, m); delete mc.photo; return mc;
+  });
   if (o.comps) o.comps = o.comps.map(function(c){
     if (!c.affiche || !c.affiche.startsWith('data:')) return c;
     var cc = Object.assign({}, c); delete cc.affiche; return cc;
@@ -5014,7 +5028,7 @@ function _flushSaveState() {
   try { if (S.notesfrais && Object.keys(S.notesfrais).length) localStorage.setItem(LS_NDF, JSON.stringify(S.notesfrais)); } catch(e) {}
   try { if (S.securiteEvents && S.securiteEvents.length) localStorage.setItem(LS_SECURITE_EVS, JSON.stringify(S.securiteEvents)); } catch(e) {}
   try { if (S.ganttTasks && Object.keys(S.ganttTasks).length) localStorage.setItem(LS_GANTT, JSON.stringify(S.ganttTasks)); } catch(e) {}
-  try { if (S.collectif  && S.collectif.length)              localStorage.setItem(LS_COLLECTIF, JSON.stringify(S.collectif)); } catch(e) {}
+  try { if (S.collectif && S.collectif.length) { var _cfLS=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } } catch(e) {}
   try { if (S.docSettings && S.docSettings.signatureImage)  localStorage.setItem(LS_SIG,   S.docSettings.signatureImage); } catch(e) {}
   try { if (S.docSettings && S.docSettings.stampImage)      localStorage.setItem(LS_STAMP, S.docSettings.stampImage);     } catch(e) {}
 }
@@ -5799,6 +5813,13 @@ function updateSeasonFilter() {
 // ── Logo centralisé (S.settings.logo > localStorage legacy) ──
 function _getAppLogo() {
   return (S.settings && S.settings.logo) || localStorage.getItem('ffplum_logo') || '';
+}
+// ── Signature + tampon : même mécanisme que _getAppLogo ──
+function _getDocSig() {
+  return (S.docSettings && S.docSettings.signatureImage) || localStorage.getItem(LS_SIG) || '';
+}
+function _getDocStamp() {
+  return (S.docSettings && S.docSettings.stampImage) || localStorage.getItem(LS_STAMP) || '';
 }
 
 // ── Saison partagée entre page Base et page Compétitions ──
@@ -12716,6 +12737,102 @@ function _hdgConfirmEquipImport() {
   }, 80);
 }
 
+function _printCompEquipageAttestation(pilotId, compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  var p  = (S.pilots||[]).find(function(x){ return x.id===pilotId; });
+  if (!cp || !p) { toast('Données manquantes', 'err'); return; }
+
+  var esc = function(v){ return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var fmtD = function(d){ if(!d) return ''; var p=String(d).split('-'); if(p.length===3) return p[2]+'/'+p[1]+'/'+p[0]; return d; };
+  var today = new Date(); var td = today.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+  var sig = S.signature || {};
+  var sigNom = (sig.prenom||'Mohamed')+' '+(sig.nom||'AZZOUNI');
+
+  // Entête officielle
+  var od = S.officialDocs||{};
+  var px = function(v){ return Math.round((v||0)*3.7795)+'px'; };
+  var hdrSrc = _getOfficialDocImg('header'), ftrSrc = _getOfficialDocImg('footer');
+  var hdrAlign = {left:'left',center:'center',right:'right'}[od.headerPos||'left']||'left';
+  var hdrHtml = hdrSrc ? '<div style="text-align:'+hdrAlign+';margin-bottom:20px"><img src="'+hdrSrc+'" style="max-height:'+px((od.headerHeight||20)*2.2)+';width:auto"></div>' : '<div style="margin-bottom:20px"></div>';
+  var ftrImgHtml = ftrSrc ? '<img src="'+ftrSrc+'" style="display:block;height:'+px(od.footerHeight||15)+';width:auto">' : '';
+  var ftrHtml = ftrImgHtml ? '<div style="margin-top:6px;margin-left:-5mm">'+ftrImgHtml+'</div>' : '';
+  var sigBlock = _buildSigStampBlock(esc);
+
+  // Infos pilote
+  var genre = p.genre||'';
+  var genreLabel = genre==='Mme.'?'Mme':'M.';
+  var nomDisplay = (p.prenom||'')+' '+(p.nom||'').toUpperCase();
+  var ddnFmt = fmtD(p.ddn||p.dateNaissance||'');
+  var licenceStr = p.licence ? ' — N° de licence : <strong>'+esc(p.licence)+'</strong>' : '';
+
+  // Statut collectif (Collectif France ou Équipe de France)
+  var collectifLine = '';
+  var cfMatch = (S.collectif||[]).find(function(m){
+    return m.pilotId===pilotId || (p.licence && m.licence===p.licence);
+  });
+  if (cfMatch && cfMatch.statut) {
+    var statutLabel = cfMatch.statut;
+    var pratLabel2 = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi-axes'}[cfMatch.pratique||p.pratique||''] || (cfMatch.pratique||p.pratique||'');
+    var discLabel2 = {classique:'Classic',classic:'Classic',freestyle:'Freestyle',cross:'Cross Country',slalom:'Slalom'}[cfMatch.discipline||''] || (cfMatch.discipline||'');
+    var discStr = pratLabel2&&discLabel2 ? pratLabel2+' — '+discLabel2 : (pratLabel2||discLabel2);
+    var saisonStr = cfMatch.saison ? ' '+cfMatch.saison : '';
+    collectifLine = '<p style="margin:10px 0">Est membre du <strong>'+esc(statutLabel)+'</strong>'+(discStr?' en <em>'+esc(discStr)+'</em>':'')+esc(saisonStr)+'.</p>';
+  }
+
+  // Compétition — futur ou passé
+  var compDateFrom = cp.dateFrom ? new Date(cp.dateFrom) : null;
+  var isPast = compDateFrom ? compDateFrom < today : false;
+  var participe = isPast ? 'a participé' : 'participera';
+
+  var pratLabelComp = {microlight:'Championnat de France ULM Microlight',paramoteur:'Championnat de France ULM Paramoteur',multi:'Championnat de France ULM Multi-axes'}[cp.pratique||''] || esc(cp.nom||'');
+  var discLabelComp = {classique:'Classic',classic:'Classic',freestyle:'Freestyle',cross:'Cross Country',slalom:'Slalom'}[cp.discipline||''] || (cp.discipline||'');
+  var compTitleLine = (cp.pratique ? esc(pratLabelComp) : esc(cp.nom||'')) + (discLabelComp ? ' <em>'+esc(discLabelComp)+'</em>' : '');
+
+  var meta = (((S.enrollMeta||{})[compId])||{})[pilotId] || {};
+  var podium = meta.podium || '';
+  var niveau = meta.niveau || '';
+  var podTxt = {'1':'1ère place','2':'2ème place','3':'3ème place'};
+
+  var dateRange = '';
+  if (cp.dateFrom && cp.dateTo && cp.dateFrom !== cp.dateTo) dateRange = 'du '+fmtD(cp.dateFrom)+' au '+fmtD(cp.dateTo);
+  else if (cp.dateFrom) dateRange = 'le '+fmtD(cp.dateFrom);
+
+  var body = '<p style="margin-bottom:2px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+    + '<div style="text-align:right;margin-bottom:20px;color:#333">'+(sig.ville ? esc(sig.ville)+', le ' : 'le ')+td+'</div>'
+    + '<div style="text-align:center;margin:16px 0 6px"><div style="border-top:1px solid #111;margin-bottom:8px"></div>'
+    + '<div style="font-size:14pt;font-weight:900;letter-spacing:2px;text-transform:uppercase">ATTESTATION</div>'
+    + '<div style="border-bottom:1px solid #111;margin-top:8px"></div></div>'
+    + '<p style="margin:18px 0 12px">Je soussigné, <strong>'+esc(sigNom)+'</strong>, Directeur Technique National de la Fédération Française ULM, atteste par la présente :</p>'
+    + '<p style="margin-bottom:4px;text-align:center"><strong>'+esc(genreLabel)+' '+esc(nomDisplay)+'</strong></p>'
+    + '<p style="margin-bottom:16px;text-align:center">né'+(genre==='Mme.'?'e':'')+' le '+esc(ddnFmt||'___________')+licenceStr+'</p>'
+    + collectifLine
+    + '<p style="margin:0 0 12px">&nbsp;</p>'
+    + '<p style="margin:0 0 6px">et <strong>'+participe+'</strong> :</p>'
+    + '<div style="margin:0 0 6px;padding-left:16px;border-left:3px solid #003399">'
+    + '<div style="font-weight:700;font-size:11pt">'+compTitleLine+'</div>'
+    + (dateRange ? '<div style="font-size:10pt;color:#555;margin-top:3px">'+esc(dateRange)+'</div>' : '')
+    + (cp.lieu ? '<div style="font-size:10pt;color:#333;margin-top:3px">'+esc(cp.lieu)+'</div>' : '')
+    + (niveau ? '<div style="font-size:10pt;color:#333;margin-top:3px">Niveau : <strong>'+esc(niveau)+'</strong></div>' : '')
+    + (podium ? '<div style="font-size:10pt;font-weight:700;margin-top:4px">&#127942; '+esc(podTxt[podium]||podium+'ème place')+'</div>' : '')
+    + '</div>'
+    + '<div style="page-break-inside:avoid;break-inside:avoid;page-break-before:avoid;break-before:avoid"><p style="margin-top:24px;margin-bottom:36px">Cette attestation est délivrée pour servir ce que de droit.</p>'
+    + sigBlock + '</div>';
+
+  var win = window.open('','_blank','width=820,height=900');
+  if (!win) { toast('Popup bloqué — autoriser les popups', 'err'); return; }
+  win.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Attestation — '+esc(nomDisplay)+'</title>'
+    +'<style>'
+    +'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:11pt;color:#111;margin:10mm 15mm 35mm 15mm}'
+    +'p{margin:0 0 10px;line-height:1.6}strong{font-weight:700}'
+    +'.print-footer{position:fixed;bottom:8mm;left:15mm;right:15mm;border-top:2px solid #003399;padding-top:6px}'
+    +'@media print{@page{size:A4;margin:10mm 15mm 10mm 15mm}}'
+    +'</style></head><body>'
+    + hdrHtml + body + '<div class="print-footer">'+ftrHtml+'</div>'
+    +'<script>window.onload=function(){var s=document.getElementById(\'sig-block\');if(s){var pH=914,t=s.offsetTop;if(t>pH*0.7&&t%pH<pH*0.4){s.style.marginTop=\'10px\';var st=document.getElementById(\'sig-stamp\');if(st)st.style.height=\'22mm\';var si=document.getElementById(\'sig-img\');if(si)si.style.height=\'25mm\';}}window.print();}<\/script></body></html>');
+  win.document.close();
+}
+
 function hdgPrintEquipage(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
@@ -13368,7 +13485,7 @@ function _imprimerOm(omId) {
   var nomComplet = ((om.prenom||'')+' '+(om.nom||'')).trim();
   var ref     = _omRef(om);
   var logo    = (S.settings&&S.settings.logo) ? '<img src="'+S.settings.logo+'" style="height:60px;object-fit:contain">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8">FFPLUM</div>';
-  var sigImg  = (S.docSettings&&S.docSettings.signatureImage) ? '<img src="'+S.docSettings.signatureImage+'" style="max-height:60px;max-width:180px;object-fit:contain">' : '';
+  var sigImg  = _getDocSig() ? '<img src="'+_getDocSig()+'" style="max-height:60px;max-width:180px;object-fit:contain">' : '';
   var today   = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   var html2 = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>ODM '+ref+'</title>'
     +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background:#f3f4f6;padding:24px 12px}'
@@ -15763,7 +15880,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_moteurVal)+'" placeholder="—" title="Moteur" style="'+_iStE+(_moteurVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'moteur\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
         html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_aileVal)+'" placeholder="—" title="Aile" style="'+_iStE+(_aileVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'aile\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
         html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(_heliceVal)+'" placeholder="—" title="Hélice" style="'+_iStE+(_heliceVal?';color:var(--txt)':'')+'" onchange="eqpSaveULMField(\''+pidE+'\',\'helice\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
-        html5 += '<div style="display:flex;align-items:center;justify-content:center;padding-right:12px" onclick="event.stopPropagation()"><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Supprimer">×</button></div>';
+        var _prtBtnSt = 'width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,.15);border:none;color:#818cf8;cursor:pointer;font-size:13px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
+        html5 += '<div style="display:flex;align-items:center;justify-content:center;gap:6px;padding-right:12px" onclick="event.stopPropagation()"><button onclick="_printCompEquipageAttestation(\''+pidE+'\',\''+escG(cid)+'\')" style="'+_prtBtnSt+'" title="Imprimer attestation">🖨</button><button onclick="hdgRemoveComp(\''+cid+'\',\''+pid+'\')" style="'+_rmBtnSt+'" title="Supprimer">×</button></div>';
         html5 += '</div>';
       }
     });
@@ -20894,7 +21012,7 @@ function removeDocStamp() {
 function _reglStampRefresh() {
   var prev = document.getElementById('regl-stamp-preview');
   var del  = document.getElementById('regl-stamp-del');
-  var src  = S.docSettings && S.docSettings.stampImage;
+  var src  = _getDocStamp();
   if (prev) prev.innerHTML = src ? '<img src="'+src+'" style="max-width:48px;max-height:48px;object-fit:contain">' : '<span style="font-size:9px;color:#aaa;font-style:italic;text-align:center">Aperçu</span>';
   if (del)  del.style.display = src ? '' : 'none';
   var inp = document.getElementById('regl-stamp-inp');
@@ -20905,7 +21023,7 @@ function _reglStampRefresh() {
 function _reglSigRefresh() {
   var img = document.getElementById('regl-sig-preview');
   var del = document.getElementById('regl-sig-del');
-  var src = S.docSettings && S.docSettings.signatureImage;
+  var src = _getDocSig();
   if (img) {
     if (src) {
       img.innerHTML = '<img src="'+src+'" style="max-width:78px;max-height:34px;object-fit:contain">';
@@ -21183,7 +21301,7 @@ function _renderDocumentFromTemplate(tpl, pilote, extraVars) {
   var sig = Object.assign({ prenom:'Mohamed', nom:'AZZOUNI', titre:'Directeur Technique National', organisation:'Fédération Française ULM', ville:'Maisons-Alfort' }, ds.signataire || {});
   var orgBlock = Object.assign({ nom:"Fédération Française d'ULM", adresse:'96 bis rue Marc Sangnier', cp:'94700', ville:'Maisons-Alfort', tel:'01 49 81 74 43', email:'ffplum@ffplum.org', www:'www.ffplum.fr', accent:'#c0392b' }, ds.orgBlock || {});
   var police = 'Arial,Helvetica,sans-serif';
-  var sigImage = ds.signatureImage || null;
+  var sigImage = _getDocSig() || null;
   var bv = _buildVarMap(pilote, sig, extraVars);
   var vars = bv.vars;
   var dateStr = bv.dateStr;
@@ -21286,9 +21404,9 @@ function renderDocModeles() {
   polices.forEach(function(o){ h += '<option value="' + escH(o[0]) + '"' + (curPolice === o[0] ? ' selected' : '') + '>' + escH(o[1]) + '</option>'; });
   h += '</select></div>';
   h += '<div><div style="' + lSt + '">Signature (image PNG)</div>';
-  if (ds.signatureImage) {
+  if (_getDocSig()) {
     h += '<div style="display:flex;gap:6px;align-items:center">';
-    h += '<img src="' + escH(ds.signatureImage) + '" style="height:36px;max-width:120px;object-fit:contain;border:1px solid var(--bdr);border-radius:5px;background:#fff;padding:2px">';
+    h += '<img src="' + escH(_getDocSig()) + '" style="height:36px;max-width:120px;object-fit:contain;border:1px solid var(--bdr);border-radius:5px;background:#fff;padding:2px">';
     h += '<button style="' + bSt + '" onclick="removeDocSignature()">✕</button>';
     h += '</div>';
   } else {
@@ -23546,6 +23664,9 @@ async function loadFromSupabaseFirst() {
     var savedGanttTasks = (S.ganttTasks && Object.keys(S.ganttTasks).length) ? JSON.parse(JSON.stringify(S.ganttTasks)) : null;
     // ✅ GARDE AIDES : préserver les aides fédérales locales
     var savedAides = (S.aides && S.aides.length) ? S.aides.slice() : null;
+    // ✅ GARDE COLLECTIF : le local est toujours plus récent que Supabase (les modifs ne sont pas encore poussées)
+    var savedCollectif = (S.collectif && S.collectif.length) ? S.collectif.slice() : null;
+    var savedShn = (S.shn && S.shn.length) ? S.shn.slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -23581,6 +23702,29 @@ async function loadFromSupabaseFirst() {
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
     if (savedPilots)  S.pilots = savedPilots;
+    // ✅ Fusionner collectif local avec cloud : local gagne membre par membre (plus récent)
+    if (savedCollectif) {
+      if (!S.collectif || !S.collectif.length) {
+        S.collectif = savedCollectif;
+      } else {
+        savedCollectif.forEach(function(m) {
+          var idx = S.collectif.findIndex(function(x){ return x.id === m.id; });
+          if (idx === -1) { S.collectif.push(m); }
+          else { S.collectif[idx] = m; } // local toujours plus récent que cloud
+        });
+      }
+    }
+    if (savedShn) {
+      if (!S.shn || !S.shn.length) {
+        S.shn = savedShn;
+      } else {
+        savedShn.forEach(function(m) {
+          var idx = S.shn.findIndex(function(x){ return x.id === m.id; });
+          if (idx === -1) { S.shn.push(m); }
+          else { S.shn[idx] = m; }
+        });
+      }
+    }
     // Fusionner les événements agenda locaux non présents dans le cloud
     if (localAgendaEvents.length) {
       if (!S.agendaEvents) S.agendaEvents = [];
@@ -24195,8 +24339,12 @@ async function pullFromCloud() {
       });
     }
   }
-  // Objets scalaires simples
-  S.docSettings        = _mergeObj(S.docSettings, r.docSettings);
+  // Objets scalaires simples — signature + tampon jamais écrasés par le cloud (stockage local uniquement)
+  var _sigBefore   = _getDocSig();
+  var _stampBefore = _getDocStamp();
+  S.docSettings = _mergeObj(S.docSettings, r.docSettings);
+  if (_sigBefore   && !S.docSettings.signatureImage) S.docSettings.signatureImage = _sigBefore;
+  if (_stampBefore && !S.docSettings.stampImage)     S.docSettings.stampImage     = _stampBefore;
   // Types de partenaire : union des deux listes (local + cloud), ordre local en premier
   if (r.partenaireTypes && Array.isArray(r.partenaireTypes)) {
     var baseTypes = S.partenaireTypes || _DEFAULT_PART_TYPES.slice();
@@ -26126,7 +26274,7 @@ function cfToggleEF(id) {
   if (!m) return;
   m.equipe_france = !m.equipe_france;
   saveState();
-  try { localStorage.setItem(LS_COLLECTIF, JSON.stringify(S.collectif)); } catch(e) {}
+  try { var _cfLS2=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS2)); } catch(e) {}
   // Mettre à jour uniquement le bouton de la ligne (pas de re-render complet)
   var btn = document.getElementById('cf-ef-'+id);
   if (btn) {
@@ -26142,6 +26290,36 @@ function cfSetStatutShn(id, val) {
   if (!m) return;
   m.statut_shn = val;
   saveState();
+}
+
+function _cfAutoSyncFromLicenceDB() {
+  if (!S.licenceDB || !Object.keys(S.licenceDB).length) return;
+  if (!S.collectif || !S.collectif.length) return;
+  var _norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var updated = 0;
+  S.collectif.forEach(function(m) {
+    var missing = !m.licence || !m.email || !m.tel || !m.club || !m.genre || !m.dateNaissance;
+    if (!missing) return;
+    var k1 = _norm(m.nom)+'|'+_norm(m.prenom);
+    var k2 = _norm(m.prenom)+'|'+_norm(m.nom);
+    var rec = S.licenceDB[k1] || S.licenceDB[k2] || null;
+    if (!rec) return;
+    var changed = false;
+    if (!m.licence       && rec.licence)  { m.licence       = rec.licence;  changed = true; }
+    if (!m.genre         && rec.genre)    { m.genre         = rec.genre;    changed = true; }
+    if (!m.dateNaissance && rec.ddn)      { m.dateNaissance = rec.ddn;      changed = true; }
+    if (!m.email         && rec.email)    { m.email         = rec.email;    changed = true; }
+    if (!m.tel           && rec.tel)      { m.tel           = rec.tel;      changed = true; }
+    if (!m.club          && rec.club)     { m.club          = rec.club;     changed = true; }
+    if (!m.adresse       && rec.adresse)  { m.adresse       = rec.adresse;  changed = true; }
+    if (!m.region        && rec.region)   { m.region        = rec.region;   changed = true; }
+    if (changed) updated++;
+  });
+  if (updated > 0) {
+    saveState();
+    renderCollectifList();
+    toast('✓ '+updated+' membre'+(updated>1?'s':'')+' mis à jour depuis la base licences', 'ok');
+  }
 }
 
 function renderCollectifList() {
@@ -26475,7 +26653,7 @@ function openCfEditModal(id) {
   var hsel = document.getElementById('cfe-hist-statut-body');
   if (hsel) {
     var pilotEntries = (S.collectif||[]).filter(function(x){
-      return (m.pilotId && x.pilotId === m.pilotId) || (m.licence && x.licence === m.licence);
+      return x.id === m.id || (m.pilotId && x.pilotId === m.pilotId) || (m.licence && x.licence === m.licence);
     }).sort(function(a,b){ return (b.saison||'').localeCompare(a.saison||''); });
     if (!pilotEntries.length) {
       hsel.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">Aucun historique</td></tr>';
@@ -26492,7 +26670,13 @@ function openCfEditModal(id) {
           + '<td style="padding:8px 10px;text-align:center">'+flag+'</td>'
           + '<td style="padding:8px 10px;text-align:center">'+(e.equipe_france?flag:dash)+'</td>'
           + '<td style="padding:8px 10px;text-align:center">'+(e.statut_shn?flag:dash)+'</td>'
-          + '<td style="padding:6px 10px;text-align:right"><button data-cfeid="'+esc(e.id)+'" onclick="_cfPrintAttestationByEntry(this.dataset.cfeid)" title="Imprimer l\'attestation saison '+esc(e.saison)+'" style="display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:7px;border:1px solid rgba(20,184,166,.35);background:rgba(20,184,166,.08);color:var(--stol);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🖨️</button></td>'
+          + '<td style="padding:6px 10px;text-align:right"><div style="position:relative;display:inline-block" id="imp-wrap-'+esc(e.id)+'">'
+          + '<button onclick="_histImpMenu(\''+esc(e.id)+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🖨️ Impressions ▾</button>'
+          + '<div id="imp-menu-'+esc(e.id)+'" style="display:none;position:absolute;right:0;top:calc(100% + 4px);min-width:230px;background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:500;padding:5px">'
+          + '<button onclick="_cfPrintAttestationByEntry(\''+esc(e.id)+'\');_histImpClose(\''+esc(e.id)+'\')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Attestation Collectif France</button>'
+          + '<button onclick="_efPrintAttestation(\''+esc(e.id)+'\');_histImpClose(\''+esc(e.id)+'\')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Attestation Équipe de France</button>'
+          + '<button onclick="_efPrintSelection(\''+esc(e.id)+'\');_histImpClose(\''+esc(e.id)+'\')" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Fiche Sélection Équipe de France</button>'
+          + '</div></div></td>'
           + '</tr>';
       }).join('');
     }
@@ -26509,14 +26693,23 @@ function openCfEditModal(id) {
     }
     var pid = pilot ? pilot.id : null;
     var compList = [];
+    var _seenCompIds = {};
     if (pid) {
       (S.comps||[]).forEach(function(cp){
+        if (_seenCompIds[cp.id]) return; // dédoublonnage
         if (((S.compEnroll||{})[cp.id]||[]).indexOf(pid) >= 0) {
+          _seenCompIds[cp.id] = true;
           var meta = (((S.enrollMeta||{})[cp.id])||{})[pid] || {};
           compList.push({ saison:cp.saison, nom:cp.nom, lieu:cp.lieu||'', podium:meta.podium||'' });
         }
       });
       compList.sort(function(a,b){ return (b.saison||'').localeCompare(a.saison||''); });
+    }
+    // Peupler le select de saison
+    var _saisonSel = document.getElementById('pratique-print-saison');
+    if (_saisonSel) {
+      var _saisons = [...new Set(compList.map(function(c){ return c.saison; }).filter(Boolean))].sort(function(a,b){ return b.localeCompare(a); });
+      _saisonSel.innerHTML = '<option value="">Complet</option>' + _saisons.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('');
     }
     var podL = {'1':'🥇 1er','2':'🥈 2ème','3':'🥉 3ème'};
     if (!compList.length) {
@@ -26599,7 +26792,7 @@ function _cfeFillFromLicence() {
     set('cfe2-genre',   rec.genre);
     set('cfe2-prenom',  rec.prenom);
     set('cfe2-nom',     rec.nom);
-    set('cfe2-ddn',     rec.ddn);
+    set('cfe2-ddn',     (typeof _mapDate === 'function') ? _mapDate(rec.ddn) : rec.ddn);
     set('cfe2-licence', rec.licence);
     set('cfe2-email',   rec.email);
     set('cfe2-tel',     rec.tel);
@@ -26670,7 +26863,7 @@ function cfSaveMemberModal() {
   m.saison        = get('cfe2-saison');
   if (_cfePhotoData !== undefined) m.photo = _cfePhotoData;
   saveState();
-  try { localStorage.setItem(LS_COLLECTIF, JSON.stringify(S.collectif)); } catch(e) {}
+  try { var _cfLS2=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS2)); } catch(e) {}
   renderCollectifList();
   closeCfEditModal();
   toast('Membre mis à jour ✓', 'ok');
@@ -27701,7 +27894,7 @@ function cfMessageStarter(entryId) {
   // Stocker data pour printCfAttestation
   el.dataset.attestationData = JSON.stringify(data);
   // Aperçu modal : utilise le même template que l'impression (docSettings inclus)
-  el.innerHTML = '<div style="font-family:\'Times New Roman\',Times,serif;color:#111;background:#fff;border-radius:4px;padding:16px 20px">'
+  el.innerHTML = '<div style="font-family:\'Segoe UI\',Arial,sans-serif;color:#111;background:#fff;border-radius:4px;padding:16px 20px">'
     + _docTemplates.attestation_collectif(data)
     + '</div>';
 
@@ -27762,21 +27955,20 @@ function _cfPrintAttestationByEntry(entryId) {
   var hdrAlign = {left:'left',center:'center',right:'right'}[od.headerPos||'left']||'left';
   var hdrHtml = hdrSrc
     ? '<div style="text-align:'+hdrAlign+';margin-bottom:16px"><img src="'+hdrSrc+'" style="max-height:'+px((od.headerHeight||20)*2.2)+';width:auto"></div>'
-    : '<div style="margin-bottom:16px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:18px;font-weight:900;color:#003399;letter-spacing:-.3px">FFPLUM <span style="font-size:14px;font-weight:700;letter-spacing:.5px">— DTN</span></div>';
+    : '<div style="margin-bottom:16px"></div>';
   var ftrImgHtml = ftrSrc ? '<img src="'+ftrSrc+'" style="display:block;height:'+px(od.footerHeight||15)+';width:auto;margin:0;padding:0">' : '';
   var ftrHtml = ftrImgHtml ? '<div style="margin-top:6px;margin-left:-5mm">'+ftrImgHtml+'</div>' : '';
   var sigBlock = _buildSigStampBlock(esc);
-  var body = '<div style="text-align:right;margin-bottom:16px;color:#333">'+esc(sig.ville)+', le '+today+'</div>'
-    + '<p style="margin-bottom:2px">'+esc(m.adresse||'')+'</p>'
-    + '<p style="margin-bottom:16px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+  var body = '<p style="margin-bottom:4px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+    + '<div style="text-align:right;margin-bottom:20px;color:#333">'+esc(sig.ville)+', le '+today+'</div>'
     + _printTitle('Attestation Collectif France — Saison '+esc(String(saison)))
     + '<p style="margin-top:20px">Je soussigné, '+esc(sigNom)+', '+esc(sig.titre)+' de la '+esc(sig.organisation)+', atteste que :</p>'
     + '<div style="text-align:center;margin:14px 0 4px"><strong>'+esc(genreLabel)+' '+esc(nomDisplay)+'</strong>,</div>'
     + '<div style="text-align:center;margin-bottom:2px">né'+(isF?'e':'')+' le '+esc(ddnFmt||'___________')+(m.licence ? ', N° licence : '+esc(m.licence) : '')+'</div>'
     + '<div style="margin-bottom:14px">&nbsp;</div>'
     + '<p>Est membre du Collectif France et sélectionnable en Équipe de France pour la saison '+esc(String(saison))+' en '+esc(pratFmt)+', discipline'+(discFmt2?'s':'')+' '+esc(discStr)+'.</p>'
-    + '<p>Cette attestation est délivrée pour servir ce que de droit.</p>'
-    + sigBlock;
+    + '<div style="page-break-inside:avoid;break-inside:avoid;page-break-before:avoid;break-before:avoid"><p>Cette attestation est délivrée pour servir ce que de droit.</p>'
+    + sigBlock + '</div>';
   var w = window.open('','_blank','width=820,height=900');
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation Collectif France '+esc(String(saison))+'</title>'
     +'<style>'
@@ -27787,7 +27979,257 @@ function _cfPrintAttestationByEntry(entryId) {
     +'@media print{@page{size:A4;margin:10mm 15mm 10mm 15mm}}'
     +'</style>'
     +'</head><body>'+hdrHtml+body+'<div class="print-footer">'+ftrHtml+'</div>'
-    +'<script>window.onload=function(){window.print();}<\/script></body></html>');
+    +'<script>window.onload=function(){var s=document.getElementById(\'sig-block\');if(s){var pH=914,t=s.offsetTop;if(t>pH*0.7&&t%pH<pH*0.4){s.style.marginTop=\'10px\';var st=document.getElementById(\'sig-stamp\');if(st)st.style.height=\'22mm\';var si=document.getElementById(\'sig-img\');if(si)si.style.height=\'25mm\';}}window.print();}<\/script></body></html>');
+  w.document.close();
+}
+
+function _efPrintAttestation(id) {
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) { toast('Membre non trouvé', 'err'); return; }
+  var pilot = m.pilotId ? (S.pilots||[]).find(function(p){ return p.id === m.pilotId; }) : null;
+  if (!pilot && m.licence) pilot = (S.pilots||[]).find(function(p){ return p.licence && String(p.licence)===String(m.licence); });
+  var prenom = m.prenom || (pilot && pilot.prenom) || '';
+  var nom    = m.nom    || (pilot && pilot.nom)    || '';
+  var genre  = m.genre  || (pilot && pilot.genre)  || '';
+  var ddn    = m.dateNaissance || (pilot && pilot.ddn) || '';
+  var pratique = m.pratique || ''; var discipline = m.discipline || ''; var saison = m.saison || '';
+  var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var ddnFmt = '';
+  if (ddn) { var _d=new Date((ddn.indexOf('T')<0?ddn+'T00:00:00':ddn)); if(!isNaN(_d)) ddnFmt=_d.getDate()+' '+moisFr[_d.getMonth()]+' '+_d.getFullYear(); else ddnFmt=ddn; }
+  var ds = S.docSettings || {};
+  var sig = Object.assign({prenom:'Mohamed',nom:'AZZOUNI',titre:'Directeur Technique National',organisation:'Fédération Française ULM',ville:'Maisons-Alfort'}, ds.signataire||{});
+  var sigNom = ((sig.prenom||'')+' '+(sig.nom||'')).trim();
+  var pratLabel = {microlight:'Microlight (ULM)',paramoteur:'Paramoteur',paramotor:'Paramoteur'};
+  var discLabel = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
+  var pratFmt = pratLabel[pratique] || pratique || '___________';
+  var discFmt = discLabel[discipline] || discipline || '___________';
+  var disc2 = m.discipline2 || '';
+  var discFmt2 = disc2 ? (discLabel[disc2] || disc2) : '';
+  var discStr = discFmt + (discFmt2 ? ' et '+discFmt2 : '');
+  var genreLabel = (genre||'').toLowerCase()==='f' ? 'Mme' : 'M.';
+  var isF = (genre||'').toLowerCase()==='f';
+  var nomDisplay = (prenom+' '+nom.toUpperCase()).trim() || '___________';
+  var today = new Date().toLocaleDateString('fr-FR');
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var od = S.officialDocs || {};
+  var px = function(v){ return Math.round((v||0)*3.7795)+'px'; };
+  var hdrSrc = _getOfficialDocImg('header'), ftrSrc = _getOfficialDocImg('footer');
+  var hdrAlign = {left:'left',center:'center',right:'right'}[od.headerPos||'left']||'left';
+  var hdrHtml = hdrSrc ? '<div style="text-align:'+hdrAlign+';margin-bottom:16px"><img src="'+hdrSrc+'" style="max-height:'+px((od.headerHeight||20)*2.2)+';width:auto"></div>' : '<div style="margin-bottom:16px"></div>';
+  var ftrImgHtml = ftrSrc ? '<img src="'+ftrSrc+'" style="display:block;height:'+px(od.footerHeight||15)+';width:auto">' : '';
+  var ftrHtml = ftrImgHtml ? '<div style="margin-top:6px">'+ftrImgHtml+'</div>' : '';
+  var sigBlock = _buildSigStampBlock(esc);
+  var body = '<p style="margin-bottom:4px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+    + '<div style="text-align:right;margin-bottom:24px;color:#333">'+esc(sig.ville)+', le '+today+'</div>'
+    + _printTitle('Attestation Équipe de France — Saison '+esc(String(saison)))
+    + '<p style="margin-top:20px">Je soussigné, <strong>'+esc(sigNom)+'</strong>, '+esc(sig.titre)+' de la '+esc(sig.organisation)+', atteste que :</p>'
+    + '<div style="text-align:center;margin:14px 0 4px"><strong>'+esc(genreLabel)+' '+esc(nomDisplay)+'</strong>,</div>'
+    + '<div style="text-align:center;margin-bottom:14px">né'+(isF?'e':'')+' le '+esc(ddnFmt||'___________')+(m.licence?', N° licence : '+esc(m.licence):'')+'</div>'
+    + '<p>Est membre de l\'<strong>Équipe de France</strong> pour la saison <strong>'+esc(String(saison))+'</strong> en <strong>'+esc(pratFmt)+'</strong>, discipline'+(discFmt2?'s':'')+' <strong>'+esc(discStr)+'</strong>.</p>'
+    + '<div style="page-break-inside:avoid;break-inside:avoid;page-break-before:avoid;break-before:avoid"><p style="margin-bottom:32px">Cette attestation est délivrée pour servir ce que de droit.</p>'
+    + sigBlock + '</div>';
+  var w = window.open('','_blank','width=820,height=900');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation Équipe de France '+esc(String(saison))+'</title><style>body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:11pt;color:#111;margin:10mm 15mm 35mm 15mm}p{margin:0 0 10px;line-height:1.6}h2{font-size:12pt;font-weight:800;margin:0 0 14px;color:#003399}strong{font-weight:700}.print-footer{position:fixed;bottom:8mm;left:15mm;right:15mm;border-top:2px solid #003399;padding-top:6px}@media print{@page{size:A4;margin:10mm 15mm 10mm 15mm}}</style></head><body>'+hdrHtml+body+'<div class="print-footer">'+ftrHtml+'</div><script>window.onload=function(){var s=document.getElementById(\'sig-block\');if(s){var pH=914,t=s.offsetTop;if(t>pH*0.7&&t%pH<pH*0.4){s.style.marginTop=\'10px\';var st=document.getElementById(\'sig-stamp\');if(st)st.style.height=\'22mm\';var si=document.getElementById(\'sig-img\');if(si)si.style.height=\'25mm\';}}window.print();}<\/script></body></html>');
+  w.document.close();
+}
+
+function _printPratiqueAttestation(id) {
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) { toast('Membre non trouvé', 'err'); return; }
+  var pilot = m.pilotId ? (S.pilots||[]).find(function(p){ return p.id === m.pilotId; }) : null;
+  if (!pilot && m.licence) pilot = (S.pilots||[]).find(function(p){ return p.licence && String(p.licence)===String(m.licence); });
+  if (!pilot && m.prenom && m.nom) {
+    var _pn = function(s){ return (s||'').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+    pilot = (S.pilots||[]).find(function(p){ return _pn(p.prenom)===_pn(m.prenom) && _pn(p.nom)===_pn(m.nom); });
+  }
+  var pid = pilot ? pilot.id : null;
+  if (!pid) { toast('Pilote non trouvé dans les compétitions', 'err'); return; }
+
+  var prenom = m.prenom || (pilot && pilot.prenom) || '';
+  var nom    = m.nom    || (pilot && pilot.nom)    || '';
+  var genre  = m.genre  || (pilot && pilot.genre)  || '';
+  var ddn    = m.dateNaissance || (pilot && pilot.ddn) || '';
+  var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var fmtDate = function(iso) {
+    if (!iso) return '';
+    var d = new Date(iso.indexOf('T')<0 ? iso+'T00:00:00' : iso);
+    if (isNaN(d)) return iso;
+    return d.getDate()+' '+moisFr[d.getMonth()]+' '+d.getFullYear();
+  };
+  var fmtShort = function(iso) {
+    if (!iso) return '';
+    var d = new Date(iso.indexOf('T')<0 ? iso+'T00:00:00' : iso);
+    if (isNaN(d)) return iso;
+    return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+  };
+  var ddnFmt = fmtShort(ddn);
+  var ds = S.docSettings || {};
+  var sig = Object.assign({prenom:'Mohamed',nom:'AZZOUNI',titre:'Directeur Technique National',organisation:'Fédération Française ULM',ville:'Maisons-Alfort'}, ds.signataire||{});
+  var sigNom = ((sig.prenom||'')+' '+(sig.nom||'')).trim();
+  var genreLabel = (genre||'').toLowerCase()==='f' ? 'Mme' : 'M.';
+  var nomDisplay = (prenom+' '+nom.toUpperCase()).trim() || '___________';
+  var today = new Date(); var todayStr = today.getDate()+' '+moisFr[today.getMonth()]+' '+today.getFullYear();
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var pratLabel = {microlight:'Microlight (ULM)',paramoteur:'Paramoteur',paramotor:'Paramoteur',stol:'STOL'};
+  var discLabel = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision',multiaxe:'Multiaxe monoplace'};
+  var podTxt = {'1':'1ère place','2':'2ème place','3':'3ème place'};
+
+  // Filtre saison sélectionné
+  var _saisonFilter = (document.getElementById('pratique-print-saison')||{}).value || '';
+
+  // Construire la liste complète des compétitions — dédoublonnage par cp.id
+  var compList = [];
+  var _seenIds = {};
+  (S.comps||[]).forEach(function(cp) {
+    if (_seenIds[cp.id]) return;
+    if (((S.compEnroll||{})[cp.id]||[]).indexOf(pid) < 0) return;
+    if (_saisonFilter && String(cp.saison) !== _saisonFilter) return;
+    _seenIds[cp.id] = true;
+    var meta = (((S.enrollMeta||{})[cp.id])||{})[pid] || {};
+    compList.push({
+      saison: cp.saison||'', nom: cp.nom||cp.name||'', lieu: cp.lieu||'',
+      dateFrom: cp.dateFrom||'', dateTo: cp.dateTo||'',
+      pratique: cp.pratique||'', discipline: cp.discipline||'',
+      podium: meta.podium||''
+    });
+  });
+  compList.sort(function(a,b){ return (a.dateFrom||a.saison||'').localeCompare(b.dateFrom||b.saison||''); });
+
+  if (!compList.length) { toast('Aucune compétition enregistrée pour ce pilote', 'err'); return; }
+
+  var od = S.officialDocs || {};
+  var px = function(v){ return Math.round((v||0)*3.7795)+'px'; };
+  var hdrSrc = _getOfficialDocImg('header'), ftrSrc = _getOfficialDocImg('footer');
+  var hdrAlign = {left:'left',center:'center',right:'right'}[od.headerPos||'left']||'left';
+  var hdrHtml = hdrSrc ? '<div style="text-align:'+hdrAlign+';margin-bottom:20px"><img src="'+hdrSrc+'" style="max-height:'+px((od.headerHeight||20)*2.2)+';width:auto"></div>' : '<div style="margin-bottom:20px"></div>';
+  var ftrImgHtml = ftrSrc ? '<img src="'+ftrSrc+'" style="display:block;height:'+px(od.footerHeight||15)+';width:auto;margin:0;padding:0">' : '';
+  var ftrHtml = ftrImgHtml ? '<div style="margin-top:6px;margin-left:-5mm">'+ftrImgHtml+'</div>' : '';
+  var sigBlock = _buildSigStampBlock(esc);
+
+  // Entrées compétitions
+  var compHtml = compList.map(function(c, i) {
+    var isLast = i === compList.length - 1;
+    var dateRange = '';
+    if (c.dateFrom && c.dateTo && c.dateFrom !== c.dateTo) dateRange = fmtDate(c.dateFrom)+' au '+fmtDate(c.dateTo);
+    else if (c.dateFrom) dateRange = fmtDate(c.dateFrom);
+    var disc = discLabel[c.discipline] || c.discipline || '';
+    var prat = pratLabel[c.pratique]   || c.pratique   || '';
+    var disciplineStr = prat && disc ? prat+' — '+disc : (prat||disc);
+    var podHtml = c.podium ? '<div style="margin-top:4px;padding-left:16px;font-weight:700;color:#1e293b">'+esc(podTxt[String(c.podium)]||c.podium+'ème place')+'</div>' : '';
+    return '<div class="comp-item" style="margin-bottom:18px;padding-left:16px;border-left:3px solid #003399'+(isLast?';page-break-after:avoid;break-after:avoid':'')+'">'
+      + '<div style="font-weight:700;font-size:11pt">'+esc(c.nom)+(c.lieu&&c.nom.toLowerCase().indexOf(c.lieu.toLowerCase())===-1?' — '+esc(c.lieu):'')+'</div>'
+      + (dateRange ? '<div style="font-size:10pt;color:#555;margin-top:2px">'+esc(dateRange)+'</div>' : '')
+      + (disciplineStr ? '<div style="font-size:10pt;color:#333;margin-top:2px">Discipline '+esc(disciplineStr)+'</div>' : '')
+      + podHtml
+      + '</div>';
+  }).join('');
+
+  var licenceStr = m.licence ? ', N° licence : <strong>'+esc(m.licence)+'</strong>' : '';
+  var body = '<p style="margin-bottom:2px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+    + '<div style="text-align:right;margin-bottom:20px;color:#333">'+esc(sig.ville)+', le '+esc(todayStr)+'</div>'
+    + '<div style="text-align:center;margin:16px 0 6px"><div style="border-top:1px solid #111;margin-bottom:8px"></div>'
+    + '<div style="font-size:14pt;font-weight:900;letter-spacing:2px;text-transform:uppercase">ATTESTATION</div>'
+    + '<div style="border-bottom:1px solid #111;margin-top:8px"></div></div>'
+    + '<p style="margin:18px 0 16px">Je soussigné, <strong>'+esc(sigNom)+'</strong>, Directeur Technique National de la Fédération Française ULM, atteste par la présente du parcours de :</p>'
+    + '<p style="margin-bottom:4px;text-align:center"><strong>'+esc(genreLabel)+' '+esc(nomDisplay)+'</strong></p>'
+    + '<p style="margin-bottom:20px;text-align:center">né'+(genre.toLowerCase()==='f'?'e':'')+' le '+esc(ddnFmt||'___________')+licenceStr+'</p>'
+    + compHtml
+    + '<div style="page-break-inside:avoid;break-inside:avoid;page-break-before:avoid;break-before:avoid;page-break-before:avoid;break-before:avoid"><p style="margin-top:10px;margin-bottom:36px">Cette attestation est délivrée pour servir ce que de droit.</p>'
+    + sigBlock + '</div>';
+
+  var w = window.open('','_blank','width=820,height=1050');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation parcours — '+esc(nomDisplay)+'</title><style>'
+    +'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:11pt;color:#111;margin:10mm 15mm 35mm 15mm}'
+    +'p{margin:0 0 10px;line-height:1.6}strong{font-weight:700}'
+    +'.print-footer{position:fixed;bottom:8mm;left:15mm;right:15mm;border-top:2px solid #003399;padding-top:6px}'
+    +'@media print{@page{size:A4;margin:10mm 15mm 10mm 15mm}}'
+    +'</style></head><body>'
+    +hdrHtml+body+'<div class="print-footer">'+ftrHtml+'</div>'
+    +'<script>window.onload=function(){var items=document.querySelectorAll(\'.comp-item\');var s=document.getElementById(\'sig-block\');if(items.length>=3&&s){items.forEach(function(el){el.style.marginBottom=\'8px\';});s.style.marginTop=\'10px\';var st=document.getElementById(\'sig-stamp\');if(st)st.style.height=\'22mm\';var si=document.getElementById(\'sig-img\');if(si)si.style.height=\'25mm\';}window.print();}<\/script></body></html>');
+  w.document.close();
+}
+
+function _histImpMenu(id) {
+  var menu = document.getElementById('imp-menu-'+id);
+  if (!menu) return;
+  var open = menu.style.display !== 'none';
+  // Fermer tous les autres menus ouverts
+  document.querySelectorAll('[id^="imp-menu-"]').forEach(function(m){ m.style.display='none'; });
+  if (!open) {
+    menu.style.display = 'block';
+    setTimeout(function(){ document.addEventListener('click', function _cl(e){ if(!document.getElementById('imp-wrap-'+id)||!document.getElementById('imp-wrap-'+id).contains(e.target)){ menu.style.display='none'; document.removeEventListener('click',_cl); } }); }, 0);
+  }
+}
+function _histImpClose(id) {
+  var menu = document.getElementById('imp-menu-'+id);
+  if (menu) menu.style.display = 'none';
+}
+
+function _efPrintSelection(id) {
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) { toast('Membre non trouvé', 'err'); return; }
+  var pilot = m.pilotId ? (S.pilots||[]).find(function(p){ return p.id === m.pilotId; }) : null;
+  if (!pilot && m.licence) pilot = (S.pilots||[]).find(function(p){ return p.licence && String(p.licence)===String(m.licence); });
+  var prenom  = m.prenom  || (pilot && pilot.prenom) || '';
+  var nom     = m.nom     || (pilot && pilot.nom)    || '';
+  var genre   = m.genre   || (pilot && pilot.genre)  || '';
+  var ddn     = m.dateNaissance || (pilot && pilot.ddn) || '';
+  var pratique   = m.pratique   || '';
+  var discipline = m.discipline || '';
+  var saison  = m.saison || '';
+  var moisFr = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var ddnFmt = '';
+  if (ddn) { var _d=new Date((ddn.indexOf('T')<0?ddn+'T00:00:00':ddn)); if(!isNaN(_d)) ddnFmt=_d.getDate()+' '+moisFr[_d.getMonth()]+' '+_d.getFullYear(); else ddnFmt=ddn; }
+  var ds  = S.docSettings || {};
+  var sig = Object.assign({prenom:'Mohamed',nom:'AZZOUNI',titre:'Directeur Technique National',organisation:'Fédération Française ULM',ville:'Maisons-Alfort'}, ds.signataire||{});
+  var sigNom = ((sig.prenom||'')+' '+(sig.nom||'')).trim();
+  var pratLabel = {microlight:'Microlight (ULM)',paramoteur:'Paramoteur',paramotor:'Paramoteur'};
+  var discLabel = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
+  var pratFmt = pratLabel[pratique] || pratique || '___________';
+  var discFmt = discLabel[discipline] || discipline || '___________';
+  var disc2   = m.discipline2 || '';
+  var discFmt2 = disc2 ? (discLabel[disc2] || disc2) : '';
+  var discStr = discFmt + (discFmt2 ? ' et '+discFmt2 : '');
+  var genreLabel = (genre||'').toLowerCase()==='f' ? 'Mme' : 'M.';
+  var isF = (genre||'').toLowerCase()==='f';
+  var nomDisplay = (prenom+' '+nom.toUpperCase()).trim() || '___________';
+  var today = new Date().toLocaleDateString('fr-FR');
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var od = S.officialDocs || {};
+  var px = function(v){ return Math.round((v||0)*3.7795)+'px'; };
+  var hdrSrc = _getOfficialDocImg('header'), ftrSrc = _getOfficialDocImg('footer');
+  var hdrAlign = {left:'left',center:'center',right:'right'}[od.headerPos||'left']||'left';
+  var hdrHtml = hdrSrc
+    ? '<div style="text-align:'+hdrAlign+';margin-bottom:16px"><img src="'+hdrSrc+'" style="max-height:'+px((od.headerHeight||20)*2.2)+';width:auto"></div>'
+    : '<div style="margin-bottom:16px"></div>';
+  var ftrImgHtml = ftrSrc ? '<img src="'+ftrSrc+'" style="display:block;height:'+px(od.footerHeight||15)+';width:auto;margin:0;padding:0">' : '';
+  var ftrHtml = ftrImgHtml ? '<div style="margin-top:6px;margin-left:-5mm">'+ftrImgHtml+'</div>' : '';
+  var sigBlock = _buildSigStampBlock(esc);
+  var infos = '<div style="margin-top:32px;padding-top:14px;border-top:1px solid #ccc;font-size:9.5pt;color:#333;line-height:1.55">'
+    + '<p style="font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Informations :</p>'
+    + '<p><strong>Dates &gt;</strong> Selon les conditions météorologiques et les contraintes d\'organisation, les dates annoncées sont susceptibles d\'être modifiées dans les délais nécessaires. Toute modification sera communiquée aux participants dans les plus brefs délais.</p>'
+    + '<p><strong>Équipement / Documents &gt;</strong> Les compétiteurs-trices doivent se munir d\'un équipement matériel de vol complet avec les documents administratifs à jour.</p>'
+    + '<p><strong>Indisponibilité &gt;</strong> En cas d\'indisponibilité justifiée et reconnue, merci de prévenir la DTN dans les plus brefs délais.</p>'
+    + '<p><strong>Prise en charge &gt;</strong> Les modalités de PEC seront communiquées dans les plus brefs délais dans les annexes suivantes.</p>'
+    + '</div>';
+  var body = '<p style="margin-bottom:4px"><strong>&#9632; LA DIRECTION TECHNIQUE NATIONALE</strong></p>'
+    + '<div style="text-align:right;margin-bottom:24px;color:#333">'+esc(sig.ville)+', le '+today+'</div>'
+    + _printTitle('Sélection Équipe de France — Saison '+esc(String(saison)))
+    + '<p style="margin-top:20px">Suite aux modalités de sélection, <strong>'+esc(genreLabel)+' '+esc(nomDisplay)+'</strong>'+(m.licence?', N° de licence <strong>'+esc(m.licence)+'</strong>':'')+', vous intégrez l\'<strong>Équipe de France</strong> en <strong>'+esc(pratFmt)+' — '+esc(discStr)+'</strong> pour participer aux prochaines échéances internationales de la saison <strong>'+esc(String(saison))+'</strong>. Selon le calendrier sportif.</p>'
+    + '<div style="page-break-inside:avoid;break-inside:avoid;page-break-before:avoid;break-before:avoid"><p style="margin-bottom:32px">Cette attestation est délivrée pour servir ce que de droit.</p>'
+    + sigBlock + '</div>'
+    + infos;
+  var w = window.open('','_blank','width=820,height=900');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sélection Équipe de France '+esc(String(saison))+'</title>'
+    +'<style>'
+    +'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:11pt;color:#111;margin:10mm 15mm 35mm 15mm}'
+    +'p{margin:0 0 10px;line-height:1.6}h2{font-size:12pt;font-weight:800;margin:0 0 14px;color:#003399}'
+    +'strong{font-weight:700}'
+    +'.print-footer{position:fixed;bottom:8mm;left:15mm;right:15mm;border-top:2px solid #003399;padding-top:6px}'
+    +'@media print{@page{size:A4;margin:10mm 15mm 10mm 15mm}}'
+    +'</style>'
+    +'</head><body>'+hdrHtml+body+'<div class="print-footer">'+ftrHtml+'</div>'
+    +'<script>window.onload=function(){var s=document.getElementById(\'sig-block\');if(s){var pH=914,t=s.offsetTop;if(t>pH*0.7&&t%pH<pH*0.4){s.style.marginTop=\'10px\';var st=document.getElementById(\'sig-stamp\');if(st)st.style.height=\'22mm\';var si=document.getElementById(\'sig-img\');if(si)si.style.height=\'25mm\';}}window.print();}<\/script></body></html>');
   w.document.close();
 }
 
@@ -27850,19 +28292,13 @@ function _printCfAttestationWordStyle(data) {
   // Corps du document
   win.document.write('<div class="a4-body">');
 
-  // Ville + date (droite)
-  win.document.write('<div style="text-align:right;margin-bottom:16px;margin-top:8mm;color:#333;font-size:12px">'+E(sig.ville)+', le '+E(dateStr)+'</div>');
-
-  // Destinataire (droite)
-  win.document.write('<div style="text-align:right;margin-bottom:20px">');
-  win.document.write('<div style="font-weight:700;font-size:13px">'+E(nomDisplay)+'</div>');
-  if (data.adresse) {
-    win.document.write('<div style="font-size:12px;color:#333;margin-top:3px">'+E(data.adresse)+'</div>');
-  }
+  // DTN en haut à gauche
+  win.document.write('<div style="font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase;margin-top:8mm">LA DIRECTION TECHNIQUE NATIONALE</div>');
+  // Lieu + date + destinataire en dessous à droite
+  win.document.write('<div style="text-align:right;margin-top:10px;margin-bottom:20px">');
+  win.document.write('<div style="color:#333;font-size:12px">'+E(sig.ville)+', le '+E(dateStr)+'</div>');
+  win.document.write('<div style="font-weight:700;font-size:13px;margin-top:6px">'+E(nomDisplay)+'</div>');
   win.document.write('</div>');
-
-  // Label institution (centré, gras)
-  win.document.write('<div style="text-align:center;font-weight:700;font-size:13px;letter-spacing:.5px;margin-bottom:4px;text-transform:uppercase">LA DIRECTION TECHNIQUE NATIONALE</div>');
 
   // Titre ATTESTATION (centré, gras, encadré)
   win.document.write('<div style="margin:12px 0 20px">');
@@ -36704,11 +37140,13 @@ function _buildSigStampBlock(escFn) {
   var ds  = S.docSettings || {};
   var sig = Object.assign({prenom:'Mohamed',nom:'AZZOUNI',titre:'Directeur Technique National',organisation:'Fédération Française ULM',ville:'Maisons-Alfort'}, ds.signataire||{});
   var sigNom = ((sig.prenom||'')+' '+(sig.nom||'')).trim();
-  var html = '<div style="display:flex;align-items:flex-end;justify-content:flex-end;gap:20px;margin-top:48px;margin-right:1cm">';
-  if (ds.stampImage) html += '<img src="'+ds.stampImage+'" style="height:40mm;max-width:40mm;object-fit:contain;flex-shrink:0">';
+  var _sig   = _getDocSig();
+  var _stamp = _getDocStamp();
+  var html = '<div id="sig-block" style="display:flex;align-items:flex-end;justify-content:flex-end;gap:20px;margin-top:48px;margin-right:1cm">';
+  if (_stamp) html += '<img id="sig-stamp" src="'+_stamp+'" style="height:40mm;max-width:40mm;object-fit:contain;flex-shrink:0">';
   html += '<div style="text-align:right">';
   html += '<p style="margin:0 0 4px"><strong>'+E(sigNom)+'</strong></p>';
-  if (ds.signatureImage) html += '<img src="'+ds.signatureImage+'" style="height:45mm;max-width:120mm;object-fit:contain">';
+  if (_sig) html += '<img id="sig-img" src="'+_sig+'" style="height:45mm;max-width:120mm;object-fit:contain">';
   html += '</div></div>';
   return html;
 }
@@ -44097,6 +44535,7 @@ function _collectifRenderEF() {
     + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Région</th>'
     + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Email</th>'
     + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Téléphone</th>'
+    + '<th style="padding:10px 12px;width:44px"></th>'
     + '</tr></thead>'
     + '<tbody id="ef-tbody"></tbody>'
     + '</table></div>';
@@ -44158,6 +44597,7 @@ function _efRenderList() {
       + '<td style="'+tdSt+'">'+esc(m.region||'—')+'</td>'
       + '<td style="'+tdSt+'"><a href="mailto:'+esc(m.email||'')+'" style="color:#0057ff;text-decoration:none">'+esc(m.email||'—')+'</a></td>'
       + '<td style="'+tdSt+'">'+esc(m.tel||'—')+'</td>'
+      + '<td style="'+tdSt+';text-align:center"><button onclick="_efPrintAttestation(\''+esc(m.id)+'\')" title="Imprimer attestation Équipe de France" style="display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:7px;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#b45309;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🖨️</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -44223,6 +44663,7 @@ function _collectifRenderCF() {
     }
   }
   renderCollectifList();
+  _cfAutoSyncFromLicenceDB();
 }
 
 function _collectifRenderSHN() {
@@ -45880,15 +46321,15 @@ function _renderSecuriteStats() {
     evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')nOui++;else nNon++;});
     var tot=nOui+nNon, pctOui=tot>0?Math.round(nOui/tot*100):0;
     var svgD='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:140px;display:block;margin:0 auto">';
-    svgD+=_donut([{v:nOui},{v:nNon}],['#10b981','#ef4444'],70,70,52,20);
+    svgD+=_donut([{v:nOui},{v:nNon}],['#ef4444','#3b82f6'],70,70,52,20);
     svgD+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="28" font-weight="900" fill="var(--txt)">'+pctOui+'%</text>';
     svgD+='<text x="70" y="82" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">avec instructeur</text>';
     svgD+='</svg>';
     var leg='<div style="display:flex;justify-content:center;gap:20px;margin-top:10px">'
-      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#10b981"></div>'
-      +'<span style="font-size:11px;color:var(--txt2)">Avec · <b style="color:#10b981">'+nOui+'</b></span></div>'
       +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#ef4444"></div>'
-      +'<span style="font-size:11px;color:var(--txt2)">Sans · <b style="color:#ef4444">'+nNon+'</b></span></div>'
+      +'<span style="font-size:11px;color:var(--txt2)">Avec · <b style="color:#ef4444">'+nOui+'</b></span></div>'
+      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#3b82f6"></div>'
+      +'<span style="font-size:11px;color:var(--txt2)">Sans · <b style="color:#3b82f6">'+nNon+'</b></span></div>'
       +'</div>';
     html+=_card('Instructeur à bord','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD+leg+'</div>');
   })();
@@ -51113,7 +51554,13 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         <!-- Historique pratique -->
         <div id="cfe-content-hist-pratique" style="display:none">
-          <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Historique compétitions</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px">
+            <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Historique compétitions</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <select id="pratique-print-saison" style="height:30px;padding:0 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-family:inherit;font-size:11px;font-weight:600;outline:none;cursor:pointer"><option value="">Complet</option></select>
+              <button onclick="_printPratiqueAttestation(document.getElementById('cfe-id').value)" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">🖨️ Attestation parcours</button>
+            </div>
+          </div>
           <table style="width:100%;border-collapse:collapse">
             <thead>
               <tr style="background:var(--navy3);border-bottom:2px solid var(--bdr)">
