@@ -1283,7 +1283,6 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- Onglets -->
       <div class="class-tabs" id="pilots-class-tabs" style="margin:0 12px 4px">
         <button class="class-tab active" onclick="setPilotsClass('pilotes',this)">Pilotes</button>
-        <button class="class-tab" onclick="setPilotsClass('aides',this)">Aides</button>
         <button class="class-tab" onclick="setPilotsClass('divers',this)">Divers</button>
       </div>
       <!-- Barre d'actions : + / recherche / actions (visible onglet Pilotes uniquement) -->
@@ -2509,6 +2508,13 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       Territoires
     </button>
 
+    <button id="dtn-nav-aides" onclick="_dtnOpenAidesPage()"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
+      onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnNavOut('aides')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H9"/></svg>
+      Dispositifs d'aide
+    </button>
+
     <div style="height:1px;background:var(--bdr);margin:10px 4px"></div>
     <div style="font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--txt3);padding:4px 12px 5px;opacity:.65">Outils</div>
 
@@ -2546,6 +2552,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="9" y2="15"/><line x1="11" y1="15" x2="16" y2="15"/></svg>
       Note de frais
     </button>
+
 
   </nav>
   <!-- ── Pied de page fixe : Réglages toujours visible ── -->
@@ -2626,6 +2633,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <div style="font-size:15px;font-weight:700;color:var(--txt)">Territoires</div>
     <div style="font-size:13px;text-align:center;line-height:1.7;max-width:320px">Module en cours de développement.<br>Ce volet traitera de la cartographie<br>et des données territoriales ULM.</div>
   </div>
+</div>
+
+
+<div id="page-dispositifs-aide" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:300;background:var(--bg);flex-direction:column">
+  <div style="display:flex;align-items:center;padding:14px 20px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0;gap:12px">
+    <div style="flex:1;text-align:center;font-size:20px;font-weight:900;color:var(--txt)">💶 Dispositifs d'aide</div>
+  </div>
+  <div id="aides-class-tabs" style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;margin:8px 12px 4px;flex-shrink:0">
+    <button class="class-tab active" onclick="_aideTab('competiteurs',this)" style="flex:none;min-width:160px;text-align:center">Aides compétiteurs</button>
+    <button class="class-tab" onclick="_aideTab('organisateurs',this)" style="flex:none;min-width:160px;text-align:center">Aides organisateurs</button>
+  </div>
+  <div id="aides-content" style="flex:1;overflow:auto;min-height:0;padding-bottom:60px"></div>
 </div>
 
 <!-- ═══════════════ MODAL DÉTAIL BUDGET ═══════════════ -->
@@ -2725,10 +2744,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button onclick="closeCollectifModule()" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
   </div>
   <!-- Onglets -->
-  <div id="collectif-tab-bar" style="display:flex;gap:8px;padding:12px 22px;border-bottom:1px solid var(--bdr);background:#ffffff;flex-shrink:0">
-    <button id="collectif-tab-cf" onclick="_collectifSetPage('collectif-france')" style="width:160px;text-align:center;padding:7px 18px;border-radius:8px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🇫🇷 Collectif France</button>
-    <button id="collectif-tab-ef" onclick="_collectifSetPage('equipes-france')" style="width:160px;text-align:center;padding:7px 18px;border-radius:8px;border:1px solid var(--bdr);background:#ffffff;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏅 Équipes de France</button>
-    <button id="collectif-tab-shn" onclick="_collectifSetPage('shn')" style="width:160px;text-align:center;padding:7px 18px;border-radius:8px;border:1px solid var(--bdr);background:#ffffff;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⭐ SHN</button>
+  <div id="collectif-tab-bar" style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;margin:8px 22px 4px;flex-shrink:0">
+    <button id="collectif-tab-cf" class="class-tab active" onclick="_collectifSetPage('collectif-france')" style="flex:none;min-width:160px;text-align:center">🇫🇷 Collectif France</button>
+    <button id="collectif-tab-ef" class="class-tab" onclick="_collectifSetPage('equipes-france')" style="flex:none;min-width:160px;text-align:center">🏅 Équipes de France</button>
+    <button id="collectif-tab-shn" class="class-tab" onclick="_collectifSetPage('shn')" style="flex:none;min-width:160px;text-align:center">⭐ SHN</button>
   </div>
   <div id="collectif-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column"></div>
 </div>
@@ -19096,7 +19115,6 @@ function renderPilots() {
   updatePilotsToggleBtn();
   var cont = document.getElementById('pilots-list'); if (!cont) return;
   cont.innerHTML = '';
-  if (_pilotsClass === 'aides') { renderAides(); return; }
   if (_pilotsClass === 'divers') {
     var divEl = document.createElement('div');
     divEl.style.cssText = 'color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px';
@@ -26285,11 +26303,21 @@ function cfToggleEF(id) {
   }
 }
 
+function cfSetEfr(id, field, val) {
+  var m = (S.collectif||[]).find(function(x){ return x.id === id; });
+  if (!m) return;
+  m[field] = val;
+  saveState();
+  try { var _cfLS=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } catch(e) {}
+  if (document.getElementById('ef-tbody')) _efRenderList();
+}
+
 function cfSetStatutShn(id, val) {
   var m = (S.collectif||[]).find(function(x){ return x.id === id; });
   if (!m) return;
   m.statut_shn = val;
   saveState();
+  if (document.getElementById('shn-table-body')) renderSHNList();
 }
 
 function _cfAutoSyncFromLicenceDB() {
@@ -26341,7 +26369,7 @@ function renderCollectifList() {
   var pratLabel = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur', '':'' };
   var discLabel = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision', '':'' };
   var thSt = 'padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px';
-  var colCount = 9 + (showPrat ? 1 : 0) + (showDisc ? 2 : 0);
+  var colCount = 10 + (showPrat ? 1 : 0) + (showDisc ? 2 : 0);
 
   var thead = document.getElementById('cf-thead-row');
   if (thead) {
@@ -26350,11 +26378,11 @@ function renderCollectifList() {
       + '<th style="'+thSt+'">Club</th>'
       + (showPrat ? '<th style="'+thSt+'">Pratique</th>' : '')
       + (showDisc ? '<th style="'+thSt+'">Discipline</th><th style="'+thSt+'">Discipline 2</th>' : '')
+      + '<th style="'+thSt+';text-align:center;width:110px">EFR 1</th>'
+      + '<th style="'+thSt+';text-align:center;width:110px">EFR 2</th>'
       + '<th style="'+thSt+'">Statut SHN</th>'
       + '<th style="'+thSt+'">Email</th>'
       + '<th style="'+thSt+'">Téléphone</th>'
-      + '<th style="'+thSt+';text-align:center;width:60px">Docs</th>'
-      + '<th style="'+thSt+';text-align:center;width:44px" title="Équipe de France">🏅 EF</th>'
       + '<th style="'+thSt+';text-align:center;width:36px"></th>';
   }
 
@@ -26365,8 +26393,19 @@ function renderCollectifList() {
     return;
   }
 
-  var statutColors = { 'Elite':'#f59e0b', 'Relève':'#3b82f6', 'Espoir':'#10b981' };
+  var statutColors = { 'Elite':'#f59e0b', 'Relève':'#3b82f6', 'Espoir':'#10b981', 'Sénior':'#ec4899', 'Collectifs Nationaux':'#8b5cf6' };
   var selSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;font-family:inherit;font-size:11px;font-weight:600;padding:3px 6px;outline:none;cursor:pointer;min-width:80px';
+  var efrSelSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;font-family:inherit;font-size:11px;font-weight:600;padding:3px 6px;outline:none;cursor:pointer;width:100%';
+
+  var mkEfrSel = function(m, field, disc) {
+    if (!disc) return '<span style="color:var(--txt3);font-size:11px">—</span>';
+    var val = m[field] || '';
+    var lbl = discLabel[disc] || disc;
+    var col = val ? 'var(--stol)' : 'var(--txt2)';
+    var opts = '<option value=""'+(val===''?' selected':'')+'>—</option>'
+      + '<option value="'+esc(disc)+'"'+(val===disc?' selected':'')+'>'+esc(lbl)+'</option>';
+    return '<select data-cfid="'+esc(m.id)+'" data-field="'+field+'" onchange="cfSetEfr(this.dataset.cfid,this.dataset.field,this.value);this.style.color=this.value?\'var(--stol)\':\'var(--txt2)\'" style="'+efrSelSt+';color:'+col+'">'+opts+'</select>';
+  };
 
   var html = '';
   list.forEach(function(m, i) {
@@ -26378,6 +26417,8 @@ function renderCollectifList() {
       + '<option value="Elite"'+(st==='Elite'?' selected':'')+'>Elite</option>'
       + '<option value="Relève"'+(st==='Relève'?' selected':'')+'>Relève</option>'
       + '<option value="Espoir"'+(st==='Espoir'?' selected':'')+'>Espoir</option>'
+      + '<option value="Sénior"'+(st==='Sénior'?' selected':'')+'>Sénior</option>'
+      + '<option value="Collectifs Nationaux"'+(st==='Collectifs Nationaux'?' selected':'')+'>Collectifs Nationaux</option>'
       + '</select>';
     var _photo = m.photo || '';
     if (!_photo) {
@@ -26400,17 +26441,11 @@ function renderCollectifList() {
           ? '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline]||m.discipline)+'</td>'
           + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(discLabel[m.discipline2]||m.discipline2||'')+'</td>'
           : '')
+      + '<td style="padding:5px 8px;min-width:110px">'+mkEfrSel(m,'efr1',m.discipline)+'</td>'
+      + '<td style="padding:5px 8px;min-width:110px">'+mkEfrSel(m,'efr2',m.discipline2)+'</td>'
       + '<td style="padding:6px 10px">'+statutSel+'</td>'
       + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2)">'+esc(m.email||'')+'</td>'
       + '<td style="padding:9px 10px;font-size:12px;color:var(--txt2);white-space:nowrap">'+esc(m.tel||'')+'</td>'
-      + '<td style="padding:9px 10px;text-align:center">'
-          + '<button data-cfid="'+esc(m.id)+'" onclick="openDocFromCfMember(this.dataset.cfid)" title="Générer un document" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:7px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">'
-          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'
-          + 'Docs</button>'
-        + '</td>'
-      + '<td style="padding:6px 10px;text-align:center">'
-          + '<button id="cf-ef-'+esc(m.id)+'" onclick="cfToggleEF(\''+esc(m.id)+'\')" title="'+(m.equipe_france?'Retirer de l\'Équipe de France':'Ajouter à l\'Équipe de France')+'" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:26px;border-radius:7px;border:1px solid '+(m.equipe_france?'rgba(245,158,11,.5)':'var(--bdr)')+';background:'+(m.equipe_france?'rgba(245,158,11,.15)':'transparent')+';font-size:14px;cursor:pointer;transition:all .15s;line-height:1">'+(m.equipe_france?'🏅':'<span style="color:var(--txt3);font-size:11px">—</span>')+'</button>'
-        + '</td>'
       + '<td style="padding:9px 10px;text-align:center">'
           + '<button id="cf-del-'+esc(m.id)+'" onclick="cfDeleteMember(\''+esc(m.id)+'\')" title="Supprimer" style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);color:#ef4444;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .2s;line-height:1">×</button>'
         + '</td>'
@@ -36415,8 +36450,26 @@ function _printNDFLines(list, titre, commentaires) {
 // ═══════════════════════════════════════════════
 // AIDES FÉDÉRALES
 // ═══════════════════════════════════════════════
-function renderAides() {
-  var cont = document.getElementById('pilots-list');
+function _dtnOpenAidesPage() {
+  _dtnCloseOverlays();
+  var pg = document.getElementById('page-dispositifs-aide');
+  if (pg) pg.style.display = 'flex';
+  _dtnSetActiveNav('aides');
+  _aideTab('competiteurs', document.querySelector('#aides-class-tabs .class-tab'));
+}
+function _aideTab(tab, btn) {
+  document.querySelectorAll('#aides-class-tabs .class-tab').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var cont = document.getElementById('aides-content');
+  if (!cont) return;
+  if (tab === 'competiteurs') {
+    renderAides(cont);
+  } else {
+    cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Contenu à venir.</div>';
+  }
+}
+function renderAides(containerEl) {
+  var cont = containerEl || document.getElementById('pilots-list');
   if (!cont) return;
   if (!S.aides) S.aides = [];
   var fmt = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
@@ -36438,7 +36491,7 @@ function renderAides() {
       +(S.aides.length ? '<button onclick="printAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">🖨️ Imprimer</button>' : '')
     +'</div>'
   +'</div>';
-  html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter une aide</button>';
+  html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter un dispositif</button>';
   html += '</div></div></div>';
   html += '<script>document.addEventListener("click",function(){var m=document.getElementById("aides-act-menu");if(m)m.style.display="none";});<\/script>';
 
@@ -36471,7 +36524,40 @@ function renderAides() {
     grandAide+=(parseFloat(a.aideOctroye)||0);
   });
 
+  var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+  var grpHdSt='padding:8px 10px;background:var(--navy3);font-size:11px;font-weight:800;color:var(--txt);border-top:2px solid var(--bdr)';
+
   html += '<div style="padding:12px">';
+  html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden"><div style="overflow-x:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;min-width:820px">';
+  html += '<colgroup>'
+    +'<col style="min-width:130px">'
+    +'<col style="width:80px">'
+    +'<col style="width:88px">'
+    +'<col style="width:90px">'
+    +'<col style="min-width:160px">'
+    +'<col style="width:90px">'
+    +'<col style="width:90px">'
+    +'<col style="width:90px">'
+    +'<col style="width:90px">'
+    +'<col style="min-width:100px">'
+    +'<col style="width:64px">'
+    +'</colgroup>';
+  html += '<thead><tr>'
+    +'<th style="'+thSt+'">Pilote</th>'
+    +'<th style="'+thSt+'">N° Licence</th>'
+    +'<th style="'+thSt+'">Date dem.</th>'
+    +'<th style="'+thSt+'">Dispositif</th>'
+    +'<th style="'+thSt+'">Projet</th>'
+    +'<th style="'+thSt+';text-align:right">Coût</th>'
+    +'<th style="'+thSt+';text-align:right">Demandée</th>'
+    +'<th style="'+thSt+';text-align:right">Proposée</th>'
+    +'<th style="'+thSt+';text-align:right">Reste</th>'
+    +'<th style="'+thSt+'">Note</th>'
+    +'<th style="'+thSt+'"></th>'
+    +'</tr></thead>';
+  html += '<tbody>';
+
   campOrder.forEach(function(camp) {
     var grp=byCamp[camp];
     var gCout=grp.reduce(function(s,a){return s+(parseFloat(a.cout)||0);},0);
@@ -36479,29 +36565,12 @@ function renderAides() {
     var gAide=grp.reduce(function(s,a){return s+(parseFloat(a.aideOctroye)||0);},0);
     var gReste=gCout-gAide;
 
-    html += '<div style="margin-bottom:20px">';
-    html += '<div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-    html += '<span>'+_escHtml(camp)+'</span>';
-    html += '<span style="font-size:10px;font-weight:400;color:var(--txt3)">'+grp.length+' aide'+(grp.length>1?'s':'')+'</span>';
-    html += '<span style="color:var(--txt3)">·</span><span style="font-size:11px;color:#f59e0b">Demandé : '+fmt(gDem)+'</span>';
-    html += '<span style="color:var(--txt3)">·</span><span style="font-size:11px;color:#10b981">Octroyé : '+fmt(gAide)+'</span>';
-    html += '</div>';
-
-    html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden"><div style="overflow-x:auto">';
-    var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
-    html += '<table style="width:100%;border-collapse:collapse;min-width:820px"><thead><tr>';
-    html += '<th style="'+thSt+'">Pilote</th>';
-    html += '<th style="'+thSt+';width:70px">N° Licence</th>';
-    html += '<th style="'+thSt+';width:80px">Date dem.</th>';
-    html += '<th style="'+thSt+'">Dispositif</th>';
-    html += '<th style="'+thSt+'">Projet</th>';
-    html += '<th style="'+thSt+';text-align:right">Coût</th>';
-    html += '<th style="'+thSt+';text-align:right">Demandée</th>';
-    html += '<th style="'+thSt+';text-align:right">Proposée</th>';
-    html += '<th style="'+thSt+';text-align:right">Reste</th>';
-    html += '<th style="'+thSt+'">Note</th>';
-    html += '<th style="'+thSt+';width:64px"></th>';
-    html += '</tr></thead><tbody>';
+    html += '<tr><td colspan="11" style="'+grpHdSt+'">'
+      +_escHtml(camp)
+      +' <span style="font-size:10px;font-weight:400;color:var(--txt3)">'+grp.length+' aide'+(grp.length>1?'s':'')+'</span>'
+      +' <span style="color:var(--txt3)">·</span> <span style="color:#f59e0b">Demandé : '+fmt(gDem)+'</span>'
+      +' <span style="color:var(--txt3)">·</span> <span style="color:#10b981">Octroyé : '+fmt(gAide)+'</span>'
+      +'</td></tr>';
 
     grp.forEach(function(a) {
       var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
@@ -36513,29 +36582,39 @@ function renderAides() {
         +'<td style="'+cellSt+';font-size:11px;color:var(--txt3)">'+_escHtml(_licDisp)+'</td>'
         +'<td style="'+cellSt+';font-size:11px;color:var(--txt3);white-space:nowrap">'+_escHtml(fmtDate(a.dateDemande||''))+'</td>'
         +'<td style="'+cellSt+'"><span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
-        +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
+        +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
         +'<td style="'+cellSt+';text-align:right">'+fmt(a.cout)+'</td>'
         +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
         +'<td style="'+cellSt+';text-align:right;color:#10b981;font-weight:700">'+fmt(a.aideOctroye)+'</td>'
         +'<td style="'+cellSt+';text-align:right;color:'+rc+';font-weight:700">'+fmt(reste)+'</td>'
-        +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
+        +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
         +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
           +'<button onclick="_aideFormOpen(\''+a.id+'\')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:5px;background:none;color:var(--stol);cursor:pointer;font-size:13px;margin-right:3px">✎</button>'
           +'<button id="aide-del-'+a.id+'" onclick="_aideDelete(\''+a.id+'\')" title="Supprimer" style="width:26px;height:26px;border:none;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;font-weight:900;line-height:1">×</button>'
         +'</td></tr>';
     });
-    html += '</tbody>';
+
     if (grp.length > 1) {
-      html += '<tfoot><tr>'
+      html += '<tr>'
         +'<td colspan="5" style="'+totSt+';color:var(--txt3)">TOTAL</td>'
         +'<td style="'+totSt+';text-align:right">'+fmt(gCout)+'</td>'
         +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(gDem)+'</td>'
         +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(gAide)+'</td>'
         +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(gReste)+'</td>'
-        +'<td colspan="2" style="'+totSt+'"></td></tr></tfoot>';
+        +'<td colspan="2" style="'+totSt+'"></td></tr>';
     }
-    html += '</table></div></div></div>';
   });
+
+  html += '</tbody>';
+  html += '<tfoot><tr>'
+    +'<td colspan="5" style="'+totSt+';color:var(--txt3);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Total général</td>'
+    +'<td style="'+totSt+';text-align:right">'+fmt(grandCout)+'</td>'
+    +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(grandDem)+'</td>'
+    +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(grandAide)+'</td>'
+    +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(grandCout-grandAide)+'</td>'
+    +'<td colspan="2" style="'+totSt+'"></td>'
+    +'</tr></tfoot>';
+  html += '</table></div></div>';
 
   // ── KPIs globaux ────────────────────────────────────────────────────────
   var grandReste=grandCout-grandAide;
@@ -36613,12 +36692,12 @@ function printAides() {
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
     +'<title>Aides fédérales aux pilotes</title>'
     +'<style>'
-    +'@page{size:A4;margin:12mm}'
+    +'@page{size:A4 landscape;margin:12mm}'
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}'
     +'.print-btn{position:fixed;top:12px;right:12px;padding:8px 18px;background:'+accent+';color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}'
     +'@media print{.print-btn{display:none}}'
-    +'.header{display:flex;align-items:center;gap:16px;border-bottom:3px solid '+accent+';padding-bottom:10px;margin-bottom:14px}'
+    +'.header{display:flex;align-items:center;gap:16px;padding-bottom:10px;margin-bottom:14px}'
     +'.logo{max-height:240px;max-width:440px;object-fit:contain}'
     +'.org-info h1{font-size:14pt;font-weight:900;color:'+accent+';margin-bottom:2px}'
     +'.org-info .sub{font-size:8pt;color:#555}'
@@ -36650,27 +36729,23 @@ function printAides() {
     +'<th>Pilote</th>'
     +'<th style="width:70px">N° Licence</th>'
     +'<th style="width:62px">Date dem.</th>'
-    +'<th>Dispositif</th>'
-    +'<th>Projet</th>'
-    +'<th class="r">Coût total</th>'
-    +'<th class="r">Demandée</th>'
-    +'<th class="r">Proposée</th>'
+    +'<th style="width:100px">Dispositif</th>'
+    +'<th style="min-width:220px">Projet</th>'
+    +'<th class="r" style="width:80px">Coût total</th>'
+    +'<th class="r" style="width:80px">Demandée</th>'
+    +'<th class="r" style="width:80px">Proposée</th>'
     +'<th style="min-width:120px">Note</th>'
-    +'</tr></thead><tbody>'
-    +tRows
-    +'<tr class="grandtot">'
+    +'</tr></thead>'
+    +'<tfoot><tr class="grandtot">'
     +'<td colspan="5">TOTAL GÉNÉRAL</td>'
     +'<td class="num">'+fmt(grandCout)+'</td>'
     +'<td class="num">'+fmt(grandDem)+'</td>'
     +'<td class="num">'+fmt(grandAide)+'</td>'
     +'<td></td>'
-    +'</tr>'
+    +'</tr></tfoot>'
+    +'<tbody>'
+    +tRows
     +'</tbody></table>'
-    +'<div class="kpi-row">'
-    +'<div class="kpi"><div class="lbl">Coût total</div><div class="val">'+fmt(grandCout)+'</div></div>'
-    +'<div class="kpi"><div class="lbl">Aides demandées</div><div class="val">'+fmt(grandDem)+'</div></div>'
-    +'<div class="kpi"><div class="lbl">Aides octroyées</div><div class="val">'+fmt(grandAide)+'</div></div>'
-    +'</div>'
     +'<div class="footer" style="margin-top:16px;text-align:right;font-size:7.5pt;color:#999">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+campOrder.length+' campagne'+(campOrder.length>1?'s':'')+'</div>'
     +'</body></html>';
 
@@ -36857,7 +36932,7 @@ function _aideFormOpen(id) {
   var dlg=document.getElementById('aides-dlg'); if(!dlg) return;
   if(!S.aides) S.aides=[];
   var aide=id?(S.aides.find(function(a){return a.id===id;})):null;
-  var title=document.getElementById('aides-dlg-title'); if(title) title.textContent=aide?'Modifier l\'aide':'Nouvelle aide';
+  var title=document.getElementById('aides-dlg-title'); if(title) title.textContent=aide?'Modifier le dispositif':'Nouveau dispositif d\'aide';
   // Année
   var anneeEl=document.getElementById('aide-form-annee');
   if(anneeEl){ var curY=new Date().getFullYear(),opts=''; for(var y=curY+1;y>=curY-6;y--) opts+='<option value="'+y+'"'+(aide?(aide.annee===y?' selected':''):(y===curY?' selected':''))+'>'+y+'</option>'; anneeEl.innerHTML=opts; }
@@ -40283,6 +40358,126 @@ function _pilotsActMenu() { _makeActMenu('pilots-act-menu','pilots-act-wrap'); }
 function _pilotsActClose(){ var m=document.getElementById('pilots-act-menu'); if(m) m.style.display='none'; }
 function _cfActMenu()     { _makeActMenu('cf-act-menu','cf-act-wrap'); }
 function _cfActClose()    { var m=document.getElementById('cf-act-menu'); if(m) m.style.display='none'; }
+function _efActMenu()     { _makeActMenu('ef-act-menu','ef-act-wrap'); }
+function _efActClose()    { var m=document.getElementById('ef-act-menu'); if(m) m.style.display='none'; }
+function _shnActMenu()    { _makeActMenu('shn-act-menu','shn-act-wrap'); }
+function _shnActClose()   { var m=document.getElementById('shn-act-menu'); if(m) m.style.display='none'; }
+
+function exportEFFmt(fmt) {
+  var discL = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+  var _low = function(s){ return (s||'').toLowerCase(); };
+  var list = (S.collectif||[]).filter(function(m) {
+    if (!m.equipe_france && !m.efr1 && !m.efr2) return false;
+    if (_efFilters.saison   && String(m.saison) !== String(_efFilters.saison))   return false;
+    if (_efFilters.pratique && _low(m.pratique) !== _low(_efFilters.pratique))   return false;
+    if (_efFilters.discipline) {
+      var df = _low(_efFilters.discipline);
+      if (_low(m.discipline)!==df && _low(m.discipline2)!==df && _low(m.efr1)!==df && _low(m.efr2)!==df) return false;
+    }
+    return true;
+  });
+  if (!list.length) { toast('Aucun membre à exporter','err'); return; }
+  var dateStr = new Date().toISOString().substring(0,10);
+  var cols    = ['prenom','nom','licence','club','pratique','discipline','discipline2','saison','email','tel','region','efr1','efr2'];
+  var headers = ['Prénom','Nom','N° Licence','Club','Pratique','Discipline','Discipline 2','Saison','Email','Téléphone','Région','EFR 1','EFR 2'];
+  var rows = list.map(function(m){ return cols.map(function(c){ return m[c]||''; }); });
+  var sais = _efFilters.saison || new Date().getFullYear();
+  if (fmt==='json') {
+    var blob=new Blob([JSON.stringify({equipes_france:list},null,2)],{type:'application/json'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='equipes_france_'+sais+'_'+dateStr+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
+    toast('Export JSON ('+list.length+' membres)','ok');
+  } else if (fmt==='excel') {
+    var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Équipes de France');
+    XLSX.writeFile(wb,'equipes_france_'+sais+'_'+dateStr+'.xlsx');
+    toast('Export Excel ('+list.length+' membres)','ok');
+  } else {
+    var csv=[headers].concat(rows).map(function(r){return r.map(function(c){return '"'+(c+'').replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+    var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='equipes_france_'+sais+'_'+dateStr+'.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
+    toast('Export CSV ('+list.length+' membres)','ok');
+  }
+}
+
+function printEFList() {
+  var discL = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+  var _low = function(s){ return (s||'').toLowerCase(); };
+  var list = (S.collectif||[]).filter(function(m) {
+    if (!m.equipe_france && !m.efr1 && !m.efr2) return false;
+    if (_efFilters.saison   && String(m.saison) !== String(_efFilters.saison))   return false;
+    if (_efFilters.pratique && _low(m.pratique) !== _low(_efFilters.pratique))   return false;
+    if (_efFilters.discipline) {
+      var df = _low(_efFilters.discipline);
+      if (_low(m.discipline)!==df && _low(m.discipline2)!==df && _low(m.efr1)!==df && _low(m.efr2)!==df) return false;
+    }
+    return true;
+  }).sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
+  if (!list.length) { toast('Aucun membre à imprimer','warn'); return; }
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var rows = list.map(function(m){
+    var efr = [m.efr1,m.efr2].filter(Boolean).map(function(d){ return discL[d]||d; }).join(', ');
+    return '<tr><td>'+esc((m.prenom||'')+' '+(m.nom||''))+'</td><td>'+esc(m.licence||'—')+'</td><td>'+esc(m.club||'—')+'</td><td>'+esc(m.saison||'')+'</td><td>'+(m.equipe_france?'✓':'')+'</td><td>'+esc(efr)+'</td></tr>';
+  }).join('');
+  var w = window.open('','_blank','width=900,height=700');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Équipes de France</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th{background:#1a3a8f;color:#fff;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even)td{background:#f8fafc}@media print{button{display:none}}</style></head><body>');
+  w.document.write('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">Équipes de France — '+esc(String(_efFilters.saison||new Date().getFullYear()))+'</h2><button onclick="window.print()" style="padding:6px 14px;background:#1a3a8f;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button></div>');
+  w.document.write('<table><thead><tr><th>Prénom Nom</th><th>N° Licence</th><th>Club</th><th>Saison</th><th>EF</th><th>EFR Disciplines</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  w.document.write('</body></html>'); w.document.close();
+}
+
+function printSHNList() {
+  var manualList = (S.shn||[]).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
+  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
+    .filter(function(m){ return !m.licence||manualLicences.indexOf((m.licence||'').trim())===-1; })
+    .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn}; });
+  var list = manualList.concat(cfList);
+  if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
+  if (!list.length) { toast('Aucun sportif à imprimer','warn'); return; }
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var rows = list.map(function(m){
+    return '<tr><td>'+esc(m.nom)+'</td><td>'+esc(m.licence||'—')+'</td><td>'+esc(m.pratique||'—')+'</td><td>'+esc(m.discipline||'—')+'</td><td>'+esc(m.saison||'—')+'</td><td>'+esc(m.statut||'—')+'</td></tr>';
+  }).join('');
+  var w = window.open('','_blank','width=900,height=700');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>SHN</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th{background:#1a3a8f;color:#fff;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even)td{background:#f8fafc}@media print{button{display:none}}</style></head><body>');
+  w.document.write('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">Sportifs de Haut Niveau'+(_shnFilter?' — '+_shnFilter:'')+'</h2><button onclick="window.print()" style="padding:6px 14px;background:#1a3a8f;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button></div>');
+  w.document.write('<table><thead><tr><th>Nom</th><th>N° Licence</th><th>Pratique</th><th>Discipline</th><th>Saison</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  w.document.write('</body></html>'); w.document.close();
+}
+
+function exportSHNFmt(fmt) {
+  var manualList = (S.shn||[]).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
+  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
+    .filter(function(m){ return !m.licence||manualLicences.indexOf((m.licence||'').trim())===-1; })
+    .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn,_source:'cf'}; });
+  var list = manualList.concat(cfList);
+  if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
+  if (!list.length) { toast('Aucun sportif à exporter','err'); return; }
+  var dateStr = new Date().toISOString().substring(0,10);
+  var cols    = ['nom','licence','pratique','discipline','saison','statut'];
+  var headers = ['Nom','N° Licence','Pratique','Discipline','Saison','Statut SHN'];
+  var rows = list.map(function(m){ return cols.map(function(c){ return m[c]||''; }); });
+  if (fmt==='json') {
+    var blob=new Blob([JSON.stringify({shn:list},null,2)],{type:'application/json'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='shn_'+dateStr+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
+    toast('Export JSON ('+list.length+' sportifs)','ok');
+  } else if (fmt==='excel') {
+    var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'SHN');
+    XLSX.writeFile(wb,'shn_'+dateStr+'.xlsx');
+    toast('Export Excel ('+list.length+' sportifs)','ok');
+  } else {
+    var csv=[headers].concat(rows).map(function(r){return r.map(function(c){return '"'+(c+'').replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+    var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='shn_'+dateStr+'.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
+    toast('Export CSV ('+list.length+' sportifs)','ok');
+  }
+}
 function _dtnCfActMenu()  { _makeActMenu('dtn-cf-act-menu','dtn-cf-act-wrap'); }
 function _dtnCfActClose() { var m=document.getElementById('dtn-cf-act-menu'); if(m) m.style.display='none'; }
 function _compActMenu() {
@@ -44448,6 +44643,8 @@ function _dtnCloseOverlays() {
   if (bgt) bgt.style.display = 'none';
   var col = document.getElementById('collectif-overlay');
   if (col) col.style.display = 'none';
+  var aid = document.getElementById('page-dispositifs-aide');
+  if (aid) aid.style.display = 'none';
 }
 
 var _collectifCurrentPage = 'collectif-france';
@@ -44474,16 +44671,10 @@ function _collectifSetPage(page) {
   var tabShn = document.getElementById('collectif-tab-shn');
   var sub    = document.getElementById('collectif-subtitle');
   var tabBar = document.getElementById('collectif-tab-bar');
-  if (tabBar) tabBar.style.background = '#ffffff';
-  var _setTab = function(btn, active) {
-    if (!btn) return;
-    btn.style.background   = active ? 'var(--stol)' : '#ffffff';
-    btn.style.color        = active ? '#fff' : 'var(--txt2)';
-    btn.style.borderColor  = active ? 'var(--stol)' : 'var(--bdr)';
-  };
-  _setTab(tabCf,  page === 'collectif-france');
-  _setTab(tabEf,  page === 'equipes-france');
-  _setTab(tabShn, page === 'shn');
+  [tabCf, tabEf, tabShn].forEach(function(b){ if(b) b.classList.remove('active'); });
+  if (page === 'collectif-france' && tabCf)  tabCf.classList.add('active');
+  if (page === 'equipes-france'   && tabEf)  tabEf.classList.add('active');
+  if (page === 'shn'              && tabShn) tabShn.classList.add('active');
   if (sub) sub.textContent = page === 'collectif-france' ? 'Membres du Collectif France'
                            : page === 'equipes-france'   ? 'Équipes de France par saison, pratique et discipline'
                            : 'Sportifs de Haut Niveau';
@@ -44504,13 +44695,14 @@ function _collectifRenderEF() {
   var all = S.collectif || [];
   var saisons     = [...new Set(all.map(function(m){ return m.saison; }).filter(Boolean))].sort(function(a,b){ return b-a; });
   var pratiques   = [...new Set(all.map(function(m){ return m.pratique; }).filter(Boolean))].sort();
-  var disciplines = [...new Set(all.map(function(m){ return [m.discipline, m.discipline2]; }).flat().filter(Boolean))].sort();
+  var _discRaw = all.map(function(m){ return [m.discipline, m.discipline2, m.efr1, m.efr2]; }).flat().filter(Boolean).map(function(d){ return d.toLowerCase(); });
+  var disciplines = [...new Set(_discRaw)].sort();
 
   var pratL = { microlight:'Microlight', paramoteur:'Paramoteur', paramotor:'Paramoteur' };
   var discL = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
 
-  var selStyle = 'height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:#f8fafc;color:#1e293b;font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer';
+  var selStyle = 'height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer';
 
   var saionOpts = '<option value="">Toutes saisons</option>'
     + saisons.map(function(s){ return '<option value="'+s+'"'+(s===_efFilters.saison?' selected':'')+'>'+s+'</option>'; }).join('');
@@ -44519,23 +44711,33 @@ function _collectifRenderEF() {
   var discOpts = '<option value="">Toutes disciplines</option>'
     + disciplines.map(function(d){ return '<option value="'+d+'"'+(d===_efFilters.discipline?' selected':'')+'>'+(discL[d]||d)+'</option>'; }).join('');
 
-  var html = '<div style="padding:12px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;background:#ffffff">'
+  var actBtn = '<div style="position:relative;flex-shrink:0" id="ef-act-wrap">'
+    + '<button onclick="_efActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>Actions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>'
+    + '<div id="ef-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">'
+    + '<button onclick="exportEFFmt(\'json\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>'
+    + '<button onclick="exportEFFmt(\'excel\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>'
+    + '<button onclick="exportEFFmt(\'csv\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>'
+    + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="printEFList();_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
+    + '</div></div>';
+
+  var html = '<div style="padding:12px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;background:var(--navy2)">'
     + '<select style="'+selStyle+'" onchange="_efFilters.saison=this.value;_efRenderList()">'+saionOpts+'</select>'
     + '<select style="'+selStyle+'" onchange="_efFilters.pratique=this.value;_efRenderList()">'+pratOpts+'</select>'
     + '<select style="'+selStyle+'" onchange="_efFilters.discipline=this.value;_efRenderList()">'+discOpts+'</select>'
-    + '<span id="ef-counter" style="margin-left:auto;font-size:12px;font-weight:700;color:#64748b"></span>'
+    + '<span id="ef-counter" style="margin-left:auto;font-size:12px;font-weight:700;color:var(--txt3)"></span>'
+    + actBtn
     + '</div>'
     + '<div style="flex:1;overflow-y:auto;padding:0">'
     + '<table style="width:100%;border-collapse:collapse" id="ef-table">'
-    + '<thead><tr style="background:#f1f5f9;position:sticky;top:0;z-index:2">'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;width:44px"></th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Nom / Prénom</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">N° Licence</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Club</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Région</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Email</th>'
-    + '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Téléphone</th>'
-    + '<th style="padding:10px 12px;width:44px"></th>'
+    + '<thead><tr style="background:var(--navy3);position:sticky;top:0;z-index:2;border-bottom:2px solid var(--bdr)">'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Prénom Nom</th>'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">N° Licence</th>'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Club</th>'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Région</th>'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Email</th>'
+    + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Téléphone</th>'
+    + '<th style="padding:9px 10px;width:36px"></th>'
     + '</tr></thead>'
     + '<tbody id="ef-tbody"></tbody>'
     + '</table></div>';
@@ -44553,12 +44755,19 @@ function _efRenderList() {
   var discL = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
   var _low = function(s){ return (s||'').toLowerCase(); };
 
+  var discL2 = { classic:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
   var list = (S.collectif||[]).filter(function(m) {
-    if (!m.equipe_france) return false;
-    if (_efFilters.saison     && String(m.saison)     !== String(_efFilters.saison))     return false;
-    if (_efFilters.pratique   && _low(m.pratique)     !== _low(_efFilters.pratique))     return false;
-    if (_efFilters.discipline && _low(m.discipline)   !== _low(_efFilters.discipline)
-                              && _low(m.discipline2)  !== _low(_efFilters.discipline))   return false;
+    var hasEF  = !!m.equipe_france;
+    var hasEFR = !!(m.efr1 || m.efr2);
+    if (!hasEF && !hasEFR) return false;
+    if (_efFilters.saison   && String(m.saison) !== String(_efFilters.saison))   return false;
+    if (_efFilters.pratique && _low(m.pratique) !== _low(_efFilters.pratique))   return false;
+    if (_efFilters.discipline) {
+      var df = _low(_efFilters.discipline);
+      var matchEF  = hasEF  && (_low(m.discipline) === df || _low(m.discipline2) === df);
+      var matchEFR = hasEFR && (_low(m.efr1) === df || _low(m.efr2) === df);
+      if (!matchEF && !matchEFR) return false;
+    }
     return true;
   }).sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
 
@@ -44566,14 +44775,13 @@ function _efRenderList() {
 
   if (!list.length) {
     var msg = (_efFilters.saison||_efFilters.pratique||_efFilters.discipline)
-      ? 'Aucun membre Équipe de France pour ces critères'
-      : 'Aucun membre sélectionné — activez le bouton 🏅 dans la liste Collectif France';
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">'+msg+'</td></tr>';
+      ? 'Aucun membre pour ces critères'
+      : 'Aucun membre — activez EFR dans le volet Collectif France';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">'+msg+'</td></tr>';
     return;
   }
 
   tbody.innerHTML = list.map(function(m, i) {
-    // Avatar
     var photo = m.photo || '';
     if (!photo) {
       var _ap = m.pilotId ? (S.pilots||[]).find(function(p){ return p.id === m.pilotId; }) : null;
@@ -44582,22 +44790,30 @@ function _efRenderList() {
     }
     var ini = ((m.prenom||'').charAt(0) + (m.nom||'').charAt(0)).toUpperCase();
     var avatar = photo
-      ? '<img src="'+photo+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid #e2e8f0">'
-      : '<div style="width:34px;height:34px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff">'+ini+'</div>';
+      ? '<img src="'+photo+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--bdr)">'
+      : '<div style="width:30px;height:30px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</div>';
 
-    var bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
-    var tdSt = 'padding:10px 12px;font-size:12px;color:#1e293b;border-bottom:1px solid #f1f5f9;vertical-align:middle';
+    var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
+    var tdSt = 'padding:9px 10px;font-size:12px;color:var(--txt2);border-bottom:1px solid var(--bdr);vertical-align:middle';
+    var clickSt = 'padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle;cursor:pointer';
 
-    var clickSt = tdSt+';cursor:pointer';
-    return '<tr style="background:'+bg+';transition:background .1s" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\''+bg+'\'">'
-      + '<td style="'+clickSt+'" onclick="openCfEditModal(\''+esc(m.id)+'\')">'+avatar+'</td>'
-      + '<td style="'+clickSt+';font-weight:700" onclick="openCfEditModal(\''+esc(m.id)+'\')">'+esc((m.prenom||'')+' '+(m.nom||'').toUpperCase())+'</td>'
-      + '<td style="'+tdSt+';font-family:monospace;font-size:11px;color:#0057ff">'+esc(m.licence||'—')+'</td>'
+    var efrBadges = '';
+    if (m.efr1) efrBadges += '<span style="margin-left:4px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">EFR '+(discL2[m.efr1]||m.efr1)+'</span>';
+    if (m.efr2) efrBadges += '<span style="margin-left:4px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">EFR '+(discL2[m.efr2]||m.efr2)+'</span>';
+
+    return '<tr style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
+      + '<td style="'+clickSt+'" onclick="openCfEditModal(\''+esc(m.id)+'\')">'
+        + '<div style="display:flex;align-items:center;gap:8px">'+avatar
+        + '<span style="font-size:13px;font-weight:600;color:var(--txt)">'
+          + esc((m.prenom||'')+' '+((m.nom||'')))
+          + efrBadges
+          + '</span></div></td>'
+      + '<td style="'+tdSt+';font-family:monospace;font-size:12px">'+esc(m.licence||'—')+'</td>'
       + '<td style="'+tdSt+'">'+esc(m.club||'—')+'</td>'
       + '<td style="'+tdSt+'">'+esc(m.region||'—')+'</td>'
-      + '<td style="'+tdSt+'"><a href="mailto:'+esc(m.email||'')+'" style="color:#0057ff;text-decoration:none">'+esc(m.email||'—')+'</a></td>'
+      + '<td style="'+tdSt+'"><a href="mailto:'+esc(m.email||'')+'" style="color:var(--txt2);text-decoration:none">'+esc(m.email||'—')+'</a></td>'
       + '<td style="'+tdSt+'">'+esc(m.tel||'—')+'</td>'
-      + '<td style="'+tdSt+';text-align:center"><button onclick="_efPrintAttestation(\''+esc(m.id)+'\')" title="Imprimer attestation Équipe de France" style="display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:7px;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:#b45309;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">🖨️</button></td>'
+      + '<td style="'+tdSt+';text-align:center"><button onclick="_efPrintAttestation(\''+esc(m.id)+'\')" title="Imprimer attestation" style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.08);color:#f59e0b;font-size:13px;font-family:inherit;cursor:pointer">🖨️</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -44666,31 +44882,37 @@ function _collectifRenderCF() {
   _cfAutoSyncFromLicenceDB();
 }
 
+var _shnFilter = '';
+function _shnSetFilter(val, btn) {
+  _shnFilter = val;
+  document.querySelectorAll('.shn-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderSHNList();
+}
+
 function _collectifRenderSHN() {
   if (!S.shn) S.shn = [];
   var body = document.getElementById('collectif-body');
   if (!body) return;
-  var iSt = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;outline:none;box-sizing:border-box';
-  var fo = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
-  var selSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;outline:none';
   var thSt = 'padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px';
-  var curY = new Date().getFullYear();
-  var saisonOpts = '';
-  for (var y = curY + 1; y >= curY - 4; y--) saisonOpts += '<option value="'+y+'"'+(y===curY?' selected':'')+'>'+y+'</option>';
+  var statuts = ['','Elite','Relève','Espoir','Sénior','Collectifs Nationaux'];
+  var triOpts = statuts.map(function(s){
+    return '<option value="'+s+'"'+(_shnFilter===s?' selected':'')+'>'+(s||'Tous les statuts')+'</option>';
+  }).join('');
   body.innerHTML =
-    // Barre d'ajout
-    '<div style="padding:12px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">'
-    + '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Ajouter un sportif SHN</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
-    + '<div style="flex:2;min-width:180px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">Prénom Nom</div><input id="shn-nom" list="shn-pilot-list" type="text" placeholder="Prénom Nom du sportif…" autocomplete="off" oninput="shnPilotAutocomplete()" onchange="shnSelectPilot()" style="'+iSt+'" '+fo+'><datalist id="shn-pilot-list"></datalist></div>'
-    + '<div style="flex:1;min-width:110px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">N° Licence</div><input id="shn-licence" type="text" placeholder="N° licence" style="'+iSt+'" '+fo+'></div>'
-    + '<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">Pratique</div><select id="shn-pratique" style="'+selSt+';width:100%"><option value="">— Toutes —</option><option value="microlight">Microlight</option><option value="paramoteur">Paramoteur</option></select></div>'
-    + '<div style="flex:1;min-width:110px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">Discipline</div><select id="shn-discipline" style="'+selSt+';width:100%"><option value="">— Toutes —</option><option value="classic">Classic</option><option value="slalom">Slalom</option><option value="stol">STOL</option></select></div>'
-    + '<div style="flex:1;min-width:90px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">Saison</div><select id="shn-saison" style="'+selSt+';width:100%">'+saisonOpts+'</select></div>'
-    + '<div style="flex:1;min-width:110px"><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px;text-transform:uppercase">Statut</div><select id="shn-statut" style="'+selSt+';width:100%"><option value="Elite">Elite</option><option value="Relève">Relève</option><option value="Espoir">Espoir</option></select></div>'
-    + '<button onclick="addSHNMember()" style="padding:8px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;align-self:flex-end">＋ Ajouter</button>'
+    '<div style="padding:10px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Tri</span>'
+    + '<select onchange="_shnSetFilter(this.value,null)" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer">'+triOpts+'</select>'
+    + '<div style="margin-left:auto;position:relative;flex-shrink:0" id="shn-act-wrap">'
+    + '<button onclick="_shnActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>Actions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>'
+    + '<div id="shn-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">'
+    + '<button onclick="exportSHNFmt(\'json\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>'
+    + '<button onclick="exportSHNFmt(\'excel\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>'
+    + '<button onclick="exportSHNFmt(\'csv\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>'
+    + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="printSHNList();_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
     + '</div></div>'
-    // Table
+    + '</div>'
     + '<div style="flex:1;overflow-y:auto;min-height:0">'
     + '<table style="width:100%;border-collapse:collapse">'
     + '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--navy3);border-bottom:2px solid var(--bdr)">'
@@ -44698,9 +44920,11 @@ function _collectifRenderSHN() {
     + '<th style="'+thSt+'">N° Licence</th>'
     + '<th style="'+thSt+'">Pratique</th>'
     + '<th style="'+thSt+'">Discipline</th>'
-    + '<th style="'+thSt+'">Saison</th>'
+    + '<th style="'+thSt+'">Club</th>'
+    + '<th style="'+thSt+'">Région</th>'
+    + '<th style="'+thSt+'">Email</th>'
+    + '<th style="'+thSt+'">Téléphone</th>'
     + '<th style="'+thSt+'">Statut</th>'
-    + '<th style="'+thSt+';text-align:center;width:40px"></th>'
     + '</tr></thead>'
     + '<tbody id="shn-table-body"></tbody>'
     + '</table>'
@@ -44762,35 +44986,81 @@ function deleteSHNMember(id) {
 function renderSHNList() {
   var tbody = document.getElementById('shn-table-body');
   if (!tbody) return;
-  var list = S.shn || [];
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">Aucun sportif SHN — utilisez le formulaire ci-dessus pour en ajouter</td></tr>';
-    return;
-  }
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
-  var cellSt = 'padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;color:var(--txt)';
-  var statutColor = { 'Elite':'#f59e0b', 'Relève':'#3b82f6', 'Espoir':'#10b981' };
+  var cellSt = 'padding:9px 10px;font-size:12px;color:var(--txt2);border-bottom:1px solid var(--bdr);vertical-align:middle';
+  var statutColor = { 'Elite':'#f59e0b', 'Relève':'#3b82f6', 'Espoir':'#10b981', 'Sénior':'#ec4899', 'Collectifs Nationaux':'#8b5cf6' };
   var iSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;box-sizing:border-box';
   var selSt = 'width:100%;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none';
   var curY = new Date().getFullYear();
   var saisonOpts = function(sel){ var h=''; for(var y=curY+1;y>=curY-4;y--) h+='<option value="'+y+'"'+(String(y)===String(sel)?' selected':'')+'>'+y+'</option>'; return h; };
   var pratOpts = function(sel){ return ['','microlight','paramotor'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+(v||'— Toutes —')+'</option>'; }).join(''); };
   var discOpts = function(sel){ return ['','classic','slalom','stol'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+(v||'— Toutes —')+'</option>'; }).join(''); };
-  var statOpts = function(sel){ return ['Elite','Relève','Espoir'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>'; }).join(''); };
-  tbody.innerHTML = list.map(function(m) {
-    var id = m.id;
+  var statOpts = function(sel){ return ['Elite','Relève','Espoir','Sénior','Collectifs Nationaux'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>'; }).join(''); };
+
+  // Fusionner S.shn (saisis manuellement) + membres CF avec statut_shn
+  var manualList = (S.shn || []).map(function(m){ return Object.assign({}, m, {_source:'shn'}); });
+  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var cfList = (S.collectif || [])
+    .filter(function(m){ return m.statut_shn; })
+    .filter(function(m){ return !m.licence || manualLicences.indexOf((m.licence||'').trim()) === -1; })
+    .map(function(m){ return {
+      id: 'cf-'+m.id, nom: (m.prenom||'')+' '+(m.nom||''), licence: m.licence||'',
+      pratique: m.pratique||'', discipline: m.discipline||'',
+      club: m.club||'', region: m.region||'', email: m.email||'', tel: m.tel||'',
+      statut: m.statut_shn, _source:'cf'
+    }; });
+  var list = manualList.concat(cfList);
+  if (_shnFilter) list = list.filter(function(m){ return m.statut === _shnFilter; });
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">Aucun sportif'
+      +(_shnFilter ? ' avec le statut « '+_shnFilter+' »' : ' SHN')
+      +' — assignez un statut SHN dans le volet Collectif France</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(function(m, i) {
     var sc = statutColor[m.statut] || 'var(--txt3)';
-    return '<tr id="shn-row-'+id+'">'
-      +'<td style="'+cellSt+';font-weight:600">'+esc(m.nom)+'</td>'
-      +'<td style="'+cellSt+'">'+(esc(m.licence)||'—')+'</td>'
+    var isCF = m._source === 'cf';
+    var sourceBadge = isCF ? '<span title="Issu du Collectif France" style="margin-left:5px;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(0,87,255,.15);color:var(--stol)">CF</span>' : '';
+    // Chercher photo + données complémentaires dans S.collectif puis S.pilots
+    var photo = '';
+    var club = m.club||'', region = m.region||'', email = m.email||'', tel = m.tel||'';
+    var cfMember = (S.collectif||[]).find(function(x){ return m.licence && x.licence && String(x.licence)===String(m.licence); });
+    if (cfMember) {
+      if (cfMember.photo) photo = cfMember.photo;
+      if (!club)   club   = cfMember.club||'';
+      if (!region) region = cfMember.region||'';
+      if (!email)  email  = cfMember.email||'';
+      if (!tel)    tel    = cfMember.tel||'';
+    }
+    if (!photo || (!club && !email)) {
+      var pilot = (S.pilots||[]).find(function(p){ return m.licence && p.licence && String(p.licence)===String(m.licence); });
+      if (pilot) {
+        if (!photo  && pilot.photo)  photo  = pilot.photo;
+        if (!club   && pilot.club)   club   = pilot.club;
+        if (!region && pilot.region) region = pilot.region;
+        if (!email  && pilot.email)  email  = pilot.email;
+        if (!tel    && pilot.tel)    tel    = pilot.tel;
+      }
+    }
+    var ini = (m.nom||'').split(' ').map(function(w){ return w.charAt(0); }).slice(0,2).join('').toUpperCase();
+    var avatar = photo
+      ? '<img src="'+photo+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid var(--bdr);flex-shrink:0">'
+      : '<div style="width:30px;height:30px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini)+'</div>';
+    var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
+    return '<tr style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
+      +'<td style="padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle">'
+        +'<div style="display:flex;align-items:center;gap:8px">'+avatar
+        +'<span style="font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.nom)+sourceBadge+'</span></div></td>'
+      +'<td style="'+cellSt+';font-family:monospace">'+(esc(m.licence)||'—')+'</td>'
       +'<td style="'+cellSt+'">'+(esc(m.pratique)||'—')+'</td>'
       +'<td style="'+cellSt+'">'+(esc(m.discipline)||'—')+'</td>'
-      +'<td style="'+cellSt+'">'+(esc(m.saison)||'—')+'</td>'
+      +'<td style="'+cellSt+'">'+(esc(club)||'—')+'</td>'
+      +'<td style="'+cellSt+'">'+(esc(region)||'—')+'</td>'
+      +'<td style="'+cellSt+'"><a href="mailto:'+esc(email)+'" style="color:var(--txt2);text-decoration:none">'+(esc(email)||'—')+'</a></td>'
+      +'<td style="'+cellSt+'">'+(esc(tel)||'—')+'</td>'
       +'<td style="'+cellSt+'"><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+esc(m.statut)+'</span></td>'
-      +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
-      +'<button onclick="shnEditRow(\''+id+'\')" title="Modifier" style="width:26px;height:26px;border:none;border-radius:6px;background:rgba(14,165,233,.1);color:#38bdf8;cursor:pointer;font-size:13px;margin-right:4px">✎</button>'
-      +'<button id="shn-del-'+id+'" onclick="deleteSHNMember(\''+id+'\')" style="width:26px;height:26px;border:none;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px">×</button>'
-      +'</td>'
       +'</tr>';
   }).join('');
 
@@ -45360,7 +45630,7 @@ function _dtnToggleSidebar() {
 
 // ── Navigation DTN sidebar ─────────────────────────────────────────
 var _dtnActiveNav = 'home';
-var _dtnNavIds = ['home','comp','collectif','agenda','gantt','espaces','acces','formations','securite','territoires'];
+var _dtnNavIds = ['home','comp','collectif','agenda','gantt','espaces','acces','formations','securite','territoires','aides'];
 
 function _dtnSetActiveNav(key) {
   _dtnActiveNav = key;
