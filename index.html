@@ -2424,7 +2424,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
         onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='';this.style.color=''">
         <svg viewBox="0 0 24 24" fill="none" stroke="#0057FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
-        Liste
+        Agenda fédéral
       </button>
       <button id="dtn-sub-base" onclick="_compSbNav('page-base')"
         style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
@@ -3279,7 +3279,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <div class="cf-grid3">
           <div class="cf-row">
             <label class="cf-label">Type</label>
-            <select class="cf-select" id="comp-type">
+            <select class="cf-select" id="comp-type" onchange="_compTypeChanged()">
               <option value="comp-internationale">Compétition internationale</option>
               <option value="cdf">Compétition nationale</option>
               <option value="comp-regionale">Compétition régionale</option>
@@ -3340,33 +3340,48 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <div class="cf-panel" id="cfp-lieu">
         <div class="cf-panel-head">
           <div class="cf-panel-title">Lieu</div>
-          <div class="cf-panel-sub">Aérodrome, commune et région</div>
+          <div id="cfp-lieu-sub" class="cf-panel-sub">Aérodrome, commune et région</div>
         </div>
-        <div class="cf-grid-oaci">
-          <div class="cf-row">
-            <label class="cf-label">Code OACI</label>
-            <input class="cf-input cf-oaci-input" type="text" id="comp-oaci" placeholder="LFSE" maxlength="8" oninput="autoFillCompOACI(this.value)">
+
+        <!-- Vue standard (tous types sauf Rallye) -->
+        <div id="comp-lieu-standard">
+          <div class="cf-grid-oaci">
+            <div class="cf-row">
+              <label class="cf-label">Code OACI</label>
+              <input class="cf-input cf-oaci-input" type="text" id="comp-oaci" placeholder="LFSE" maxlength="8" oninput="autoFillCompOACI(this.value)">
+            </div>
+            <div class="cf-row">
+              <label class="cf-label">Lieu / Aérodrome</label>
+              <input class="cf-input" type="text" id="comp-lieu" placeholder="Commune, terrain…">
+            </div>
+            <div class="cf-row">
+              <label class="cf-label">Région / Pays</label>
+              <input class="cf-input" type="text" id="comp-region" placeholder="Région ou pays" list="comp-regions-list">
+              <datalist id="comp-regions-list">
+                <option value="Auvergne-Rhône-Alpes"><option value="Bourgogne-Franche-Comté">
+                <option value="Bretagne"><option value="Centre-Val de Loire"><option value="Corse">
+                <option value="Grand Est"><option value="Hauts-de-France"><option value="Île-de-France">
+                <option value="Normandie"><option value="Nouvelle-Aquitaine"><option value="Occitanie">
+                <option value="Pays de la Loire"><option value="Provence-Alpes-Côte d'Azur">
+                <option value="Guadeloupe"><option value="Martinique"><option value="Guyane">
+                <option value="La Réunion"><option value="Mayotte">
+                <option value="Allemagne"><option value="Belgique"><option value="Espagne">
+                <option value="Italie"><option value="Luxembourg"><option value="Maroc">
+                <option value="Pays-Bas"><option value="Portugal"><option value="Royaume-Uni">
+                <option value="Suisse"><option value="Tunisie">
+              </datalist>
+            </div>
           </div>
-          <div class="cf-row">
-            <label class="cf-label">Lieu / Aérodrome</label>
-            <input class="cf-input" type="text" id="comp-lieu" placeholder="Commune, terrain…">
-          </div>
-          <div class="cf-row">
-            <label class="cf-label">Région / Pays</label>
-            <input class="cf-input" type="text" id="comp-region" placeholder="Région ou pays" list="comp-regions-list">
-            <datalist id="comp-regions-list">
-              <option value="Auvergne-Rhône-Alpes"><option value="Bourgogne-Franche-Comté">
-              <option value="Bretagne"><option value="Centre-Val de Loire"><option value="Corse">
-              <option value="Grand Est"><option value="Hauts-de-France"><option value="Île-de-France">
-              <option value="Normandie"><option value="Nouvelle-Aquitaine"><option value="Occitanie">
-              <option value="Pays de la Loire"><option value="Provence-Alpes-Côte d'Azur">
-              <option value="Guadeloupe"><option value="Martinique"><option value="Guyane">
-              <option value="La Réunion"><option value="Mayotte">
-              <option value="Allemagne"><option value="Belgique"><option value="Espagne">
-              <option value="Italie"><option value="Luxembourg"><option value="Maroc">
-              <option value="Pays-Bas"><option value="Portugal"><option value="Royaume-Uni">
-              <option value="Suisse"><option value="Tunisie">
-            </datalist>
+        </div>
+
+        <!-- Vue Rallye Itinérant : redirection vers onglet Étapes -->
+        <div id="comp-lieu-rallye" style="display:none">
+          <div style="margin-top:8px;padding:12px 14px;background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.25);border-radius:10px;display:flex;align-items:center;gap:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="flex-shrink:0"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#38bdf8;margin-bottom:2px">Les étapes se gèrent dans l'onglet Étapes</div>
+              <div style="font-size:11px;color:var(--txt3)">Enregistrez cet événement puis ouvrez l'onglet <b style="color:var(--txt2)">🗺 Étapes</b> pour ajouter, modifier ou supprimer les étapes du rallye.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -4079,6 +4094,7 @@ const LS_GANTT       = 'geststol_gantt';           // Tâches Gantt (sous-tâche
 const LS_COLLECTIF   = 'geststol_collectif';       // Collectif France — clé dédiée anti-perte (indépendante du quota)
 const LS_SIG         = 'geststol_signature';        // Image de signature — clé dédiée anti-perte
 const LS_STAMP       = 'geststol_stamp';            // Image de tampon officiel — clé dédiée anti-perte
+const LS_ETAPES      = 'geststol_etapes';           // Étapes rallye — clé dédiée anti-perte
 
 // ── Régions & Pays — listes partagées ────────────────────────────────────
 var _FR_REGIONS = [
@@ -4606,6 +4622,28 @@ async function loadState() {
         }
       }
     }
+    // 1b-bis. Clé dédiée LS_ETAPES — fusionnée APRÈS Object.assign (filet anti-perte étapes rallye)
+    try {
+      var _etapesRaw = localStorage.getItem(LS_ETAPES);
+      if (_etapesRaw) {
+        var _etapesParsed = JSON.parse(_etapesRaw);
+        if (_etapesParsed && typeof _etapesParsed === 'object') {
+          if (!S.etapes || typeof S.etapes !== 'object') S.etapes = {};
+          Object.keys(_etapesParsed).forEach(function(cid) {
+            var idbArr = Array.isArray(_etapesParsed[cid]) ? _etapesParsed[cid] : [];
+            if (!S.etapes[cid] || !S.etapes[cid].length) {
+              S.etapes[cid] = idbArr;
+            } else {
+              // Fusionner par id : garder la version la plus récente
+              var byId = {};
+              S.etapes[cid].forEach(function(e){ if(e&&e.id) byId[e.id]=e; });
+              idbArr.forEach(function(e){ if(e&&e.id&&!byId[e.id]) byId[e.id]=e; });
+              S.etapes[cid] = Object.values(byId);
+            }
+          });
+        }
+      }
+    } catch(e) {}
     // 1b. Clé dédiée LS_GANTT — fusionnée APRÈS Object.assign (filet anti-perte sous-tâches)
     try {
       var _ganttRaw = localStorage.getItem(LS_GANTT);
@@ -4812,6 +4850,22 @@ async function loadState() {
             });
           }
         }
+        // Restaurer étapes depuis IDB (fusionner par id, éviter de perdre des étapes ajoutées offline)
+        if (idbData.etapes && typeof idbData.etapes === 'object') {
+          if (!S.etapes || typeof S.etapes !== 'object') S.etapes = {};
+          Object.keys(idbData.etapes).forEach(function(cid) {
+            var idbArr = Array.isArray(idbData.etapes[cid]) ? idbData.etapes[cid] : [];
+            if (!idbArr.length) return;
+            if (!S.etapes[cid] || !S.etapes[cid].length) {
+              S.etapes[cid] = idbArr;
+            } else {
+              var byId = {};
+              S.etapes[cid].forEach(function(e){ if(e&&e.id) byId[e.id]=e; });
+              idbArr.forEach(function(e){ if(e&&e.id&&!byId[e.id]) byId[e.id]=e; });
+              S.etapes[cid] = Object.values(byId);
+            }
+          });
+        }
         // Restaurer ganttTasks depuis IDB (last-write-wins par tâche)
         if (idbData.ganttTasks && typeof idbData.ganttTasks === 'object') {
           if (!S.ganttTasks || typeof S.ganttTasks !== 'object') S.ganttTasks = {};
@@ -5013,6 +5067,8 @@ function _flushSaveState() {
     collectif:S.collectif||[], _deletedCollectif:S._deletedCollectif||[],
     shn:S.shn||[], _deletedSHN:S._deletedSHN||[]
   });
+  // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
+  try { if (S.etapes && Object.keys(S.etapes).length) localStorage.setItem(LS_ETAPES, JSON.stringify(S.etapes)); } catch(e) {}
   // ── Clé dédiée aides (filet anti-perte — jamais strippée) ──
   try { if (S.aides && S.aides.length) localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
   try {
@@ -5387,6 +5443,71 @@ function calcRunScore() {
 // ═══════════════════════════════════
 // COMPÉTITIONS
 // ═══════════════════════════════════
+
+function _compTypeChanged() {
+  var type = (document.getElementById('comp-type')||{}).value || '';
+  var std  = document.getElementById('comp-lieu-standard');
+  var ral  = document.getElementById('comp-lieu-rallye');
+  var sub  = document.getElementById('cfp-lieu-sub');
+  var isRallye = (type === 'rallye');
+  if (std) std.style.display = isRallye ? 'none' : '';
+  if (ral) ral.style.display = isRallye ? '' : 'none';
+  if (sub) sub.textContent = isRallye ? 'Étapes du rallye — aérodromes, clubs et régions' : 'Aérodrome, commune et région';
+  if (isRallye) {
+    var tb = document.getElementById('rallye-etapes-tbody');
+    if (tb && !tb.children.length) _rallyeAddEtape();
+  }
+}
+
+function _rallyeRowHTML(e) {
+  e = e || {};
+  var iSt = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 7px;outline:none;box-sizing:border-box';
+  var rl = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur'];
+  var rid = 'rl-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+  return '<tr style="border-bottom:1px solid var(--bdr)">'
+    + '<td style="padding:5px 6px"><input type="date" value="'+(e.dateFrom||'')+'" style="'+iSt+';min-width:120px"></td>'
+    + '<td style="padding:5px 6px"><input type="date" value="'+(e.dateTo||'')+'" style="'+iSt+';min-width:120px"></td>'
+    + '<td style="padding:5px 6px"><input type="text" value="'+(e.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+iSt+';min-width:80px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></td>'
+    + '<td style="padding:5px 6px"><input type="text" value="'+(e.lieu||'')+'" placeholder="Commune, terrain…" style="'+iSt+';min-width:140px"></td>'
+    + '<td style="padding:5px 6px"><input type="text" value="'+(e.club||'')+'" placeholder="Club organisateur…" style="'+iSt+';min-width:130px"></td>'
+    + '<td style="padding:5px 6px"><input type="text" value="'+(e.region||'')+'" placeholder="Région…" style="'+iSt+';min-width:120px" list="'+rid+'"><datalist id="'+rid+'">'+rl.map(function(r){return '<option value="'+r+'">';}).join('')+'</datalist></td>'
+    + '<td style="padding:5px 6px"><input type="text" value="'+(e.responsable||'')+'" placeholder="Nom, prénom…" style="'+iSt+';min-width:140px"></td>'
+    + '<td style="padding:5px 6px;text-align:center"><button type="button" onclick="_rallyeDeleteEtape(this)" title="Supprimer" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);color:#ef4444;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1">×</button></td>'
+    + '</tr>';
+}
+
+function _rallyeAddEtape(e) {
+  var tb = document.getElementById('rallye-etapes-tbody');
+  if (!tb) return;
+  tb.insertAdjacentHTML('beforeend', _rallyeRowHTML(e));
+}
+
+function _rallyeDeleteEtape(btn) {
+  var tr = btn.closest('tr');
+  if (tr) tr.remove();
+}
+
+function _getRallyeEtapes() {
+  var tb = document.getElementById('rallye-etapes-tbody');
+  if (!tb) return [];
+  return Array.from(tb.querySelectorAll('tr')).map(function(tr) {
+    var inp = tr.querySelectorAll('input');
+    return { dateFrom: (inp[0]||{}).value||'', dateTo: (inp[1]||{}).value||'', oaci: (inp[2]||{}).value||'', lieu: (inp[3]||{}).value||'', club: (inp[4]||{}).value||'', region: (inp[5]||{}).value||'', responsable: (inp[6]||{}).value||'' };
+  }).filter(function(e){ return e.dateFrom||e.lieu||e.oaci; });
+}
+
+function _loadRallyeEtapes(etapes) {
+  var tb = document.getElementById('rallye-etapes-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  var sorted = (etapes||[]).slice().sort(function(a,b){
+    var da = a.dateFrom||a.date||'9999', db = b.dateFrom||b.date||'9999';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  sorted.forEach(function(e){ _rallyeAddEtape(e); });
+  if (!tb.children.length) _rallyeAddEtape();
+}
+
 function _cfTab(name) {
   document.querySelectorAll('.cf-panel').forEach(function(p) {
     p.classList.remove('cf-panel-active');
@@ -5423,6 +5544,7 @@ function openAddComp() {
   resetAfficheForm();
   var delBtn = document.getElementById('comp-delete-btn');
   if (delBtn) delBtn.style.display = 'none';
+  _compTypeChanged();
   _cfTab('ident');
   openSheet('sheet-comp');
 }
@@ -5760,6 +5882,7 @@ function saveComp() {
     lieu: document.getElementById('comp-lieu').value.trim(),
     region: document.getElementById('comp-region').value.trim(),
     type: document.getElementById('comp-type').value,
+    etapes: (function(){ var _ex=(S.comps||[]).find(function(c){return c.id===id;}); return (_ex&&_ex.etapes)||[]; })(),
     pratique: document.getElementById('comp-pratique').value,
     discipline: document.getElementById('comp-discipline').value,
     desc: document.getElementById('comp-desc').value.trim(),
@@ -5799,6 +5922,78 @@ function saveComp() {
   saveState(); closeSheet('sheet-comp'); renderCompetitions(); renderHomeDesktopComps(); toast('Compétition enregistrée ✓', 'ok');
   if (_currentCompId) { try { renderHomeDetailPanel(null); } catch(e){} }
   silentPush();
+}
+
+function _syncLieuToEtapesTab(compId, lieuEtapes) {
+  if (!compId || !lieuEtapes || !lieuEtapes.length) return;
+  if (!S.etapes) S.etapes = {};
+  if (!S.etapes[compId]) S.etapes[compId] = [];
+  var sEt = S.etapes[compId];
+
+  // Pour chaque étape du formulaire Lieu, mettre à jour ou créer l'entrée dans S.etapes
+  var matched = [];
+  lieuEtapes.forEach(function(ce) {
+    var existing = sEt.find(function(se) {
+      return (ce.oaci && se.oaci && ce.oaci === se.oaci) ||
+             (ce.lieu && se.lieu && ce.lieu.toLowerCase() === (se.lieu||'').toLowerCase());
+    });
+    if (existing) {
+      if (ce.lieu)        existing.lieu        = ce.lieu;
+      if (ce.oaci)        existing.oaci        = ce.oaci;
+      if (ce.club)        existing.club        = ce.club;
+      if (ce.region)      existing.region      = ce.region;
+      if (ce.responsable) existing.responsable = ce.responsable;
+      if (ce.dateFrom) { existing.dateFrom = ce.dateFrom; existing.date = ce.dateFrom; }
+      if (ce.dateTo)  existing.dateTo  = ce.dateTo;
+      // Préserver les coordonnées existantes ; les écraser seulement si le formulaire en fournit de nouvelles
+      if (ce.lat)  existing.lat  = ce.lat;
+      if (ce.lng)  existing.lng  = ce.lng;
+      existing.nom = existing.lieu || existing.nom;
+      matched.push(existing);
+    } else {
+      var newEt = {
+        id: 'et' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+        nom: ce.lieu || '', lieu: ce.lieu || '', oaci: ce.oaci || '',
+        club: ce.club || '', region: ce.region || '', responsable: ce.responsable || '',
+        dateFrom: ce.dateFrom || '', dateTo: ce.dateTo || '',
+        date: ce.dateFrom || '', desc: '',
+        lat: ce.lat || '', lng: ce.lng || ''
+      };
+      sEt.push(newEt);
+      matched.push(newEt);
+    }
+  });
+
+  // Réordonner S.etapes pour suivre l'ordre du formulaire Lieu
+  var ordered = [];
+  lieuEtapes.forEach(function(ce) {
+    var found = matched.find(function(se) {
+      return (ce.oaci && se.oaci && ce.oaci === se.oaci) ||
+             (ce.lieu && se.lieu && ce.lieu.toLowerCase() === (se.lieu||'').toLowerCase());
+    });
+    if (found && ordered.indexOf(found) === -1) ordered.push(found);
+  });
+  // Conserver les étapes S.etapes qui n'existent pas dans le formulaire Lieu (ajoutées manuellement)
+  sEt.forEach(function(se) { if (ordered.indexOf(se) === -1) ordered.push(se); });
+  S.etapes[compId] = ordered;
+}
+
+function _syncEtapesTabToLieu(compId) {
+  // Charge les étapes de S.etapes dans le tableau Lieu du formulaire
+  if (!S.etapes || !S.etapes[compId] || !S.etapes[compId].length) return;
+  var tb = document.getElementById('rallye-etapes-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  S.etapes[compId].forEach(function(et) {
+    _rallyeAddEtape({
+      dateFrom: et.dateFrom || et.date || '',
+      dateTo:   et.dateTo   || '',
+      oaci:     et.oaci     || '',
+      lieu:     et.lieu     || et.nom || '',
+      club:     et.club     || '',
+      region:   et.region   || ''
+    });
+  });
 }
 
 function updateSeasonFilter() {
@@ -6547,73 +6742,248 @@ function renderMobileCompDetail() {
   }
 }
 
+var _etapesMap = null;
+
+function _etapeFormOpen(compId, etId, et) {
+  var e2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); };
+  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
+  var fo  = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
+  var lbl = function(t, req){ return '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px">'+(req?'<b style="color:#f87171">*</b> ':'')+t+'</div>'; };
+  var regions = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur'];
+  var rl = regions.map(function(r){ return '<option value="'+r+'">'; }).join('');
+  et = et || {};
+  var isEdit = !!etId;
+  var ov = document.createElement('div');
+  ov.id = 'etape-form-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);backdrop-filter:blur(3px)';
+  ov.onclick = function(ev){ if(ev.target===ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--navy2);border-radius:14px;width:min(560px,97vw);padding:22px 24px 18px;box-shadow:0 20px 60px rgba(0,0,0,.55);max-height:95vh;overflow-y:auto">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:4px">'+(isEdit?'✎ Modifier':'＋ Ajouter')+'  une étape</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">Saisissez le code OACI pour auto-compléter le lieu et la région</div>'
+
+    // Code OACI
+    +lbl('Code OACI')
+    +'<input id="ef-oaci" type="text" value="'+e2(et.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+iSt+';text-transform:uppercase;font-weight:700;letter-spacing:1px;width:140px" '+fo
+    +' oninput="this.value=this.value.toUpperCase();_etapeFormFillOACI(this.value)" autocomplete="off">'
+    +'<div id="ef-oaci-status" style="font-size:11px;color:var(--stol);margin-top:3px;min-height:16px"></div>'
+
+    // Lieu / Aérodrome
+    +lbl('Lieu / Aérodrome', true)
+    +'<input id="ef-lieu" type="text" value="'+e2(et.lieu||et.nom||'')+'" placeholder="Commune, aérodrome…" style="'+iSt+'" '+fo+'>'
+
+    // Club
+    +lbl('Club')
+    +'<input id="ef-club" type="text" value="'+e2(et.club||'')+'" placeholder="Club organisateur…" style="'+iSt+'" '+fo+'>'
+
+    // Région
+    +lbl('Région')
+    +'<input id="ef-region" type="text" value="'+e2(et.region||'')+'" placeholder="Région…" list="ef-regions-dl" style="'+iSt+'" '+fo+'>'
+    +'<datalist id="ef-regions-dl">'+rl+'</datalist>'
+
+    // Dates (grille 2 colonnes)
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+      +'<div>'+lbl('Date du')+'<input id="ef-date-from" type="date" value="'+e2(et.dateFrom||et.date||'')+'" style="'+iSt+'" '+fo+'></div>'
+      +'<div>'+lbl('Date au')+'<input id="ef-date-to" type="date" value="'+e2(et.dateTo||'')+'" style="'+iSt+'" '+fo+'></div>'
+    +'</div>'
+
+    // Responsable
+    +lbl('Responsable de l\'étape')
+    +'<input id="ef-responsable" type="text" value="'+e2(et.responsable||'')+'" placeholder="Nom, prénom…" style="'+iSt+'" '+fo+'>'
+
+    // Description
+    +lbl('Description / Notes')
+    +'<textarea id="ef-desc" rows="2" placeholder="Parcours, points de passage…" style="'+iSt+';resize:vertical" '+fo+'>'+e2(et.desc||'')+'</textarea>'
+
+    // Boutons
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+    +'<button onclick="document.getElementById(\'etape-form-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    +'<button onclick="_etapeSave(\''+compId+'\','+(isEdit?'\''+etId+'\'':'null')+')" style="padding:8px 20px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
+    +'</div>'
+    +'</div>';
+  // Stocker lat/lng si déjà connus
+  if (et.lat) ov.dataset.lat = et.lat;
+  if (et.lng) ov.dataset.lng = et.lng;
+  document.body.appendChild(ov);
+  setTimeout(function(){ var ef=document.getElementById('ef-oaci'); if(ef&&!ef.value) { var el=document.getElementById('ef-lieu'); if(el)el.focus(); } else if(ef&&ef.value) ef.blur(); }, 60);
+}
+
+function _etapeFormFillOACI(val) {
+  var oaci = (val||'').toUpperCase().trim();
+  var statusEl = document.getElementById('ef-oaci-status');
+  if (oaci.length < 4) { if(statusEl) statusEl.textContent=''; return; }
+  var lieuEl   = document.getElementById('ef-lieu');
+  var regionEl = document.getElementById('ef-region');
+  var aMatch   = (AERODROMES_FR||[]).find(function(a){ return a[0]===oaci; });
+  if (aMatch) {
+    if (lieuEl && !lieuEl.value) lieuEl.value = aMatch[1];
+    var prefix3 = oaci.length >= 3 ? oaci[2].toUpperCase() : '';
+    var region  = _OACI_REGION_MAP[prefix3] || '';
+    if (regionEl && !regionEl.value && region) regionEl.value = region;
+    if (statusEl) statusEl.textContent = '✓ ' + aMatch[1];
+    // Fetch coords via Nominatim (pour la carte)
+    var ov = document.getElementById('etape-form-ov');
+    if (ov && !ov.dataset.lat) {
+      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(oaci+' aerodrome france')+'&format=json&limit=1', {headers:{'Accept-Language':'fr'}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if (d && d[0] && ov.parentNode) {
+            ov.dataset.lat = d[0].lat;
+            ov.dataset.lng = d[0].lon;
+          }
+        }).catch(function(){});
+    }
+  } else {
+    if (statusEl) statusEl.textContent = oaci.length>=4 ? '⚠ Code OACI non reconnu' : '';
+  }
+}
+
 function _etapeAdd(compId) {
   if (!S.etapes) S.etapes = {};
   if (!S.etapes[compId]) S.etapes[compId] = [];
-  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;margin-bottom:8px';
-  var fo = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
-  var ov = document.createElement('div');
-  ov.id = 'etape-form-ov';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)';
-  ov.innerHTML = '<div style="background:var(--navy2);border-radius:14px;width:min(480px,97vw);padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
-    +'<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">＋ Ajouter une étape</div>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Nom / Lieu <b style="color:#f87171">*</b></div>'
-    +'<input id="etape-nom" type="text" placeholder="Ex : Étape 1 — Bordeaux" style="'+iSt+'" '+fo+'>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Date</div>'
-    +'<input id="etape-date" type="date" style="'+iSt+'" '+fo+'>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Description</div>'
-    +'<textarea id="etape-desc" placeholder="Parcours, points de passage…" rows="3" style="'+iSt+';resize:vertical" '+fo+'></textarea>'
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">'
-    +'<button onclick="document.getElementById(\'etape-form-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
-    +'<button onclick="_etapeSave(\''+compId+'\',null)" style="padding:8px 18px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
-    +'</div></div>';
-  document.body.appendChild(ov);
-  setTimeout(function(){ var e=document.getElementById('etape-nom');if(e)e.focus(); }, 60);
+  var newEt = { id:'et'+Date.now().toString(36), nom:'', lieu:'', oaci:'', club:'', region:'', responsable:'', gestionnaire:'', contactDSAC:'', notam:false, commentaires:'', dateFrom:'', dateTo:'', date:'', desc:'', lat:'', lng:'' };
+  S.etapes[compId].push(newEt);
+  saveState();
+  switchHomeDetailTab('etapes');
+  setTimeout(function(){
+    var row = document.getElementById('etape-row-'+newEt.id);
+    if (row) { var inp = row.querySelector('input'); if(inp) inp.focus(); }
+    _etapeToggleAcc(newEt.id);
+  }, 80);
 }
 
 function _etapeEdit(compId, etId) {
   if (!S.etapes || !S.etapes[compId]) return;
   var et = S.etapes[compId].find(function(x){ return x.id===etId; });
   if (!et) return;
-  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;margin-bottom:8px';
-  var fo = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
-  var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); };
-  var ov = document.createElement('div');
-  ov.id = 'etape-form-ov';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)';
-  ov.innerHTML = '<div style="background:var(--navy2);border-radius:14px;width:min(480px,97vw);padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
-    +'<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">✎ Modifier l\'étape</div>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Nom / Lieu <b style="color:#f87171">*</b></div>'
-    +'<input id="etape-nom" type="text" value="'+esc2(et.nom)+'" style="'+iSt+'" '+fo+'>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Date</div>'
-    +'<input id="etape-date" type="date" value="'+esc2(et.date||'')+'" style="'+iSt+'" '+fo+'>'
-    +'<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Description</div>'
-    +'<textarea id="etape-desc" rows="3" style="'+iSt+';resize:vertical" '+fo+'>'+esc2(et.desc)+'</textarea>'
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">'
-    +'<button onclick="document.getElementById(\'etape-form-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
-    +'<button onclick="_etapeSave(\''+compId+'\',\''+etId+'\')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Enregistrer</button>'
-    +'</div></div>';
-  document.body.appendChild(ov);
-  setTimeout(function(){ var e=document.getElementById('etape-nom');if(e)e.focus(); }, 60);
+  _etapeFormOpen(compId, etId, et);
 }
 
 function _etapeSave(compId, etId) {
-  var nom  = (document.getElementById('etape-nom') ||{value:''}).value.trim();
-  var date = (document.getElementById('etape-date')||{value:''}).value;
-  var desc = (document.getElementById('etape-desc')||{value:''}).value.trim();
-  if (!nom) { toast('Nom / Lieu requis', 'err'); return; }
+  var lieu     = (document.getElementById('ef-lieu')     ||{value:''}).value.trim();
+  var oaci     = (document.getElementById('ef-oaci')     ||{value:''}).value.toUpperCase().trim();
+  var club     = (document.getElementById('ef-club')     ||{value:''}).value.trim();
+  var region   = (document.getElementById('ef-region')   ||{value:''}).value.trim();
+  var dateFrom = (document.getElementById('ef-date-from')||{value:''}).value;
+  var dateTo   = (document.getElementById('ef-date-to')  ||{value:''}).value;
+  var desc         = (document.getElementById('ef-desc')        ||{value:''}).value.trim();
+  var responsable  = (document.getElementById('ef-responsable') ||{value:''}).value.trim();
+  if (!lieu) { toast('Lieu / Aérodrome requis', 'err'); return; }
+  var ov = document.getElementById('etape-form-ov');
+  var lat = ov ? (ov.dataset.lat||'') : '';
+  var lng = ov ? (ov.dataset.lng||'') : '';
   if (!S.etapes) S.etapes = {};
   if (!S.etapes[compId]) S.etapes[compId] = [];
+  var rec = { nom: lieu, lieu: lieu, oaci: oaci, club: club, region: region, responsable: responsable, dateFrom: dateFrom, dateTo: dateTo, date: dateFrom, desc: desc, lat: lat, lng: lng };
   if (etId) {
     var et = S.etapes[compId].find(function(x){ return x.id===etId; });
-    if (et) { et.nom=nom; et.date=date; et.desc=desc; }
+    if (et) Object.assign(et, rec);
   } else {
-    S.etapes[compId].push({id:'et'+Date.now().toString(36), nom:nom, date:date, desc:desc});
+    rec.id = 'et'+Date.now().toString(36);
+    S.etapes[compId].push(rec);
+  }
+  // Sync retour vers cp.etapes pour garder le formulaire Lieu cohérent
+  var _cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (_cp && _cp.type==='rallye') {
+    _cp.etapes = S.etapes[compId].map(function(se){
+      return { dateFrom:se.dateFrom||'', dateTo:se.dateTo||'', oaci:se.oaci||'', lieu:se.lieu||se.nom||'', club:se.club||'', region:se.region||'', responsable:se.responsable||'', lat:se.lat||'', lng:se.lng||'' };
+    });
   }
   saveState();
-  var ov = document.getElementById('etape-form-ov'); if(ov) ov.remove();
+  if (ov) ov.remove();
+  // Géocodage asynchrone si pas encore de coordonnées (lieu sans OACI ou fetch Nominatim raté)
+  var savedEt = (S.etapes[compId]||[]).find(function(x){ return x.id===(etId||rec.id); });
+  if (savedEt && (!savedEt.lat || !savedEt.lng)) {
+    var _geoQ = oaci ? oaci+' aerodrome france' : lieu+' france';
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(_geoQ)+'&format=json&limit=1',
+          {headers:{'Accept-Language':'fr'}})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if (d&&d[0]&&savedEt) {
+          savedEt.lat=d[0].lat; savedEt.lng=d[0].lon;
+          if (_cp&&_cp.type==='rallye') {
+            _cp.etapes=S.etapes[compId].map(function(se){
+              return {dateFrom:se.dateFrom||'',dateTo:se.dateTo||'',oaci:se.oaci||'',lieu:se.lieu||se.nom||'',club:se.club||'',region:se.region||'',lat:se.lat||'',lng:se.lng||''};
+            });
+          }
+          saveState();
+          if (typeof _etapeMapRefresh==='function') _etapeMapRefresh(compId);
+        }
+      }).catch(function(){});
+  }
   switchHomeDetailTab('etapes');
   toast('Étape enregistrée ✓', 'ok');
+}
+
+function _etapeMapInit(compId) {
+  if (typeof L === 'undefined') return;
+  var el = document.getElementById('etapes-map');
+  if (!el) return;
+  if (_etapesMap) { try{_etapesMap.remove();}catch(e){} _etapesMap=null; }
+  _etapesMap = L.map(el, {zoomControl:true, attributionControl:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(_etapesMap);
+  _etapesMap.fitBounds([[41.3,-5.2],[51.2,9.6]]);
+  setTimeout(function(){if(_etapesMap)_etapesMap.invalidateSize();},150);
+  _etapeMapRefresh(compId);
+  // Géocodage rétroactif : étapes sans coordonnées (séquentielles pour respecter le rate-limit Nominatim)
+  var etList = (S.etapes && S.etapes[compId]) || [];
+  var toGeo = etList.filter(function(e){ return (!e.lat||!e.lng)&&(e.oaci||e.lieu||e.nom); });
+  if (!toGeo.length) return;
+  var _cp2 = (S.comps||[]).find(function(c){return c.id===compId;});
+  var idx = 0;
+  function _nextGeo() {
+    if (idx >= toGeo.length) return;
+    var et = toGeo[idx++];
+    var q = et.oaci ? et.oaci+' aerodrome france' : (et.lieu||et.nom)+' france';
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1',
+          {headers:{'Accept-Language':'fr'}})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if (d&&d[0]&&et) {
+          et.lat=d[0].lat; et.lng=d[0].lon;
+          if (_cp2&&_cp2.type==='rallye') {
+            _cp2.etapes=(S.etapes[compId]||[]).map(function(se){
+              return {dateFrom:se.dateFrom||'',dateTo:se.dateTo||'',oaci:se.oaci||'',lieu:se.lieu||se.nom||'',club:se.club||'',region:se.region||'',lat:se.lat||'',lng:se.lng||''};
+            });
+          }
+          saveState();
+          _etapeMapRefresh(compId);
+        }
+        setTimeout(_nextGeo, 1100); // 1 req/s pour respecter Nominatim ToS
+      }).catch(function(){ setTimeout(_nextGeo, 1100); });
+  }
+  setTimeout(_nextGeo, 500);
+}
+
+function _etapeMapRefresh(compId) {
+  if (!_etapesMap) return;
+  _etapesMap.eachLayer(function(l){ if(!(l instanceof L.TileLayer)) _etapesMap.removeLayer(l); });
+  var etList = ((S.etapes && S.etapes[compId]) || []).slice().sort(function(a,b){
+    var da = a.dateFrom||a.date||'9999', db = b.dateFrom||b.date||'9999';
+    return da<db?-1:da>db?1:0;
+  });
+  var pts = [];
+  etList.forEach(function(et, i) {
+    var lat = parseFloat(et.lat), lng = parseFloat(et.lng);
+    if (isNaN(lat)||isNaN(lng)) return;
+    pts.push([lat,lng]);
+    var num = i+1;
+    var icon = L.divIcon({
+      className:'',
+      html:'<div style="width:30px;height:30px;border-radius:50%;background:#0057FF;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.45)">'+num+'</div>',
+      iconSize:[30,30], iconAnchor:[15,15], tooltipAnchor:[16,0]
+    });
+    var dateStr = et.dateFrom ? formatDate(et.dateFrom) : (et.date||'');
+    if (et.dateTo && et.dateTo !== et.dateFrom) dateStr += ' → '+formatDate(et.dateTo);
+    L.marker([lat,lng],{icon:icon}).addTo(_etapesMap)
+      .bindTooltip('<b style="font-size:13px">Étape '+num+'</b><br>'+(et.lieu||et.nom||'')+(dateStr?'<br><span style="color:#94a3b8">'+dateStr+'</span>':'')+(et.club?'<br>'+et.club:''),
+        {direction:'top',offset:[0,-18],opacity:1});
+  });
+  if (pts.length > 1) {
+    L.polyline(pts,{color:'#0057FF',weight:2.5,dashArray:'8 5',opacity:.8}).addTo(_etapesMap);
+    try{_etapesMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});}catch(e){}
+  } else if (pts.length===1) {
+    _etapesMap.setView(pts[0],10);
+  }
 }
 
 function _etapeDel(compId, etId) {
@@ -6625,9 +6995,73 @@ function _etapeDel(compId, etId) {
     return;
   }
   S.etapes[compId] = (S.etapes[compId]||[]).filter(function(x){ return x.id!==etId; });
+  var _cpD = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (_cpD && _cpD.type==='rallye') {
+    _cpD.etapes = S.etapes[compId].map(function(se){
+      return { dateFrom:se.dateFrom||'', dateTo:se.dateTo||'', oaci:se.oaci||'', lieu:se.lieu||se.nom||'', club:se.club||'', region:se.region||'', responsable:se.responsable||'' };
+    });
+  }
   saveState();
   switchHomeDetailTab('etapes');
   toast('Étape supprimée', 'ok');
+}
+
+function _etapeToggleAcc(etId) {
+  var acc  = document.getElementById('etape-acc-'+etId);
+  var chev = document.getElementById('et-chev-'+etId);
+  if (!acc) return;
+  var open = acc.style.display !== 'none';
+  acc.style.display = open ? 'none' : '';
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function _etapeFieldSave(compId, etId, field, value) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id === etId; });
+  if (!et) return;
+  et[field] = value;
+  saveState();
+}
+
+function _etapeFieldSaveLieu(compId, etId, value) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id === etId; });
+  if (!et) return;
+  et.lieu = value; et.nom = value;
+  saveState();
+  _etapeMapRefresh(compId);
+}
+
+function _etapeInlineOACI(compId, etId, val, inputEl) {
+  var oaci = (val||'').toUpperCase().trim();
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id === etId; });
+  if (!et) return;
+  et.oaci = oaci;
+  if (oaci.length >= 4) {
+    var aMatch = (AERODROMES_FR||[]).find(function(a){ return a[0]===oaci; });
+    if (aMatch) {
+      var row = inputEl ? inputEl.closest('tr') : null;
+      if (!et.lieu && row) {
+        var lieuInp = row.querySelectorAll('input')[0];
+        if (lieuInp) { lieuInp.value = aMatch[1]; et.lieu = aMatch[1]; et.nom = aMatch[1]; }
+      }
+      var prefix3 = oaci.length >= 3 ? oaci[2].toUpperCase() : '';
+      var region = (typeof _OACI_REGION_MAP !== 'undefined' && _OACI_REGION_MAP[prefix3]) || '';
+      if (!et.region && region && row) {
+        var regInp = row.querySelectorAll('input')[5];
+        if (regInp) { regInp.value = region; et.region = region; }
+      }
+    }
+  }
+  saveState();
+  if (oaci.length >= 4 && !et.lat) {
+    var geoQ = oaci + ' aerodrome france';
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(geoQ)+'&format=json&limit=1',{headers:{'Accept-Language':'fr'}})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d&&d[0]){ et.lat=d[0].lat; et.lng=d[0].lon; saveState(); _etapeMapRefresh(compId); } })
+      .catch(function(){});
+  }
 }
 
 function toggleMaterielCheck(compId, matId) {
@@ -6958,6 +7392,7 @@ function editComp(id) {
   // Rétrocompatibilité : mapper les anciens types vers les nouveaux
   var _typeMap = {regional:'comp-regionale', entrainement:'entrainement-national'};
   document.getElementById('comp-type').value = _typeMap[cp.type] || cp.type || 'cdf';
+  _compTypeChanged();
   document.getElementById('comp-pratique').value = cp.pratique || 'microlight';
   document.getElementById('comp-discipline').value = cp.discipline || 'stol';
   document.getElementById('comp-desc').value = cp.desc || '';
@@ -12167,33 +12602,444 @@ async function hdpForceSave() {
 }
 
 function _hdgFilter(val) {
-  var v = val.toLowerCase();
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var v = norm(val);
+  if (!v) return [];
+  var byLic = v.match(/^\d/); // commence par un chiffre → recherche licence prioritaire
   return (S.pilots||[]).filter(function(p){
-    var pr = (p.prenom||'').toLowerCase();
-    var no = (p.nom||'').toLowerCase();
-    return pr.startsWith(v) || (pr+' '+no).startsWith(v);
-  }).slice(0,12);
+    var pr  = norm(p.prenom);
+    var no  = norm(p.nom);
+    var lic = (p.licence||'').toLowerCase();
+    if (byLic) return lic.startsWith(v) || lic.includes(v);
+    return pr.startsWith(v) || no.startsWith(v)
+      || (pr+' '+no).startsWith(v) || (no+' '+pr).startsWith(v)
+      || (pr+' '+no).includes(v)   || (no+' '+pr).includes(v)
+      || lic.startsWith(v);
+  }).sort(function(a,b){
+    // Priorité : correspondances exactes de début de nom/prénom
+    var norm2 = function(s){ return norm(s||''); };
+    var scoreA = (norm2(a.nom).startsWith(v)||norm2(a.prenom).startsWith(v)) ? 0 : 1;
+    var scoreB = (norm2(b.nom).startsWith(v)||norm2(b.prenom).startsWith(v)) ? 0 : 1;
+    if (scoreA!==scoreB) return scoreA-scoreB;
+    return (a.nom||'').localeCompare(b.nom||'');
+  }).slice(0,15);
 }
 function hdgShowSuggestC(compId) {
   var inp = document.getElementById('hdg-c-nom'); if (!inp) return;
   var box = document.getElementById('hdg-sug-c'); if (!box) return;
   var val = inp.value.trim();
-  if (!val) { box.style.display='none'; return; }
+  if (val.length < 2) { box.style.display='none'; return; }
   var enrolled = (S.compEnroll||{})[compId]||[];
+
+  // Pilotes déjà en base
   var matches = _hdgFilter(val);
-  if (!matches.length) { box.style.display='none'; return; }
-  box.innerHTML = matches.map(function(p){
+
+  // Recherche complémentaire dans licenceDB (noms pas encore importés dans S.pilots)
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var v = norm(val);
+  var ldbExtra = [];
+  if (S.licenceDB && Object.keys(S.licenceDB).length) {
+    var seen = {};
+    matches.forEach(function(p){ if(p.licence) seen[p.licence]=''; });
+    Object.entries(S.licenceDB).forEach(function(entry){
+      var lic = entry[0], d = entry[1];
+      if (seen[lic]) return;
+      var nom2 = norm((d.nom||'')+(d.prenom||''));
+      var licN = lic.toLowerCase();
+      if (nom2.includes(v) || licN.startsWith(v) || (norm(d.nom||'').startsWith(v)) || (norm(d.prenom||'').startsWith(v))) {
+        ldbExtra.push({_fromLdb:true, licence:lic, nom:d.nom||'', prenom:d.prenom||'', pratique:d.pratique||'', region:d.region||''});
+      }
+    });
+    ldbExtra = ldbExtra.slice(0,6);
+  }
+
+  var rows = [];
+
+  if (!matches.length && !ldbExtra.length) {
+    rows.push('<div style="padding:8px 12px;font-size:11px;color:var(--txt3);font-style:italic">Aucun pilote trouvé pour «&nbsp;'+val.replace(/</g,'&lt;')+'&nbsp;»</div>');
+  }
+
+  rows = rows.concat(matches.map(function(p){
     var ulm = ((S.ulms||{})[p.id]||[])[0]||{};
     var sub = [ulm.marque,ulm.modele].filter(Boolean).join(' ');
     var done = enrolled.indexOf(p.id)>=0;
-    return '<div onmousedown="hdgPickComp(\''+p.id+'\',\''+compId+'\')" style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">'
-      +'<div><span style="font-size:12px;font-weight:700">'+(p.prenom||'')+' '+(p.nom||'')+'</span>'
-      +(sub?'<span style="font-size:10px;color:var(--txt3);margin-left:8px">'+sub+'</span>':'')+'</div>'
-      +(done?'<span style="font-size:10px;color:var(--stol);font-weight:700">✓</span>':'')
+    var licBadge = p.licence ? '<span style="font-size:9px;font-family:monospace;background:rgba(0,87,255,.18);color:var(--stol);border-radius:4px;padding:1px 5px;margin-left:6px">'+p.licence+'</span>' : '';
+    return '<div onmousedown="hdgPickComp(\''+p.id+'\',\''+compId+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">'
+      +'<div>'
+        +'<span style="font-size:12px;font-weight:700;color:var(--txt)">'+(p.prenom||'')+' '+(p.nom||'')+'</span>'
+        +licBadge
+        +(sub?'<span style="font-size:10px;color:var(--txt3);margin-left:6px">'+sub+'</span>':'')
+        +(p.region?'<span style="font-size:10px;color:var(--txt3);display:block;margin-top:1px">'+p.region+'</span>':'')
+      +'</div>'
+      +(done?'<span style="font-size:10px;color:var(--stol);font-weight:700;flex-shrink:0;margin-left:8px">✓ inscrit</span>':'')
       +'</div>';
-  }).join('');
-  box.style.display='block';
+  }));
+
+  if (ldbExtra.length) {
+    rows.push('<div style="padding:5px 12px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;background:rgba(255,255,255,.04)">Depuis la base licences FFPLUM</div>');
+    ldbExtra.forEach(function(d){
+      rows.push('<div onmousedown="hdgPickLdb('+JSON.stringify(d).replace(/"/g,"'")+',\''+compId+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'\'">'
+        +'<div>'
+          +'<span style="font-size:12px;font-weight:700;color:var(--txt)">'+(d.prenom||'')+' '+(d.nom||'')+'</span>'
+          +'<span style="font-size:9px;font-family:monospace;background:rgba(0,87,255,.18);color:var(--stol);border-radius:4px;padding:1px 5px;margin-left:6px">'+d.licence+'</span>'
+          +(d.region?'<span style="font-size:10px;color:var(--txt3);display:block;margin-top:1px">'+d.region+'</span>':'')
+        +'</div>'
+        +'<span style="font-size:9px;color:var(--txt3);flex-shrink:0;margin-left:8px">+ créer</span>'
+        +'</div>');
+    });
+  }
+
+  // Toujours proposer la saisie manuelle en bas
+  var safeVal = val.replace(/'/g,"\\'").replace(/</g,'&lt;');
+  rows.push('<div style="height:1px;background:var(--bdr)"></div>');
+  rows.push('<div onmousedown="hdgAddManual(\''+compId+'\',\''+safeVal+'\')" style="padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#f59e0b" onmouseover="this.style.background=\'rgba(245,158,11,.1)\'" onmouseout="this.style.background=\'\'">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    +'<span style="font-size:12px;font-weight:700">Saisir manuellement…</span>'
+    +'</div>');
+
+  box.innerHTML = rows.join('');
+  box.style.display = 'block';
 }
+function hdgAddManual(compId, prefill) {
+  var box = document.getElementById('hdg-sug-c'); if(box) box.style.display='none';
+  // Tenter de décomposer la saisie en prénom + nom
+  var parts = (prefill||'').trim().split(/\s+/);
+  var guessPrenom = '', guessNom = '';
+  if (parts.length >= 2) {
+    // Si tout en majuscules → NOM PRENOM, sinon PRENOM NOM
+    var allUpper = parts.every(function(p){ return p === p.toUpperCase(); });
+    guessPrenom = allUpper ? parts.slice(1).join(' ') : parts[0];
+    guessNom    = allUpper ? parts[0] : parts.slice(1).join(' ');
+  } else {
+    guessNom = prefill || '';
+  }
+  var e2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); };
+  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var fo  = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
+  var lbl = function(t,req){ return '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px">'+(req?'<span style="color:#f87171">*</span> ':'')+t+'</div>'; };
+  var pratiques = ['microlight','paramoteur','multi'];
+  var pratOpts = pratiques.map(function(p){ return '<option value="'+p+'">'+p.charAt(0).toUpperCase()+p.slice(1)+'</option>'; }).join('');
+  var ov = document.createElement('div');
+  ov.id = 'hdg-manual-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);backdrop-filter:blur(3px)';
+  ov.onclick = function(ev){ if(ev.target===ov) ov.remove(); };
+  ov.innerHTML =
+    '<div style="background:var(--navy2);border-radius:14px;width:min(480px,97vw);padding:22px 24px 18px;box-shadow:0 20px 60px rgba(0,0,0,.55)">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:2px">➕ Ajouter un pilote manuellement</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Ce pilote sera ajouté à la base locale et inscrit dans l\'équipage. Vous pourrez compléter sa fiche plus tard.</div>'
+    +'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px 12px;font-size:11px;color:#f59e0b;margin-bottom:4px">⚠ Vérifiez bien le nom et la licence — cette fiche sera à valider ultérieurement.</div>'
+    +lbl('Prénom',true)
+    +'<input id="hdg-man-prenom" type="text" value="'+e2(guessPrenom)+'" placeholder="Prénom…" style="'+iSt+'" '+fo+'>'
+    +lbl('Nom',true)
+    +'<input id="hdg-man-nom" type="text" value="'+e2(guessNom)+'" placeholder="Nom de famille…" style="'+iSt+'" '+fo+'>'
+    +lbl('N° Licence')
+    +'<input id="hdg-man-licence" type="text" placeholder="Ex : 12345678 (facultatif)" style="'+iSt+'" '+fo+'>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+      +'<div>'+lbl('Pratique')+'<select id="hdg-man-pratique" style="'+iSt+'"><option value="">—</option>'+pratOpts+'</select></div>'
+      +'<div>'+lbl('Région')+'<input id="hdg-man-region" type="text" placeholder="Région…" style="'+iSt+'" '+fo+'></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
+      +'<button onclick="document.getElementById(\'hdg-manual-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+      +'<button onclick="hdgSaveManual(\''+compId+'\')" style="padding:8px 20px;border-radius:8px;border:none;background:#f59e0b;color:#000;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Inscrire dans l\'équipage</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){
+    var f = document.getElementById('hdg-man-prenom');
+    if (f) { f.focus(); f.select(); }
+  }, 60);
+}
+
+function hdgSaveManual(compId) {
+  var prenom  = (document.getElementById('hdg-man-prenom') ||{value:''}).value.trim();
+  var nom     = (document.getElementById('hdg-man-nom')    ||{value:''}).value.trim();
+  var licence = (document.getElementById('hdg-man-licence')||{value:''}).value.trim();
+  var pratique= (document.getElementById('hdg-man-pratique')||{value:''}).value;
+  var region  = (document.getElementById('hdg-man-region') ||{value:''}).value.trim();
+  if (!prenom || !nom) { toast('Prénom et Nom obligatoires', 'err'); return; }
+  // Vérifier doublon par licence
+  if (licence) {
+    var dup = (S.pilots||[]).find(function(p){ return p.licence && String(p.licence) === String(licence); });
+    if (dup) {
+      toast((dup.prenom||'')+' '+(dup.nom||'')+' existe déjà (licence '+licence+')', 'err');
+      document.getElementById('hdg-manual-ov').remove();
+      // Inscrire directement le doublon
+      if (!S.compEnroll) S.compEnroll={};
+      if (!S.compEnroll[compId]) S.compEnroll[compId]=[];
+      if (S.compEnroll[compId].indexOf(dup.id)<0) {
+        S.compEnroll[compId].push(dup.id);
+        saveState(); _hdpSaveNow();
+        renderHomeDetailPanel(null);
+        toast((dup.prenom||'')+' '+(dup.nom||'')+' inscrit ✓','ok');
+      }
+      return;
+    }
+  }
+  var pilot = {
+    id: 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    prenom: prenom, nom: nom, licence: licence,
+    pratique: pratique, region: region,
+    categorie:'', classe:'', equipage:'', genre:'',
+    _provisional: true
+  };
+  if (!S.pilots) S.pilots = [];
+  S.pilots.push(pilot);
+  if (!S.compEnroll) S.compEnroll={};
+  if (!S.compEnroll[compId]) S.compEnroll[compId]=[];
+  if (S.compEnroll[compId].indexOf(pilot.id)<0) {
+    S.compEnroll[compId].push(pilot.id);
+    var _cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+    if (_cp) _applyCompFieldsToPilot(pilot, _cp);
+  }
+  saveState();
+  _hdpSaveNow();
+  var ov = document.getElementById('hdg-manual-ov'); if(ov) ov.remove();
+  // Vider le champ de recherche
+  var inp = document.getElementById('hdg-c-nom'); if(inp){ inp.value=''; if(inp.dataset) inp.dataset.pid=''; }
+  renderHomeDetailPanel(null);
+  toast(prenom+' '+nom+' inscrit ✓'+(licence?' — licence à vérifier':''),'ok');
+}
+
+var _TOUR_ULM_2026 = [
+  {licence:'11105',nom:'ANDRAL',prenom:'ROLAND',ddn:'27/03/1959',role:'pilote',email:'roland.andral@free.fr',tel:'0651799189',adresse:'27 RUE DU FOURNIL 12400 MONTLAUR',immat:'12JA',marque:'BRAKO',modele:'GT',moteur:'ROTAX 912'},
+  {licence:'105657',nom:'MARTI',prenom:'MICHEL',ddn:'29/08/1958',role:'pilote',email:'michel.marti@free.fr',tel:'0781047538',adresse:'16 RUE DES ERABLES 31170 TOURNEFEUILLE',immat:'84XX',marque:'AEROPRAKT',modele:'A32',moteur:'Zonsen'},
+  {licence:'171230',nom:'VIGNES',prenom:'BAPTISTE',ddn:'08/08/1998',role:'pilote',email:'baptistevignes.aero@gmail.com',tel:'0624178241',adresse:'28 RUE ROBERT SCHUMANN 84000 AVIGNON',immat:'84KA',marque:'ICP SRL',modele:'SAVANNAH S 912 ULSFR',moteur:'ROTAX 912 ULS'},
+  {licence:'167670',nom:'VIEILLEDENT',prenom:'STEPHANE',ddn:'11/02/1955',role:'pilote',email:'stephane.vieilledent@gmail.com',tel:'0687509569',adresse:'21 AVENUE CHARLES DE GAULLE 12100 MILLAU',immat:'68AGB',marque:'Zlin',modele:'Savage',moteur:'ROTAX ULS'},
+  {licence:'150021',nom:'MELARD',prenom:'SYLVAIN',ddn:'13/12/1967',role:'pilote',email:'melard.sylvain@orange.fr',tel:'0607574306',adresse:'47 AVENUE FRANCOIS MITTERRAND 62217 BEAURAINS',immat:'31AAN',marque:'Flightdesign',modele:'CTSL',moteur:'ROTAX 912'},
+  {licence:'198619',nom:'LECHEVALIER',prenom:'ANTOINE',ddn:'21/01/1987',role:'pilote',email:'taz_apocalipse@hotmail.com',tel:'0618055149',adresse:'60 RUE HENRY POTEZ 40000 MONT DE MARSAN',immat:'84LI',marque:'AEROPRAKT LTD',modele:'A22 L2',moteur:'Rotax 912 ULS'},
+  {licence:'196273',nom:'LIEBE',prenom:'ARISTIDE',ddn:'10/06/2002',role:'pilote',email:'aristideliebe@gmail.com',tel:'0783115399',adresse:'2 ROUTE DE SAVIGNY 21380 MARSANNAY LE BOIS',immat:'21ALQ',marque:'Bristell',modele:'XL-8',moteur:'Rotax 912 ULS'},
+  {licence:'192048',nom:'SERVAT',prenom:'JEAN-MARC',ddn:'27/12/1966',role:'pilote',email:'jean-marc@servat.name',tel:'0675977690',adresse:'19 FREDERIC MOMPOU 17255 BEGUR',immat:'66SD',marque:'Aeroprakt',modele:'A32',moteur:'Rotax 912 ULS'},
+  {licence:'20289',nom:'LACASSAGNE',prenom:'THIERRY',ddn:'28/02/1960',role:'pilote',email:'thierrylacassagne@wanadoo.fr',tel:'0662740118',adresse:'6 CHEMIN DE LA GRANGE 33650 MARTILLAC',immat:'47ZH',marque:'SKYLEADER',modele:'200',moteur:'ROTAX 912 iS'},
+  {licence:'195342',nom:'LAFFONT',prenom:'YANN',ddn:'31/01/2003',role:'pilote',email:'laffontyann31@gmail.com',tel:'0782571128',adresse:'9 ROUTE DES BLANCS 81200 MAZAMET',immat:'81LO',marque:'BESTOFF',modele:'NYNJA',moteur:'ROTAX 912 80 CV'},
+  {licence:'201520',nom:'ABALLEA',prenom:'ELOUAN',ddn:'16/10/2001',role:'pilote',email:'elouan.aballea@laposte.net',tel:'0620236315',adresse:'1 RUE ANDRE MAZANA 31100 TOULOUSE',immat:'FJHIF',marque:'IKARUS',modele:'C42',moteur:'Rotax 912'},
+  {licence:'185379',nom:'COUCHAUX',prenom:'PIERRE-EMMANUEL',ddn:'05/10/1995',role:'pilote',email:'couchaux.pierreemmanuel@gmail.com',tel:'0777397828',adresse:'24 RUE SAINTE GENEVIEVE 54600 VILLERS-LES-NANCY',immat:'54BDD',marque:'HUMBERT AVIATION',modele:'TETRAS CTS',moteur:'ROTAX 912'},
+  {licence:'168139',nom:'MARIANNE',prenom:'ALAIN',ddn:'28/05/1962',role:'pilote',email:'alainmarianne78@gmail.com',tel:'0613666523',adresse:'12 RUE JEAN MONNET 78340 LES CLAYES SOUS BOIS',immat:'05OO',marque:'FK Aircraft',modele:'FK9 MK IV SW',moteur:'ROTAX 912 UL'},
+  {licence:'199494',nom:'COLLET',prenom:'MATTHIEU',ddn:'20/08/2001',role:'pilote',email:'matthi.collet@gmail.com',tel:'0671791945',adresse:'6 RUE STUREL PAIGNE 57000 METZ',immat:'54AZL',marque:'ICP',modele:'Savannah S',moteur:'Rotax 912 ULS'},
+  {licence:'105074',nom:'MONTORIO',prenom:'CELINE',ddn:'25/12/1984',role:'pilote',email:'celine.montorio@gmail.com',tel:'0607274227',adresse:'04 AVENUE DU MARECHAL JOFFRE 65100 LOURDES',immat:'65SP',marque:'Aeroprakt',modele:'A22',moteur:'Rotax 80cv'},
+  {licence:'106035',nom:'GRABE',prenom:'OLIVIER',ddn:'27/02/1970',role:'pilote',email:'olivier.grabe@sfr.fr',tel:'0683967633',adresse:'4 AVENUE DU MARECHAL JOFFRE 65100 LOURDES',immat:'65SB',marque:'AEROPRAKT',modele:'A22L2',moteur:'ROTAX 912 80HP'},
+  {licence:'186266',nom:'COMIER',prenom:'JEAN-FRANCOIS',ddn:'11/01/1960',role:'pilote',email:'jf.comier@lilo.org',tel:'0663234742',adresse:'18 RUE DU CLOS 78870 BAILLY',immat:'17MC',marque:'JCC AVIATION',modele:'J300',moteur:'ROTAX 912 UL'},
+  {licence:'196082',nom:'TRAVARD',prenom:'JAROD',ddn:'03/12/2004',role:'pilote',email:'trajarod@gmail.com',tel:'0629655396',adresse:'2 CHEMIN 42430 CHERIER',immat:'42QP',marque:'airlony',modele:'skylane',moteur:'912 ul rotax'},
+  {licence:'202207',nom:'ANDRAL MEIGNAN',prenom:'MATEIS',ddn:'08/03/2005',role:'copilote',email:'andral.mateis@free.fr',tel:'0782515563',adresse:'27 RUE DU FOURNIL 12400 MONTLAUR',immat:'12JA',marque:'',modele:'',moteur:''},
+  {licence:'198624',nom:'DELLAC',prenom:'MARTIN',ddn:'26/02/2008',role:'copilote',email:'martin.dellac@icloud.com',tel:'0672564967',adresse:'3 IMPASSE DE COMMIS 31180 CASTELMAUROU',immat:'84XX',marque:'',modele:'',moteur:''},
+  {licence:'196069',nom:'BARLET-BAS',prenom:'MAILYS',ddn:'27/08/2003',role:'copilote',email:'mailysbarletbas@gmail.com',tel:'0666619720',adresse:'7 AVENUE DE LA REINE NATHALIE 64200 BIARRITZ',immat:'84KA',marque:'',modele:'',moteur:''},
+  {licence:'199296',nom:'FOULQUIER',prenom:'INES',ddn:'09/09/2008',role:'copilote',email:'inesfoulq@gmail.com',tel:'0629482458',adresse:'966 RUE DU PRINTEMPS 12100 MILLAU',immat:'68AGB',marque:'',modele:'',moteur:''},
+  {licence:'194277',nom:'BIHAN',prenom:'MARION',ddn:'27/02/2006',role:'copilote',email:'marion.bihan20@yahoo.com',tel:'0782044815',adresse:'1 RUE LA ROTONDE 62217 ACHICOURT',immat:'31AAN',marque:'',modele:'',moteur:''},
+  {licence:'199661',nom:'DALBOS',prenom:'HINATEA',ddn:'11/12/2001',role:'copilote',email:'hinateadalbos@yahoo.fr',tel:'0640364588',adresse:'972 Rue du 11 Novembre 82400 Valence d\'Agen',immat:'84LI',marque:'',modele:'',moteur:''},
+  {licence:'174864',nom:'DOUSSE-PLANTE',prenom:'JEANNE',ddn:'28/03/2001',role:'copilote',email:'dousseplante.jeanne@gmail.com',tel:'0783001771',adresse:'20 RUE DE LA COLOMBIERE 21000 DIJON',immat:'21ALQ',marque:'',modele:'',moteur:''},
+  {licence:'201358',nom:'MOREALE',prenom:'JULIE',ddn:'03/08/2002',role:'copilote',email:'julie.moreale@gmail.com',tel:'0641809207',adresse:'1 RUE ANDRE MAZANA 31100 TOULOUSE',immat:'66SD',marque:'',modele:'',moteur:''},
+  {licence:'180550',nom:'CLUZEAU',prenom:'MANON',ddn:'19/01/2002',role:'copilote',email:'manon.cluzeau@gmail.com',tel:'0667818631',adresse:'44 ALLEE CHARLES DE FITTE 31300 TOULOUSE',immat:'47ZH',marque:'',modele:'',moteur:''},
+  {licence:'191870',nom:'MOREAU',prenom:'SACHA',ddn:'01/07/2008',role:'copilote',email:'moreausacha183@gmail.com',tel:'0769050121',adresse:'45 ROUTE DU STADE 81150 ROUFFIAC',immat:'81LO',marque:'',modele:'',moteur:''},
+  {licence:'192276',nom:'FESQUET',prenom:'NAEL',ddn:'18/08/2000',role:'copilote',email:'naelfesquet7@gmail.com',tel:'0768196079',adresse:'146 AVENUE DE MURET 31300 TOULOUSE',immat:'FJHIF',marque:'',modele:'',moteur:''},
+  {licence:'199694',nom:'FERREIRA',prenom:'BENJAMIN',ddn:'21/02/2001',role:'copilote',email:'benjamin.ferreira200@gmail.com',tel:'0621976204',adresse:'8 RUE DU GENERAL CUSTINE 54000 NANCY',immat:'54BDD',marque:'',modele:'',moteur:''},
+  {licence:'195721',nom:'POMBOURCQ',prenom:'NATHAN',ddn:'14/11/2008',role:'copilote',email:'nathan.pombourcq@gmail.com',tel:'0785804109',adresse:'48 CHEMIN PAVE 78620 L ETANG LA VILLE',immat:'05OO',marque:'',modele:'',moteur:''},
+  {licence:'202567',nom:'COQUET',prenom:'TIMON',ddn:'25/09/2002',role:'copilote',email:'timon.coquet@gmail.com',tel:'0610750807',adresse:'89 RUE FALGUIERE 75015 PARIS',immat:'54AZL',marque:'',modele:'',moteur:''},
+  {licence:'200395',nom:'ANEZO',prenom:'ESTEBAN',ddn:'10/06/2008',role:'copilote',email:'tonatiuh.anezo@gmail.com',tel:'0035266180835',adresse:'34 RUE JEANPIERRE KEMMER 1850 LUXEMBOURG',immat:'21ALQ',marque:'',modele:'',moteur:''},
+  {licence:'201718',nom:'LEVEQUE',prenom:'TITOUAN',ddn:'27/02/2003',role:'copilote',email:'titouanleveque16@gmail.com',tel:'0652804974',adresse:'14 RUE DES GRAVES 65000 TARBES',immat:'65SP',marque:'',modele:'',moteur:''},
+  {licence:'200067',nom:'LEDINGTON',prenom:'ELLEA',ddn:'27/04/2001',role:'copilote',email:'ellea0ledington@gmail.com',tel:'0695346752',adresse:'8 RUE LICOUET 44170 LA GRIGONNAIS',immat:'65SB',marque:'',modele:'',moteur:''},
+  {licence:'199552',nom:'COMIER',prenom:'ANTOINE',ddn:'31/07/2009',role:'copilote',email:'titoucomier78@gmail.com',tel:'0769078040',adresse:'18 RUE DU CLOS 78870 BAILLY',immat:'17MC',marque:'',modele:'',moteur:''},
+  {licence:'202591',nom:'JUNILLON',prenom:'MATHIEU',ddn:'12/10/2006',role:'copilote',email:'mathieu67.junillon@gmail.com',tel:'0768072733',adresse:'9 RUE GUERRIERE 42110 POUILLY-LES-FEURS',immat:'42QP',marque:'',modele:''}
+];
+
+function hdgImportTourULM2026(compId) {
+  var data = _TOUR_ULM_2026;
+  if (!S.pilots) S.pilots = [];
+  if (!S.compEnroll) S.compEnroll = {};
+  if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+  if (!S.ulms) S.ulms = {};
+
+  var normL = function(s){ return (s||'').toString().trim().replace(/^0+/,''); };
+  var toCreate = [], toEnroll = [], alreadyIn = [];
+
+  data.forEach(function(d) {
+    var licN = normL(d.licence);
+    // Chercher doublon par licence
+    var existing = licN ? (S.pilots).find(function(p){ return normL(p.licence||'') === licN; }) : null;
+    // Fallback nom+prénom
+    if (!existing && d.nom) {
+      var nd = (d.nom||'').toUpperCase(), pd = (d.prenom||'').toUpperCase();
+      existing = (S.pilots).find(function(p){ return (p.nom||'').toUpperCase()===nd && (p.prenom||'').toUpperCase()===pd; });
+    }
+
+    if (existing) {
+      // Mettre à jour les champs manquants
+      if (!existing.email   && d.email)   existing.email   = d.email;
+      if (!existing.tel     && d.tel)     existing.tel     = d.tel;
+      if (!existing.adresse && d.adresse) existing.adresse = d.adresse;
+      if (!existing.ddn     && d.ddn)     existing.ddn     = d.ddn;
+      if (!existing.licence && d.licence) existing.licence = d.licence;
+      existing._updatedAt = Date.now();
+      // ULM
+      if (d.immat && d.marque) {
+        if (!S.ulms[existing.id]) S.ulms[existing.id] = [];
+        if (!S.ulms[existing.id].length) {
+          S.ulms[existing.id].push({id:'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),immat:d.immat,marque:d.marque,modele:d.modele||'',moteur:d.moteur||''});
+        }
+      }
+      if (S.compEnroll[compId].indexOf(existing.id) !== -1) {
+        alreadyIn.push({pilot:existing, _src:d});
+      } else {
+        toEnroll.push({pilot:existing, _src:d});
+      }
+    } else {
+      toCreate.push(d);
+    }
+  });
+
+  // Afficher prévisualisation
+  var ov = document.createElement('div');
+  ov.id = '_tul26-preview';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+
+  var mkRow = function(label, color, items, getName) {
+    if (!items.length) return '';
+    var h = '<div style="font-size:12px;font-weight:700;color:'+color+';margin:10px 0 5px">'+label+' ('+items.length+')</div>';
+    h += '<div style="max-height:120px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px">';
+    items.forEach(function(item, i) {
+      var bg = i%2===0 ? 'background:var(--navy3)' : '';
+      var p = getName(item);
+      h += '<div style="padding:5px 10px;font-size:12px;'+bg+';display:flex;align-items:center;gap:8px">'
+        + '<span style="color:'+color+';font-size:10px">●</span>'
+        + '<span style="flex:1;font-weight:600">'+p.prenom+' '+p.nom+'</span>'
+        + '<span style="font-size:10px;color:var(--txt3)">'+p.lic+'</span>'
+        + (p.role ? '<span style="font-size:10px;background:rgba(255,255,255,.08);border-radius:4px;padding:1px 5px">'+p.role+'</span>' : '')
+        + (p.immat ? '<span style="font-size:10px;font-family:monospace;color:#60a5fa">'+p.immat+'</span>' : '')
+        + '</div>';
+    });
+    h += '</div>';
+    return h;
+  };
+
+  var listHtml = mkRow('✨ À créer et inscrire', '#10b981', toCreate, function(d){ return {prenom:d.prenom,nom:d.nom,lic:d.licence,role:d.role,immat:d.immat||''}; });
+  listHtml += mkRow('🔗 Existants à inscrire', '#3b82f6', toEnroll, function(item){ return {prenom:item.pilot.prenom,nom:item.pilot.nom,lic:item.pilot.licence||'',role:item._src.role,immat:item._src.immat||''}; });
+  listHtml += mkRow('🔄 Déjà inscrits (données mises à jour)', '#f59e0b', alreadyIn, function(item){ return {prenom:item.pilot.prenom,nom:item.pilot.nom,lic:item.pilot.licence||'',role:item._src.role,immat:''}; });
+  if (!toCreate.length && !toEnroll.length && !alreadyIn.length) {
+    listHtml = '<div style="text-align:center;padding:20px;color:var(--txt3)">Aucun pilote à importer.</div>';
+  }
+
+  var total = toCreate.length + toEnroll.length;
+  ov.innerHTML = '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.5)">'
+    + '<div style="padding:22px 24px 12px">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:2px">✈️ Import — Tour ULM 2026</div>'
+    + '<div style="font-size:12px;color:var(--txt3);margin-bottom:12px">Compétition : <strong>'+(cp?cp.name:compId)+'</strong> · 37 participants · 19 équipages</div>'
+    + listHtml
+    + '</div>'
+    + '<div style="padding:14px 24px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--bdr)">'
+    + '<button onclick="document.getElementById(\'_tul26-preview\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+    + (total + alreadyIn.length > 0 ? '<button onclick="_tul26Confirm(\''+compId+'\')" style="padding:9px 22px;border-radius:10px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Confirmer l\'import ('+(total+alreadyIn.length)+')</button>' : '')
+    + '</div>'
+    + '</div>';
+
+  ov._toCreate  = toCreate;
+  ov._toEnroll  = toEnroll;
+  ov._alreadyIn = alreadyIn;
+  document.body.appendChild(ov);
+}
+
+function _tul26Confirm(compId) {
+  var ov = document.getElementById('_tul26-preview'); if (!ov) return;
+  var toCreate  = ov._toCreate  || [];
+  var toEnroll  = ov._toEnroll  || [];
+  var alreadyIn = ov._alreadyIn || [];
+
+  var normL = function(s){ return (s||'').toString().trim().replace(/^0+/,''); };
+  if (!S.pilots) S.pilots = [];
+  if (!S.compEnroll) S.compEnroll = {};
+  if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+  if (!S.ulms) S.ulms = {};
+
+  // Créer les nouveaux pilotes
+  toCreate.forEach(function(d) {
+    var pid = 'p_tul26_'+d.licence+'_'+Math.random().toString(36).slice(2,5);
+    var pilot = {
+      id: pid,
+      nom: d.nom, prenom: d.prenom, licence: d.licence,
+      ddn: d.ddn || '', email: d.email || '', tel: d.tel || '',
+      adresse: d.adresse || '', club: '', region: '',
+      pratique: 'microlight', categorie: '', equipage: d.role==='pilote'?'Biplace':'',
+      role: d.role==='pilote'?'Pilote':'Copilote',
+      genre: '', statut: 'pilote',
+      _createdAt: Date.now(), _updatedAt: Date.now()
+    };
+    S.pilots.push(pilot);
+    if (d.immat && d.marque) {
+      S.ulms[pid] = [{id:'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),immat:d.immat,marque:d.marque,modele:d.modele||'',moteur:d.moteur||''}];
+    }
+    S.compEnroll[compId].push(pid);
+  });
+
+  // Inscrire les existants
+  toEnroll.forEach(function(item) {
+    var pid = item.pilot.id;
+    if (S.compEnroll[compId].indexOf(pid) === -1) S.compEnroll[compId].push(pid);
+    // ULM si absent
+    var d = item._src;
+    if (d.immat && d.marque && (!S.ulms[pid] || !S.ulms[pid].length)) {
+      S.ulms[pid] = [{id:'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),immat:d.immat,marque:d.marque,modele:d.modele||'',moteur:d.moteur||''}];
+    }
+  });
+
+  // alreadyIn : les données ont déjà été mises à jour dans hdgImportTourULM2026
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  if (cp && typeof _applyCompFieldsToPilot === 'function') {
+    S.compEnroll[compId].forEach(function(pid) {
+      var p = (S.pilots||[]).find(function(x){ return x.id===pid; });
+      if (p) _applyCompFieldsToPilot(p, cp);
+    });
+  }
+
+  if (!S._tul26Imported) S._tul26Imported = {};
+  S._tul26Imported[compId] = true;
+  saveState();
+  if (typeof _hdpSaveNow === 'function') _hdpSaveNow();
+  ov.remove();
+  if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+  var nb = toCreate.length + toEnroll.length;
+  toast(nb + ' pilote'+(nb>1?'s':'')+' importé'+(nb>1?'s':'')+' ✓'+(alreadyIn.length?' · '+alreadyIn.length+' mis à jour':''), 'ok');
+}
+
+function hdgPickLdb(d, compId) {
+  // Créer le pilote depuis licenceDB s'il n'existe pas encore
+  var existing = (S.pilots||[]).find(function(p){
+    return p.licence && String(p.licence) === String(d.licence);
+  });
+  var pilot = existing;
+  if (!pilot) {
+    pilot = {
+      id: 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      nom: d.nom||'', prenom: d.prenom||'', licence: d.licence||'',
+      pratique: d.pratique||'', region: d.region||'',
+      categorie:'', classe:'', equipage:'', genre:''
+    };
+    if (!S.pilots) S.pilots = [];
+    S.pilots.push(pilot);
+    saveState();
+    toast((pilot.prenom||'')+' '+(pilot.nom||'')+' créé dans la base pilotes','ok');
+  }
+  // Pré-remplir la ligne de saisie
+  var set = function(id,v){ var el=document.getElementById(id); if(el)el.value=v||''; };
+  set('hdg-c-nom',(pilot.prenom||'')+' '+(pilot.nom||''));
+  set('hdg-c-lic', pilot.licence||'');
+  set('hdg-c-region', pilot.region||'');
+  set('hdg-c-pratique', pilot.pratique||'');
+  var inp = document.getElementById('hdg-c-nom'); if(inp) inp.dataset.pid = pilot.id;
+  var box = document.getElementById('hdg-sug-c'); if(box) box.style.display='none';
+  // Inscrire directement
+  if (!S.compEnroll) S.compEnroll = {};
+  if (!S.compEnroll[compId]) S.compEnroll[compId] = [];
+  if (S.compEnroll[compId].indexOf(pilot.id) < 0) {
+    S.compEnroll[compId].push(pilot.id);
+    var _cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+    if (_cp) _applyCompFieldsToPilot(pilot, _cp);
+    saveState();
+    _hdpSaveNow();
+    var el=document.getElementById('hdg-c-nom'); if(el){el.value='';if(el.dataset)el.dataset.pid='';}
+    renderHomeDetailPanel(null);
+    toast((pilot.prenom||'')+' '+(pilot.nom||'')+' inscrit ✓','ok');
+  }
+}
+
 function hdgPickComp(pilotId, compId) {
   var p = (S.pilots||[]).find(function(x){return x.id===pilotId;}); if (!p) return;
   var ulm = ((S.ulms||{})[pilotId]||[])[0]||{};
@@ -12256,9 +13102,36 @@ function hdgRemoveComp(compId, pilotId) {
   toast('Pilote retiré','');
 }
 // ─── Équipage inline field save ────────────────────────────────────────────
-function eqpInlineSave(pilotId, field, value, compId) {
+function _isValidLicence(v) {
+  return /^\d{4,7}$/.test((v||'').trim());
+}
+function eqpInlineSave(pilotId, field, value, compId, inputEl) {
   var p = (S.pilots||[]).find(function(x){ return x.id===pilotId; });
   if (!p) return;
+  if (field === 'licence') {
+    var v = (value||'').trim();
+    if (v && !_isValidLicence(v)) {
+      // Format invalide → effacer et signaler dans le DOM
+      value = '';
+      if (inputEl) { inputEl.value = ''; inputEl.style.outline='2px solid #ef4444'; setTimeout(function(){ if(inputEl)inputEl.style.outline=''; },1800); }
+    } else if (v) {
+      // Licence valide → enrichissement automatique depuis licenceDB
+      var ldb = S.licenceDB && (S.licenceDB['_lic_'+v] || null);
+      if (!ldb && S.licenceDB) {
+        ldb = Object.values(S.licenceDB).find(function(r){ return r.licence===v; }) || null;
+      }
+      if (ldb) {
+        var ow = function(f,val){ if(val&&!p[f]) p[f]=val; };
+        ow('nom',   ldb.nom   ? ldb.nom.trim().toUpperCase()    : '');
+        ow('prenom',ldb.prenom? ldb.prenom.trim().toUpperCase() : '');
+        ow('genre', ldb.genre);  ow('ddn',ldb.ddn);
+        ow('club',  ldb.club);   ow('region',ldb.region);
+        if (!p._identifiedAt) p._identifiedAt = Date.now();
+        if (p._provisional) delete p._provisional;
+        setTimeout(function(){ if(typeof renderHomeDetailPanel==='function') renderHomeDetailPanel(null); }, 80);
+      }
+    }
+  }
   p[field] = value;
   // Si classe sauvegardée → aussi dans le 1er ULM si c'est la classe ULM
   if (field === 'classe') {
@@ -12416,11 +13289,14 @@ function hdgImportEquipageExcel(inp, compId) {
         var nomF    = ((ldb&&ldb.nom)    || nom    || '').trim().toUpperCase();
         var prenomF = ((ldb&&ldb.prenom) || prenom || '').trim().toUpperCase();
         var licF    = (ldb&&ldb.licence)|| lic    || '';
+        // licF brut pour la recherche (même invalide, on veut retrouver le pilote existant)
 
         // Chercher pilote existant (par licence prioritaire, puis nom+prénom)
         var found = null;
         if (licF) found = (S.pilots||[]).find(function(p){ return p.licence && normName(p.licence)===normName(licF); });
         if (!found && nomF) found = (S.pilots||[]).find(function(p){ return normName(p.nom)===normName(nomF) && normName(p.prenom)===normName(prenomF); });
+        // Valider le format FFPLUM APRÈS la recherche — on ne stocke que les licences valides
+        var licToSave = _isValidLicence(licF) ? licF : '';
 
         // Smart mapping des champs contrôlés
         var rawForMap = {
@@ -12451,7 +13327,7 @@ function hdgImportEquipageExcel(inp, compId) {
         // Objet de données import partagé (toEnroll ET alreadyIn)
         var _importData = {
           pilot: found, row: r, smart: smart, ldb: ldb,
-          licence: licF,
+          licence: licToSave,
           email:  (ldb&&ldb.email)  || get(r,'email')  || '',
           tel:    (ldb&&ldb.tel)    || get(r,'tel')    || '',
           club:   (ldb&&ldb.club)   || get(r,'club')   || '',
@@ -12478,7 +13354,7 @@ function hdgImportEquipageExcel(inp, compId) {
         } else {
           // Préparer un nouveau pilote à créer
           toCreate.push({
-            nom: nomF, prenom: prenomF, licence: licF,
+            nom: nomF, prenom: prenomF, licence: licToSave,
             genre:     (typeof _mapGenre === 'function') ? _mapGenre((ldb&&ldb.genre)||get(r,'genre')) : '',
             ddn:       (typeof _mapDate  === 'function') ? _mapDate((ldb&&ldb.ddn)||get(r,'ddn'))     : '',
             email:     (ldb&&ldb.email)  || get(r, 'email')  || '',
@@ -12493,7 +13369,7 @@ function hdgImportEquipageExcel(inp, compId) {
             role:      smart.role,
             niveau:    get(r, 'niveau')    || '',
             remarques: get(r, 'remarques') || '',
-            adresse:   (ldb&&ldb.adresse)  || get(r, 'adresse') || '',
+            adresse:   (ldb&&ldb.adresse)  || ([get(r,'adresse'),get(r,'_cp'),get(r,'_ville')].filter(Boolean).join(' ')) || '',
             _immat:    get(r, 'immat')   || '',
             _marque:   _resMarque,
             _modele:   _resModele,
@@ -12804,9 +13680,10 @@ function _printCompEquipageAttestation(pilotId, compId) {
   var isPast = compDateFrom ? compDateFrom < today : false;
   var participe = isPast ? 'a participé' : 'participera';
 
+  var _isCDF = cp.type === 'cdf';
   var pratLabelComp = {microlight:'Championnat de France ULM Microlight',paramoteur:'Championnat de France ULM Paramoteur',multi:'Championnat de France ULM Multi-axes'}[cp.pratique||''] || esc(cp.nom||'');
   var discLabelComp = {classique:'Classic',classic:'Classic',freestyle:'Freestyle',cross:'Cross Country',slalom:'Slalom'}[cp.discipline||''] || (cp.discipline||'');
-  var compTitleLine = (cp.pratique ? esc(pratLabelComp) : esc(cp.nom||'')) + (discLabelComp ? ' <em>'+esc(discLabelComp)+'</em>' : '');
+  var compTitleLine = (_isCDF && cp.pratique ? esc(pratLabelComp) : esc(cp.nom||'')) + (discLabelComp ? ' <em>'+esc(discLabelComp)+'</em>' : '');
 
   var meta = (((S.enrollMeta||{})[compId])||{})[pilotId] || {};
   var podium = meta.podium || '';
@@ -12856,30 +13733,125 @@ function hdgPrintEquipage(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
   var enrolled = (S.compEnroll||{})[compId] || [];
-  var clsLbl = {paramotor:'Para',paramoteur:'Para',multiaxes:'Multi',pendulaire:'Pend',gyro:'Gyro',autogire:'Gyro',microlight:'Micro'};
-  var rows = enrolled.map(function(pid, i) {
+
+  // Construire les objets pilote+ULM
+  var items = enrolled.map(function(pid){
     var p   = (S.pilots||[]).find(function(x){ return x.id===pid; })||{};
     var ulm = ((S.ulms||{})[pid]||[])[0]||{};
-    var cls = (ulm.classe||'').toLowerCase();
-    return '<tr style="background:'+(i%2?'#f4f6f9':'#fff')+'">'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(i+1)+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde;font-weight:600">'+(p.prenom||'')+' '+(p.nom||'')+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(p.licence||'—')+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(ulm.immat||'—')+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(ulm.marque||'—')+' '+(ulm.modele||'')+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(clsLbl[cls]||(cls||'—'))+'</td>'
-      +'<td style="padding:6px 10px;border:1px solid #dde">'+(p.region||'—')+'</td>'
+    return { p:p, ulm:ulm, immat:(ulm.immat||'').replace(/[\s\-]/g,'').toUpperCase() };
+  });
+
+  // Grouper par immatriculation
+  var groups = {}, noImmat = [];
+  items.forEach(function(item){
+    if (!item.immat) { noImmat.push(item); return; }
+    if (!groups[item.immat]) groups[item.immat] = { immat:item.immat, ulm:item.ulm, members:[] };
+    groups[item.immat].members.push(item.p);
+  });
+
+  // Trier : Pilote en premier dans chaque équipage
+  var _isPilot = function(p){ var r=(p.role||'').toLowerCase(); return r.indexOf('pilote')!==-1&&r.indexOf('co')===-1; };
+  Object.keys(groups).forEach(function(k){
+    groups[k].members.sort(function(a,b){ return (_isPilot(a)?0:1)-(_isPilot(b)?0:1); });
+  });
+
+  // Trier les équipages par immat
+  var equipList = Object.values(groups).sort(function(a,b){ return a.immat.localeCompare(b.immat); });
+
+  var td  = 'padding:7px 12px;border:1px solid #d0d5dd;font-size:12px;vertical-align:top';
+  var tdb = td+';font-weight:700';
+  var html = '';
+  var eqNum = 0;
+
+  equipList.forEach(function(g){
+    eqNum++;
+    var ulm = g.ulm;
+    var appareil = [ulm.marque, ulm.modele].filter(Boolean).join(' ') || '—';
+    var moteur   = ulm.moteur || '';
+
+    // Ligne d'en-tête équipage (bleu marine)
+    html += '<tr style="background:#1e3a5f;color:#fff;page-break-inside:avoid">'
+      +'<td colspan="7" style="padding:8px 14px;font-size:13px;font-weight:700">'
+        +'<span style="background:rgba(255,255,255,.2);border-radius:12px;padding:2px 10px;margin-right:10px;font-size:11px">Éq. '+eqNum+'</span>'
+        +g.immat
+        +' <span style="font-weight:400;font-size:12px;margin-left:8px">'+appareil+(moteur?' · '+moteur:'')+'</span>'
+      +'</td>'
+    +'</tr>';
+
+    // Lignes membres
+    g.members.forEach(function(p, mi){
+      var role = p.role || (mi===0?'Pilote':'Copilote');
+      var roleCl = role.toLowerCase().indexOf('co')!==-1?'#7c3aed':'#0369a1';
+      html += '<tr style="background:'+(mi%2===0?'#f8faff':'#fff')+'">'
+        +'<td style="'+td+';color:'+roleCl+';font-weight:700;width:80px">'+role+'</td>'
+        +'<td style="'+tdb+'">'+((p.prenom||'')+' '+(p.nom||'')).trim()+'</td>'
+        +'<td style="'+td+'">'+( p.licence||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.ddn||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.email||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.tel||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.region||'—')+'</td>'
       +'</tr>';
-  }).join('');
-  var win = window.open('','_blank','width=900,height=700');
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Équipage — '+cp.name+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h2{margin:0 0 4px}p{margin:0 0 16px;color:#666;font-size:13px}table{border-collapse:collapse;width:100%}th{background:#1e3a5f;color:#fff;padding:7px 10px;border:1px solid #1e3a5f;text-align:left;font-size:12px}@media print{button{display:none}}</style>'
+    });
+
+    // Ligne vide de séparation
+    html += '<tr><td colspan="7" style="padding:5px;background:#f1f5f9;border:none"></td></tr>';
+  });
+
+  // Pilotes sans immat
+  if (noImmat.length) {
+    html += '<tr style="background:#92400e;color:#fff">'
+      +'<td colspan="7" style="padding:7px 14px;font-weight:700;font-size:12px">⚠ Sans identification ULM ('+noImmat.length+')</td>'
+    +'</tr>';
+    noImmat.forEach(function(item){
+      var p=item.p;
+      html += '<tr>'
+        +'<td style="'+td+'">'+( p.role||'—')+'</td>'
+        +'<td style="'+tdb+'">'+((p.prenom||'')+' '+(p.nom||'')).trim()+'</td>'
+        +'<td style="'+td+'">'+( p.licence||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.ddn||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.email||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.tel||'—')+'</td>'
+        +'<td style="'+td+'">'+( p.region||'—')+'</td>'
+      +'</tr>';
+    });
+  }
+
+  var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var nbEq = equipList.length;
+
+  var win = window.open('','_blank','width=1100,height=800');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'
+    +'<title>Équipages — '+cp.name+'</title>'
+    +'<style>'
+      +'*{box-sizing:border-box}'
+      +'body{font-family:Arial,Helvetica,sans-serif;padding:28px 32px;color:#1e293b;font-size:13px}'
+      +'.hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;border-bottom:3px solid #1e3a5f;padding-bottom:12px}'
+      +'.hdr h1{margin:0;font-size:20px;color:#1e3a5f}'
+      +'.hdr .meta{font-size:11px;color:#64748b;text-align:right;line-height:1.6}'
+      +'table{border-collapse:collapse;width:100%;margin-bottom:0}'
+      +'thead th{background:#334155;color:#fff;padding:8px 12px;font-size:11px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.5px}'
+      +'@media print{.no-print{display:none}tr{page-break-inside:avoid}}'
+    +'</style>'
     +'</head><body>'
-    +'<h2>Équipage — '+cp.name+'</h2>'
-    +'<p>'+enrolled.length+' pilote(s) inscrit(s)</p>'
-    +'<button onclick="window.print()" style="margin-bottom:16px;padding:8px 18px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Imprimer</button>'
-    +'<table><thead><tr><th>#</th><th>Nom</th><th>Licence</th><th>Immat.</th><th>Appareil</th><th>Classe</th><th>Région</th></tr></thead>'
-    +'<tbody>'+rows+'</tbody></table>'
+    +'<div class="hdr">'
+      +'<div><h1>Équipages — '+cp.name+'</h1>'
+        +'<div style="font-size:12px;color:#475569;margin-top:4px">'+nbEq+' équipage'+(nbEq>1?'s':'')+' · '+enrolled.length+' participant'+(enrolled.length>1?'s':'')+' au total</div>'
+      +'</div>'
+      +'<div class="meta">Édité le '+now+'<br>'+(cp.dateDebut||'')+(cp.dateFin?' → '+cp.dateFin:'')+'</div>'
+    +'</div>'
+    +'<button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:8px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">🖨 Imprimer</button>'
+    +'<table>'
+      +'<thead><tr>'
+        +'<th style="width:80px">Rôle</th>'
+        +'<th>Nom Prénom</th>'
+        +'<th style="width:90px">Licence</th>'
+        +'<th style="width:90px">Date naiss.</th>'
+        +'<th>Email</th>'
+        +'<th style="width:110px">Téléphone</th>'
+        +'<th style="width:130px">Région</th>'
+      +'</tr></thead>'
+      +'<tbody>'+html+'</tbody>'
+    +'</table>'
     +'</body></html>');
   win.document.close();
 }
@@ -14139,6 +15111,9 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
   }
 
   detail.innerHTML = html;
+  if (_homeDetailTab === 'etapes') {
+    setTimeout(function(){ try { _etapeMapInit(cp.id); } catch(e){ console.warn('[GestSTOL] _etapeMapInit:', e); } }, 150);
+  }
   if (_homeDetailTab === 'infos') {
     setTimeout(function(){ try { initInfosMaps(cp, enrolled); } catch(e){ console.warn('[GestSTOL] initInfosMaps:', e); } }, 150);
     // Monte les charts à 250ms, puis simule un resize à 400ms pour forcer ApexCharts
@@ -15385,45 +16360,43 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     }
 
     // ── Compétiteurs — SVG natif (pas d'ApexCharts → fonctionne partout) ──
-    html += _sep('Compétiteurs');
-    html += '<div style="'+_g2+'">';
+    var _compCards = [];
     // Carte Genre — donut SVG + légende
     if (nbH+nbF>0) {
       var _gTot = nbH+nbF, _gCx=80, _gCy=80, _gR=58, _gSw=26;
-      html += '<div style="'+_cSt+';padding:14px 16px 12px">';
-      html += '<div style="'+_tSt+'">Répartition genre</div>';
-      html += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
-      html += '<svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0">';
-      html += _donut([{v:nbH},{v:nbF}],['#0891b2','#f43f5e'],_gCx,_gCy,_gR,_gSw);
-      html += '<text x="'+_gCx+'" y="'+(+_gCy-5)+'" text-anchor="middle" font-size="22" font-weight="900" fill="var(--txt)">'+_gTot+'</text>';
-      html += '<text x="'+_gCx+'" y="'+(_gCy+13)+'" text-anchor="middle" font-size="9" fill="var(--txt3)">PILOTES</text>';
-      html += '</svg>';
-      html += '<div style="flex:1;min-width:80px">';
-      if (nbH>0) html += _leg('#0891b2','Hommes',nbH,Math.round(nbH/_gTot*100));
-      if (nbF>0) html += _leg('#f43f5e','Femmes',nbF,Math.round(nbF/_gTot*100));
-      html += '</div></div></div>';
-    } else {
-      html += _empty('👤','Genre non renseigné','Champ « genre » absent sur les fiches pilotes');
+      var _gc = '<div style="'+_cSt+';padding:14px 16px 12px">';
+      _gc += '<div style="'+_tSt+'">Répartition genre</div>';
+      _gc += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
+      _gc += '<svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0">';
+      _gc += _donut([{v:nbH},{v:nbF}],['#0891b2','#f43f5e'],_gCx,_gCy,_gR,_gSw);
+      _gc += '<text x="'+_gCx+'" y="'+(+_gCy-5)+'" text-anchor="middle" font-size="22" font-weight="900" fill="var(--txt)">'+_gTot+'</text>';
+      _gc += '<text x="'+_gCx+'" y="'+(_gCy+13)+'" text-anchor="middle" font-size="9" fill="var(--txt3)">PILOTES</text>';
+      _gc += '</svg>';
+      _gc += '<div style="flex:1;min-width:80px">';
+      if (nbH>0) _gc += _leg('#0891b2','Hommes',nbH,Math.round(nbH/_gTot*100));
+      if (nbF>0) _gc += _leg('#f43f5e','Femmes',nbF,Math.round(nbF/_gTot*100));
+      _gc += '</div></div></div>';
+      _compCards.push(_gc);
     }
     // Carte Âge — barres CSS
     if (ageCount>0) {
       var _aMx = Math.max.apply(null, ageBuckets.map(function(b){return b.n;}));
-      html += '<div style="'+_cSt+';padding:14px 16px 12px">';
-      html += '<div style="'+_tSt+'">Tranches d\'âge · moy. '+ageMoyen+' ans</div>';
-      ageBuckets.forEach(function(b){ if(b.n>0) html += _bRow(b.lbl,b.n,_aMx,ageCount,'#0891b2'); });
-      html += '</div>';
-    } else {
-      html += _empty('🎂','Âge non renseigné','Champ « date de naissance » absent');
+      var _ac = '<div style="'+_cSt+';padding:14px 16px 12px">';
+      _ac += '<div style="'+_tSt+'">Tranches d\'âge · moy. '+ageMoyen+' ans</div>';
+      ageBuckets.forEach(function(b){ if(b.n>0) _ac += _bRow(b.lbl,b.n,_aMx,ageCount,'#0891b2'); });
+      _ac += '</div>';
+      _compCards.push(_ac);
     }
-    html += '</div>';
+    if (_compCards.length > 0) {
+      html += _sep('Compétiteurs');
+      var _gComp = isMobile ? 'display:flex;flex-direction:column;gap:10px' : 'display:grid;grid-template-columns:repeat('+_compCards.length+',1fr);gap:10px';
+      html += '<div style="'+_gComp+'">'+_compCards.join('')+'</div>';
+    }
 
     // ── Classement & classes ──
-    html += _sep('Classement & classes');
     var _clsCards = [];
     if (hasCat)  _clsCards.push(_aCard('apex-cats', 'Catégories compétitives', Math.max(160, Object.keys(catPilCounts).length*34+40)));
-    else         _clsCards.push(_empty('🏅', 'Catégories non renseignées', 'PL1 · PF1 · PL2 · PF2…'));
     if (hasCls)  _clsCards.push(_aCard('apex-cls',  'Classes ULM', Math.max(160, Object.keys(ulmClsCounts).length*34+40)));
-    else         _clsCards.push(_empty('✈️', 'Classes ULM non renseignées', 'Multiaxes · Pendulaire · Paramoteur…'));
     if (hasEqui) {
       // Équipages — donut SVG natif
       var _eTot=nbMono+nbBi;
@@ -15439,8 +16412,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       _eHtml+='</div></div></div>';
       _clsCards.push(_eHtml);
     }
-    var _nCls = Math.min(_clsCards.length, 3);
-    html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:repeat('+_nCls+',1fr);gap:10px')+'">'+_clsCards.join('')+'</div>';
+    if (_clsCards.length > 0) {
+      html += _sep('Classement & classes');
+      var _nCls = Math.min(_clsCards.length, 3);
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:repeat('+_nCls+',1fr);gap:10px')+'">'+_clsCards.join('')+'</div>';
+    }
 
     // ── Matériels ──
     var _icd = window._infosChartsData;
@@ -15509,14 +16485,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var _isMobBgt = window.innerWidth < 768;
       var _BH = _isMobBgt ? 260 : 300; // hauteur réduite sur mobile
       if (_hasBdep || _hasBres) {
-        html += '<div style="display:grid;grid-template-columns:'+(_isMobBgt ? '1fr' : '1fr 1fr')+';gap:10px">';
-        html += _hasBdep
-          ? _aCard('apex-budget-dep', 'Dépenses par domaine', _BH)
-          : '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:'+_BH+'px"><span style="font-size:11px;color:var(--txt3)">Aucune donnée</span></div>';
-        html += _hasBres
-          ? _aCard('apex-budget-res', 'Recettes par domaine', _BH)
-          : '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;display:flex;align-items:center;justify-content:center;min-height:'+_BH+'px"><span style="font-size:11px;color:var(--txt3)">Aucune donnée</span></div>';
-        html += '</div>';
+        var _bCards2 = [];
+        if (_hasBdep) _bCards2.push(_aCard('apex-budget-dep', 'Dépenses par domaine', _BH));
+        if (_hasBres) _bCards2.push(_aCard('apex-budget-res', 'Recettes par domaine', _BH));
+        var _bCols2 = (_isMobBgt || _bCards2.length===1) ? '1fr' : '1fr 1fr';
+        html += '<div style="display:grid;grid-template-columns:'+_bCols2+';gap:10px">'+_bCards2.join('')+'</div>';
       }
     }
 
@@ -15622,7 +16595,12 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _addBtnSt = 'width:24px;height:24px;border-radius:50%;background:var(--stol);border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rmBtnSt  = 'width:28px;height:28px;border-radius:50%;background:rgba(239,68,68,.15);border:none;color:#ef4444;cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0';
     var _rowInpSt = 'border-bottom:2px solid var(--stol);background:var(--navy4)';
-    var _eqpTpl = _equipGetTpl();
+    // Colonnes Niveau/Podium/Catégorie : masquées si pas une compétition officielle
+    var _eqpCompetitif = ['cdf','regional','comp-internationale','comp-regionale','entrainement-national'].indexOf(cp.type||'') !== -1;
+    var _eqpTpl = _equipColWidths.map(function(w, i) {
+      if (!_eqpCompetitif && (i===4||i===5||i===10)) return '0px';
+      return w+'px';
+    }).join(' ');
     var _isMobEquip = window.innerWidth < 768;
     var html5 = '';
     // ── Bannière : compétition(s) co-localisée(s) au même aérodrome + même date ──
@@ -15678,7 +16656,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += _eqpMI(_eqpDl,'Exporter CSV',       'exportEquipageFmt(\'csv\',\''+cid+'\')');
     html5 += _eqpMI(_eqpDl,'Exporter JSON',      'exportEquipageFmt(\'json\',\''+cid+'\')');
     html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
-    html5 += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_eqpUl+'<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importEquipageAuto(this,\''+cid+'\');_eqpActClose()"></label>';
+    html5 += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_eqpUl+'<span>Importer…</span><input type="file" accept=".json,.xlsx,.xls,.csv,.txt" style="display:none" onchange="_smartImportOpen(this,\''+cid+'\');_eqpActClose()"></label>';
     html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
     var _b44Ico = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 2H3v16h5v4l4-4h5l4-4V2zm-10 9V7m5 4V7"/></svg>';
     html5 += _eqpMI(_b44Ico, 'Site Pôle Sport', 'openBase44Picker(\''+cid+'\');_eqpActClose()');
@@ -15700,7 +16678,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _stickyBg = 'var(--navy3)';
     html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 0;border-bottom:2px solid var(--bdr);align-items:center;background:'+_stickyBg+';position:sticky;top:0;z-index:10">';
     html5 += '<div style="position:sticky;left:0;z-index:12;background:'+_stickyBg+';padding-left:12px"></div>'; // avatar col
+    var _hiddenHdrIdx = _eqpCompetitif ? [] : [3, 4, 9]; // Niveau, Podium, Catégorie
     _eqHdrs.forEach(function(h, i) {
+      if (_hiddenHdrIdx.indexOf(i) !== -1) { html5 += '<div style="overflow:hidden;padding:0"></div>'; return; }
       var sortCol = _eqSort[i];
       var clickable = sortCol ? 'cursor:pointer;user-select:none;' : '';
       var click = sortCol ? ' onclick="_equipToggleSort(\''+sortCol+'\')"' : '';
@@ -15723,19 +16703,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<div style="position:sticky;left:43px;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // genre
     html5 += '<div style="position:sticky;left:90px;z-index:8;background:'+_sBg+';border-right:2px solid rgba(255,255,255,.12)">';
     html5 += '<div style="position:relative">';
-    html5 += '<input id="hdg-c-nom" placeholder="Tapez un prénom…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
+    html5 += '<input id="hdg-c-nom" placeholder="Nom, prénom ou N° licence…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
     html5 += '<div id="hdg-sug-c" style="display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
     html5 += '</div>'; // fin position:relative (dropdown)
     html5 += '</div>'; // fin sticky nom cell
     // Ordre : lic | niveau | podium | region | immat | pratique | classe | cat | equip | marque | modele | moteur | aile | helice
     html5 += '<div><input id="hdg-c-lic"      placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-niveau"   placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-podium"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    var _hcS = !_eqpCompetitif ? 'overflow:hidden;padding:0' : '';
+    html5 += '<div style="'+_hcS+'"><input id="hdg-c-niveau"   placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div style="'+_hcS+'"><input id="hdg-c-podium"   placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-region"   placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-immat"    placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-pratique" placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-classe"   placeholder="—" style="'+_iSt+'" readonly></div>';
-    html5 += '<div><input id="hdg-c-categorie"placeholder="—" style="'+_iSt+'" readonly></div>';
+    html5 += '<div style="'+_hcS+'"><input id="hdg-c-categorie"placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-equipage" placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-marque"   placeholder="—" style="'+_iSt+'" readonly></div>';
     html5 += '<div><input id="hdg-c-modele"   placeholder="—" style="'+_iSt+'" readonly></div>';
@@ -15829,21 +16810,25 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         // Nom — sticky left:90px + separator
         html5 += '<div data-sc style="position:sticky;left:90px;z-index:5;background:'+_rowBg+';border-right:2px solid rgba(255,255,255,.12);'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
         // Licence — éditable
-        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(p.licence||'')+'" placeholder="—" title="Licence" style="'+_iStE+(p.licence?';color:var(--txt)':'')+'" onchange="eqpInlineSave(\''+pidE+'\',\'licence\',this.value,\''+cid+'\')" onclick="event.stopPropagation()"></div>';
-        // Niveau — select National/Espoir/Elite/vide (par compétition)
-        var _nivVal = (((S.enrollMeta||{})[cid]||{})[pid]||{}).niveau||'';
-        var _nivStyle = _nivVal==='Elite' ? ';color:#6366f1;font-weight:700' : _nivVal==='Espoir' ? ';color:#0891b2;font-weight:600' : _nivVal==='National' ? ';color:var(--txt2);font-weight:600' : _nivVal==='Open' ? ';color:#f97316;font-weight:600' : ';color:var(--txt3)';
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpSaveMeta(\''+pidE+'\',\'niveau\',this.value,\''+cid+'\')" style="'+_sISt+_nivStyle+'" title="Niveau compétitif">'
-          +'<option value="">—</option>'
-          +['National','Espoir','Elite','Open'].map(function(v){ return '<option value="'+v+'"'+(_nivVal===v?' selected':'')+'>'+v+'</option>'; }).join('')
-          +'</select></div>';
-        // Podium — select 1/2/3/vide (par compétition)
-        var _podVal = (((S.enrollMeta||{})[cid]||{})[pid]||{}).podium||'';
-        var _podStyle = _podVal==='1' ? ';color:#f59e0b;font-weight:900' : _podVal ? ';color:var(--txt2);font-weight:600' : ';color:var(--txt3)';
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpSaveMeta(\''+pidE+'\',\'podium\',this.value,\''+cid+'\')" style="'+_sISt+_podStyle+'" title="Podium dans cette compétition">'
-          +'<option value="">—</option>'
-          +['1','2','3'].map(function(v){ return '<option value="'+v+'"'+(_podVal===v?' selected':'')+'>'+v+'</option>'; }).join('')
-          +'</select></div>';
+        html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(p.licence||'')+'" placeholder="—" title="Licence FFPLUM (4-7 chiffres)" style="'+_iStE+(p.licence?';color:var(--txt)':';color:#f59e0b')+'" onchange="eqpInlineSave(\''+pidE+'\',\'licence\',this.value,\''+cid+'\',this)" onclick="event.stopPropagation()"></div>';
+        // Niveau — masqué hors compétition officielle
+        if (_eqpCompetitif) {
+          var _nivVal = (((S.enrollMeta||{})[cid]||{})[pid]||{}).niveau||'';
+          var _nivStyle = _nivVal==='Elite' ? ';color:#6366f1;font-weight:700' : _nivVal==='Espoir' ? ';color:#0891b2;font-weight:600' : _nivVal==='National' ? ';color:var(--txt2);font-weight:600' : _nivVal==='Open' ? ';color:#f97316;font-weight:600' : ';color:var(--txt3)';
+          html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpSaveMeta(\''+pidE+'\',\'niveau\',this.value,\''+cid+'\')" style="'+_sISt+_nivStyle+'" title="Niveau compétitif">'
+            +'<option value="">—</option>'
+            +['National','Espoir','Elite','Open'].map(function(v){ return '<option value="'+v+'"'+(_nivVal===v?' selected':'')+'>'+v+'</option>'; }).join('')
+            +'</select></div>';
+        } else { html5 += '<div style="overflow:hidden;padding:0"></div>'; }
+        // Podium — masqué hors compétition officielle
+        if (_eqpCompetitif) {
+          var _podVal = (((S.enrollMeta||{})[cid]||{})[pid]||{}).podium||'';
+          var _podStyle = _podVal==='1' ? ';color:#f59e0b;font-weight:900' : _podVal ? ';color:var(--txt2);font-weight:600' : ';color:var(--txt3)';
+          html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpSaveMeta(\''+pidE+'\',\'podium\',this.value,\''+cid+'\')" style="'+_sISt+_podStyle+'" title="Podium dans cette compétition">'
+            +'<option value="">—</option>'
+            +['1','2','3'].map(function(v){ return '<option value="'+v+'"'+(_podVal===v?' selected':'')+'>'+v+'</option>'; }).join('')
+            +'</select></div>';
+        } else { html5 += '<div style="overflow:hidden;padding:0"></div>'; }
         // Région — select
         html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'region\',this.value,\''+cid+'\')" style="'+_sISt+(p.region?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
           +_mkRegionOpts(p.region)
@@ -15865,15 +16850,17 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           +'<option value="">—</option>'
           +_clsFilt.map(function(c){ return '<option value="'+c+'"'+(_clsCur===c?' selected':'')+'>'+(_clsMap[c]||c)+'</option>'; }).join('')
           +'</select></div>';
-        // Catégorie — select adapté à la pratique
-        var _catPMOpts = [{v:'PF1',l:'PF1'},{v:'PF2',l:'PF2'},{v:'PL1',l:'PL1'},{v:'PL2',l:'PL2'}];
-        var _catMLOpts = [{v:'AW1',l:'AW1'},{v:'AW2',l:'AW2'},{v:'WL1',l:'WL1'},{v:'WL2',l:'WL2'},{v:'GP1',l:'GP1'},{v:'GP2',l:'GP2'}];
-        var _catInlineOpts = _pratVal==='paramoteur' ? _catPMOpts : _pratVal==='microlight' ? _catMLOpts
-          : _catPMOpts.concat(_catMLOpts); // multi ou non précisé : tout afficher
-        html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'categorie\',this.value,\''+cid+'\')" style="'+_sISt+';'+catStyle+'">'
-          +'<option value="">—</option>'
-          +_catInlineOpts.map(function(o){ return '<option value="'+o.v+'"'+(catVal===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')
-          +'</select></div>';
+        // Catégorie — masquée hors compétition officielle
+        if (_eqpCompetitif) {
+          var _catPMOpts = [{v:'PF1',l:'PF1'},{v:'PF2',l:'PF2'},{v:'PL1',l:'PL1'},{v:'PL2',l:'PL2'}];
+          var _catMLOpts = [{v:'AW1',l:'AW1'},{v:'AW2',l:'AW2'},{v:'WL1',l:'WL1'},{v:'WL2',l:'WL2'},{v:'GP1',l:'GP1'},{v:'GP2',l:'GP2'}];
+          var _catInlineOpts = _pratVal==='paramoteur' ? _catPMOpts : _pratVal==='microlight' ? _catMLOpts
+            : _catPMOpts.concat(_catMLOpts);
+          html5 += '<div onclick="event.stopPropagation()"><select onchange="eqpInlineSave(\''+pidE+'\',\'categorie\',this.value,\''+cid+'\')" style="'+_sISt+';'+catStyle+'">'
+            +'<option value="">—</option>'
+            +_catInlineOpts.map(function(o){ return '<option value="'+o.v+'"'+(catVal===o.v?' selected':'')+'>'+o.l+'</option>'; }).join('')
+            +'</select></div>';
+        } else { html5 += '<div style="overflow:hidden;padding:0"></div>'; }
         // Équipage — select adapté à la pratique
         // *1 categories → Monoplace figé ; *2 → Biplace suggéré
         var _catMonoInline = ['PL1','PF1','AW1','WL1','GP1'].indexOf(catVal) >= 0;
@@ -15911,45 +16898,144 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
   } else if (tab === 'etapes') {
     if (!S.etapes) S.etapes = {};
     if (!S.etapes[cp.id]) S.etapes[cp.id] = [];
-    var etList = S.etapes[cp.id];
+    // Migration cp.etapes (ancien système Lieu) → S.etapes si le nouveau tableau est vide
+    if (!S.etapes[cp.id].length && cp.etapes && cp.etapes.length) {
+      var _t36 = Date.now().toString(36);
+      S.etapes[cp.id] = cp.etapes.map(function(e, _i) {
+        return {
+          id: 'et'+(_t36)+'_'+_i,
+          nom: e.lieu||e.nom||'', lieu: e.lieu||e.nom||'',
+          oaci: e.oaci||'', club: e.club||'', region: e.region||'',
+          responsable: e.responsable||'', gestionnaire: e.gestionnaire||'',
+          contactDSAC: e.contactDSAC||'', notam: !!e.notam, commentaires: e.commentaires||'',
+          dateFrom: e.dateFrom||e.date||'', dateTo: e.dateTo||'',
+          date: e.dateFrom||e.date||'', desc: e.desc||'',
+          lat: e.lat||'', lng: e.lng||''
+        };
+      });
+      saveState();
+    }
+    var etList = S.etapes[cp.id].slice().sort(function(a, b) {
+      var da = a.dateFrom || a.date || '9999';
+      var db = b.dateFrom || b.date || '9999';
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
     var canEditEt = canModify();
-    var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;outline:none';
-    var fo = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
-    var thSt = 'padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bdr);background:var(--navy2)';
-    var cellSt = 'padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;color:var(--txt);vertical-align:middle';
-    var etH = '<div style="display:flex;flex-direction:column;height:100%">';
+    var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+    var thSt = 'padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--bdr);background:var(--navy3);white-space:nowrap';
+    var cellSt = 'padding:8px 10px;border-bottom:1px solid var(--bdr);font-size:12px;color:var(--txt);vertical-align:middle';
+    var etH = '<div style="display:flex;height:100%;overflow:hidden">';
+
+    // ── Colonne gauche : liste des étapes ────────────────────────────────────
+    etH += '<div style="width:52%;display:flex;flex-direction:column;border-right:1px solid var(--bdr);overflow:hidden">';
     // Header
-    etH += '<div style="padding:12px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--navy2)">';
-    etH += '<div style="font-size:13px;font-weight:700;color:var(--txt)">🗺 Étapes <span style="font-size:11px;color:var(--txt3);font-weight:400">('+etList.length+' étape'+(etList.length>1?'s':'')+')</span></div>';
-    if (canEditEt) etH += '<button onclick="_etapeAdd(\''+cp.id+'\')" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:8px;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter une étape</button>';
+    etH += '<div style="padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--navy2)">';
+    etH += '<div style="font-size:13px;font-weight:700;color:var(--txt)">🗺 Étapes <span style="font-size:11px;color:var(--txt3);font-weight:400">('+etList.length+')</span></div>';
+    if (canEditEt) etH += '<button onclick="_etapeAdd(\''+cp.id+'\')" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:none;border-radius:8px;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ajouter</button>';
     etH += '</div>';
     // Table
     etH += '<div style="flex:1;overflow-y:auto;min-height:0">';
     if (!etList.length) {
-      etH += '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px">Aucune étape — cliquez sur <b>Ajouter une étape</b></div>';
+      etH += '<div style="padding:40px 20px;text-align:center;color:var(--txt3);font-size:13px">Aucune étape<br><span style="font-size:12px">Cliquez sur <b>Ajouter</b> pour créer la première étape</span></div>';
     } else {
+      var rlInline = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur'].map(function(r){ return '<option value="'+r+'">'; }).join('');
+      etH += '<datalist id="et-inline-regions">'+rlInline+'</datalist>';
+      var inpSt = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none;min-width:0';
+      var inpFo = 'onfocus="this.style.borderBottomColor=\'var(--stol)\'" onblur="this.style.borderBottomColor=\'var(--bdr)\'"';
+      var accInpSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none';
+      var accLblSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;display:block';
       etH += '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-      etH += '<th style="'+thSt+';width:36px">#</th>';
-      etH += '<th style="'+thSt+'">Nom / Lieu</th>';
-      etH += '<th style="'+thSt+';width:120px">Date</th>';
-      etH += '<th style="'+thSt+'">Description</th>';
-      etH += '<th style="'+thSt+';width:40px"></th>';
+      etH += '<th style="'+thSt+';width:32px;text-align:center">#</th>';
+      etH += '<th style="'+thSt+'">Lieu / Aérodrome</th>';
+      etH += '<th style="'+thSt+';width:72px">OACI</th>';
+      etH += '<th style="'+thSt+';width:108px">Date du</th>';
+      etH += '<th style="'+thSt+';width:108px">Date au</th>';
+      etH += '<th style="'+thSt+'">Club</th>';
+      etH += '<th style="'+thSt+'">Région</th>';
+      etH += '<th style="'+thSt+';width:28px"></th>';
       etH += '</tr></thead><tbody>';
       etList.forEach(function(et, i) {
-        var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
-        etH += '<tr id="etape-row-'+et.id+'">';
-        etH += '<td style="'+cellSt+';text-align:center;font-weight:700;color:var(--stol)">'+(i+1)+'</td>';
-        etH += '<td style="'+cellSt+';font-weight:600">'+esc2(et.nom)+'</td>';
-        etH += '<td style="'+cellSt+';color:var(--txt2)">'+esc2(et.date||'—')+'</td>';
-        etH += '<td style="'+cellSt+';color:var(--txt2)">'+esc2(et.desc||'—')+'</td>';
-        etH += '<td style="'+cellSt+';text-align:center">';
-        if (canEditEt) etH += '<button onclick="_etapeEdit(\''+cp.id+'\',\''+et.id+'\')" style="background:rgba(14,165,233,.1);color:#38bdf8;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;margin-right:3px">✎</button>';
-        if (canEditEt) etH += '<button id="etdel-'+et.id+'" onclick="_etapeDel(\''+cp.id+'\',\''+et.id+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:14px">×</button>';
+        var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
+        var cid = cp.id; var eid = et.id;
+        etH += '<tr id="etape-row-'+eid+'" style="'+bg+'" onclick="if(!event.target.closest(\'button\')&&event.target.tagName!==\'INPUT\'&&event.target.tagName!==\'TEXTAREA\')_etapeToggleAcc(\''+eid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">';
+        // # + chevron
+        etH += '<td style="'+cellSt+';text-align:center;width:44px;cursor:pointer;white-space:nowrap" onclick="_etapeToggleAcc(\''+eid+'\');event.stopPropagation()">'
+          +'<span id="et-chev-'+eid+'" style="font-size:13px;color:var(--txt3);margin-right:4px;display:inline-block;transition:transform .15s">▶</span>'
+          +'<span style="font-weight:800;color:var(--stol);font-size:12px">'+(i+1)+'</span>'
+          +'</td>';
+        // Lieu
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="text" value="'+esc2(et.lieu||et.nom||'')+'" placeholder="Commune, aérodrome…" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSaveLieu(\''+cid+'\',\''+eid+'\',this.value)">'
+          +'</td>';
+        // OACI
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="text" value="'+esc2(et.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+inpSt+';text-transform:uppercase;font-family:monospace;font-size:11px;color:var(--stol);letter-spacing:1px" '+inpFo+' oninput="this.value=this.value.toUpperCase()" onchange="_etapeInlineOACI(\''+cid+'\',\''+eid+'\',this.value,this)">'
+          +'</td>';
+        // Date du
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="date" value="'+esc2(et.dateFrom||et.date||'')+'" style="'+inpSt+';font-size:11px" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'dateFrom\',this.value);_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'date\',this.value)">'
+          +'</td>';
+        // Date au
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="date" value="'+esc2(et.dateTo||'')+'" style="'+inpSt+';font-size:11px" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'dateTo\',this.value)">'
+          +'</td>';
+        // Club
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="text" value="'+esc2(et.club||'')+'" placeholder="Club…" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'club\',this.value)">'
+          +'</td>';
+        // Région
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="text" value="'+esc2(et.region||'')+'" placeholder="Région…" list="et-inline-regions" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'region\',this.value)">'
+          +'</td>';
+        // Supprimer
+        etH += '<td style="'+cellSt+';text-align:center;padding:4px 2px">';
+        if (canEditEt) etH += '<button id="etdel-'+eid+'" onclick="_etapeDel(\''+cid+'\',\''+eid+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:6px;width:22px;height:22px;cursor:pointer;font-size:13px;line-height:1">×</button>';
         etH += '</td></tr>';
+        // ── Accordéon infos complémentaires ──────────────────────────────────
+        etH += '<tr id="etape-acc-'+eid+'" style="display:none">';
+        etH += '<td colspan="8" style="padding:0;border-bottom:2px solid var(--stol)">';
+        etH += '<div style="padding:12px 14px 14px;background:rgba(14,165,233,.04);display:grid;grid-template-columns:1fr 1fr;gap:10px 18px">';
+        // Responsable
+        etH += '<div>'
+          +'<label style="'+accLblSt+'">Responsable de l\'étape</label>'
+          +'<input type="text" value="'+esc2(et.responsable||'')+'" placeholder="Nom, prénom…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'responsable\',this.value)">'
+          +'</div>';
+        // Gestionnaire
+        etH += '<div>'
+          +'<label style="'+accLblSt+'">Gestionnaire</label>'
+          +'<input type="text" value="'+esc2(et.gestionnaire||'')+'" placeholder="Nom du gestionnaire…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'gestionnaire\',this.value)">'
+          +'</div>';
+        // Contact DSAC
+        etH += '<div>'
+          +'<label style="'+accLblSt+'">Contact DSAC</label>'
+          +'<input type="text" value="'+esc2(et.contactDSAC||'')+'" placeholder="Nom / tél / email…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'contactDSAC\',this.value)">'
+          +'</div>';
+        // Notam
+        etH += '<div style="display:flex;align-items:center;gap:8px;padding-top:14px">'
+          +'<input type="checkbox" id="notam-'+eid+'" '+(et.notam?'checked':'')+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'notam\',this.checked)" style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">'
+          +'<label for="notam-'+eid+'" style="font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;user-select:none">NOTAM déposé</label>'
+          +'</div>';
+        // Commentaires (pleine largeur)
+        etH += '<div style="grid-column:1/-1">'
+          +'<label style="'+accLblSt+'">Commentaires</label>'
+          +'<textarea rows="2" placeholder="Notes, informations complémentaires…" style="'+accInpSt+';resize:vertical" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'commentaires\',this.value)">'+esc2(et.commentaires||'')+'</textarea>'
+          +'</div>';
+        etH += '</div></td></tr>';
       });
       etH += '</tbody></table>';
     }
     etH += '</div></div>';
+
+    // ── Colonne droite : carte Leaflet ───────────────────────────────────────
+    etH += '<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">';
+    etH += '<div style="padding:8px 12px;border-bottom:1px solid var(--bdr);flex-shrink:0;background:var(--navy2);display:flex;align-items:center;gap:8px">';
+    etH += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="color:var(--stol)"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>';
+    etH += '<span style="font-size:12px;font-weight:700;color:var(--txt2)">Carte des étapes</span>';
+    etH += '</div>';
+    etH += '<div id="etapes-map" style="flex:1;background:var(--navy3)"></div>';
+    etH += '</div>';
+
+    etH += '</div>'; // fin split
     return etH;
 
   } else if (tab === 'installation') {
@@ -27081,8 +28167,11 @@ function _mapDiscipline(v) {
 function _mapRole(v) {
   var s = _normStr(v);
   if (!s) return '';
+  // Copilote avant Pilote pour éviter que "Copilote" match "PILOT"
+  if (s.indexOf('COPIL')!==-1||s==='CO'||s==='CPL'||s.replace(/[\s\-]/g,'').indexOf('COPIL')!==-1) return 'Copilote';
   if (s.indexOf('PILOT')!==-1||s==='P'||s==='PL') return 'Pilote';
-  if (s.indexOf('NAV')!==-1||s==='N'||s.indexOf('COPIL')!==-1||s.indexOf('PASS')!==-1) return 'Navigateur';
+  if (s.indexOf('NAV')!==-1||s==='N') return 'Navigateur';
+  if (s.indexOf('PASS')!==-1) return 'Passager';
   return '';
 }
 
@@ -27109,7 +28198,7 @@ function _mapDate(v) {
 /* ── Mapping colonnes Excel → champs internes compétiteur ── */
 var _PILOT_COL_MAP = {
   // Licence
-  'licence':'licence','n° licence':'licence','no licence':'licence','numero licence':'licence',
+  'licence':'licence','n° licence':'licence','n° de licence':'licence','no licence':'licence','numero licence':'licence',
   'numéro licence':'licence','num licence':'licence','n°licence':'licence','nolicence':'licence',
   // Nom / Prénom
   'nom':'nom','name':'nom','last name':'nom','lastname':'nom','nom de famille':'nom',
@@ -27143,6 +28232,7 @@ var _PILOT_COL_MAP = {
   // ULM données
   'immat':'immat','immatriculation':'immat','immat.':'immat','immatriculation ulm':'immat',
   'n° immat':'immat','numero immat':'immat','numéro immat':'immat',
+  'identification':'immat','identifiant':'immat','id ulm':'immat','matricule':'immat',
   'marque':'marque','brand':'marque','constructeur':'marque','fabricant':'marque',
   'modele':'modele','modèle':'modele','model':'modele',
   'moteur':'moteur','motorisation':'moteur','engine':'moteur','motor':'moteur',
@@ -27150,6 +28240,8 @@ var _PILOT_COL_MAP = {
   'aile':'aile','voile':'aile','wing':'aile','type aile':'aile','aile haute':'aile','aile basse':'aile',
   'train':'train','train atterrissage':'train','landing gear':'train','tricycle':'train','classique':'train',
   'adresse':'adresse','address':'adresse',
+  'code postal':'_cp','codepostal':'_cp','cp':'_cp','zip':'_cp','postal code':'_cp',
+  'ville':'_ville','city':'_ville','commune':'_ville','localite':'_ville','localité':'_ville',
   // ── Format export FFPLUM (colonnes spécifiques) ──
   'marque aeronef':'_marqueAeronef','marque aéronef':'_marqueAeronef',
   'modele aeronef':'_modeleAeronef','modèle aeronef':'_modeleAeronef','modèle aéronef':'_modeleAeronef',
@@ -27225,7 +28317,7 @@ function _detectPilotColumns(headerRow, dataRows) {
     var genreRe  = /^(m\.|mme\.|m|f|h|homme|femme|male|female)$/i;
     var ddnRe    = /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}$|^\d{4}-\d{2}-\d{2}$/;
     var licRe    = /^\d{5,7}$/;
-    var immatRe  = /^[A-Z]-[A-Z]{2,4}$|^[A-Z]{1,2}-[A-Z0-9]{3,5}$/i;
+    var immatRe  = /^[A-Z]-[A-Z]{2,4}$|^[A-Z]{1,2}-[A-Z0-9]{3,5}$|^\d{2}-?[A-Z]{2,4}$|^[A-Z]{4,6}$/i;
     var pratRe   = /^(paramoteur|microlight|paramotor|para|micro|ulm)$/i;
     var discRe   = /^(classic|slalom|stol|cross|precision|classique)$/i;
 
@@ -33584,6 +34676,541 @@ function _fixB44UlmMapping() {
 })();
 // ── Fin BASE44 SYNC ───────────────────────────────────────────────────────────
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SMART IMPORT — assistant intelligent 2 étapes (mapping + preview)
+// ══════════════════════════════════════════════════════════════════════════════
+
+var _SI_FIELDS = [
+  {id:'',label:'— Ignorer —'},
+  {id:'nom',label:'Nom de famille'},{id:'prenom',label:'Prénom'},
+  {id:'licence',label:'N° Licence'},{id:'ddn',label:'Date de naissance'},
+  {id:'genre',label:'Genre'},{id:'email',label:'Email'},{id:'tel',label:'Téléphone'},
+  {id:'adresse',label:'Adresse'},{id:'_cp',label:'Code postal'},{id:'_ville',label:'Ville'},
+  {id:'club',label:'Club'},{id:'region',label:'Région'},
+  {id:'pratique',label:'Pratique (microlight…)'},{id:'classe',label:'Classe ULM'},
+  {id:'categorie',label:'Catégorie'},{id:'equipage',label:'Équipage (mono/biplace)'},
+  {id:'role',label:'Rôle (pilote/copilote)'},
+  {id:'immat',label:'Immatriculation ULM'},{id:'marque',label:'Marque ULM'},
+  {id:'modele',label:'Modèle ULM'},{id:'moteur',label:'Moteur'},
+  {id:'helice',label:'Hélice'},{id:'aile',label:'Aile / Voile'},
+  {id:'niveau',label:'Niveau'},{id:'remarques',label:'Remarques'},
+];
+
+function _siNrm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+
+function _siDetect(hdrs, dataRows) {
+  // Retourne [{srcIdx, srcName, field, conf, method, samples[]}]
+  var cols = hdrs.map(function(h,i){ return {srcIdx:i,srcName:h||('Col '+(i+1)),field:'',conf:0,method:'none',samples:[]}; });
+  var sample = (dataRows||[]).slice(0,10);
+  cols.forEach(function(c){
+    c.samples = sample.map(function(r){ return ((r[c.srcIdx]||'').toString().trim()); }).filter(Boolean).slice(0,3);
+  });
+  var used = function(f){ return cols.some(function(c){ return c.field===f&&c.conf>0; }); };
+
+  // Niveau 1 : correspondance exacte via _PILOT_COL_MAP
+  cols.forEach(function(c){
+    var n=_siNrm(c.srcName);
+    if(_PILOT_COL_MAP[n]&&!used(_PILOT_COL_MAP[n])){ c.field=_PILOT_COL_MAP[n]; c.conf=100; c.method='exact'; }
+  });
+
+  // Niveau 2 : sous-chaîne sur les en-têtes
+  var fuzzy = [
+    ['licence', function(n){ return n.indexOf('licenc')!==-1&&n.indexOf('club')===-1; }],
+    ['prenom',  function(n){ return n.indexOf('prenom')!==-1||n.indexOf('firstname')!==-1; }],
+    ['nom',     function(n){ return (n==='nom'||n==='name'||n.indexOf('famille')!==-1)&&!n.includes('prenom')&&!n.includes('complet'); }],
+    ['email',   function(n){ return n.indexOf('mail')!==-1; }],
+    ['tel',     function(n){ return n.indexOf('tel')!==-1||n.indexOf('phone')!==-1||n.indexOf('portabl')!==-1||n.indexOf('mobile')!==-1; }],
+    ['ddn',     function(n){ return n.indexOf('naiss')!==-1||n.indexOf('birth')!==-1||n==='ddn'||n==='dob'; }],
+    ['genre',   function(n){ return n==='genre'||n.indexOf('sexe')!==-1||n.indexOf('civil')!==-1||n.indexOf('gender')!==-1; }],
+    ['club',    function(n){ return n.indexOf('club')!==-1; }],
+    ['region',  function(n){ return n.indexOf('region')!==-1||n.indexOf('ligue')!==-1; }],
+    ['adresse', function(n){ return n.indexOf('adress')!==-1; }],
+    ['_cp',     function(n){ return n.indexOf('postal')!==-1||n==='cp'||n==='zip'; }],
+    ['_ville',  function(n){ return n==='ville'||n==='city'||n==='commune'||n.indexOf('localit')!==-1; }],
+    ['immat',   function(n){ return n.indexOf('immat')!==-1||n.indexOf('identif')!==-1||n.indexOf('matricul')!==-1; }],
+    ['marque',  function(n){ return n==='marque'||n.indexOf('marque')!==-1||n.indexOf('construct')!==-1; }],
+    ['modele',  function(n){ return n.indexOf('model')!==-1; }],
+    ['moteur',  function(n){ return n.indexOf('moteur')!==-1||n.indexOf('motor')!==-1; }],
+    ['pratique',function(n){ return n.indexOf('pratiqu')!==-1||n.indexOf('activit')!==-1; }],
+    ['classe',  function(n){ return n.indexOf('class')!==-1&&n.indexOf('categ')===-1; }],
+    ['categorie',function(n){ return n.indexOf('categ')!==-1; }],
+    ['equipage',function(n){ return n.indexOf('equip')!==-1||n.indexOf('place')!==-1||n.indexOf('config')!==-1; }],
+    ['role',    function(n){ return n==='role'||n.indexOf('role')!==-1||n.indexOf('fonct')!==-1; }],
+    ['helice',  function(n){ return n.indexOf('helice')!==-1||n.indexOf('propul')!==-1; }],
+    ['aile',    function(n){ return n.indexOf('aile')!==-1||n.indexOf('voile')!==-1||n.indexOf('wing')!==-1; }],
+    ['niveau',  function(n){ return n.indexOf('niveau')!==-1||n==='level'; }],
+    ['remarques',function(n){ return n.indexOf('remarq')!==-1||n.indexOf('note')!==-1||n.indexOf('comment')!==-1; }],
+  ];
+  fuzzy.forEach(function(pair){
+    if(used(pair[0])) return;
+    cols.forEach(function(c){
+      if(c.conf>0) return;
+      if(pair[1](_siNrm(c.srcName))){ c.field=pair[0]; c.conf=85; c.method='fuzzy'; }
+    });
+  });
+
+  // Niveau 3 : patterns sur les valeurs
+  var mPct = function(re, ci){ var v=sample.map(function(r){return (r[ci]||'').toString().trim();}).filter(Boolean); return v.length?v.filter(function(x){return re.test(x);}).length/v.length:0; };
+  var pDdn   = /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}$|^\d{4}-\d{2}-\d{2}$/;
+  var pLic   = /^\d{4,7}$/;
+  var pImmat = /^\d{2}-?[A-Z]{2,4}$|^[A-Z]{4,6}$|^[A-Z]-[A-Z]{2,4}$|^[A-Z]{1,2}-[A-Z0-9]{3,5}$/i;
+  var pRole  = /^(pilote|copilote|co-pilote|navigateur|passager)$/i;
+  var pEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var pTel   = /^[\d\s\+\-\.]{8,15}$/;
+  var pGenre = /^(m\.|mme\.|m|f|h|homme|femme|male|female)$/i;
+  cols.forEach(function(c){
+    if(c.conf>0) return;
+    var ci=c.srcIdx;
+    if(!used('ddn')    &&mPct(pDdn,  ci)>=0.5){c.field='ddn';    c.conf=72;c.method='value';}
+    else if(!used('licence')&&mPct(pLic,  ci)>=0.5){c.field='licence'; c.conf=72;c.method='value';}
+    else if(!used('immat')  &&mPct(pImmat,ci)>=0.4){c.field='immat';   c.conf=65;c.method='value';}
+    else if(!used('role')   &&mPct(pRole, ci)>=0.5){c.field='role';    c.conf=75;c.method='value';}
+    else if(!used('email')  &&mPct(pEmail,ci)>=0.5){c.field='email';   c.conf=75;c.method='value';}
+    else if(!used('tel')    &&mPct(pTel,  ci)>=0.5){c.field='tel';     c.conf=60;c.method='value';}
+    else if(!used('genre')  &&mPct(pGenre,ci)>=0.6){c.field='genre';   c.conf=70;c.method='value';}
+  });
+  return cols;
+}
+
+function _siParseCSV(text) {
+  var firstLine = text.split('\n')[0]||'';
+  var sep = (firstLine.split(';').length >= firstLine.split(',').length) ? ';' : ',';
+  function parseLine(line){
+    var res=[],cur='',inQ=false;
+    for(var i=0;i<line.length;i++){var ch=line[i];
+      if(inQ){if(ch==='"'&&line[i+1]==='"'){cur+='"';i++;}else if(ch==='"')inQ=false;else cur+=ch;}
+      else{if(ch==='"')inQ=true;else if(ch===sep){res.push(cur.trim());cur='';}else cur+=ch;}
+    } res.push(cur.trim()); return res;
+  }
+  return text.replace(/\r/g,'').split('\n').filter(function(l){return l.trim();}).map(parseLine);
+}
+
+function _smartImportOpen(inp, compId) {
+  var file = inp.files&&inp.files[0]; if(!file) return;
+  var ext  = file.name.split('.').pop().toLowerCase();
+  var fname = file.name;
+  inp.value = '';
+
+  if(ext==='json') { // JSON : import direct existant
+    var rj=new FileReader();
+    rj.onload=function(e){
+      try{
+        var data=JSON.parse(e.target.result);
+        var list=data.pilots||(Array.isArray(data)?data:null);
+        if(!list){toast('Format JSON invalide','err');return;}
+        if(!S.compEnroll)S.compEnroll={};
+        if(!S.compEnroll[compId])S.compEnroll[compId]=[];
+        if(!S.pilots)S.pilots=[];
+        var added=0;
+        list.forEach(function(p){
+          if(!p.id)return;
+          if(!S.pilots.some(function(x){return x.id===p.id;})){var q=Object.assign({},p);delete q.ulms;S.pilots.push(q);}
+          if(!S.compEnroll[compId].includes(p.id)){S.compEnroll[compId].push(p.id);added++;}
+          if(p.ulms&&p.ulms.length){if(!S.ulms)S.ulms={};S.ulms[p.id]=p.ulms;}
+        });
+        saveState();_hdpSaveNow();renderHomeDetailPanel(null);
+        toast(added+' compétiteur'+(added>1?'s':'')+' importé'+(added>1?'s':'')+' ✓','ok');
+      }catch(e){toast('JSON invalide','err');}
+    };
+    rj.readAsText(file,'UTF-8');
+    return;
+  }
+
+  // CSV ou XLSX → wizard intelligent
+  if(ext==='csv'||ext==='txt') {
+    var rc=new FileReader();
+    rc.onload=function(e){ var rows=_siParseCSV(e.target.result); _siStep1(rows,fname,compId); };
+    rc.readAsText(file,'UTF-8');
+  } else {
+    if(typeof XLSX==='undefined'){toast('Librairie Excel non chargée','err');return;}
+    var rx=new FileReader();
+    rx.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:'array',cellDates:true,raw:false,dateNF:'dd/mm/yyyy'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'dd/mm/yyyy'});
+        _siStep1(rows,fname,compId);
+      }catch(er){toast('Erreur lecture Excel : '+(er.message||er),'err');}
+    };
+    rx.readAsArrayBuffer(file);
+  }
+}
+
+function _siStep1(rawRows, filename, compId) {
+  // Trouver ligne d'en-tête (1ère non vide avec >1 cellule)
+  var hIdx=0;
+  for(var hi=0;hi<Math.min(5,rawRows.length);hi++){
+    if(rawRows[hi]&&rawRows[hi].filter(function(c){return c&&c.toString().trim().length>1;}).length>=2){hIdx=hi;break;}
+  }
+  var hdrs     = rawRows[hIdx];
+  var dataRows = rawRows.slice(hIdx+1).filter(function(r){return r&&r.some(function(c){return c&&c.toString().trim();});});
+  if(!hdrs||hdrs.length<2||!dataRows.length){toast('Fichier vide ou format non reconnu','err');return;}
+
+  var cols = _siDetect(hdrs, dataRows);
+  var cp   = (S.comps||[]).find(function(c){return c.id===compId;});
+
+  // ── UI Étape 1 ──
+  var ov = document.createElement('div');
+  ov.id  = '_si-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+  // Barre de confiance visuelle
+  var confBar = function(conf){
+    var dots=4, filled=Math.round(conf/100*dots);
+    var col = conf>=90?'#10b981':conf>=70?'#f59e0b':conf>=50?'#f97316':'#ef4444';
+    var h='';
+    for(var i=0;i<dots;i++) h+='<span style="color:'+(i<filled?col:'rgba(255,255,255,.15)')+'">●</span>';
+    return '<span style="font-size:11px;letter-spacing:2px">'+h+'</span> <span style="font-size:10px;color:'+col+';font-weight:700">'+conf+'%</span>';
+  };
+
+  // Dropdown champ
+  var mkSel = function(idx, currentField){
+    var s='<select id="_si_sel_'+idx+'" onchange="_siSelChange('+idx+')" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:11px;padding:4px 6px;cursor:pointer">';
+    _SI_FIELDS.forEach(function(f){ s+='<option value="'+f.id+'"'+(f.id===currentField?' selected':'')+'>'+f.label+'</option>'; });
+    return s+'</select>';
+  };
+
+  var tableRows='';
+  cols.forEach(function(c,i){
+    var samples = c.samples.slice(0,2).map(function(s){return s.length>14?s.slice(0,13)+'…':s;}).join(', ');
+    var rowBg = i%2===0?'background:rgba(255,255,255,.03)':'';
+    var hasConf = c.conf>=85;
+    tableRows += '<tr style="'+rowBg+'">'
+      +'<td style="padding:7px 10px;font-size:12px;font-weight:600;white-space:nowrap;color:var(--txt2)">'+c.srcName+'</td>'
+      +'<td style="padding:4px 6px;min-width:170px">'+mkSel(i,c.field)+'</td>'
+      +'<td style="padding:7px 10px;white-space:nowrap">'+confBar(c.conf)+'</td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:var(--txt3);font-family:monospace">'+samples+'</td>'
+      +'</tr>';
+  });
+
+  ov.innerHTML =
+    '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:min(700px,97vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.6)">'
+    // Header
+    +'<div style="padding:20px 24px 14px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between">'
+        +'<div>'
+          +'<div style="font-size:15px;font-weight:800;color:var(--txt)">✨ Import intelligent — Équipage</div>'
+          +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+filename+' · '+dataRows.length+' lignes · '+(cp?'<strong>'+cp.name+'</strong>':compId)+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;align-items:center">'
+          +'<span style="font-size:11px;background:rgba(99,102,241,.2);color:#a5b4fc;border-radius:6px;padding:3px 10px;font-weight:700">Étape 1 / 2</span>'
+        +'</div>'
+      +'</div>'
+      +'<div style="margin-top:10px;font-size:11px;color:var(--txt3)">Vérifiez le mapping des colonnes. Chaque colonne de votre fichier est associée à un champ — corrigez si besoin.</div>'
+    +'</div>'
+    // Table
+    +'<div style="overflow-y:auto;flex:1;padding:0 0 4px">'
+      +'<table style="width:100%;border-collapse:collapse">'
+        +'<thead><tr style="position:sticky;top:0;background:var(--navy3);z-index:2">'
+          +'<th style="padding:8px 10px;font-size:10px;font-weight:700;color:var(--txt3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Colonne source</th>'
+          +'<th style="padding:8px 10px;font-size:10px;font-weight:700;color:var(--txt3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Champ identifié</th>'
+          +'<th style="padding:8px 10px;font-size:10px;font-weight:700;color:var(--txt3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Confiance</th>'
+          +'<th style="padding:8px 10px;font-size:10px;font-weight:700;color:var(--txt3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Exemples</th>'
+        +'</tr></thead>'
+        +'<tbody>'+tableRows+'</tbody>'
+      +'</table>'
+    +'</div>'
+    // Footer
+    +'<div style="padding:14px 24px 18px;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'_si-ov\').remove()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>'
+      +'<button onclick="_siGoStep2()" style="padding:10px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Analyser les données →</button>'
+    +'</div>'
+    +'</div>';
+
+  ov._rawRows  = rawRows;
+  ov._hIdx     = hIdx;
+  ov._cols     = cols;
+  ov._compId   = compId;
+  document.body.appendChild(ov);
+}
+
+function _siSelChange(idx) {
+  var ov = document.getElementById('_si-ov'); if(!ov) return;
+  var sel = document.getElementById('_si_sel_'+idx); if(!sel) return;
+  ov._cols[idx].field = sel.value;
+}
+
+function _siGoStep2() {
+  var ov = document.getElementById('_si-ov'); if(!ov) return;
+  var cols    = ov._cols;
+  var rawRows = ov._rawRows;
+  var hIdx    = ov._hIdx;
+  var compId  = ov._compId;
+  ov.remove();
+  _siStep2(cols, rawRows, hIdx, compId);
+}
+
+function _siStep2(cols, rawRows, hIdx, compId) {
+  var dataRows = rawRows.slice(hIdx+1).filter(function(r){return r&&r.some(function(c){return c&&c.toString().trim();});});
+  // Construire colMap depuis cols
+  var colMap={};
+  cols.forEach(function(c){ if(c.field) colMap[c.field]=c.srcIdx; });
+
+  var get=function(r,f){ return colMap[f]!==undefined?(r[colMap[f]]||'').toString().trim():''; };
+  var normL=function(s){ return (s||'').toString().trim(); };
+
+  if(!S.pilots) S.pilots=[];
+  var cp=(S.comps||[]).find(function(c){return c.id===compId;})||{};
+  var defaultClasse=(cp.discipline==='stol')?'multiaxes':(cp.pratique==='paramoteur')?'paramotor':'pendulaire';
+  var enrolled=(S.compEnroll||{})[compId]||[];
+
+  var toCreate=[],toEnroll=[],alreadyIn=[];
+
+  dataRows.forEach(function(r){
+    var nom=get(r,'nom'), prenom=get(r,'prenom');
+    // Nom complet éventuel
+    if(!nom&&!prenom&&colMap['_nomComplet']!==undefined){
+      var full=get(r,'_nomComplet');var pts=full.split(/\s+/);
+      if(pts.length>=2){var up=pts[0]===pts[0].toUpperCase();nom=up?pts[0]:pts[pts.length-1];prenom=up?pts.slice(1).join(' '):pts.slice(0,-1).join(' ');}else nom=full;
+    }
+    var lic=get(r,'licence');
+    if(!nom&&!prenom&&!lic) return;
+
+    // Normaliser
+    var nomN  =(nom||'').trim().toUpperCase();
+    var prenomN=(prenom||'').trim().toUpperCase();
+    var licN  = lic.trim();
+
+    // Enrichissement licenceDB
+    var ldb=null;
+    if(S.licenceDB){
+      if(licN) ldb=S.licenceDB['_lic_'+licN]||null;
+      if(!ldb&&nomN){ var k1=_siNrm(nomN)+'|'+_siNrm(prenomN); ldb=S.licenceDB[k1]||S.licenceDB[_siNrm(prenomN)+'|'+_siNrm(nomN)]||null; }
+    }
+    if(ldb&&ldb.nom)  nomN   =ldb.nom.trim().toUpperCase();
+    if(ldb&&ldb.prenom)prenomN=ldb.prenom.trim().toUpperCase();
+    if(ldb&&ldb.licence)licN  =ldb.licence;
+
+    // Smart mapping
+    var rawMap={pratique:get(r,'pratique'),classe:get(r,'classe'),categorie:get(r,'categorie'),equipage:get(r,'equipage'),discipline:get(r,'discipline'),role:get(r,'role')};
+    var smart=(typeof _applySmartMapping==='function')?_applySmartMapping(rawMap,ldb):{pratique:'',classe:defaultClasse,categorie:'',equipage:'',discipline:'',role:''};
+
+    // Adresse composée
+    var adrParts=[get(r,'adresse'),get(r,'_cp'),get(r,'_ville')].filter(Boolean);
+    var adr=(ldb&&ldb.adresse)||adrParts.join(' ')||'';
+
+    // Chercher doublon — on utilise licN brut pour retrouver les pilotes existants
+    var found=null;
+    if(licN) found=(S.pilots).find(function(p){return p.licence&&_siNrm(p.licence)===_siNrm(licN);});
+    if(!found&&nomN) found=(S.pilots).find(function(p){return _siNrm(p.nom)===_siNrm(nomN)&&_siNrm(p.prenom)===_siNrm(prenomN);});
+    // Format FFPLUM : valider après matching, ne stocker que les licences valides
+    var licToSave=_isValidLicence(licN)?licN:'';
+
+    var _immat=get(r,'immat').replace(/\s/g,'').toUpperCase();
+    var entry={
+      nom:nomN,prenom:prenomN,licence:licToSave,
+      genre:(ldb&&ldb.genre)||get(r,'genre')||'',
+      ddn:(ldb&&ldb.ddn)||get(r,'ddn')||'',
+      email:(ldb&&ldb.email)||get(r,'email')||'',
+      tel:(ldb&&ldb.tel)||get(r,'tel')||'',
+      club:(ldb&&ldb.club)||get(r,'club')||'',
+      region:(ldb&&ldb.region)||get(r,'region')||'',
+      adresse:adr,
+      pratique:smart.pratique||(cp.pratique||''),
+      classe:smart.classe||defaultClasse,
+      categorie:smart.categorie||'',
+      equipage:smart.equipage||'',
+      role:smart.role||'',
+      discipline:smart.discipline||'',
+      niveau:get(r,'niveau')||'',
+      remarques:get(r,'remarques')||'',
+      _immat:_immat,
+      _marque:get(r,'marque')||get(r,'_marqueAeronef')||'',
+      _modele:get(r,'modele')||get(r,'_modeleAeronef')||'',
+      _moteur:get(r,'moteur')||'',
+      _helice:get(r,'helice')||'',
+      _aile:get(r,'aile')||'',
+      _ldb:ldb
+    };
+
+    if(found){
+      entry._existingId=found.id;
+      // Calculer ce qui va changer
+      var changes=[];
+      if(!found.email&&entry.email) changes.push('email');
+      if(!found.tel&&entry.tel) changes.push('tél');
+      if(!found.ddn&&entry.ddn) changes.push('DDN');
+      if(!found.licence&&entry.licence) changes.push('licence');
+      if(!found.adresse&&entry.adresse) changes.push('adresse');
+      if(!found.club&&entry.club) changes.push('club');
+      if(!found.region&&entry.region) changes.push('région');
+      entry._changes=changes;
+      if(enrolled.indexOf(found.id)!==-1) alreadyIn.push(entry);
+      else toEnroll.push(entry);
+    } else {
+      toCreate.push(entry);
+    }
+  });
+
+  // ── UI Étape 2 ──
+  var ov=document.createElement('div');
+  ov.id='_si-ov2';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+
+  var mkSection=function(title,color,icon,items,mkRow){
+    if(!items.length) return '';
+    var h='<div style="margin-bottom:12px">'
+      +'<div style="font-size:12px;font-weight:700;color:'+color+';margin-bottom:6px">'+icon+' '+title+' <span style="background:'+color+'22;border-radius:10px;padding:1px 8px">'+items.length+'</span></div>'
+      +'<div style="max-height:130px;overflow-y:auto;border:1px solid var(--bdr);border-radius:10px">';
+    items.forEach(function(item,i){
+      h+='<div style="padding:7px 12px;'+(i%2===0?'background:rgba(255,255,255,.03)':'')+';display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+mkRow(item,color)+'</div>';
+    });
+    return h+'</div></div>';
+  };
+  var tag=function(txt,col){ return '<span style="font-size:10px;background:'+col+'22;color:'+col+';border-radius:5px;padding:1px 7px;font-weight:600">'+txt+'</span>'; };
+  var pill=function(txt){ return '<span style="font-size:10px;color:var(--txt3)">'+txt+'</span>'; };
+
+  var listHtml='';
+  listHtml+=mkSection('À créer et inscrire','#10b981','✨',toCreate,function(e,col){
+    return '<span style="flex:1;font-size:12px;font-weight:700;color:var(--txt)">'+e.prenom+' '+e.nom+'</span>'
+      +(e.licence?tag(e.licence,'#6366f1'):'')
+      +(e.role?tag(e.role,col):'')
+      +(e._immat?tag(e._immat,'#0891b2'):'')
+      +(e._marque?pill(e._marque+(e._modele?' '+e._modele:'')):'');
+  });
+  listHtml+=mkSection('Existants à inscrire','#3b82f6','🔗',toEnroll,function(e,col){
+    return '<span style="flex:1;font-size:12px;font-weight:700;color:var(--txt)">'+e.prenom+' '+e.nom+'</span>'
+      +(e.licence?tag(e.licence,'#6366f1'):'')
+      +(e.role?tag(e.role,col):'')
+      +(e._changes&&e._changes.length?'<span style="font-size:10px;color:#f59e0b">+ '+e._changes.join(', ')+'</span>':'');
+  });
+  listHtml+=mkSection('Déjà inscrits — données enrichies','#f59e0b','🔄',alreadyIn,function(e,col){
+    return '<span style="flex:1;font-size:12px;font-weight:700;color:var(--txt)">'+e.prenom+' '+e.nom+'</span>'
+      +(e._changes&&e._changes.length?'<span style="font-size:10px;color:'+col+'">+ '+e._changes.join(', ')+'</span>':'<span style="font-size:10px;color:var(--txt3)">aucune modification</span>');
+  });
+  if(!toCreate.length&&!toEnroll.length&&!alreadyIn.length){
+    listHtml='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:13px">Aucun participant détecté.<br>Vérifiez le mapping des colonnes à l\'étape précédente.</div>';
+  }
+
+  var hasLdb=S.licenceDB&&Object.keys(S.licenceDB).length>0;
+  var total=toCreate.length+toEnroll.length;
+
+  ov.innerHTML=
+    '<div style="background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;width:min(600px,97vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.6)">'
+    +'<div style="padding:20px 24px 14px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between">'
+        +'<div>'
+          +'<div style="font-size:15px;font-weight:800;color:var(--txt)">✨ Import intelligent — Prévisualisation</div>'
+          +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+(cp.name||compId)+' · '+(total+alreadyIn.length)+' participants traités</div>'
+        +'</div>'
+        +'<span style="font-size:11px;background:rgba(99,102,241,.2);color:#a5b4fc;border-radius:6px;padding:3px 10px;font-weight:700">Étape 2 / 2</span>'
+      +'</div>'
+      +(hasLdb?'<div style="margin-top:8px;font-size:11px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10b981;border-radius:7px;padding:6px 10px">✅ Base licences FFPLUM chargée ('+Object.keys(S.licenceDB).length+' licences) — données enrichies automatiquement</div>':'<div style="margin-top:8px;font-size:11px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);color:#f59e0b;border-radius:7px;padding:6px 10px">💡 Importez la base licences FFPLUM dans Réglages pour enrichir automatiquement les données.</div>')
+    +'</div>'
+    +'<div style="overflow-y:auto;flex:1;padding:16px 24px 8px">'+listHtml+'</div>'
+    +'<div style="padding:14px 24px 18px;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'
+      +'<button onclick="_siBackToStep1()" style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">← Retour</button>'
+      +(total+alreadyIn.length>0?'<button onclick="_siExecute()" style="padding:10px 26px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Confirmer l\'import ('+( total+alreadyIn.length)+') →</button>':'<button disabled style="padding:10px 26px;border-radius:10px;border:none;background:var(--navy3);color:var(--txt3);font-size:13px;font-weight:700;font-family:inherit;cursor:not-allowed">Rien à importer</button>')
+    +'</div>'
+    +'</div>';
+
+  ov._toCreate=toCreate; ov._toEnroll=toEnroll; ov._alreadyIn=alreadyIn;
+  ov._compId=compId; ov._cols=cols; ov._rawRows=rawRows; ov._hIdx=hIdx;
+  document.body.appendChild(ov);
+}
+
+function _siBackToStep1() {
+  var ov2=document.getElementById('_si-ov2'); if(!ov2) return;
+  var cols=ov2._cols, rawRows=ov2._rawRows, hIdx=ov2._hIdx, compId=ov2._compId;
+  ov2.remove();
+  var hdrs=rawRows[hIdx];
+  var dataRows=rawRows.slice(hIdx+1).filter(function(r){return r&&r.some(function(c){return c&&c.toString().trim();});});
+  _siStep1(rawRows, '(retour)', compId);
+  // Re-appliquer les sélections
+  setTimeout(function(){
+    cols.forEach(function(c,i){
+      var sel=document.getElementById('_si_sel_'+i);
+      if(sel) sel.value=c.field||'';
+    });
+    var ov=document.getElementById('_si-ov');
+    if(ov){ov._cols=cols;}
+  },50);
+}
+
+function _siExecute() {
+  var ov=document.getElementById('_si-ov2'); if(!ov) return;
+  var toCreate=ov._toCreate||[],toEnroll=ov._toEnroll||[],alreadyIn=ov._alreadyIn||[];
+  var compId=ov._compId;
+  if(!S.pilots) S.pilots=[];
+  if(!S.compEnroll) S.compEnroll={};
+  if(!S.compEnroll[compId]) S.compEnroll[compId]=[];
+  if(!S.ulms) S.ulms={};
+
+  var _regionFromAdr=function(adr){
+    if(!adr||typeof regionFromCP!=='function') return '';
+    var m=(adr||'').match(/\b(\d{5})\b/); return m?regionFromCP(m[1])||'':'';
+  };
+  var _applyUlm=function(pid,e){
+    if(!e._immat&&!e._marque) return;
+    if(!S.ulms[pid]||!S.ulms[pid].length){
+      S.ulms[pid]=[{id:'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),immat:e._immat,marque:e._marque,modele:e._modele||'',moteur:e._moteur||'',helice:e._helice||'',aile:e._aile||''}];
+    }
+  };
+  var _mergeFields=function(pilot,e){
+    var fill=function(f,v){if(v&&!pilot[f])pilot[f]=v;};
+    fill('email',e.email);fill('tel',e.tel);fill('ddn',e.ddn);fill('adresse',e.adresse);
+    fill('licence',e.licence);fill('club',e.club);fill('genre',e.genre);
+    fill('pratique',e.pratique);fill('categorie',e.categorie);fill('equipage',e.equipage);fill('role',e.role);
+    if(e._ldb&&e._ldb.licence){var ow=function(f,v){if(v)pilot[f]=v;};ow('genre',e._ldb.genre);ow('ddn',e._ldb.ddn);ow('club',e._ldb.club);}
+    // Région : depuis licenceDB, sinon depuis adresse via code postal
+    if(!pilot.region) pilot.region=e.region||_regionFromAdr(pilot.adresse||e.adresse)||'';
+    pilot._updatedAt=Date.now();
+  };
+
+  var nbC=0,nbE=0,nbU=0;
+
+  toCreate.forEach(function(e){
+    var pid='p_si_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,5);
+    var reg=e.region||_regionFromAdr(e.adresse)||'';
+    var pilot={id:pid,nom:e.nom,prenom:e.prenom,licence:e.licence,
+      genre:(typeof _mapGenre==='function')?_mapGenre(e.genre):e.genre,
+      ddn:(typeof _mapDate==='function')?_mapDate(e.ddn):e.ddn,
+      email:e.email,tel:e.tel,adresse:e.adresse,club:e.club,region:reg,
+      pratique:e.pratique,classe:e.classe,categorie:e.categorie,equipage:e.equipage,
+      role:(typeof _mapRole==='function')?_mapRole(e.role):e.role,
+      discipline:e.discipline,niveau:e.niveau,remarques:e.remarques,
+      statut:'pilote',_createdAt:Date.now(),_updatedAt:Date.now()};
+    S.pilots.push(pilot);
+    _applyUlm(pid,e);
+    S.compEnroll[compId].push(pid);
+    nbC++;
+  });
+  toEnroll.forEach(function(e){
+    var pilot=(S.pilots).find(function(p){return p.id===e._existingId;});
+    if(!pilot) return;
+    _mergeFields(pilot,e);
+    _applyUlm(pilot.id,e);
+    if(S.compEnroll[compId].indexOf(pilot.id)===-1) S.compEnroll[compId].push(pilot.id);
+    nbE++;
+  });
+  alreadyIn.forEach(function(e){
+    var pilot=(S.pilots).find(function(p){return p.id===e._existingId;});
+    if(!pilot) return;
+    _mergeFields(pilot,e);
+    _applyUlm(pilot.id,e);
+    nbU++;
+  });
+
+  var cp=(S.comps||[]).find(function(c){return c.id===compId;});
+  if(cp&&typeof _applyCompFieldsToPilot==='function'){
+    S.compEnroll[compId].forEach(function(pid){
+      var p=(S.pilots||[]).find(function(x){return x.id===pid;}); if(p) _applyCompFieldsToPilot(p,cp);
+    });
+  }
+  if(!S._enrollResetAt)S._enrollResetAt={};
+  S._enrollResetAt[compId]=Date.now();
+  saveState();if(typeof _hdpSaveNow==='function')_hdpSaveNow();
+  ov.remove();
+  if(typeof renderHomeDetailPanel==='function')renderHomeDetailPanel(null);
+  var parts=[];
+  if(nbC)parts.push(nbC+' créé'+(nbC>1?'s':''));
+  if(nbE)parts.push(nbE+' inscrit'+(nbE>1?'s':''));
+  if(nbU)parts.push(nbU+' mis à jour');
+  toast(parts.join(' · ')+' ✓','ok');
+}
+
+// ── Fin Smart Import ─────────────────────────────────────────────────────────
+
 function importEquipageAuto(inp, compId) {
   var file = inp.files && inp.files[0]; if (!file) return;
   var ext = file.name.split('.').pop().toLowerCase(); inp.value = '';
@@ -35740,11 +37367,13 @@ function hdgRefreshFromLicence(compId) {
     return '';
   };
 
-  var updated = 0, notFound = 0;
+  var updated = 0, notFound = 0, identified = 0, licCleaned = 0;
 
   enrolled.forEach(function(pid) {
     var p = (S.pilots||[]).find(function(x){ return x.id === pid; });
     if (!p) return;
+    // Nettoyer les licences au format invalide avant la recherche
+    if (p.licence && !_isValidLicence(p.licence)) { p.licence = ''; licCleaned++; }
     // Recherche par licence (index rapide _lic_XXXXX) puis par nom|prénom
     var ldb = null;
     if (p.licence) ldb = S.licenceDB['_lic_'+(p.licence||'').toString().trim()] || null;
@@ -35752,19 +37381,65 @@ function hdgRefreshFromLicence(compId) {
     if (!ldb) { notFound++; return; }
 
     var changed = false;
-    var overwrite = function(f, v){ if (v && p[f] !== v) { p[f] = v; changed = true; } };
-    var fill      = function(f, v){ if (v && !p[f])      { p[f] = v; changed = true; } };
+    var overwrite = function(f, v){ if (v !== undefined && v !== null && v !== '' && p[f] !== v) { p[f] = v; changed = true; } };
+    var fill      = function(f, v){ if (v && !p[f]) { p[f] = v; changed = true; } };
 
+    // ── Identité (écrase toujours depuis licenceDB — source de vérité) ──
     overwrite('licence', ldb.licence);
     overwrite('genre',   ldb.genre);
     overwrite('ddn',     ldb.ddn);
     overwrite('club',    ldb.club);
-    // Région : même normalisation que le bouton individuel
+
+    // Pour les pilotes provisoires, corriger aussi le nom/prénom depuis la base
+    if (p._provisional && ldb.nom && ldb.prenom) {
+      overwrite('nom',    ldb.nom);
+      overwrite('prenom', ldb.prenom);
+    }
+
+    // ── Région normalisée ──
     var reg = matchRegion(ldb.region);
-    overwrite('region',  reg || ldb.region);
+    overwrite('region', reg || ldb.region);
+
+    // ── Contact ──
     fill('email',   ldb.email);
     fill('tel',     ldb.tel);
     fill('adresse', ldb.adresse);
+
+    // ── Pratique, Classe, Catégorie depuis licenceDB ──
+    if (ldb.pratique) {
+      var prat = (typeof _mapPratique === 'function') ? _mapPratique(ldb.pratique) : ldb.pratique;
+      fill('pratique', prat);
+    }
+    if (ldb.classe) {
+      var cls = (typeof _mapClasse === 'function') ? _mapClasse(ldb.classe) : ldb.classe;
+      fill('classe', cls);
+    }
+    if (ldb.categorie) {
+      var cat = (typeof _mapCategorie === 'function') ? _mapCategorie(ldb.categorie) : ldb.categorie;
+      fill('categorie', cat);
+    }
+
+    // ── ULM : immat, marque, modèle, aile, moteur ──
+    if (ldb.immat || ldb.marque || ldb.modele) {
+      if (!S.ulms) S.ulms = {};
+      if (!S.ulms[pid]) S.ulms[pid] = [];
+      var ulm = S.ulms[pid][0];
+      if (!ulm) { ulm = {id:'u'+Date.now().toString(36)}; S.ulms[pid].push(ulm); }
+      if (ldb.immat  && !ulm.immat)  { ulm.immat  = ldb.immat;  changed = true; }
+      if (ldb.marque && !ulm.marque) { ulm.marque = ldb.marque; changed = true; }
+      if (ldb.modele && !ulm.modele) { ulm.modele = ldb.modele; changed = true; }
+      if (ldb.aile   && !ulm.aile)   { ulm.aile   = ldb.aile;   changed = true; }
+      if (ldb.moteur && !ulm.moteur) { ulm.moteur = ldb.moteur; changed = true; }
+    }
+
+    // ── Marquer le pilote comme identifié ──
+    if (p._provisional) {
+      delete p._provisional;
+      p._identifiedAt = Date.now();
+      identified++;
+      changed = true;
+    }
+
     if (changed) { p._updatedAt = Date.now(); updated++; }
   });
 
@@ -35775,8 +37450,9 @@ function hdgRefreshFromLicence(compId) {
   if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
 
   var msg = updated + ' compétiteur'+(updated>1?'s':'')+' mis à jour depuis la base licences';
+  if (licCleaned) msg += ' · '+licCleaned+' licence'+(licCleaned>1?'s':'')+' invalide'+(licCleaned>1?'s':'')+' effacée'+(licCleaned>1?'s':'');
   if (notFound) msg += ' ('+notFound+' non trouvé'+(notFound>1?'s':'')+')';
-  toast(msg, updated ? 'ok' : '');
+  toast(msg, updated||licCleaned ? 'ok' : '');
 }
 
 function refreshAllFromLicenceDB() {
@@ -40840,53 +42516,52 @@ function printCompDossier(compId, opts) {
   // ── Données graphiques ───────────────────────────────────────────────
   var genreSegs=[{v:nbH,l:'Hommes',c:'#0891b2'},{v:nbF,l:'Femmes',c:'#f43f5e'},{v:nbNR,l:'N/R',c:'#94a3b8'}].filter(function(d){return d.v>0;});
   var equipSegs=[{v:nbMono,l:'Monoplace',c:'#6366f1'},{v:nbBi,l:'Biplace',c:'#10b981'}].filter(function(d){return d.v>0;});
-  var ageRows=ageBuckets.map(function(b){return barRow(b.l,b.n,maxAge,'#6366f1');}).join('');
-  var catRows=Object.keys(catCounts).map(function(c){return barRow(c,catCounts[c],maxCat,'#0891b2');}).join('')||'<tr><td colspan="3" style="color:#9ca3af;font-style:italic;font-size:8px">—</td></tr>';
+  var ageRows=ageBuckets.filter(function(b){return b.n>0;}).map(function(b){return barRow(b.l,b.n,maxAge,'#6366f1');}).join('');
+  var catRows=Object.keys(catCounts).map(function(c){return barRow(c,catCounts[c],maxCat,'#0891b2');}).join('');
   var clsRows=Object.keys(clsCounts).map(function(c){return barRow(c,clsCounts[c],maxCls,'#8b5cf6');}).join('');
-  var regRows=regSorted.slice(0,8).map(function(r){return barRow(r.length>14?r.slice(0,14)+'…':r,regionCounts[r],maxReg,'#0d9488');}).join('')||'<tr><td colspan="3" style="color:#9ca3af;font-style:italic;font-size:8px">—</td></tr>';
-  var _mkBars=function(obj,col){var ks=_topK(obj,8);var mx=ks.length?obj[ks[0]]:1;return ks.map(function(k){return barRow(k.length>16?k.slice(0,16)+'…':k,obj[k],mx,col);}).join('')||'<tr><td colspan="3" style="color:#9ca3af;font-style:italic;font-size:8px">—</td></tr>';};
-  var _mkBdRows=function(groups,color){var sorted=groups.order.slice().sort(function(a,b){return groups.map[b]-groups.map[a];});var mx=sorted.length?groups.map[sorted[0]]:1;return sorted.map(function(d){return barRow(d.length>16?d.slice(0,16)+'…':d,Math.round(groups.map[d]),Math.round(mx),color);}).join('')||'<tr><td colspan="3" style="color:#9ca3af;font-style:italic;font-size:8px">—</td></tr>';};
+  var regRows=regSorted.slice(0,8).map(function(r){return barRow(r.length>14?r.slice(0,14)+'…':r,regionCounts[r],maxReg,'#0d9488');}).join('');
+  var _mkBars=function(obj,col){var ks=_topK(obj,8);var mx=ks.length?obj[ks[0]]:1;return ks.map(function(k){return barRow(k.length>16?k.slice(0,16)+'…':k,obj[k],mx,col);}).join('');};
+  var _mkBdRows=function(groups,color){var sorted=groups.order.slice().sort(function(a,b){return groups.map[b]-groups.map[a];});var mx=sorted.length?groups.map[sorted[0]]:1;return sorted.map(function(d){return barRow(d.length>16?d.slice(0,16)+'…':d,Math.round(groups.map[d]),Math.round(mx),color);}).join('');};
 
   // ── Assemblage ───────────────────────────────────────────────────────
+  var _pLigne1=[];
+  if(genreSegs.length>0)         _pLigne1.push(donutBox('Genre',genreSegs));
+  if(ageRows)                    _pLigne1.push(chartBox('Tranches d\'âge',ageRows));
+  if(catRows)                    _pLigne1.push(chartBox('Catégories',catRows));
+  var _pLigne2=[];
+  if(clsRows)                    _pLigne2.push(chartBox('Classes ULM',clsRows));
+  if(equipSegs.length>0)         _pLigne2.push(donutBox('Équipages',equipSegs));
+  if(regRows)                    _pLigne2.push(chartBox('Régions / Pays',regRows));
+  var _pClubs=Object.keys(clubCounts).length>0?_mkBars(clubCounts,'#0891b2'):'';
+
   var chartsHtml='<div class="page-sec">'
     +SH('Statistiques — '+enrolled.length+' participant(s)')
     +kpiHtml
-    // Ligne 1 : Genre (donut) | Tranches d'âge | Catégories
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-    +donutBox('Genre',genreSegs)
-    +chartBox('Tranches d\'âge',ageRows)
-    +chartBox('Catégories',catRows)
-    +'</div>'
-    // Ligne 2 : Classes ULM | Équipages (donut) | Régions
-    +(clsRows||equipSegs.length?
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
-      +(clsRows?chartBox('Classes ULM',clsRows):'<div style="border:1px solid #dde3f0;border-radius:5px"></div>')
-      +donutBox('Équipages',equipSegs)
-      +chartBox('Régions / Pays',regRows)
-      +'</div>'
-    :'')
-    // Ligne 3 : Clubs (si données)
-    +(Object.keys(clubCounts).length>0?
-      '<div style="margin-bottom:0">'+chartBox('Clubs (top 8)',_mkBars(clubCounts,'#0891b2'))+'</div>'
-    :'')
+    +(_pLigne1.length?'<div style="display:grid;grid-template-columns:repeat('+_pLigne1.length+',1fr);gap:8px;margin-bottom:8px">'+_pLigne1.join('')+'</div>':'')
+    +(_pLigne2.length?'<div style="display:grid;grid-template-columns:repeat('+_pLigne2.length+',1fr);gap:8px;margin-bottom:8px">'+_pLigne2.join('')+'</div>':'')
+    +(_pClubs?'<div style="margin-bottom:0">'+chartBox('Clubs (top 8)',_pClubs)+'</div>':'')
     +'</div>';
 
   // ── Matériels ────────────────────────────────────────────────────────
   if(_hasMat||_hasPM){
     chartsHtml+='<div class="page-sec">'+SH('Matériels');
     if(_hasMat){
-      chartsHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
-        +chartBox('Ailes — Multiaxes / ML',_mkBars(_aileML,'#0891b2'))
-        +chartBox('Ailes — Pendulaire',_mkBars(_ailePend,'#0d9488'))
-        +'</div>';
-      chartsHtml+='<div style="margin-bottom:8px">'+chartBox('Moteurs — Microlight &amp; Pendulaire',_mkBars(_motML,'#6366f1'))+'</div>';
+      var _ml1=[],_rAileML=_mkBars(_aileML,'#0891b2'),_rAilePd=_mkBars(_ailePend,'#0d9488');
+      if(_rAileML) _ml1.push(chartBox('Ailes — Multiaxes / ML',_rAileML));
+      if(_rAilePd) _ml1.push(chartBox('Ailes — Pendulaire',_rAilePd));
+      if(_ml1.length===2) chartsHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+_ml1.join('')+'</div>';
+      else if(_ml1.length===1) chartsHtml+='<div style="margin-bottom:8px">'+_ml1[0]+'</div>';
+      var _rMotML=_mkBars(_motML,'#6366f1');
+      if(_rMotML) chartsHtml+='<div style="margin-bottom:8px">'+chartBox('Moteurs — Microlight &amp; Pendulaire',_rMotML)+'</div>';
     }
     if(_hasPM){
-      chartsHtml+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
-        +chartBox('Ailes Paramoteur',_mkBars(_aileMP,'#f59e0b'))
-        +chartBox('Moteurs Paramoteur',_mkBars(_motMP,'#ef4444'))
-        +chartBox('Hélices Paramoteur',_mkBars(_helMP,'#8b5cf6'))
-        +'</div>';
+      var _pm=[],_rAileMP=_mkBars(_aileMP,'#f59e0b'),_rMotMP=_mkBars(_motMP,'#ef4444'),_rHelMP=_mkBars(_helMP,'#8b5cf6');
+      if(_rAileMP) _pm.push(chartBox('Ailes Paramoteur',_rAileMP));
+      if(_rMotMP)  _pm.push(chartBox('Moteurs Paramoteur',_rMotMP));
+      if(_rHelMP)  _pm.push(chartBox('Hélices Paramoteur',_rHelMP));
+      if(_pm.length===3) chartsHtml+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+_pm.join('')+'</div>';
+      else if(_pm.length===2) chartsHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+_pm.join('')+'</div>';
+      else if(_pm.length===1) chartsHtml+=_pm[0];
     }
     chartsHtml+='</div>';
   }
