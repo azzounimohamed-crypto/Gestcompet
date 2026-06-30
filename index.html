@@ -4622,7 +4622,9 @@ async function loadState() {
         }
       }
     }
-    // 1b-bis. Clé dédiée LS_ETAPES — fusionnée APRÈS Object.assign (filet anti-perte étapes rallye)
+    // 1b-bis. Clé dédiée LS_ETAPES — SOURCE UNIQUE DE VÉRITÉ pour les étapes (filet anti-perte)
+    // Pas de fusion champ par champ (source de bugs) : si LS_ETAPES a des données pour une
+    // compétition, elles remplacent intégralement S.etapes[cid], point final.
     try {
       var _etapesRaw = localStorage.getItem(LS_ETAPES);
       if (_etapesRaw) {
@@ -4630,16 +4632,8 @@ async function loadState() {
         if (_etapesParsed && typeof _etapesParsed === 'object') {
           if (!S.etapes || typeof S.etapes !== 'object') S.etapes = {};
           Object.keys(_etapesParsed).forEach(function(cid) {
-            var idbArr = Array.isArray(_etapesParsed[cid]) ? _etapesParsed[cid] : [];
-            if (!S.etapes[cid] || !S.etapes[cid].length) {
-              S.etapes[cid] = idbArr;
-            } else {
-              // Fusionner par id : garder la version la plus récente
-              var byId = {};
-              S.etapes[cid].forEach(function(e){ if(e&&e.id) byId[e.id]=e; });
-              idbArr.forEach(function(e){ if(e&&e.id&&!byId[e.id]) byId[e.id]=e; });
-              S.etapes[cid] = Object.values(byId);
-            }
+            var arr = Array.isArray(_etapesParsed[cid]) ? _etapesParsed[cid] : [];
+            if (arr.length) S.etapes[cid] = arr;
           });
         }
       }
@@ -4850,20 +4844,14 @@ async function loadState() {
             });
           }
         }
-        // Restaurer étapes depuis IDB (fusionner par id, éviter de perdre des étapes ajoutées offline)
+        // Restaurer étapes depuis IDB — uniquement pour combler les compétitions absentes
+        // (LS_ETAPES, déjà appliqué ci-dessus en synchrone, reste la source de vérité)
         if (idbData.etapes && typeof idbData.etapes === 'object') {
           if (!S.etapes || typeof S.etapes !== 'object') S.etapes = {};
           Object.keys(idbData.etapes).forEach(function(cid) {
             var idbArr = Array.isArray(idbData.etapes[cid]) ? idbData.etapes[cid] : [];
             if (!idbArr.length) return;
-            if (!S.etapes[cid] || !S.etapes[cid].length) {
-              S.etapes[cid] = idbArr;
-            } else {
-              var byId = {};
-              S.etapes[cid].forEach(function(e){ if(e&&e.id) byId[e.id]=e; });
-              idbArr.forEach(function(e){ if(e&&e.id&&!byId[e.id]) byId[e.id]=e; });
-              S.etapes[cid] = Object.values(byId);
-            }
+            if (!S.etapes[cid] || !S.etapes[cid].length) S.etapes[cid] = idbArr;
           });
         }
         // Restaurer ganttTasks depuis IDB (last-write-wins par tâche)
@@ -4938,7 +4926,8 @@ function clearLocalStorageQuota() {
   var _KEEP = [LS_CRITICAL, LS_OD_HEADER, LS_OD_FOOTER, 'ffplum_logo',
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
-               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES, LS_GANTT, LS_COLLECTIF, LS_SIG, LS_STAMP];
+               'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES, LS_GANTT, LS_COLLECTIF, LS_SIG, LS_STAMP,
+               LS_ETAPES];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
@@ -5065,10 +5054,24 @@ function _flushSaveState() {
     aides:S.aides||[],
     _deletedAides:S._deletedAides||{},
     collectif:S.collectif||[], _deletedCollectif:S._deletedCollectif||[],
-    shn:S.shn||[], _deletedSHN:S._deletedSHN||[]
+    shn:S.shn||[], _deletedSHN:S._deletedSHN||[],
+    etapes:S.etapes||{}
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
-  try { if (S.etapes && Object.keys(S.etapes).length) localStorage.setItem(LS_ETAPES, JSON.stringify(S.etapes)); } catch(e) {}
+  // Priorité absolue : si le quota est dépassé, on libère de la place et on réessaie
+  // immédiatement, plutôt que d'abandonner silencieusement (cause de perte de données).
+  if (S.etapes && Object.keys(S.etapes).length) {
+    try {
+      localStorage.setItem(LS_ETAPES, JSON.stringify(S.etapes));
+    } catch(e) {
+      try {
+        clearLocalStorageQuota();
+        localStorage.setItem(LS_ETAPES, JSON.stringify(S.etapes));
+      } catch(e2) {
+        console.log('[Storage] Échec sauvegarde étapes même après nettoyage quota');
+      }
+    }
+  }
   // ── Clé dédiée aides (filet anti-perte — jamais strippée) ──
   try { if (S.aides && S.aides.length) localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
   try {
@@ -6847,7 +6850,7 @@ function _etapeAdd(compId) {
   setTimeout(function(){
     var row = document.getElementById('etape-row-'+newEt.id);
     if (row) { var inp = row.querySelector('input'); if(inp) inp.focus(); }
-    _etapeToggleAcc(newEt.id);
+    _etapeToggleAcc(newEt.id, compId);
   }, 80);
 }
 
@@ -6907,6 +6910,7 @@ function _etapeSave(compId, etId) {
           }
           saveState();
           if (typeof _etapeMapRefresh==='function') _etapeMapRefresh(compId);
+          if (typeof _etapeRefreshDistances==='function') _etapeRefreshDistances(compId);
         }
       }).catch(function(){});
   }
@@ -6914,13 +6918,51 @@ function _etapeSave(compId, etId) {
   toast('Étape enregistrée ✓', 'ok');
 }
 
+function _etapeMapSetLayer(type) {
+  window._etapesMapLayer = type;
+  var el = document.getElementById('etapes-map');
+  if (!el || !el._mapLayers || !el._leaflet) return;
+  var m = el._leaflet, ls = el._mapLayers;
+  [ls.osm,ls.satellite,ls.topo,ls.oaciBase,ls.oaciOver].forEach(function(l){ try{m.removeLayer(l);}catch(e){} });
+  if (type==='satellite') { ls.satellite.addTo(m); }
+  else if (type==='topo')  { ls.topo.addTo(m); }
+  else if (type==='oaci')  { ls.oaciBase.addTo(m); ls.oaciOver.addTo(m); }
+  else { ls.osm.addTo(m); }
+  ['osm','satellite','topo','oaci'].forEach(function(t){
+    var b = document.getElementById('etapes-mlb-'+t);
+    if (!b) return;
+    b.style.background = t===type ? '#fff' : 'rgba(255,255,255,.7)';
+    b.style.fontWeight = t===type ? '700'  : '400';
+  });
+}
 function _etapeMapInit(compId) {
   if (typeof L === 'undefined') return;
   var el = document.getElementById('etapes-map');
   if (!el) return;
   if (_etapesMap) { try{_etapesMap.remove();}catch(e){} _etapesMap=null; }
   _etapesMap = L.map(el, {zoomControl:true, attributionControl:false});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(_etapesMap);
+  // Couches disponibles
+  var osmL   = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18});
+  var satL   = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18});
+  var topoL  = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17});
+  // VFR : fond clair + overlay Open Flight Maps (vraie carte aéronautique)
+  var vfrBL  = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18});
+  var vfrOL  = L.tileLayer('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest',{maxZoom:14,opacity:1});
+  el._mapLayers = {osm:osmL, satellite:satL, topo:topoL, oaciBase:vfrBL, oaciOver:vfrOL};
+  el._leaflet   = _etapesMap;
+  // Barre de sélection de fond de carte
+  var bBar = document.createElement('div');
+  bBar.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1000;display:flex;gap:4px;flex-wrap:wrap';
+  var btnSt = 'border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3)';
+  bBar.innerHTML =
+    '<button id="etapes-mlb-osm"       onclick="_etapeMapSetLayer(\'osm\')"       style="background:#fff;font-weight:700;'+btnSt+'">🗺 Carte</button>'
+   +'<button id="etapes-mlb-satellite" onclick="_etapeMapSetLayer(\'satellite\')" style="background:rgba(255,255,255,.7);'+btnSt+'">🛰 Satellite</button>'
+   +'<button id="etapes-mlb-topo"      onclick="_etapeMapSetLayer(\'topo\')"      style="background:rgba(255,255,255,.7);'+btnSt+'">⛰ Topo</button>'
+   +'<button id="etapes-mlb-oaci"      onclick="_etapeMapSetLayer(\'oaci\')"      style="background:rgba(255,255,255,.7);'+btnSt+'">✈ VFR</button>'
+   ;
+  el.appendChild(bBar);
+  // Activer la dernière couche utilisée
+  _etapeMapSetLayer(window._etapesMapLayer || 'osm');
   _etapesMap.fitBounds([[41.3,-5.2],[51.2,9.6]]);
   setTimeout(function(){if(_etapesMap)_etapesMap.invalidateSize();},150);
   _etapeMapRefresh(compId);
@@ -6947,6 +6989,7 @@ function _etapeMapInit(compId) {
           }
           saveState();
           _etapeMapRefresh(compId);
+          if (typeof _etapeRefreshDistances==='function') _etapeRefreshDistances(compId);
         }
         setTimeout(_nextGeo, 1100); // 1 req/s pour respecter Nominatim ToS
       }).catch(function(){ setTimeout(_nextGeo, 1100); });
@@ -6954,6 +6997,32 @@ function _etapeMapInit(compId) {
   setTimeout(_nextGeo, 500);
 }
 
+function _etapeRefreshDistances(compId) {
+  var etList = ((S.etapes && S.etapes[compId]) || []).slice().sort(function(a,b){
+    var da = a.dateFrom||a.date||'9999', db = b.dateFrom||b.date||'9999';
+    return da<db?-1:da>db?1:0;
+  });
+  var totalKm = 0, prevPt = null;
+  etList.forEach(function(et) {
+    var cell = document.getElementById('et-dist-'+et.id);
+    var lat = parseFloat(et.lat), lng = parseFloat(et.lng);
+    var legKm = null;
+    if (!isNaN(lat) && !isNaN(lng)) {
+      if (prevPt) { legKm = _haversineKm(prevPt[0], prevPt[1], lat, lng); totalKm += legKm; }
+      prevPt = [lat, lng];
+    }
+    if (cell) cell.textContent = legKm!==null ? Math.round(legKm)+' km' : '—';
+  });
+  var totalEl = document.getElementById('et-total-km');
+  if (totalEl) totalEl.textContent = totalKm>0 ? '· '+Math.round(totalKm)+' km au total' : '';
+}
+function _haversineKm(lat1, lng1, lat2, lng2) {
+  var R = 6371;
+  var dLat = (lat2-lat1) * Math.PI/180;
+  var dLng = (lng2-lng1) * Math.PI/180;
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 function _etapeMapRefresh(compId) {
   if (!_etapesMap) return;
   _etapesMap.eachLayer(function(l){ if(!(l instanceof L.TileLayer)) _etapesMap.removeLayer(l); });
@@ -6961,11 +7030,11 @@ function _etapeMapRefresh(compId) {
     var da = a.dateFrom||a.date||'9999', db = b.dateFrom||b.date||'9999';
     return da<db?-1:da>db?1:0;
   });
-  var pts = [];
+  var pts = [], allPts = [];
   etList.forEach(function(et, i) {
     var lat = parseFloat(et.lat), lng = parseFloat(et.lng);
     if (isNaN(lat)||isNaN(lng)) return;
-    pts.push([lat,lng]);
+    pts.push([lat,lng]); allPts.push([lat,lng]);
     var num = i+1;
     var icon = L.divIcon({
       className:'',
@@ -6978,12 +7047,25 @@ function _etapeMapRefresh(compId) {
       .bindTooltip('<b style="font-size:13px">Étape '+num+'</b><br>'+(et.lieu||et.nom||'')+(dateStr?'<br><span style="color:#94a3b8">'+dateStr+'</span>':'')+(et.club?'<br>'+et.club:''),
         {direction:'top',offset:[0,-18],opacity:1});
   });
-  if (pts.length > 1) {
-    L.polyline(pts,{color:'#0057FF',weight:2.5,dashArray:'8 5',opacity:.8}).addTo(_etapesMap);
-    try{_etapesMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});}catch(e){}
-  } else if (pts.length===1) {
-    _etapesMap.setView(pts[0],10);
-  }
+  if (pts.length > 1) L.polyline(pts,{color:'#0057FF',weight:2.5,dashArray:'8 5',opacity:.8}).addTo(_etapesMap);
+  // Marqueurs déroutements
+  etList.forEach(function(et) {
+    (et.derotements||[]).forEach(function(d) {
+      var dlat = parseFloat(d.lat), dlng = parseFloat(d.lng);
+      if (isNaN(dlat)||isNaN(dlng)) return;
+      allPts.push([dlat,dlng]);
+      var dIcon = L.divIcon({
+        className:'',
+        html:'<div style="width:24px;height:24px;border-radius:50%;background:#f59e0b;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">D</div>',
+        iconSize:[24,24], iconAnchor:[12,12], tooltipAnchor:[13,0]
+      });
+      L.marker([dlat,dlng],{icon:dIcon}).addTo(_etapesMap)
+        .bindTooltip('<b style="font-size:12px">Déroutement</b><br>'+(d.lieu||d.oaci||'')+(d.typeContact?'<br><span style="color:#94a3b8">'+d.typeContact+'</span>':'')+(d.nom?'<br>'+d.nom:''),
+          {direction:'top',offset:[0,-14],opacity:1});
+    });
+  });
+  if (allPts.length > 1) { try{_etapesMap.fitBounds(L.latLngBounds(allPts),{padding:[30,30]});}catch(e){} }
+  else if (allPts.length===1) { _etapesMap.setView(allPts[0],10); }
 }
 
 function _etapeDel(compId, etId) {
@@ -7006,13 +7088,73 @@ function _etapeDel(compId, etId) {
   toast('Étape supprimée', 'ok');
 }
 
-function _etapeToggleAcc(etId) {
+// ── Drag & drop pour réordonner les étapes ───────────────────────────────────
+var _etapeDragSrc = null;
+function _etapeDragStart(ev, compId, etId) {
+  _etapeDragSrc = {compId: compId, etId: etId};
+  ev.dataTransfer.effectAllowed = 'move';
+  ev.dataTransfer.setData('text/plain', etId);
+  setTimeout(function(){ var r=document.getElementById('etape-row-'+etId); if(r) r.style.opacity='0.35'; }, 0);
+}
+function _etapeDragEnd(ev, etId) {
+  var r = document.getElementById('etape-row-'+etId);
+  if (r) r.style.opacity = '';
+  document.querySelectorAll('tr.et-drag-over').forEach(function(t){
+    t.classList.remove('et-drag-over');
+    t.style.boxShadow = '';
+  });
+}
+function _etapeDragOver(ev, etId) {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  if (!_etapeDragSrc || _etapeDragSrc.etId === etId) return;
+  document.querySelectorAll('tr.et-drag-over').forEach(function(t){
+    t.classList.remove('et-drag-over'); t.style.boxShadow='';
+  });
+  var r = document.getElementById('etape-row-'+etId);
+  if (r) { r.classList.add('et-drag-over'); r.style.boxShadow='inset 0 2px 0 var(--stol)'; }
+}
+function _etapeDragLeave(ev, etId) {
+  var r = document.getElementById('etape-row-'+etId);
+  if (r) { r.classList.remove('et-drag-over'); r.style.boxShadow=''; }
+}
+function _etapeDrop(ev, compId, etId) {
+  ev.preventDefault();
+  var r = document.getElementById('etape-row-'+etId);
+  if (r) { r.classList.remove('et-drag-over'); r.style.boxShadow=''; }
+  if (!_etapeDragSrc || _etapeDragSrc.etId === etId || _etapeDragSrc.compId !== compId) return;
+  var list = S.etapes && S.etapes[compId];
+  if (!list) return;
+  var srcIdx = list.findIndex(function(x){ return x.id === _etapeDragSrc.etId; });
+  var tgtIdx = list.findIndex(function(x){ return x.id === etId; });
+  if (srcIdx < 0 || tgtIdx < 0) return;
+  var item = list.splice(srcIdx, 1)[0];
+  list.splice(tgtIdx, 0, item);
+  list.forEach(function(e, i){ e._order = i; });
+  _flushSaveState();
+  switchHomeDetailTab('etapes');
+}
+var _derOACITimers = {};
+function _etapeDerOACISchedule(compId, etId, derId, inputEl) {
+  var key = etId+'_'+derId;
+  if (_derOACITimers[key]) clearTimeout(_derOACITimers[key]);
+  _derOACITimers[key] = setTimeout(function() {
+    delete _derOACITimers[key];
+    if (inputEl) _etapeDerOACI(compId, etId, derId, inputEl.value, inputEl);
+  }, 800);
+}
+function _etapeToggleAcc(etId, compId) {
   var acc  = document.getElementById('etape-acc-'+etId);
   var chev = document.getElementById('et-chev-'+etId);
   if (!acc) return;
   var open = acc.style.display !== 'none';
   acc.style.display = open ? 'none' : '';
   if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+  // À l'ouverture : rafraîchir déroutements et contacts depuis S.etapes courant
+  if (!open && compId) {
+    _etapeDerRender(compId, etId);
+    _etapeContactRender(compId, etId);
+  }
 }
 
 function _etapeFieldSave(compId, etId, field, value) {
@@ -7032,6 +7174,443 @@ function _etapeFieldSaveLieu(compId, etId, value) {
   _etapeMapRefresh(compId);
 }
 
+function _etapeDerRender(compId, etId) {
+  var el = document.getElementById('der-table-'+etId);
+  if (!el) return;
+  var et = S.etapes && S.etapes[compId] && S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et) return;
+  var ders = et.derotements || [];
+  var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+  var thSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;padding:4px 6px;border-bottom:1px solid var(--bdr);text-align:left;white-space:nowrap';
+  var tdSt = 'padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.04)';
+  var iSt  = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none';
+  var sSt  = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
+  var opts = ['Aéroclub','Gestionnaire','Autre'];
+  var h = '';
+  if (ders.length) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+    h += '<th style="'+thSt+';width:72px">OACI</th><th style="'+thSt+'">Lieu</th><th style="'+thSt+';width:110px">Type de contact</th><th style="'+thSt+'">Nom</th><th style="'+thSt+';width:120px">Téléphone</th><th style="'+thSt+';width:24px"></th>';
+    h += '</tr></thead><tbody>';
+    ders.forEach(function(d) {
+      if (!d.id) d.id = 'der'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      var did = d.id;
+      h += '<tr data-der-id="'+did+'">';
+      h += '<td style="'+tdSt+'"><input type="text" value="'+esc2(d.oaci||'')+'" placeholder="LFSE" maxlength="6" style="'+iSt+';text-transform:uppercase;font-family:monospace;font-size:11px;color:var(--stol);letter-spacing:1px" oninput="this.value=this.value.toUpperCase().trim();_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'oaci\',this.value);_etapeDerOACISchedule(\''+compId+'\',\''+etId+'\',\''+did+'\',this)"></td>';
+      h += '<td style="'+tdSt+'"><input type="text" value="'+esc2(d.lieu||'')+'" placeholder="Commune, terrain…" style="'+iSt+'" oninput="_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'lieu\',this.value)"></td>';
+      h += '<td style="'+tdSt+'"><select style="'+sSt+'" onchange="_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'typeContact\',this.value)"><option value="">—</option>';
+      opts.forEach(function(t){ h += '<option value="'+t+'"'+(d.typeContact===t?' selected':'')+'>'+t+'</option>'; });
+      h += '</select></td>';
+      h += '<td style="'+tdSt+'"><input type="text" value="'+esc2(d.nom||'')+'" placeholder="Prénom Nom…" style="'+iSt+'" oninput="_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'nom\',this.value)"></td>';
+      h += '<td style="'+tdSt+'"><input type="tel" value="'+esc2(d.tel||'')+'" placeholder="06 xx xx xx xx" style="'+iSt+'" oninput="_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'tel\',this.value)"></td>';
+      h += '<td style="'+tdSt+';text-align:center"><button onclick="_etapeDerDel(\''+compId+'\',\''+etId+'\',\''+did+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">×</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  } else {
+    h = '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:6px 0 2px">Aucun aérodrome de déroutement</div>';
+  }
+  el.innerHTML = h;
+}
+
+function _etapeDerAdd(compId, etId) {
+  if (!S.etapes) { toast('Erreur : S.etapes absent', 'err'); return; }
+  if (!S.etapes[compId]) { toast('Erreur : compétition introuvable ['+compId+']', 'err'); return; }
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et) { toast('Erreur : étape introuvable ['+etId+'] parmi '+S.etapes[compId].length+' étapes', 'err'); return; }
+  if (!et.derotements) et.derotements = [];
+  et.derotements.push({id:'der'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), oaci:'', lieu:'', typeContact:'', nom:'', tel:''});
+  _flushSaveState();
+  _etapeDerRender(compId, etId);
+}
+
+function _etapeDerDel(compId, etId, derId) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et || !et.derotements) return;
+  et.derotements = et.derotements.filter(function(d){ return d.id !== derId; });
+  _flushSaveState();
+  _etapeDerRender(compId, etId);
+}
+
+function _etapeDerSave(compId, etId, derId, field, value) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et || !et.derotements) return;
+  var d = et.derotements.find(function(x){ return x.id===derId; });
+  if (!d) return;
+  d[field] = value;
+  _flushSaveState();
+}
+
+function _etapeDerOACI(compId, etId, derId, val, inputEl) {
+  var oaci = (val||'').toUpperCase().trim();
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et || !et.derotements) return;
+  var d = et.derotements.find(function(x){ return x.id===derId; });
+  if (!d) return;
+
+  d.oaci = oaci; d.lieu = ''; d.lat = ''; d.lng = '';
+  saveState();
+  if (oaci.length < 4) return;
+
+  function _getLieuInput() {
+    var tbl = document.getElementById('der-table-'+etId);
+    if (!tbl) return null;
+    var row = tbl.querySelector('tr[data-der-id="'+derId+'"]');
+    return row ? row.querySelectorAll('input')[1] : null;
+  }
+  function _setLieu(v) { var li = _getLieuInput(); if (li) li.value = v; }
+  function _derApply(name, lat, lng) {
+    d.lieu = name||''; d.lat = lat||''; d.lng = lng||'';
+    _setLieu(d.lieu); saveState(); _etapeMapRefresh(compId);
+  }
+
+  // Code BasULM (LF + 4 chiffres) — non résolvable automatiquement
+  var _numPart = oaci.replace(/^LF/i,'');
+  var _isBasULM = /^\d{4}$/.test(_numPart) && oaci.length===6;
+  if (_isBasULM) {
+    _setLieu('');
+    toast('Code BasULM '+oaci+' — saisissez le lieu manuellement', 'warn');
+    return;
+  }
+
+  // Overpass : tag icao= seul (sans filtre aeroway — certains terrains ne l'ont pas)
+  _setLieu('⏳ Recherche…');
+  var ovQ = '[out:json][timeout:10];('
+    + 'node["icao"="'+oaci+'"];'
+    + 'way["icao"="'+oaci+'"];'
+    + 'relation["icao"="'+oaci+'"];'
+    + ');out center 1;';
+  fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(ovQ))
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(res) {
+      var el = res.elements && res.elements[0];
+      if (el) {
+        var lat = el.lat || (el.center && el.center.lat);
+        var lng = el.lon || (el.center && el.center.lon);
+        _derApply((el.tags && (el.tags.name||el.tags['name:fr'])) || oaci, lat, lng);
+      } else {
+        _setLieu('');
+        toast('Code '+oaci+' non trouvé — saisissez le lieu manuellement', 'warn');
+      }
+    })
+    .catch(function(){ _setLieu(''); });
+}
+
+function _etapeContactRender(compId, etId) {
+  var el = document.getElementById('contact-table-'+etId);
+  if (!el) return;
+  var et = S.etapes && S.etapes[compId] && S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et) return;
+  var contacts = et.contacts || [];
+  var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+  var thSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;padding:4px 6px;border-bottom:1px solid var(--bdr);text-align:left;white-space:nowrap';
+  var tdSt = 'padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.04)';
+  var iSt  = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none';
+  var sSt  = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
+  var foncts = ['Responsable de l\'étape','Président','Aéroclub','Gestionnaire','Autorité','Autre'];
+  var h = '';
+  if (contacts.length) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+    h += '<th style="'+thSt+'">Nom Prénom</th><th style="'+thSt+';width:160px">Fonction</th><th style="'+thSt+';width:130px">Téléphone</th><th style="'+thSt+'">Email</th><th style="'+thSt+';width:24px"></th>';
+    h += '</tr></thead><tbody>';
+    contacts.forEach(function(c) {
+      if (!c.id) c.id = 'ct'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      var ctId = c.id;
+      h += '<tr data-ct-id="'+ctId+'">';
+      h += '<td style="'+tdSt+'"><input type="text" value="'+esc2(c.nom||'')+'" placeholder="Nom Prénom…" style="'+iSt+'" oninput="_etapeContactSave(\''+compId+'\',\''+etId+'\',\''+ctId+'\',\'nom\',this.value)"></td>';
+      h += '<td style="'+tdSt+'"><select style="'+sSt+'" onchange="_etapeContactSave(\''+compId+'\',\''+etId+'\',\''+ctId+'\',\'fonction\',this.value)"><option value="">— Fonction —</option>';
+      foncts.forEach(function(f){ h += '<option value="'+f+'"'+(c.fonction===f?' selected':'')+'>'+f+'</option>'; });
+      h += '</select></td>';
+      h += '<td style="'+tdSt+'"><input type="tel" value="'+esc2(c.tel||'')+'" placeholder="06…" style="'+iSt+'" oninput="_etapeContactSave(\''+compId+'\',\''+etId+'\',\''+ctId+'\',\'tel\',this.value)"></td>';
+      h += '<td style="'+tdSt+'"><input type="email" value="'+esc2(c.email||'')+'" placeholder="adresse@…" style="'+iSt+'" oninput="_etapeContactSave(\''+compId+'\',\''+etId+'\',\''+ctId+'\',\'email\',this.value)"></td>';
+      h += '<td style="'+tdSt+';text-align:center"><button onclick="_etapeContactDel(\''+compId+'\',\''+etId+'\',\''+ctId+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">×</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  } else {
+    h = '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:6px 0 2px">Aucun contact</div>';
+  }
+  el.innerHTML = h;
+}
+
+function _etapeContactAdd(compId, etId) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et) return;
+  if (!et.contacts) et.contacts = [];
+  et.contacts.push({id:'ct'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), nom:'', prenom:'', fonction:'', tel:'', email:''});
+  _flushSaveState();
+  _etapeContactRender(compId, etId);
+}
+
+function _etapeContactDel(compId, etId, ctId) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et || !et.contacts) return;
+  et.contacts = et.contacts.filter(function(c){ return c.id !== ctId; });
+  _flushSaveState();
+  _etapeContactRender(compId, etId);
+}
+
+function _etapeContactSave(compId, etId, ctId, field, value) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id===etId; });
+  if (!et || !et.contacts) return;
+  var c = et.contacts.find(function(x){ return x.id===ctId; });
+  if (!c) return;
+  c[field] = value;
+  saveState();
+}
+
+// ── Export / Import / Impression étapes ──────────────────────────────────────
+function _etapesExportJSON(compId) {
+  var etList = (S.etapes && S.etapes[compId]) || [];
+  if (!etList.length) { toast('Aucune étape à exporter', 'warn'); return; }
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  var blob = new Blob([JSON.stringify({ competition: cp?(cp.name||cp.nom||''):compId, etapes: etList }, null, 2)], { type:'application/json' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'etapes_'+((cp&&cp.name)?cp.name.replace(/[^a-z0-9]/gi,'_').substring(0,20):compId)+'_'+new Date().toISOString().substring(0,10)+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+  toast('Étapes exportées (JSON) ✓', 'ok');
+}
+function _etapesExportXLSX(compId) {
+  if (typeof XLSX === 'undefined') { toast('Bibliothèque Excel non chargée', 'err'); return; }
+  var etList = (S.etapes && S.etapes[compId]) || [];
+  if (!etList.length) { toast('Aucune étape à exporter', 'warn'); return; }
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  var sorted = etList.slice().sort(function(a,b){ return (a._order||0)-(b._order||0); });
+  var rows = sorted.map(function(et, i){
+    var ders = (et.derotements||[]).map(function(d){ return (d.oaci||d.lieu||''); }).filter(Boolean).join(', ');
+    return [i+1, et.oaci||'', et.lieu||et.nom||'', et.dateFrom||'', et.dateTo||'', et.club||'', et.region||'', et.responsable||'', et.notam?'Oui':'Non', et.commentaires||'', (et.derotements||[]).length, ders];
+  });
+  var ws = XLSX.utils.aoa_to_sheet([['#','OACI','Lieu / Aérodrome','Date du','Date au','Club','Région','Responsable','NOTAM','Commentaires','Nb dér.','Déroutements (OACI)']].concat(rows));
+  ws['!cols'] = [3,6,22,10,10,15,18,15,6,22,5,22].map(function(w){ return {wch:w}; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Étapes');
+  XLSX.writeFile(wb, 'etapes_'+((cp&&cp.name)?cp.name.replace(/[^a-z0-9]/gi,'_').substring(0,20):compId)+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  toast('Étapes exportées (Excel) ✓', 'ok');
+}
+function _etapesImportFile(compId, input) {
+  var file = input.files && input.files[0]; if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase(); input.value = '';
+  if (ext === 'json') {
+    var rr = new FileReader(); rr.onload = function(e) {
+      try {
+        var data = JSON.parse(e.target.result);
+        var arr = Array.isArray(data) ? data : (data.etapes || []);
+        if (!arr.length) { toast('Fichier vide ou format invalide', 'err'); return; }
+        if (!S.etapes) S.etapes = {};
+        if (!S.etapes[compId]) S.etapes[compId] = [];
+        var added=0, updated=0;
+        arr.forEach(function(et) {
+          if (!et.id) et.id = 'et'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+          var ex = S.etapes[compId].find(function(x){ return x.id===et.id || (et.oaci&&x.oaci===et.oaci) || (et.lieu&&(x.lieu||x.nom||'')===(et.lieu||et.nom||'')); });
+          if (ex) { Object.assign(ex, et); updated++; } else { S.etapes[compId].push(et); added++; }
+        });
+        _flushSaveState(); switchHomeDetailTab('etapes');
+        toast(added+' ajoutée(s), '+updated+' mise(s) à jour (JSON)', 'ok');
+      } catch(err) { toast('Erreur JSON : '+err.message, 'err'); }
+    }; rr.readAsText(file);
+  } else {
+    if (typeof XLSX === 'undefined') { toast('Bibliothèque Excel non chargée', 'err'); return; }
+    var rr2 = new FileReader(); rr2.onload = function(e) {
+      try {
+        var wb = XLSX.read(e.target.result, {type:'array'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (rows.length < 2) { toast('Fichier vide', 'err'); return; }
+        var hdrs = rows[0].map(function(h){ return (h||'').toString().toLowerCase(); });
+        var ci = function(kws){ var i=-1; hdrs.forEach(function(h,j){ if(i<0 && kws.some(function(k){ return h.indexOf(k)>=0; })) i=j; }); return i; };
+        var cOaci=ci(['oaci','icao']), cLieu=ci(['lieu','aérodrome','aerodrome','site']),
+            cDf=ci(['date du','datefrom','début','deb']), cDt=ci(['date au','dateto','fin']),
+            cClub=ci(['club']), cReg=ci(['région','region']), cResp=ci(['responsable']),
+            cCom=ci(['commentaire']), cNotam=ci(['notam']);
+        if (!S.etapes) S.etapes = {};
+        if (!S.etapes[compId]) S.etapes[compId] = [];
+        var added=0, updated=0;
+        rows.slice(1).forEach(function(r) {
+          var lieu=(cLieu>=0?(r[cLieu]||'').toString().trim():''), oaci=(cOaci>=0?(r[cOaci]||'').toString().toUpperCase().trim():'');
+          if (!lieu && !oaci) return;
+          var rec = { lieu:lieu, nom:lieu, oaci:oaci, dateFrom:cDf>=0?(r[cDf]||'').toString().trim():'', dateTo:cDt>=0?(r[cDt]||'').toString().trim():'', club:cClub>=0?(r[cClub]||'').toString().trim():'', region:cReg>=0?(r[cReg]||'').toString().trim():'', responsable:cResp>=0?(r[cResp]||'').toString().trim():'', commentaires:cCom>=0?(r[cCom]||'').toString().trim():'', notam:cNotam>=0?/oui|yes|true|1/i.test((r[cNotam]||'').toString()):false, lat:'', lng:'' };
+          var ex = S.etapes[compId].find(function(x){ return (oaci&&x.oaci===oaci)||(lieu&&(x.lieu||x.nom||'').toLowerCase()===lieu.toLowerCase()); });
+          if (ex) { Object.assign(ex, rec); updated++; } else { rec.id='et'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); S.etapes[compId].push(rec); added++; }
+        });
+        _flushSaveState(); switchHomeDetailTab('etapes');
+        toast(added+' ajoutée(s), '+updated+' mise(s) à jour (Excel)', 'ok');
+      } catch(err) { toast('Erreur Excel : '+err.message, 'err'); }
+    }; rr2.readAsArrayBuffer(file);
+  }
+}
+function _etapesPrint(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
+  var etList = ((S.etapes&&S.etapes[compId])||[]).slice().sort(function(a,b){ return (a._order||0)-(b._order||0); });
+  if (!etList.length) { toast('Aucune étape à imprimer', 'warn'); return; }
+  var compNom = cp ? (cp.name||cp.nom||compId) : compId;
+
+  // Données carte (étapes + déroutements avec coordonnées)
+  var mapEtapes = [], mapDers = [], polyPts = [];
+  etList.forEach(function(et, i) {
+    var lat = parseFloat(et.lat), lng = parseFloat(et.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      polyPts.push([lat, lng]);
+      mapEtapes.push({ num:i+1, lat:lat, lng:lng, label:(et.oaci||et.lieu||et.nom||''), lieu:(et.lieu||et.nom||'') });
+    }
+    (et.derotements||[]).forEach(function(d) {
+      var dlat = parseFloat(d.lat), dlng = parseFloat(d.lng);
+      if (!isNaN(dlat) && !isNaN(dlng))
+        mapDers.push({ lat:dlat, lng:dlng, label:(d.oaci||d.lieu||'D'), lieu:(d.lieu||'') });
+    });
+  });
+  var hasMap = mapEtapes.length > 0;
+
+  // Tableau des étapes
+  var rows = etList.map(function(et, i) {
+    var ders = (et.derotements||[]).map(function(d){ return '<b>'+(d.oaci||'—')+'</b>'+(d.lieu?' '+d.lieu:'')+(d.typeContact?'<br><small>'+d.typeContact+(d.nom?' · '+d.nom:'')+(d.tel?' · '+d.tel:'')+'</small>':''); }).join('<br>');
+    var contacts = (et.contacts||[]).map(function(c){ return (c.nom||'')+(c.fonction?' ('+c.fonction+')':'')+(c.tel?' — '+c.tel:'')+(c.email?' — '+c.email:''); }).join('<br>');
+    return '<tr>'
+      +'<td style="text-align:center;font-weight:800;color:#0057FF;font-size:14px">'+(i+1)+'</td>'
+      +'<td style="font-family:monospace;font-weight:700;color:#0057FF">'+(et.oaci||'—')+'</td>'
+      +'<td><b>'+(et.lieu||et.nom||'—')+'</b>'+(et.club?'<br><small>'+et.club+'</small>':'')+'</td>'
+      +'<td>'+(et.dateFrom||'—')+(et.dateTo&&et.dateTo!==et.dateFrom?'<br>→ '+et.dateTo:'')+'</td>'
+      +'<td>'+(et.region||'')+'</td>'
+      +'<td>'+(ders||'—')+'</td>'
+      +'<td>'+(contacts||'—')+'</td>'
+      +'<td style="text-align:center">'+(et.notam?'<b>✓</b>':'')+'</td>'
+      +'</tr>'
+      +(et.commentaires?'<tr style="background:#fafbfc"><td colspan="8" style="font-style:italic;color:#6b7280;font-size:11px;padding:2px 8px 8px 36px">💬 '+et.commentaires+'</td></tr>':'');
+  }).join('');
+
+  var dateHeader = cp ? (cp.dateFrom||'')+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+cp.dateTo:'')+(cp.lieu?' · '+cp.lieu:'') : '';
+  var win = window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Étapes — '+compNom+'</title>');
+  if (hasMap) {
+    win.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">');
+  }
+  var initLayerType = (window._etapesMapLayer || 'osm');
+  win.document.write('<style>'
+    +'*{box-sizing:border-box}'
+    +'body{font-family:Arial,sans-serif;font-size:12px;padding:16px 20px;color:#111;margin:0}'
+    +'h2{margin:0 0 2px;font-size:17px;color:#0057FF}'
+    +'h3{margin:0 0 8px;font-size:11px;font-weight:400;color:#6b7280}'
+    +'#map-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}'
+    +'#map-toolbar button{border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2);font-family:Arial,sans-serif}'
+    +'#map-print{width:100%;height:360px;border:1px solid #d1d5db;border-radius:6px;margin-bottom:14px}'
+    +'table{width:100%;border-collapse:collapse}'
+    +'th{background:#e8f0fe;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border:1px solid #c7d2fe;text-align:left}'
+    +'td{padding:5px 8px;border:1px solid #e5e7eb;vertical-align:top;font-size:11px}'
+    +'tr:nth-child(even) td{background:#f9fafb}'
+    +'small{font-size:10px;color:#555}'
+    +'.foot{margin-top:12px;font-size:10px;color:#9ca3af}'
+    +'@media print{'
+    +'  #map-toolbar{display:none!important}'
+    +'  body{padding:8px}'
+    +'  #map-print{height:320px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'  thead{display:table-header-group}'
+    +'}'
+    +'</style></head><body>');
+  win.document.write('<h2>Étapes — '+compNom+'</h2><h3>'+dateHeader+'</h3>');
+  if (hasMap) {
+    win.document.write('<div id="map-toolbar">'
+      +'<span style="font-size:11px;color:#6b7280;font-weight:600">Fond de carte :</span>'
+      +'<button id="pmlb-osm"       onclick="pMapLayer(\'osm\')">🗺 Carte</button>'
+      +'<button id="pmlb-satellite" onclick="pMapLayer(\'satellite\')">🛰 Satellite</button>'
+      +'<button id="pmlb-topo"      onclick="pMapLayer(\'topo\')">⛰ Topo</button>'
+      +'<button id="pmlb-oaci"      onclick="pMapLayer(\'oaci\')">✈ VFR</button>'
+      +''
+      +'<button onclick="window.print()" style="margin-left:12px;background:#0057FF;color:#fff;font-weight:700">🖨 Imprimer</button>'
+      +'</div>');
+    win.document.write('<div id="map-print"></div>');
+  }
+  win.document.write('<table><thead><tr><th>#</th><th>OACI</th><th>Lieu / Club</th><th>Dates</th><th>Région</th><th>Déroutements</th><th>Contacts</th><th>NOTAM</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  win.document.write('<p class="foot">Imprimé le '+new Date().toLocaleDateString('fr-FR')+'</p>');
+  if (hasMap) {
+    var etapesJson = JSON.stringify(mapEtapes).replace(/<\//g,'<\\/');
+    var dersJson   = JSON.stringify(mapDers).replace(/<\//g,'<\\/');
+    var polyJson   = JSON.stringify(polyPts).replace(/<\//g,'<\\/');
+    win.document.write('<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"><\/script>');
+    win.document.write('<script>(function(){'
+      +'var etapes='+etapesJson+';'
+      +'var ders='+dersJson+';'
+      +'var poly='+polyJson+';'
+      +'var _pMap=null, _pLayerA=null, _pLayerB=null;'
+      +'var TILES={'
+      +'  osm:      {a:"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",       b:null,     maxZ:18},'
+      +'  satellite:{a:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", b:null, maxZ:18},'
+      +'  topo:     {a:"https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",          b:null,     maxZ:17},'
+      +'  oaci:     {a:"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", b:"https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest", maxZ:14},'
+      +''
+      +'};'
+      +'function pMapLayer(type){'
+      +'  if(!_pMap) return;'
+      +'  if(_pLayerA) {try{_pMap.removeLayer(_pLayerA);}catch(e){}} '
+      +'  if(_pLayerB) {try{_pMap.removeLayer(_pLayerB);}catch(e){}} '
+      +'  var t=TILES[type]||TILES.osm;'
+      +'  _pLayerA=L.tileLayer(t.a,{maxZoom:t.maxZ}).addTo(_pMap);'
+      +'  if(t.b) _pLayerB=L.tileLayer(t.b,{maxZoom:14,opacity:.9}).addTo(_pMap); else _pLayerB=null;'
+      +'  ["osm","satellite","topo","oaci"].forEach(function(k){'
+      +'    var b=document.getElementById("pmlb-"+k);'
+      +'    if(b){b.style.background=k===type?"#fff":"rgba(230,230,230,.8)";b.style.fontWeight=k===type?"700":"400";}'
+      +'  });'
+      +'}'
+      +'window.pMapLayer=pMapLayer;'
+      +'function init(){'
+      +'  _pMap=L.map("map-print",{zoomControl:true,attributionControl:false});'
+      +'  pMapLayer("'+initLayerType+'");'
+      +'  var allPts=[];'
+      +'  etapes.forEach(function(e){'
+      +'    allPts.push([e.lat,e.lng]);'
+      +'    L.marker([e.lat,e.lng],{icon:L.divIcon({className:"",html:"<div style=\\"width:28px;height:28px;border-radius:50%;background:#0057FF;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)\\">"+e.num+"</div>",iconSize:[28,28],iconAnchor:[14,14]})}).addTo(_pMap)'
+      +'      .bindTooltip("<b>"+e.num+"</b> "+e.label+(e.lieu&&e.lieu!==e.label?" · "+e.lieu:""),{direction:"top",offset:[0,-16],opacity:.95});'
+      +'  });'
+      +'  ders.forEach(function(d){'
+      +'    allPts.push([d.lat,d.lng]);'
+      +'    L.marker([d.lat,d.lng],{icon:L.divIcon({className:"",html:"<div style=\\"width:22px;height:22px;border-radius:50%;background:#f59e0b;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35)\\">D</div>",iconSize:[22,22],iconAnchor:[11,11]})}).addTo(_pMap)'
+      +'      .bindTooltip("Dér. "+d.label+(d.lieu&&d.lieu!==d.label?" · "+d.lieu:""),{direction:"top",offset:[0,-13],opacity:.95});'
+      +'  });'
+      +'  if(poly.length>1) L.polyline(poly,{color:"#0057FF",weight:2.5,dashArray:"8 5",opacity:.85}).addTo(_pMap);'
+      +'  if(allPts.length>1) _pMap.fitBounds(L.latLngBounds(allPts),{padding:[28,28]});'
+      +'  else if(allPts.length===1) _pMap.setView(allPts[0],11);'
+      +'  else _pMap.setView([46.5,2.3],6);'
+      +'  setTimeout(function(){_pMap.invalidateSize();},100);'
+      +'}'
+      +'if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();'
+      +'setTimeout(function(){window.print();},2800);'
+      +'})()'
+      +'<\/script>');
+  } else {
+    win.document.write('<script>setTimeout(function(){window.print();},300);<\/script>');
+  }
+  win.document.write('</body></html>');
+  win.document.close();
+}
+function _etapesToggleMenu(compId) {
+  var m = document.getElementById('etapes-menu-'+compId);
+  if (!m) return;
+  var visible = m.style.display !== 'none';
+  m.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    var close = function(ev) { if (!ev.target.closest('#etapes-menu-'+compId) && !ev.target.closest('#etapes-menu-btn-'+compId)) { m.style.display='none'; document.removeEventListener('click', close, true); } };
+    setTimeout(function(){ document.addEventListener('click', close, true); }, 10);
+  }
+}
+function _etapesImportTrigger(compId, fmt) {
+  var inp = document.getElementById('etapes-import-inp-'+compId);
+  if (!inp) return;
+  inp.accept = fmt === 'json' ? '.json' : '.xlsx,.xls';
+  inp.click();
+}
+function _etapesMenuAction(compId, action) {
+  var m = document.getElementById('etapes-menu-'+compId);
+  if (m) m.style.display = 'none';
+  if (action==='export-json') _etapesExportJSON(compId);
+  else if (action==='export-xlsx') _etapesExportXLSX(compId);
+  else if (action==='import-json') _etapesImportTrigger(compId, 'json');
+  else if (action==='import-xlsx') _etapesImportTrigger(compId, 'xlsx');
+  else if (action==='print') _etapesPrint(compId);
+}
+
 function _etapeInlineOACI(compId, etId, val, inputEl) {
   var oaci = (val||'').toUpperCase().trim();
   if (!S.etapes || !S.etapes[compId]) return;
@@ -7043,7 +7622,7 @@ function _etapeInlineOACI(compId, etId, val, inputEl) {
     if (aMatch) {
       var row = inputEl ? inputEl.closest('tr') : null;
       if (!et.lieu && row) {
-        var lieuInp = row.querySelectorAll('input')[0];
+        var lieuInp = row.querySelectorAll('input')[1];
         if (lieuInp) { lieuInp.value = aMatch[1]; et.lieu = aMatch[1]; et.nom = aMatch[1]; }
       }
       var prefix3 = oaci.length >= 3 ? oaci[2].toUpperCase() : '';
@@ -16899,7 +17478,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!S.etapes) S.etapes = {};
     if (!S.etapes[cp.id]) S.etapes[cp.id] = [];
     // Migration cp.etapes (ancien système Lieu) → S.etapes si le nouveau tableau est vide
-    if (!S.etapes[cp.id].length && cp.etapes && cp.etapes.length) {
+    // Garde : ne jamais migrer si LS_ETAPES contient déjà des données pour cette compétition
+    var _lsEtapesHasData = (function() {
+      try {
+        var _raw = localStorage.getItem('geststol_etapes');
+        if (!_raw) return false;
+        var _parsed = JSON.parse(_raw);
+        return !!(_parsed && Array.isArray(_parsed[cp.id]) && _parsed[cp.id].length > 0);
+      } catch(e) { return false; }
+    })();
+    if (!S.etapes[cp.id].length && !_lsEtapesHasData && cp.etapes && cp.etapes.length) {
       var _t36 = Date.now().toString(36);
       S.etapes[cp.id] = cp.etapes.map(function(e, _i) {
         return {
@@ -16913,13 +17501,20 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           lat: e.lat||'', lng: e.lng||''
         };
       });
-      saveState();
+      _flushSaveState();
     }
-    var etList = S.etapes[cp.id].slice().sort(function(a, b) {
-      var da = a.dateFrom || a.date || '9999';
-      var db = b.dateFrom || b.date || '9999';
-      return da < db ? -1 : da > db ? 1 : 0;
-    });
+    var etList = S.etapes[cp.id].slice();
+    // Si aucune étape n'a _order, trier par date puis initialiser _order
+    if (etList.every(function(e){ return e._order === undefined; })) {
+      etList.sort(function(a, b){
+        var da = a.dateFrom||a.date||'9999', db = b.dateFrom||b.date||'9999';
+        return da<db?-1:da>db?1:0;
+      });
+      etList.forEach(function(e, i){ e._order = i; });
+      if (etList.length) saveState();
+    } else {
+      etList.sort(function(a, b){ return (a._order||0) - (b._order||0); });
+    }
     var canEditEt = canModify();
     var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
     var thSt = 'padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--bdr);background:var(--navy3);white-space:nowrap';
@@ -16930,8 +17525,37 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     etH += '<div style="width:52%;display:flex;flex-direction:column;border-right:1px solid var(--bdr);overflow:hidden">';
     // Header
     etH += '<div style="padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--navy2)">';
-    etH += '<div style="font-size:13px;font-weight:700;color:var(--txt)">🗺 Étapes <span style="font-size:11px;color:var(--txt3);font-weight:400">('+etList.length+')</span></div>';
+    var _totalKm = 0, _prevPt = null;
+    etList.forEach(function(et) {
+      var _la = parseFloat(et.lat), _ln = parseFloat(et.lng);
+      if (!isNaN(_la) && !isNaN(_ln)) {
+        if (_prevPt) _totalKm += _haversineKm(_prevPt[0], _prevPt[1], _la, _ln);
+        _prevPt = [_la, _ln];
+      }
+    });
+    etH += '<div style="font-size:13px;font-weight:700;color:var(--txt)">🗺 Étapes <span style="font-size:11px;color:var(--txt3);font-weight:400">('+etList.length+')</span> <span id="et-total-km" style="font-size:11px;color:var(--stol);font-weight:600">'+(_totalKm>0?'· '+Math.round(_totalKm)+' km au total':'')+'</span></div>';
+    etH += '<div style="display:flex;align-items:center;gap:6px;position:relative">';
+    // Bouton Actions
+    etH += '<input type="file" id="etapes-import-inp-'+cp.id+'" accept=".json,.xlsx,.xls" style="display:none" onchange="_etapesImportFile(\''+cp.id+'\',this)">';
+    etH += '<div style="position:relative">';
+    etH += '<button id="etapes-menu-btn-'+cp.id+'" onclick="_etapesToggleMenu(\''+cp.id+'\')" style="display:flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
+    etH += '<div id="etapes-menu-'+cp.id+'" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:190px;z-index:999;overflow:hidden">';
+    var _mItem = function(icon, label, action) { return '<button onclick="_etapesMenuAction(\''+cp.id+'\',\''+action+'\')" style="display:flex;align-items:center;gap:9px;width:100%;padding:9px 14px;background:none;border:none;color:var(--txt);font-size:12px;font-family:inherit;cursor:pointer;text-align:left" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\'none\'">'+icon+'<span>'+label+'</span></button>'; };
+    etH += '<div style="padding:4px 0">';
+    etH += '<div style="padding:4px 14px 2px;font-size:9px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Export</div>';
+    etH += _mItem('📋','Exporter JSON','export-json');
+    etH += _mItem('📗','Exporter Excel (.xlsx)','export-xlsx');
+    etH += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    etH += '<div style="padding:4px 14px 2px;font-size:9px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Import</div>';
+    etH += _mItem('📂','Importer JSON','import-json');
+    etH += _mItem('📊','Importer Excel (.xlsx)','import-xlsx');
+    etH += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
+    etH += _mItem('🖨️','Imprimer / PDF','print');
+    etH += '</div>';
+    etH += '</div>';
+    etH += '</div>';
     if (canEditEt) etH += '<button onclick="_etapeAdd(\''+cp.id+'\')" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:none;border-radius:8px;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ajouter</button>';
+    etH += '</div>';
     etH += '</div>';
     // Table
     etH += '<div style="flex:1;overflow-y:auto;min-height:0">';
@@ -16945,31 +17569,42 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var accInpSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;outline:none';
       var accLblSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;display:block';
       etH += '<table style="width:100%;border-collapse:collapse"><thead><tr>';
+      etH += '<th style="'+thSt+';width:22px"></th>';
       etH += '<th style="'+thSt+';width:32px;text-align:center">#</th>';
-      etH += '<th style="'+thSt+'">Lieu / Aérodrome</th>';
       etH += '<th style="'+thSt+';width:72px">OACI</th>';
+      etH += '<th style="'+thSt+'">Lieu / Aérodrome</th>';
       etH += '<th style="'+thSt+';width:108px">Date du</th>';
       etH += '<th style="'+thSt+';width:108px">Date au</th>';
       etH += '<th style="'+thSt+'">Club</th>';
       etH += '<th style="'+thSt+'">Région</th>';
+      etH += '<th style="'+thSt+';width:78px;text-align:right">Distance</th>';
       etH += '<th style="'+thSt+';width:28px"></th>';
       etH += '</tr></thead><tbody>';
+      var _prevPtRow = null;
       etList.forEach(function(et, i) {
         var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
         var cid = cp.id; var eid = et.id;
-        etH += '<tr id="etape-row-'+eid+'" style="'+bg+'" onclick="if(!event.target.closest(\'button\')&&event.target.tagName!==\'INPUT\'&&event.target.tagName!==\'TEXTAREA\')_etapeToggleAcc(\''+eid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">';
+        var _legKm = null;
+        var _laR = parseFloat(et.lat), _lnR = parseFloat(et.lng);
+        if (!isNaN(_laR) && !isNaN(_lnR)) {
+          if (_prevPtRow) _legKm = _haversineKm(_prevPtRow[0], _prevPtRow[1], _laR, _lnR);
+          _prevPtRow = [_laR, _lnR];
+        }
+        etH += '<tr id="etape-row-'+eid+'" draggable="true" ondragstart="_etapeDragStart(event,\''+cid+'\',\''+eid+'\')" ondragend="_etapeDragEnd(event,\''+eid+'\')" ondragover="_etapeDragOver(event,\''+eid+'\')" ondragleave="_etapeDragLeave(event,\''+eid+'\')" ondrop="_etapeDrop(event,\''+cid+'\',\''+eid+'\')" style="'+bg+';cursor:grab" onclick="if(!event.target.closest(\'button\')&&event.target.tagName!==\'INPUT\'&&event.target.tagName!==\'TEXTAREA\'&&!event.target.closest(\'.et-drag-handle\'))_etapeToggleAcc(\''+eid+'\',\''+cid+'\')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">';
+        // Poignée drag
+        etH += '<td class="et-drag-handle" style="'+cellSt+';width:22px;text-align:center;padding:4px 2px;cursor:grab;color:var(--txt3);font-size:14px;user-select:none" title="Glisser pour réordonner">⠿</td>';
         // # + chevron
-        etH += '<td style="'+cellSt+';text-align:center;width:44px;cursor:pointer;white-space:nowrap" onclick="_etapeToggleAcc(\''+eid+'\');event.stopPropagation()">'
+        etH += '<td style="'+cellSt+';text-align:center;width:44px;cursor:pointer;white-space:nowrap" onclick="_etapeToggleAcc(\''+eid+'\',\''+cid+'\');event.stopPropagation()">'
           +'<span id="et-chev-'+eid+'" style="font-size:13px;color:var(--txt3);margin-right:4px;display:inline-block;transition:transform .15s">▶</span>'
           +'<span style="font-weight:800;color:var(--stol);font-size:12px">'+(i+1)+'</span>'
           +'</td>';
-        // Lieu
-        etH += '<td style="'+cellSt+';padding:4px 6px">'
-          +'<input type="text" value="'+esc2(et.lieu||et.nom||'')+'" placeholder="Commune, aérodrome…" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSaveLieu(\''+cid+'\',\''+eid+'\',this.value)">'
-          +'</td>';
         // OACI
         etH += '<td style="'+cellSt+';padding:4px 6px">'
-          +'<input type="text" value="'+esc2(et.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+inpSt+';text-transform:uppercase;font-family:monospace;font-size:11px;color:var(--stol);letter-spacing:1px" '+inpFo+' oninput="this.value=this.value.toUpperCase()" onchange="_etapeInlineOACI(\''+cid+'\',\''+eid+'\',this.value,this)">'
+          +'<input type="text" value="'+esc2(et.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+inpSt+';text-transform:uppercase;font-family:monospace;font-size:11px;color:var(--stol);letter-spacing:1px" '+inpFo+' oninput="this.value=this.value.toUpperCase();_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'oaci\',this.value)" onchange="_etapeInlineOACI(\''+cid+'\',\''+eid+'\',this.value,this)">'
+          +'</td>';
+        // Lieu
+        etH += '<td style="'+cellSt+';padding:4px 6px">'
+          +'<input type="text" value="'+esc2(et.lieu||et.nom||'')+'" placeholder="Commune, aérodrome…" style="'+inpSt+'" '+inpFo+' oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'lieu\',this.value);_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'nom\',this.value)" onchange="_etapeFieldSaveLieu(\''+cid+'\',\''+eid+'\',this.value)">'
           +'</td>';
         // Date du
         etH += '<td style="'+cellSt+';padding:4px 6px">'
@@ -16981,11 +17616,15 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           +'</td>';
         // Club
         etH += '<td style="'+cellSt+';padding:4px 6px">'
-          +'<input type="text" value="'+esc2(et.club||'')+'" placeholder="Club…" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'club\',this.value)">'
+          +'<input type="text" value="'+esc2(et.club||'')+'" placeholder="Club…" style="'+inpSt+'" '+inpFo+' oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'club\',this.value)">'
           +'</td>';
         // Région
         etH += '<td style="'+cellSt+';padding:4px 6px">'
-          +'<input type="text" value="'+esc2(et.region||'')+'" placeholder="Région…" list="et-inline-regions" style="'+inpSt+'" '+inpFo+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'region\',this.value)">'
+          +'<input type="text" value="'+esc2(et.region||'')+'" placeholder="Région…" list="et-inline-regions" style="'+inpSt+'" '+inpFo+' oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'region\',this.value)">'
+          +'</td>';
+        // Distance (vol à vol, à partir de l'étape précédente)
+        etH += '<td id="et-dist-'+eid+'" style="'+cellSt+';text-align:right;padding:4px 8px;font-size:11px;color:var(--txt3);white-space:nowrap">'
+          +(_legKm!==null ? Math.round(_legKm)+' km' : '—')
           +'</td>';
         // Supprimer
         etH += '<td style="'+cellSt+';text-align:center;padding:4px 2px">';
@@ -16993,28 +17632,85 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         etH += '</td></tr>';
         // ── Accordéon infos complémentaires ──────────────────────────────────
         etH += '<tr id="etape-acc-'+eid+'" style="display:none">';
-        etH += '<td colspan="8" style="padding:0;border-bottom:2px solid var(--stol)">';
+        etH += '<td colspan="10" style="padding:0;border-bottom:2px solid var(--stol)">';
         etH += '<div style="padding:12px 14px 14px;background:rgba(14,165,233,.04);display:grid;grid-template-columns:1fr 1fr;gap:10px 18px">';
-        // Responsable
-        etH += '<div>'
-          +'<label style="'+accLblSt+'">Responsable de l\'étape</label>'
-          +'<input type="text" value="'+esc2(et.responsable||'')+'" placeholder="Nom, prénom…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'responsable\',this.value)">'
-          +'</div>';
-        // Gestionnaire
-        etH += '<div>'
-          +'<label style="'+accLblSt+'">Gestionnaire</label>'
-          +'<input type="text" value="'+esc2(et.gestionnaire||'')+'" placeholder="Nom du gestionnaire…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'gestionnaire\',this.value)">'
-          +'</div>';
-        // Contact DSAC
-        etH += '<div>'
-          +'<label style="'+accLblSt+'">Contact DSAC</label>'
-          +'<input type="text" value="'+esc2(et.contactDSAC||'')+'" placeholder="Nom / tél / email…" style="'+accInpSt+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'contactDSAC\',this.value)">'
-          +'</div>';
+        // Contacts (pleine largeur, tableau ajout/suppression)
+        var _cts = et.contacts || [];
+        var _ctThSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;padding:4px 6px;border-bottom:1px solid var(--bdr);text-align:left;white-space:nowrap';
+        var _ctTdSt = 'padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.04)';
+        var _ctISt  = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none';
+        var _ctSSt  = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
+        var _ctFoncts = ['Responsable de l\'étape','Président','Aéroclub','Gestionnaire','Autorité','Autre'];
+        etH += '<div style="grid-column:1/-1">';
+        etH += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+        etH += '<label style="'+accLblSt+'">Contacts</label>';
+        if (canEditEt) etH += '<button onclick="_etapeContactAdd(\''+cid+'\',\''+eid+'\')" style="display:flex;align-items:center;gap:4px;padding:3px 9px;border:none;border-radius:6px;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter</button>';
+        etH += '</div>';
+        etH += '<div id="contact-table-'+eid+'">';
+        if (_cts.length) {
+          etH += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+          etH += '<th style="'+_ctThSt+'">Nom Prénom</th><th style="'+_ctThSt+';width:160px">Fonction</th><th style="'+_ctThSt+';width:130px">Téléphone</th><th style="'+_ctThSt+'">Email</th><th style="'+_ctThSt+';width:24px"></th>';
+          etH += '</tr></thead><tbody>';
+          _cts.forEach(function(c) {
+            if (!c.id) c.id = 'ct'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+            var ctId = c.id;
+            etH += '<tr data-ct-id="'+ctId+'">';
+            etH += '<td style="'+_ctTdSt+'"><input type="text" value="'+esc2(c.nom||'')+'" placeholder="Nom Prénom…" style="'+_ctISt+'" oninput="_etapeContactSave(\''+cid+'\',\''+eid+'\',\''+ctId+'\',\'nom\',this.value)"></td>';
+            etH += '<td style="'+_ctTdSt+'"><select style="'+_ctSSt+'" onchange="_etapeContactSave(\''+cid+'\',\''+eid+'\',\''+ctId+'\',\'fonction\',this.value)"><option value="">— Fonction —</option>';
+            _ctFoncts.forEach(function(f){ etH += '<option value="'+f+'"'+(c.fonction===f?' selected':'')+'>'+f+'</option>'; });
+            etH += '</select></td>';
+            etH += '<td style="'+_ctTdSt+'"><input type="tel" value="'+esc2(c.tel||'')+'" placeholder="06…" style="'+_ctISt+'" oninput="_etapeContactSave(\''+cid+'\',\''+eid+'\',\''+ctId+'\',\'tel\',this.value)"></td>';
+            etH += '<td style="'+_ctTdSt+'"><input type="email" value="'+esc2(c.email||'')+'" placeholder="adresse@…" style="'+_ctISt+'" oninput="_etapeContactSave(\''+cid+'\',\''+eid+'\',\''+ctId+'\',\'email\',this.value)"></td>';
+            etH += '<td style="'+_ctTdSt+';text-align:center"><button onclick="_etapeContactDel(\''+cid+'\',\''+eid+'\',\''+ctId+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">×</button></td>';
+            etH += '</tr>';
+          });
+          etH += '</tbody></table>';
+        } else {
+          etH += '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:6px 0 2px">Aucun contact</div>';
+        }
+        etH += '</div>';
+        etH += '</div>';
         // Notam
         etH += '<div style="display:flex;align-items:center;gap:8px;padding-top:14px">'
           +'<input type="checkbox" id="notam-'+eid+'" '+(et.notam?'checked':'')+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'notam\',this.checked)" style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">'
           +'<label for="notam-'+eid+'" style="font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;user-select:none">NOTAM déposé</label>'
           +'</div>';
+        // Aérodromes de déroutement (pleine largeur)
+        var _ders = et.derotements || [];
+        var _derInpSt = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none';
+        var _derThSt  = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;padding:4px 6px;border-bottom:1px solid var(--bdr);text-align:left;white-space:nowrap';
+        var _derTdSt  = 'padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.04)';
+        var _derSelSt = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
+        var _derOpts  = ['Aéroclub','Gestionnaire','Autre'];
+        etH += '<div style="grid-column:1/-1">';
+        etH += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+        etH += '<label style="'+accLblSt+'">Aérodromes de déroutement</label>';
+        if (canEditEt) etH += '<button onclick="_etapeDerAdd(\''+cid+'\',\''+eid+'\')" style="display:flex;align-items:center;gap:4px;padding:3px 9px;border:none;border-radius:6px;background:var(--stol);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter</button>';
+        etH += '</div>';
+        etH += '<div id="der-table-'+eid+'">';
+        if (_ders.length) {
+          etH += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+          etH += '<th style="'+_derThSt+';width:72px">OACI</th><th style="'+_derThSt+'">Lieu</th><th style="'+_derThSt+';width:110px">Type de contact</th><th style="'+_derThSt+'">Nom</th><th style="'+_derThSt+';width:120px">Téléphone</th><th style="'+_derThSt+';width:24px"></th>';
+          etH += '</tr></thead><tbody>';
+          _ders.forEach(function(d) {
+            if (!d.id) d.id = 'der'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+            var did = d.id;
+            etH += '<tr data-der-id="'+did+'">';
+            etH += '<td style="'+_derTdSt+'"><input type="text" value="'+esc2(d.oaci||'')+'" placeholder="LFSE" maxlength="6" style="'+_derInpSt+';text-transform:uppercase;font-family:monospace;font-size:11px;color:var(--stol);letter-spacing:1px" oninput="this.value=this.value.toUpperCase().trim();_etapeDerSave(\''+cid+'\',\''+eid+'\',\''+did+'\',\'oaci\',this.value);_etapeDerOACISchedule(\''+cid+'\',\''+eid+'\',\''+did+'\',this)"></td>';
+            etH += '<td style="'+_derTdSt+'"><input type="text" value="'+esc2(d.lieu||'')+'" placeholder="Commune, terrain…" style="'+_derInpSt+'" oninput="_etapeDerSave(\''+cid+'\',\''+eid+'\',\''+did+'\',\'lieu\',this.value)"></td>';
+            etH += '<td style="'+_derTdSt+'"><select style="'+_derSelSt+'" onchange="_etapeDerSave(\''+cid+'\',\''+eid+'\',\''+did+'\',\'typeContact\',this.value)"><option value="">—</option>';
+            _derOpts.forEach(function(t){ etH += '<option value="'+t+'"'+(d.typeContact===t?' selected':'')+'>'+t+'</option>'; });
+            etH += '</select></td>';
+            etH += '<td style="'+_derTdSt+'"><input type="text" value="'+esc2(d.nom||'')+'" placeholder="Prénom Nom…" style="'+_derInpSt+'" oninput="_etapeDerSave(\''+cid+'\',\''+eid+'\',\''+did+'\',\'nom\',this.value)"></td>';
+            etH += '<td style="'+_derTdSt+'"><input type="tel" value="'+esc2(d.tel||'')+'" placeholder="06 xx xx xx xx" style="'+_derInpSt+'" oninput="_etapeDerSave(\''+cid+'\',\''+eid+'\',\''+did+'\',\'tel\',this.value)"></td>';
+            etH += '<td style="'+_derTdSt+';text-align:center"><button onclick="_etapeDerDel(\''+cid+'\',\''+eid+'\',\''+did+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1">×</button></td>';
+            etH += '</tr>';
+          });
+          etH += '</tbody></table>';
+        } else {
+          etH += '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:6px 0 2px">Aucun aérodrome de déroutement</div>';
+        }
+        etH += '</div></div>';
         // Commentaires (pleine largeur)
         etH += '<div style="grid-column:1/-1">'
           +'<label style="'+accLblSt+'">Commentaires</label>'
