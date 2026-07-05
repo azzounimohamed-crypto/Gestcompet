@@ -4431,6 +4431,7 @@ var S = {
   _enrollResetAt: {},
   enrollMeta: {},    // { [compId]: { [pilotId]: { podium: 1|2|3|'' } } }
   repas: {},
+  deroulement: {},
   repasTarifs: {},
   nationalRanking: {},
   messages: [],
@@ -5099,6 +5100,7 @@ function _flushSaveState() {
     _enrollResetAt:S._enrollResetAt||{}, enrollMeta:S.enrollMeta||{},
     runs:S.runs, staff:S.staff, materiel:S.materiel, budgets:S.budgets,
     evenements:S.evenements, partenaires:S.partenaires, documents:S.documents,
+    deroulement:S.deroulement||{},
     homeTodosByComp:S.homeTodosByComp, moyens:S.moyens||{},
     odmConfig:S.odmConfig||{}, ordresMission:S.ordresMission||[],
     ganttTasks:S.ganttTasks||{}, docSettings:S.docSettings||{},
@@ -6604,6 +6606,7 @@ var _MOBILE_COMP_SECTIONS = [
   {id:'gestion',     lbl:'Equipage',      ico:'✈️'},
   {id:'repas',       lbl:'🍽 Repas',       ico:'🍽'},
   {id:'partenaires', lbl:'Partenaires',   ico:'🤝'},
+  {id:'deroulement', lbl:'Déroulement',   ico:'📅'},
   {id:'resultats',   lbl:'Résultats',     ico:'🏅'},
   {id:'materiel',    lbl:'Matériel',      ico:'🔧'},
   {id:'budget',      lbl:'Budget',        ico:'💰'}
@@ -6675,8 +6678,8 @@ function renderMobileCompDetail() {
   // ── Onglets verticaux ──
   var vtabs = document.getElementById('mcd-vtabs');
   if (vtabs) {
-    var _MCD_TAB_COLORS = ['#2563eb','#0369a1','#7c3aed','#d97706','#059669','#b45309','#374151','#15803d'];
-    var _MCD_TAB_LABELS = ['Accueil','Staff','Equipage','Repas','Partenaires','Résultats','Matériel','Budget'];
+    var _MCD_TAB_COLORS = ['#2563eb','#0369a1','#7c3aed','#d97706','#059669','#0891b2','#b45309','#374151','#15803d'];
+    var _MCD_TAB_LABELS = ['Accueil','Staff','Equipage','Repas','Partenaires','Déroulement','Résultats','Matériel','Budget'];
     vtabs.innerHTML = '';
     _MOBILE_COMP_SECTIONS.forEach(function(s, i) {
       var btn = document.createElement('button');
@@ -16039,7 +16042,7 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
     var _stfN = (staffList&&staffList.length)?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:rgba(255,255,255,.22);font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">'+staffList.length+'</span>':'';
     var _eqpN = (enrolled&&enrolled.length)?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:rgba(255,255,255,.22);font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">'+enrolled.length+'</span>':'';
     var _vc = cp.voletsConfig || {};
-    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'+_stfN},{id:'gestion',lbl:'Equipage'+_eqpN},{id:'repas',lbl:'🍽 Repas'},{id:'partenaires',lbl:'Partenaires'},{id:'resultats',lbl:'Résultats'}];
+    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'+_stfN},{id:'gestion',lbl:'Equipage'+_eqpN},{id:'repas',lbl:'🍽 Repas'},{id:'partenaires',lbl:'Partenaires'},{id:'deroulement',lbl:'Déroulement'},{id:'resultats',lbl:'Résultats'}];
     tabs.push({id:'installation',lbl:'Installation'},{id:'etapes',lbl:'🗺 Étapes'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'});
     tabs = tabs.filter(function(t){ return _vc[t.id] !== false; });
     if (_homeDetailTab === 'modifier' || _homeDetailTab === 'carte' || !tabs.some(function(t){return t.id===_homeDetailTab;})) _homeDetailTab = 'infos';
@@ -16052,7 +16055,7 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
     html += '</div>';
     html += '</div>';
     // ── Contenu onglet ──
-    var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'etapes' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires' || _homeDetailTab === 'resultats');
+    var _isFullH = (_homeDetailTab === 'installation' || _homeDetailTab === 'etapes' || _homeDetailTab === 'gestion' || _homeDetailTab === 'repas' || _homeDetailTab === 'staff' || _homeDetailTab === 'materiel' || _homeDetailTab === 'budget' || _homeDetailTab === 'evenements' || _homeDetailTab === 'partenaires' || _homeDetailTab === 'deroulement' || _homeDetailTab === 'resultats');
     var _isInfosTab = (_homeDetailTab === 'infos');
     html += '<div style="flex:1;background:var(--navy4);' + (_isFullH ? 'overflow:hidden;display:flex;flex-direction:column' : ('overflow-y:auto' + (_isInfosTab ? '' : ';padding:16px'))) + '" id="hdp-tab-content"' + (_isFullH ? ' class="hdp-full-h"' : '') + '>';
     try {
@@ -16326,6 +16329,140 @@ var _COUNTRY_FLAGS = {
   'Guadeloupe':'🇬🇵','Guyane':'🇬🇫','La Réunion':'🇷🇪','Martinique':'🇲🇶','Mayotte':'🇾🇹',
   'Étranger':'🌍'
 };
+
+// Normalisation d'un nom de pays (peu importe le format : FR/EN/natif/code ISO) → clé française.
+// Ex. "Germany", "Deutschland", "DE", "GER" → "Allemagne".
+var _PAYS_ALIAS = {
+  'france':'France','fr':'France','fra':'France','french':'France',
+  'allemagne':'Allemagne','germany':'Allemagne','deutschland':'Allemagne','de':'Allemagne','deu':'Allemagne','ger':'Allemagne','german':'Allemagne',
+  'suisse':'Suisse','switzerland':'Suisse','schweiz':'Suisse','svizzera':'Suisse','ch':'Suisse','sui':'Suisse','che':'Suisse','swiss':'Suisse',
+  'italie':'Italie','italy':'Italie','italia':'Italie','it':'Italie','ita':'Italie',
+  'belgique':'Belgique','belgium':'Belgique','belgie':'Belgique','belgien':'Belgique','be':'Belgique','bel':'Belgique',
+  'pays-bas':'Pays-Bas','pays bas':'Pays-Bas','netherlands':'Pays-Bas','holland':'Pays-Bas','nederland':'Pays-Bas','nl':'Pays-Bas','nld':'Pays-Bas','ned':'Pays-Bas',
+  'espagne':'Espagne','spain':'Espagne','espana':'Espagne','es':'Espagne','esp':'Espagne',
+  'autriche':'Autriche','austria':'Autriche','osterreich':'Autriche','at':'Autriche','aut':'Autriche',
+  'royaume-uni':'Royaume-Uni','royaume uni':'Royaume-Uni','uk':'Royaume-Uni','gb':'Royaume-Uni','gbr':'Royaume-Uni','angleterre':'Royaume-Uni','england':'Royaume-Uni','great britain':'Royaume-Uni','united kingdom':'Royaume-Uni',
+  'etats-unis':'États-Unis','etats unis':'États-Unis','united states':'États-Unis','usa':'États-Unis','us':'États-Unis','america':'États-Unis',
+  'pologne':'Pologne','poland':'Pologne','polska':'Pologne','pl':'Pologne','pol':'Pologne',
+  'ukraine':'Ukraine','ua':'Ukraine','ukr':'Ukraine',
+  'roumanie':'Roumanie','romania':'Roumanie','ro':'Roumanie','rou':'Roumanie',
+  'danemark':'Danemark','denmark':'Danemark','danmark':'Danemark','dk':'Danemark','dnk':'Danemark',
+  'suede':'Suède','sweden':'Suède','sverige':'Suède','se':'Suède','swe':'Suède',
+  'norvege':'Norvège','norway':'Norvège','norge':'Norvège','no':'Norvège','nor':'Norvège',
+  'finlande':'Finlande','finland':'Finlande','suomi':'Finlande','fi':'Finlande','fin':'Finlande',
+  'islande':'Islande','iceland':'Islande','is':'Islande','isl':'Islande',
+  'irlande':'Irlande','ireland':'Irlande','ie':'Irlande','irl':'Irlande',
+  'hongrie':'Hongrie','hungary':'Hongrie','hu':'Hongrie','hun':'Hongrie',
+  'luxembourg':'Luxembourg','lu':'Luxembourg','lux':'Luxembourg',
+  'russie':'Russie','russia':'Russie','ru':'Russie','rus':'Russie',
+  'bulgarie':'Bulgarie','bulgaria':'Bulgarie','bg':'Bulgarie','bgr':'Bulgarie',
+  'croatie':'Croatie','croatia':'Croatie','hrvatska':'Croatie','hr':'Croatie','hrv':'Croatie',
+  'slovenie':'Slovénie','slovenia':'Slovénie','si':'Slovénie','svn':'Slovénie',
+  'slovaquie':'Slovaquie','slovakia':'Slovaquie','sk':'Slovaquie','svk':'Slovaquie',
+  'serbie':'Serbie','serbia':'Serbie','rs':'Serbie','srb':'Serbie',
+  'estonie':'Estonie','estonia':'Estonie','ee':'Estonie','est':'Estonie',
+  'lituanie':'Lituanie','lithuania':'Lituanie','lt':'Lituanie','ltu':'Lituanie',
+  'lettonie':'Lettonie','latvia':'Lettonie','lv':'Lettonie','lva':'Lettonie',
+  'grece':'Grèce','greece':'Grèce','gr':'Grèce','grc':'Grèce',
+  'portugal':'Portugal','pt':'Portugal','prt':'Portugal',
+  'monaco':'Monaco','mc':'Monaco','mco':'Monaco',
+  'moldavie':'Moldavie','moldova':'Moldavie','md':'Moldavie',
+  'andorre':'Andorre','andorra':'Andorre','ad':'Andorre',
+  'turquie':'Turquie','turkey':'Turquie','turkiye':'Turquie','tr':'Turquie',
+  'maroc':'Maroc','morocco':'Maroc','ma':'Maroc','mar':'Maroc',
+  'tunisie':'Tunisie','tunisia':'Tunisie','tn':'Tunisie','tun':'Tunisie',
+  'algerie':'Algérie','algeria':'Algérie','dz':'Algérie','dza':'Algérie',
+  'canada':'Canada','ca':'Canada','can':'Canada',
+  'bresil':'Brésil','brazil':'Brésil','brasil':'Brésil','br':'Brésil','bra':'Brésil'
+};
+function _normStrKey(s){ return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function _paysCanon(pays){
+  var k = _normStrKey(pays);
+  if (!k) return 'France';                    // vide → France par défaut (fédération FR)
+  if (_PAYS_ALIAS[k]) return _PAYS_ALIAS[k];
+  // sinon : rapprochement direct avec une clé de _COUNTRY_FLAGS (accents/casse ignorés)
+  var hit = Object.keys(_COUNTRY_FLAGS).find(function(key){ return _normStrKey(key) === k; });
+  return hit || (pays||'').toString().trim();  // inconnu → tel quel (repli)
+}
+
+// Nom de pays → emoji drapeau. Défaut : France (fédération française).
+function _paysToFlag(pays){
+  var canon = _paysCanon(pays);
+  if (canon === 'France') return '🇫🇷';
+  return _COUNTRY_FLAGS[canon] || '🌍';
+}
+
+// ── Drapeaux SVG à DIMENSIONS FIXES pour l'impression (protocole) ──────────────
+// Les emojis drapeaux dépendent de la police système du moteur d'impression :
+// tailles incohérentes (Suisse carrée) et glyphes parfois absents (Allemagne).
+// Ici chaque drapeau est dessiné en SVG, tous à la même taille (défaut 18×12).
+// Types : v = 3 bandes verticales, h = 3 horizontales, h2 = 2 horizontales,
+//         ch = croix suisse, cross/crossN/crossI = croix nordiques.
+var _FLAG_DEFS = {
+  'France':'v|0055A4|ffffff|EF4135','Italie':'v|009246|ffffff|CE2B37','Belgique':'v|000000|FDDA24|EF3340',
+  'Irlande':'v|169B62|ffffff|FF883E','Roumanie':'v|002B7F|FCD116|CE1126','Moldavie':'v|0046AE|FFD200|CC092F',
+  'Andorre':'v|10069F|FEDF00|D50032',
+  'Allemagne':'h|000000|DD0000|FFCE00','Pays-Bas':'h|AE1C28|ffffff|21468B','Russie':'h|ffffff|0039A6|D52B1E',
+  'Autriche':'h|ED2939|ffffff|ED2939','Espagne':'h|AA151B|F1BF00|AA151B','Hongrie':'h|CE2939|ffffff|477050',
+  'Bulgarie':'h|ffffff|00966E|D62612','Luxembourg':'h|ED2939|ffffff|00A1DE','Lituanie':'h|FDB913|006A44|C1272D',
+  'Serbie':'h|C6363C|0C4076|ffffff','Slovénie':'h|ffffff|0000A0|DE2110','Croatie':'h|FF0000|ffffff|171796',
+  'Estonie':'h|0072CE|000000|ffffff',
+  'Ukraine':'h2|0057B7|FFD700','Pologne':'h2|ffffff|DC143C','Monaco':'h2|CE1126|ffffff',
+  'Suisse':'ch','Danemark':'cross|C8102E|ffffff','Finlande':'cross|ffffff|002F6C','Suède':'cross|006AA7|FECC00',
+  'Norvège':'crossN','Islande':'crossI'
+};
+function _stolFlagSvg(pays, w, h){
+  w = w||18; h = h||12;
+  var canon = _paysCanon(pays);        // Germany/Deutschland/DE/GER → Allemagne, etc.
+  var def = _FLAG_DEFS[canon];
+  var border = '<rect x="0.3" y="0.3" width="'+(w-0.6)+'" height="'+(h-0.6)+'" fill="none" stroke="#94a3b8" stroke-width="0.5"/>';
+  function svg(inner){ return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="display:inline-block;vertical-align:middle;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">'+inner+border+'</svg>'; }
+  if (!def) {
+    // Repli uniforme (drapeaux complexes non gérés : UK, USA…) : puce grise + abréviation
+    var ab = (canon||'?').replace(/[^A-Za-zÀ-ÿ]/g,'').slice(0,2).toUpperCase();
+    return svg('<rect width="'+w+'" height="'+h+'" fill="#e2e8f0"/><text x="'+(w/2)+'" y="'+(h/2+2.4)+'" font-size="6.5" text-anchor="middle" fill="#475569" font-family="Arial">'+ab+'</text>');
+  }
+  var a = def.split('|'), type = a[0], C = function(i){ return '#'+a[i]; };
+  if (type==='v')  { var t=w/3;  return svg('<rect width="'+t+'" height="'+h+'" fill="'+C(1)+'"/><rect x="'+t+'" width="'+t+'" height="'+h+'" fill="'+C(2)+'"/><rect x="'+(2*t)+'" width="'+t+'" height="'+h+'" fill="'+C(3)+'"/>'); }
+  if (type==='h')  { var b=h/3;  return svg('<rect width="'+w+'" height="'+b+'" fill="'+C(1)+'"/><rect y="'+b+'" width="'+w+'" height="'+b+'" fill="'+C(2)+'"/><rect y="'+(2*b)+'" width="'+w+'" height="'+b+'" fill="'+C(3)+'"/>'); }
+  if (type==='h2') { var b2=h/2; return svg('<rect width="'+w+'" height="'+b2+'" fill="'+C(1)+'"/><rect y="'+b2+'" width="'+w+'" height="'+b2+'" fill="'+C(2)+'"/>'); }
+  if (type==='ch') { var cx=w/2, cy=h/2, al=Math.min(w,h)*0.62, at=al*0.32;
+    return svg('<rect width="'+w+'" height="'+h+'" fill="#D52B1E"/><rect x="'+(cx-at/2)+'" y="'+(cy-al/2)+'" width="'+at+'" height="'+al+'" fill="#fff"/><rect x="'+(cx-al/2)+'" y="'+(cy-at/2)+'" width="'+al+'" height="'+at+'" fill="#fff"/>'); }
+  if (type==='cross' || type==='crossN' || type==='crossI') {
+    var bg, cr, inner2=null;
+    if (type==='cross') { bg=C(1); cr=C(2); }
+    else if (type==='crossN') { bg='#EF2B2D'; cr='#fff'; inner2='#002868'; }
+    else { bg='#003897'; cr='#fff'; inner2='#DC1E35'; }
+    var vx=w*0.34, hy=h*0.5, vw=w*0.13, hh=h*0.22;
+    var s = '<rect width="'+w+'" height="'+h+'" fill="'+bg+'"/>'
+      + '<rect x="'+(vx-vw/2)+'" y="0" width="'+vw+'" height="'+h+'" fill="'+cr+'"/>'
+      + '<rect x="0" y="'+(hy-hh/2)+'" width="'+w+'" height="'+hh+'" fill="'+cr+'"/>';
+    if (inner2) { var iw=vw*0.42, ih=hh*0.42;
+      s += '<rect x="'+(vx-iw/2)+'" y="0" width="'+iw+'" height="'+h+'" fill="'+inner2+'"/>'
+        +  '<rect x="0" y="'+(hy-ih/2)+'" width="'+w+'" height="'+ih+'" fill="'+inner2+'"/>'; }
+    return svg(s);
+  }
+  return svg('<rect width="'+w+'" height="'+h+'" fill="#e2e8f0"/>');
+}
+
+// Pays d'un pilote de classement STOL (via pid, sinon rapprochement prénom|nom)
+function _stolPilotPays(p){
+  var pil = null;
+  if (p && p.pid) pil = (S.pilots||[]).find(function(x){ return x.id === p.pid; });
+  if (!pil && p) pil = (S.pilots||[]).find(function(x){ return ((x.prenom||'')+'|'+(x.nom||'')).toLowerCase() === ((p.prenom||'')+'|'+(p.nom||'')).toLowerCase(); });
+  return pil ? (pil.pays||'') : '';
+}
+
+// Marque + modèle de l'ULM d'un pilote de classement STOL (via pid, sinon prénom|nom)
+function _stolPilotUlm(p){
+  var pid = p && p.pid;
+  if (!pid && p) {
+    var pil = (S.pilots||[]).find(function(x){ return ((x.prenom||'')+'|'+(x.nom||'')).toLowerCase() === ((p.prenom||'')+'|'+(p.nom||'')).toLowerCase(); });
+    if (pil) pid = pil.id;
+  }
+  var u = ((S.ulms||{})[pid]||[])[0] || {};
+  return { marque: u.marque || '', modele: u.modele || '' };
+}
 
 // ── ApexCharts — instances actives (pour destroy au prochain render) ──
 var _apexInfosInst = [];
@@ -18228,6 +18365,11 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlR += _resMI(_resDl,'📥 Exporter tous les tableaux (JSON)','stolExportAll(\'json\',\''+_cid+'\')');
       // Import toujours visible (tous profils) — demandé pour faciliter la saisie des résultats
       htmlR += '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--stol);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(0,87,255,.07)\'" onmouseout="this.style.background=\'none\'" title="Tous formats : Excel, CSV, TSV, texte, OpenDocument, JSON…">'+_resUl+'<span>📤 Importer un classeur STOL (tous formats)</span><input type="file" accept=".xlsx,.xlsm,.xlsb,.xls,.csv,.tsv,.txt,.prn,.dif,.ods,.fods,.xml,.html,.htm,.json" style="display:none" onchange="stolImportAll(this,\''+_cid+'\');_resActClose()"></label>';
+      // Désignation du commissaire de saisie (gestionnaire uniquement)
+      if (canDelete()) {
+        var _curCom = _stolCommissaireLabel(_cid);
+        htmlR += _resMI('👤', 'Commissaire de saisie'+(_curCom ? ' : '+escH(_curCom) : ' (non défini)'), '_stolOpenCommissairePicker(\''+_cid+'\')');
+      }
       htmlR += _resSep;
     }
     // ═══ Section Podiums (ancien système basé sur enrollMeta) ═══
@@ -19538,6 +19680,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
   } else if (tab === 'partenaires') {
     return renderPartenairesTab(cp);
 
+  } else if (tab === 'deroulement') {
+    return renderDeroulementTab(cp);
+
   } else if (tab === 'repas') {
     return renderRepasTab(cp);
   }
@@ -20287,6 +20432,112 @@ function clearRepas(compId) {
   if (S.repas) delete S.repas[compId];
   saveState(); if (typeof silentPush === 'function') silentPush();
   switchHomeDetailTab('repas');
+}
+
+/* ══════════════════════════════════════════════════════
+   DÉROULEMENT — planning de la compétition
+   Lignes : Date | Horaire | Domaine | Infos
+══════════════════════════════════════════════════════ */
+function _deroulementRerender() {
+  var mob = document.getElementById('overlay-comp-mobile');
+  if (mob && mob.style.display !== 'none' && typeof _mobileCompId !== 'undefined' && _mobileCompId) {
+    renderMobileCompDetail();
+  } else {
+    renderHomeDetailPanel(null);
+  }
+}
+
+function renderDeroulementTab(cp) {
+  if (!S.deroulement) S.deroulement = {};
+  if (!S.deroulement[cp.id]) S.deroulement[cp.id] = [];
+  var list = S.deroulement[cp.id];
+  var isGest = canModify();
+  var cid = escH(cp.id);
+  var _escQ = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
+
+  var iSt = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 8px;outline:none';
+  var fo  = 'onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'"';
+  var ro  = isGest ? '' : ' readonly';
+  var cols = isGest ? '130px 130px minmax(0,1.4fr) minmax(0,2.2fr) 34px' : '130px 130px minmax(0,1.4fr) minmax(0,2.2fr)';
+
+  // ── Barre d'actions ──
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;flex-shrink:0;border-bottom:1px solid var(--bdr);background:var(--navy4)">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--txt)">📅 Déroulement <span style="color:var(--txt3);font-weight:500;font-size:12px">('+list.length+')</span></div>';
+  if (isGest) {
+    html += '<button onclick="addDeroulementRow(\''+cid+'\')" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ Ajouter une ligne</button>';
+  }
+  html += '</div>';
+
+  html += '<div style="flex:1;overflow-y:auto;padding:12px">';
+
+  if (list.length === 0) {
+    html += '<div style="text-align:center;padding:40px 20px;color:var(--txt3);font-size:13px">Aucune ligne de déroulement.'
+         +  (isGest ? '<br>Cliquez sur « + Ajouter une ligne » pour commencer.' : '') + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // ── En-têtes de colonnes ──
+  var thSt = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px';
+  html += '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;padding:0 4px 6px;align-items:end">';
+  html += '<span style="'+thSt+'">Date</span>';
+  html += '<span style="'+thSt+'">Horaire</span>';
+  html += '<span style="'+thSt+'">Domaine</span>';
+  html += '<span style="'+thSt+'">Infos</span>';
+  if (isGest) html += '<span></span>';
+  html += '</div>';
+
+  // ── Lignes ──
+  list.forEach(function(r) {
+    var rid = escH(r.id);
+    html += '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;padding:5px 4px;align-items:start">';
+    html += '<input type="date" '+ro+' value="'+_escQ(r.date||'')+'" '+fo+' style="'+iSt+'" onchange="saveDeroulementCell(\''+cid+'\',\''+rid+'\',\'date\',this.value)">';
+    html += '<input type="text" '+ro+' placeholder="09h–12h" value="'+_escQ(r.horaire||'')+'" '+fo+' style="'+iSt+'" onchange="saveDeroulementCell(\''+cid+'\',\''+rid+'\',\'horaire\',this.value)">';
+    html += '<input type="text" '+ro+' placeholder="Domaine…" value="'+_escQ(r.domaine||'')+'" '+fo+' style="'+iSt+'" onchange="saveDeroulementCell(\''+cid+'\',\''+rid+'\',\'domaine\',this.value)">';
+    html += '<textarea rows="1" '+ro+' placeholder="Informations…" '+fo+' style="'+iSt+';resize:vertical;min-height:34px" onchange="saveDeroulementCell(\''+cid+'\',\''+rid+'\',\'infos\',this.value)">'+_escQ(r.infos||'')+'</textarea>';
+    if (isGest) {
+      html += '<button onclick="deleteDeroulementRow(\''+cid+'\',\''+rid+'\')" title="Supprimer" style="width:34px;height:34px;border-radius:7px;border:none;background:none;color:#ef4444;font-size:18px;font-weight:900;cursor:pointer;padding:0;font-family:inherit">×</button>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function addDeroulementRow(compId) {
+  if (!canModify()) return;
+  if (!S.deroulement) S.deroulement = {};
+  if (!S.deroulement[compId]) S.deroulement[compId] = [];
+  S.deroulement[compId].push({
+    id: 'dr_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    date:'', horaire:'', domaine:'', infos:''
+  });
+  saveState(); if (typeof _hdpSaveNow === 'function') _hdpSaveNow();
+  _deroulementRerender();
+}
+
+function saveDeroulementCell(compId, rowId, field, value) {
+  if (!canModify()) return;
+  var list = (S.deroulement||{})[compId];
+  if (!list) return;
+  var row = list.find(function(x){ return x.id === rowId; });
+  if (!row) return;
+  row[field] = value;
+  row._updatedAt = Date.now();
+  saveState(); if (typeof _hdpSaveNow === 'function') _hdpSaveNow();
+}
+
+function deleteDeroulementRow(compId, rowId) {
+  if (!canModify()) return;
+  var list = (S.deroulement||{})[compId];
+  if (!list) return;
+  var idx = list.findIndex(function(x){ return x.id === rowId; });
+  if (idx < 0) return;
+  list.splice(idx, 1);
+  saveState(); if (typeof _hdpSaveNow === 'function') _hdpSaveNow();
+  _deroulementRerender();
+  toast('Ligne supprimée ✓', 'ok');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -25227,6 +25478,7 @@ async function pushToCloud() {
     evenements:       S.evenements         || {},
     budgets:          S.budgets            || {},
     partenaires:      S.partenaires        || {},
+    deroulement:      S.deroulement        || {},
     messages:         S.messages           || [],
     sitesSportifs:    S.sitesSportifs      || [],
     collectif:        S.collectif          || [],
@@ -26869,15 +27121,71 @@ function closeMatActions() {
   if (s) s.classList.remove('open');
 }
 
+// La compétition est-elle une STOL ?
+function _isCompStol(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  if (!cp) return false;
+  return ((cp.discipline||'')+''+(cp.type||'')+''+(cp.name||'')).toLowerCase().indexOf('stol') !== -1;
+}
+
+// Sommes-nous en train de scorer / saisir une compétition STOL en direct ?
+// (volet Résultats ouvert sur ordinateur, ou saisie commissaire sur smartphone)
+function _isStolLiveView() {
+  try {
+    var mob = document.getElementById('overlay-comp-mobile');
+    if (mob && mob.style.display !== 'none' && typeof _mobileCompId !== 'undefined' && _mobileCompId) {
+      var sec = (typeof _MOBILE_COMP_SECTIONS !== 'undefined') ? _MOBILE_COMP_SECTIONS[_mobileCompSectionIdx] : null;
+      if (sec && sec.id === 'resultats') return _isCompStol(_mobileCompId);
+      return false;
+    }
+    if (window.innerWidth >= 768 && _homeDetailTab === 'resultats' && typeof _currentCompId !== 'undefined' && _currentCompId) {
+      return _isCompStol(_currentCompId);
+    }
+  } catch(e) {}
+  return false;
+}
+
+// Applique les données fraîchement tirées du cloud.
+// En mode « saisie live STOL » on rafraîchit uniquement la vue courante (sans toast
+// bruyant ni re-render global), et jamais pendant qu'un champ est en cours de saisie.
+function _autoSyncApplyPull(isLive) {
+  _lastSyncAt = Date.now();
+  _lastPushFailed = false;
+  if (isLive) {
+    var ae = document.activeElement;
+    var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT');
+    if (!typing) {
+      try {
+        if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+        else if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+      } catch(e) { console.warn('[AutoSync] re-render live échoué:', e); }
+    }
+    if (typeof updateSyncTime === 'function') updateSyncTime();
+    return;
+  }
+  var sf = document.getElementById('comp-season-filter');
+  if (sf) sf.value = 'all';
+  renderHome(); renderCompetitions(); renderPilots(); updateHeader();
+  var btn = document.getElementById('sync-status');
+  if (btn) btn.textContent = '🔄';
+  updateSyncTime();
+  toast('Données mises à jour depuis le cloud ☁️', 'ok');
+}
+
 function startAutoSync() {
-  // Vérifie toutes les 30s si data.json dans Storage a été mis à jour par un autre appareil.
-  // On compare le champ _pushAt embarqué dans le JSON pour éviter de télécharger tout le fichier
-  // en cas de fausse alerte. On utilise list() pour lire le updated_at du fichier sans le télécharger.
+  // Boucle auto-adaptative : pendant le scoring/saisie d'une STOL, on vérifie le
+  // cloud toutes les ~8s (quasi temps réel) ; sinon toutes les 3 min (coût maîtrisé).
+  // On lit le updated_at du fichier Storage (léger) avant de tirer tout le contenu.
   var _autoSyncFails = 0;
-  setInterval(function(){
-    if (!navigator.onLine || _syncInProgress) return;
-    var sb = getSB(); if (!sb) return;
-    // Lire les métadonnées du fichier Storage (léger, pas de téléchargement du contenu)
+  var STOL_LIVE_DELAY = 5000, NORMAL_DELAY = 180000;
+  function _reschedule() {
+    var d = _isStolLiveView() ? STOL_LIVE_DELAY : NORMAL_DELAY;
+    setTimeout(_autoSyncTick, d);
+  }
+  function _autoSyncTick() {
+    if (!navigator.onLine || _syncInProgress) { _reschedule(); return; }
+    var sb = getSB(); if (!sb) { _reschedule(); return; }
+    var live = _isStolLiveView();
     sb.storage.from('gestappli-sync').list('', { search: 'data.json' })
       .then(function(res){
         if (res.error || !res.data || !res.data.length) return;
@@ -26886,40 +27194,29 @@ function startAutoSync() {
         _lastAutoCheckAt = Date.now(); // Storage répond → auto-sync actif
         updateSyncHealthPill();
         var remoteTs = new Date(file.updated_at).getTime();
-        // Si le fichier Storage est plus récent que notre dernière synchro, on tire les données
         if (remoteTs > _lastSyncAt + 5000) { // 5s de marge pour éviter les boucles push/pull
           _autoSyncFails = 0;
-          pullFromCloud().then(function(){
-            _lastSyncAt = Date.now();
-            _lastPushFailed = false;
-            var sf = document.getElementById('comp-season-filter');
-            if (sf) sf.value = 'all';
-            renderHome(); renderCompetitions(); renderPilots(); updateHeader();
-            var btn = document.getElementById('sync-status');
-            if (btn) btn.textContent = '🔄';
-            updateSyncTime();
-            toast('Données mises à jour depuis le cloud ☁️', 'ok');
+          return pullFromCloud().then(function(){
+            _autoSyncApplyPull(live);
           }).catch(function(e){ console.warn('[AutoSync] pull échoué:', e); });
         }
       }).catch(function(e){
         _autoSyncFails++;
         if (_autoSyncFails === 1) console.warn('[AutoSync] Storage list() échoué, fallback stol_shared:', e);
-        // Fallback : essayer l'ancienne table PostgreSQL si Storage ne répond pas
+        // Fallback : ancienne table PostgreSQL si Storage ne répond pas
         if (_autoSyncFails <= 3) {
-          sb.from('stol_shared').select('updated_at').eq('id','global').single()
+          return sb.from('stol_shared').select('updated_at').eq('id','global').single()
             .then(function(res2){
               if (!res2.data) return;
               var remoteTs2 = new Date(res2.data.updated_at).getTime();
               if (remoteTs2 > _lastSyncAt + 5000) {
-                pullFromCloud().then(function(){
-                  _lastSyncAt = Date.now();
-                  renderHome(); renderCompetitions(); renderPilots(); updateHeader(); updateSyncTime();
-                }).catch(function(){});
+                return pullFromCloud().then(function(){ _autoSyncApplyPull(live); }).catch(function(){});
               }
             }).catch(function(){});
         }
-      });
-  }, 180000); // toutes les 3 minutes (était 15s — réduction ×12 des requêtes Storage)
+      }).then(_reschedule, _reschedule);
+  }
+  setTimeout(_autoSyncTick, 8000); // premier passage rapide au démarrage
 }
 
 // ── Libération d'urgence du localStorage saturé ────────────────────
@@ -30980,7 +31277,7 @@ async function syncBase44All(compId) {
 // Push silencieux — partagé avec _hdpSaveNow via le même debounce 20s
 // Évite d'envoyer des dizaines de requêtes Storage sur chaque action utilisateur
 var _silentPushTimer = null;
-function silentPush() {
+function silentPush(fast) {
   if (!getSB() || !navigator.onLine) return;
   _touchUpdatedAt();
   // Marquer "À envoyer" dans la pill
@@ -30988,6 +31285,10 @@ function silentPush() {
   var lbl = document.getElementById('sync-health-lbl');
   if (dot && !_lastPushFailed) dot.style.background = '#f59e0b';
   if (lbl && !_lastPushFailed) { lbl.textContent = '☁️ À envoyer'; lbl.style.color = '#f59e0b'; }
+  // Debounce : 10 s en usage normal, 1 s en mode « saisie live » (STOL) pour
+  // que la saisie du commissaire remonte quasi-immédiatement au scorer.
+  // (1 s coalesce juste les champs d'un même pilote saisis coup sur coup.)
+  var _pushDelay = fast ? 1000 : 10000;
   if (_silentPushTimer) clearTimeout(_silentPushTimer);
   _silentPushTimer = setTimeout(function(){
     _silentPushTimer = null;
@@ -31006,7 +31307,7 @@ function silentPush() {
       updateSyncHealthPill();
       console.warn('[silentPush] échec:', e);
     });
-  }, 10000); // debounce 10s — compromis fiabilité / coût Supabase (15 modifs en 10s = 1 seul push)
+  }, _pushDelay); // debounce : 10s normal, 2,5s en mode saisie live STOL
 }
 
 var _syncFailSince   = 0;
@@ -31109,6 +31410,7 @@ function _autoBackupLocal() {
       compEnroll:     S.compEnroll     || {},
       budgets:        S.budgets        || {},
       partenaires:    S.partenaires    || {},
+      deroulement:    S.deroulement    || {},
       materiel:       S.materiel       || {},
       evenements:     S.evenements     || {},
       homeTodosByComp: S.homeTodosByComp || {},
@@ -31168,6 +31470,7 @@ function exportGlobalBackup() {
       compEnroll:     S.compEnroll     || {},
       budgets:        S.budgets        || {},
       partenaires:    S.partenaires    || {},
+      deroulement:    S.deroulement    || {},
       materiel:       S.materiel       || {},
       evenements:     S.evenements     || {},
       homeTodosByComp: S.homeTodosByComp || {},
@@ -33069,6 +33372,98 @@ function _getStolResults(compId) {
   return S.stolResults[compId];
 }
 
+/* ══════════════════════════════════════════════════════
+   COMMISSAIRE DE SAISIE DÉSIGNÉ (un seul par compétition STOL)
+   Le gestionnaire désigne un encadrant : lui seul (connecté à son
+   compte) peut saisir les performances ; les autres sont en lecture
+   seule. Évite les conflits d'écriture entre plusieurs smartphones.
+══════════════════════════════════════════════════════ */
+function _stolCommissaire(compId) {
+  var d = (S.stolResults||{})[compId];
+  return (d && d.commissaire) || null;
+}
+function _stolCommissaireLabel(compId) {
+  var c = _stolCommissaire(compId);
+  if (!c) return '';
+  return ((c.prenom||'')+' '+(c.nom||'')).trim() || c.email || c.licence || 'Commissaire';
+}
+function _isDesignatedCommissaire(compId) {
+  var c = _stolCommissaire(compId);
+  if (!c) return false;
+  var u = S.user; if (!u) return false;
+  if (c.pilotId && u.id && c.pilotId === u.id) return true;
+  if (c.email && u.email && (''+c.email).trim().toLowerCase() === (''+u.email).trim().toLowerCase()) return true;
+  if (c.licence && u.licence && (''+c.licence).trim() === (''+u.licence).trim()) return true;
+  return false;
+}
+// Droit de saisir les performances d'une compétition STOL.
+function _canSaisirStol(compId) {
+  if (canDelete()) return true;             // gestionnaire / développeur = organisateur-scorer (override)
+  var c = _stolCommissaire(compId);
+  if (!c) return canModify();               // aucun commissaire désigné → comportement standard
+  return _isDesignatedCommissaire(compId);  // sinon : uniquement le commissaire désigné
+}
+
+function _stolOpenCommissairePicker(compId) {
+  if (!canDelete()) { toast('Réservé au gestionnaire', 'err'); return; }
+  var staff = ((S.staff||{})[compId]||[]).filter(function(s){ return s && (s.role||'').toUpperCase() !== 'NDF'; });
+  var cur = _stolCommissaire(compId);
+  var curId = cur && (cur.pilotId || '');
+  var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
+  var jsQ = function(s){ return (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); };
+  var old = document.getElementById('stol-commissaire-ov'); if (old) old.remove();
+  var ov = document.createElement('div');
+  ov.id = 'stol-commissaire-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var h = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:20px;width:min(430px,100%);max-height:82vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">';
+  h += '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:4px">👤 Commissaire de saisie</div>';
+  h += '<div style="font-size:11.5px;color:var(--txt3);margin-bottom:14px;line-height:1.5">Une seule personne saisit les performances sur le terrain. Choisissez l\'encadrant qui aura ce droit ; les autres appareils seront en lecture seule.</div>';
+  if (!staff.length) {
+    h += '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12.5px">Aucun encadrant enregistré.<br>Ajoutez d\'abord des encadrants dans l\'onglet <b>Encadrants</b>.</div>';
+  } else {
+    staff.forEach(function(s){
+      var sid = s.pilotId || s.id;
+      var active = curId && sid === curId;
+      var nm = ((s.prenom||'')+' '+(s.nom||'')).trim() || s.email || '—';
+      h += '<button onclick="_stolSetCommissaire(\''+jsQ(compId)+'\',\''+jsQ(sid)+'\')" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;margin-bottom:7px;border-radius:11px;border:1.5px solid '+(active?'var(--stol)':'var(--bdr)')+';background:'+(active?'rgba(0,87,255,.12)':'var(--navy3)')+';color:var(--txt);font-family:inherit;cursor:pointer">'
+        + '<span style="font-size:18px">'+(active?'✅':'👤')+'</span>'
+        + '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span>'
+        + (s.role?'<span style="display:block;font-size:11px;color:var(--txt3)">'+esc(s.role)+'</span>':'')+'</span>'
+        + '</button>';
+    });
+  }
+  if (cur) h += '<button onclick="_stolSetCommissaire(\''+jsQ(compId)+'\',\'\')" style="width:100%;padding:10px;margin-top:4px;border-radius:10px;border:1px solid var(--bdr);background:none;color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✕ Retirer le commissaire (aucun)</button>';
+  h += '<button onclick="document.getElementById(\'stol-commissaire-ov\').remove()" style="width:100%;padding:11px;margin-top:8px;border-radius:10px;border:none;background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Fermer</button>';
+  h += '</div>';
+  ov.innerHTML = h;
+  document.body.appendChild(ov);
+}
+
+function _stolSetCommissaire(compId, staffSid) {
+  if (!canDelete()) return;
+  _getStolResults(compId);
+  if (!staffSid) {
+    delete S.stolResults[compId].commissaire;
+  } else {
+    var s = ((S.staff||{})[compId]||[]).find(function(x){ return (x.pilotId||x.id) === staffSid; });
+    if (!s) { toast('Encadrant introuvable', 'err'); return; }
+    S.stolResults[compId].commissaire = {
+      pilotId: s.pilotId || s.id,
+      nom: s.nom || '', prenom: s.prenom || '',
+      email: s.email || '', licence: s.licence || ''
+    };
+  }
+  S.stolResults[compId].updated = Date.now();
+  saveState();
+  if (typeof _saveStolBackup === 'function') _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush(true);
+  var ov = document.getElementById('stol-commissaire-ov'); if (ov) ov.remove();
+  if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+  else if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+  toast(staffSid ? 'Commissaire désigné ✓' : 'Commissaire retiré', 'ok');
+}
+
 // Import du fichier Excel au format STOL — détection auto des 2 formats :
 //   1) Classement final : tableaux MULTIAXES/PENDULAIRES avec Poule/Résultat/Place
 //   2) Classeur de saisie : poules A/B… avec D1/A1/D2/A2/D3/A3 + PERF + Retenue
@@ -33330,31 +33725,36 @@ function _getStolEpreuves(compId) {
   return d.epreuves;
 }
 
-// Calcul des performances STOL :
-// Perf X = min(des décollages saisis) + min(des atterrissages saisis)
-//   → On prend la plus petite valeur strictement positive parmi les décollages (D1 et/ou D2)
-//   → + la plus petite valeur strictement positive parmi les atterrissages (A1 et/ou A2)
-//   → 0 et "mordu" sont ignorés (considérés comme essai invalide)
-//   → Si aucun décollage OU aucun atterrissage valide : pas de calcul (=0)
-// Retenue = min(Perf1, Perf2) = meilleur des 2 RUNs
-function _stolCalcPerf(run) {
-  if (!run) return 0;
-  // Perf = meilleure (plus petite) distance de décollage + meilleure distance d'atterrissage.
-  // Validité par ESSAI (paire Déc.i / Att.i) : si l'une des deux mesures manque, l'essai est
-  // invalide → ni son décollage ni son atterrissage ne comptent.
+// Calcul des performances STOL — RÈGLE INDÉPENDANTE :
+//   Chaque décollage compte dès qu'il est saisi (> 0), indépendamment de son atterrissage,
+//   et inversement. On NE jette PAS un décollage parce que son atterrissage est vide.
+//   Perf = meilleur (plus petit) décollage saisi + meilleur atterrissage saisi.
+//   0 / "mordu" / vide sont ignorés. Si aucun décollage OU aucun atterrissage valide → 0.
+// Décollages / atterrissages valides d'un run (collectés séparément). { ds:[...], as:[...] }.
+function _stolValidPairs(run) {
   var ds = [], as = [];
-  for (var i = 1; i <= 10; i++) {
-    var dv = parseFloat(run['d'+i]);
-    var av = parseFloat(run['a'+i]);
-    var dOk = !isNaN(dv) && dv > 0;
-    var aOk = !isNaN(av) && av > 0;
-    if (dOk && aOk) { ds.push(dv); as.push(av); } // essai complet uniquement
+  if (run) {
+    for (var i = 1; i <= 10; i++) {
+      var dv = parseFloat(run['d'+i]);
+      var av = parseFloat(run['a'+i]);
+      if (!isNaN(dv) && dv > 0) ds.push(dv);   // décollage compté indépendamment
+      if (!isNaN(av) && av > 0) as.push(av);   // atterrissage compté indépendamment
+    }
   }
-  if (!ds.length || !as.length) return 0;
-  return Math.min.apply(null, ds) + Math.min.apply(null, as);
+  return { ds: ds, as: as };
 }
+
+// Perf d'UN run = meilleur décollage saisi + meilleur atterrissage saisi (colonnes Perf 1/2/3).
+function _stolCalcPerf(run) {
+  var p = _stolValidPairs(run);
+  if (!p.ds.length || !p.as.length) return 0;
+  return Math.min.apply(null, p.ds) + Math.min.apply(null, p.as);
+}
+
+// Retenue = performance finale servant au classement = MEILLEURE Perf des runs.
+// = min(Perf run1, Perf run2, …) — on garde le meilleur run réellement réalisé
+// (et NON une combinaison de décollage/atterrissage venant de runs différents).
 function _stolCalcRetenue() {
-  // Accepte un nombre variable de RUNs (run1, run2, run3, ...)
   var runs = Array.prototype.slice.call(arguments).filter(Boolean);
   var perfs = runs.map(_stolCalcPerf).filter(function(p){ return p > 0; });
   if (!perfs.length) return 0;
@@ -33477,18 +33877,50 @@ function stolRemoveLastEssai(compId, tableId) {
 // Propage le N° de dossard d'un pilote à toutes ses lignes dans tous les tableaux
 // (essais/qualif/finale) pour que le numéro reste identique partout, y compris
 // dans le classement consolidé.
+// Clé de nom normalisée (insensible casse / accents / tirets / espaces multiples)
+function _stolNameKey(prenom, nom) {
+  return ((prenom||'')+' '+(nom||'')).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+// Propage le N° de dossard à toutes les lignes du MÊME pilote, dans TOUTES les phases
+// (essais, qualif, finale). Match par pid OU par nom normalisé (couvre les lignes sans pid).
 function _stolPropagateNum(compId, pid, prenom, nom, num) {
   var d = _getStolEpreuves(compId);
-  var key = pid || ((prenom||'')+'|'+(nom||'')).toLowerCase().trim();
-  if (!key) return;
+  var nkey = _stolNameKey(prenom, nom);
+  if (!pid && !nkey) return;
   ['essais','qualif','finale'].forEach(function(ph){
     (d[ph].tables||[]).forEach(function(t){
       (t.lignes||[]).forEach(function(l){
-        var lKey = l.pid || ((l.prenom||'')+'|'+(l.nom||'')).toLowerCase().trim();
-        if (lKey && lKey === key) l.num = num;
+        var match = (pid && l.pid && l.pid === pid) || (nkey && _stolNameKey(l.prenom, l.nom) === nkey);
+        if (match) l.num = num;
       });
     });
   });
+}
+
+// Synchronise les N° manquants entre phases : si un pilote a un N° dans une phase,
+// on le recopie sur ses lignes SANS N° des autres phases (on n'écrase jamais un N° existant).
+function _stolSyncNums(compId) {
+  var d = _getStolEpreuves(compId);
+  var byPid = {}, byName = {};
+  ['essais','qualif','finale'].forEach(function(ph){
+    (d[ph].tables||[]).forEach(function(t){ (t.lignes||[]).forEach(function(l){
+      var num = (l.num||'').toString().trim(); if (!num) return;
+      if (l.pid && !byPid[l.pid]) byPid[l.pid] = num;
+      var nk = _stolNameKey(l.prenom, l.nom); if (nk && !byName[nk]) byName[nk] = num;
+    }); });
+  });
+  var changed = false;
+  ['essais','qualif','finale'].forEach(function(ph){
+    (d[ph].tables||[]).forEach(function(t){ (t.lignes||[]).forEach(function(l){
+      if ((l.num||'').toString().trim()) return;               // ne pas écraser
+      var n = (l.pid && byPid[l.pid]) || byName[_stolNameKey(l.prenom, l.nom)];
+      if (n) { l.num = n; changed = true; }
+    }); });
+  });
+  return changed;
 }
 
 // Récupère le N° de dossard déjà attribué à un pilote dans une compétition
@@ -34352,11 +34784,61 @@ function stolDeleteTable(compId, tableId) {
 // ordinateur (S.stolResults) et sont synchronisées via silentPush.
 // ═══════════════════════════════════════════════════════════════
 var _stolMobOpen = {};
+var _stolMobPoule = ''; // '' = toutes les poules
 
 function _stolMobSetPhase(phase) {
   _stolViewPhase = phase;
   _stolMobOpen = {};
+  _stolMobPoule = ''; // les poules diffèrent d'une phase à l'autre → réinitialiser
   if (typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+}
+
+function _stolMobSetPoule(poule) {
+  _stolMobPoule = poule || '';
+  _stolMobOpen = {};
+  if (typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+}
+
+// Complète les N° de dossard manquants d'une phase en les recopiant depuis
+// les autres phases (essais/qualif/finale) où le même pilote a déjà un dossard.
+function _stolFillMissingDossards(compId) {
+  if (!_canSaisirStol(compId)) { toast('Saisie réservée au commissaire désigné', 'err'); return; }
+  var eps = _getStolEpreuves(compId);
+  var phases = ['essais','qualif','finale'];
+  // 1) Carte de référence : premier dossard connu pour chaque pilote, toutes phases confondues
+  var numByKey = {};
+  phases.forEach(function(ph){
+    (eps[ph].tables||[]).forEach(function(t){
+      (t.lignes||[]).forEach(function(l){
+        var k = _stolPiloteKey(l);
+        var n = (l.num||'').toString().trim();
+        if (n && !numByKey[k]) numByKey[k] = n;
+      });
+    });
+  });
+  // 2) Remplir les lignes sans dossard
+  var filled = 0;
+  phases.forEach(function(ph){
+    (eps[ph].tables||[]).forEach(function(t){
+      (t.lignes||[]).forEach(function(l){
+        var n = (l.num||'').toString().trim();
+        if (!n) {
+          var k = _stolPiloteKey(l);
+          if (numByKey[k]) { l.num = numByKey[k]; filled++; }
+        }
+      });
+    });
+  });
+  if (filled > 0) {
+    S.stolResults[compId].updated = Date.now();
+    saveState();
+    if (typeof _saveStolBackup === 'function') _saveStolBackup();
+    if (typeof silentPush === 'function') silentPush(true);
+    if (typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+    toast(filled + ' dossard(s) complété(s) ✓', 'ok');
+  } else {
+    toast('Aucun dossard manquant à compléter', 'ok');
+  }
 }
 
 function _stolMobToggle(key) {
@@ -34370,6 +34852,7 @@ function _stolMobToggle(key) {
 // Enregistre une valeur saisie sur mobile — MAJ du DOM en place (pas de
 // re-render : le clavier reste ouvert et l'accordéon reste déplié)
 function _stolMobUpdate(compId, tableId, ligneIdx, runKey, sub, val) {
+  if (!_canSaisirStol(compId)) { toast('Saisie réservée au commissaire désigné', 'err'); return; }
   var d = _getStolEpreuves(compId);
   var phase = (_stolViewPhase && _stolViewPhase !== 'classement') ? _stolViewPhase : 'essais';
   var table = (d[phase].tables||[]).find(function(t){ return t.id === tableId; });
@@ -34391,7 +34874,7 @@ function _stolMobUpdate(compId, tableId, ligneIdx, runKey, sub, val) {
   if (badge) { badge.textContent = ret ? fmt(ret) : '—'; badge.style.color = ret ? '#10b981' : 'var(--txt3)'; }
   saveState();
   _saveStolBackup();
-  if (typeof silentPush === 'function') silentPush();
+  if (typeof silentPush === 'function') silentPush(true); // push accéléré (2,5s) pour la saisie live
 }
 
 function _renderStolMobileSaisie(cp) {
@@ -34401,25 +34884,50 @@ function _renderStolMobileSaisie(cp) {
   var tables = (eps[phase] && eps[phase].tables) || [];
   var fmt = function(v){ if (!v) return '—'; return (Math.round(v*10)/10).toString(); };
   var runColors = ['#f59e0b','#3b82f6','#10b981','#7c3aed','#ec4899','#06b6d4'];
-  var html = '<div style="padding:14px 12px 50px">';
-  // ── En-tête ──
-  html += '<div style="margin-bottom:12px">'
-    + '<div style="font-size:16px;font-weight:800;color:var(--txt)">📏 Saisie des performances</div>'
-    + '<div style="font-size:11px;color:var(--txt3);margin-top:3px;line-height:1.4">Touchez un compétiteur pour saisir ses distances. Les valeurs alimentent automatiquement les tableaux sur l\'ordinateur du directeur de course.</div>'
+  var _canSaisir = _canSaisirStol(compId); // commissaire désigné (ou gestionnaire) uniquement
+  var html = '<div style="padding:12px 12px 50px">';
+  // ── En-tête compact : titre + bouton « compléter les dossards » ──
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt);flex:1;min-width:0">📏 Saisie des performances</div>'
+    + (_canSaisir ? '<button onclick="_stolFillMissingDossards(\''+compId+'\')" title="Compléter les N° de dossard manquants" style="padding:8px 11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;touch-action:manipulation">🔢 Dossards</button>' : '')
     + '</div>';
-  // ── Sélecteur de phase ──
+  // ── Bandeau lecture seule si l'utilisateur n'est pas le commissaire désigné ──
+  if (!_canSaisir) {
+    var _comLbl = _stolCommissaireLabel(compId);
+    html += '<div style="margin-bottom:12px;padding:12px 14px;border-radius:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#f59e0b;font-size:12px;font-weight:600;line-height:1.5">'
+      + '🔒 Lecture seule — la saisie est réservée au commissaire désigné'
+      + (_comLbl ? ' : <b>'+_escapeHTML(_comLbl)+'</b>' : '')
+      + '.<br>Le directeur de course peut vous désigner depuis l\'ordinateur (volet Résultats → Actions).'
+      + '</div>';
+  }
+  // ── Sélecteur de phase (remonté) ──
   var phDefs = [
     { id:'essais', lbl:'🟠 Essais',  col:'#f59e0b' },
     { id:'qualif', lbl:'🔵 Qualifs', col:'#3b82f6' },
     { id:'finale', lbl:'🏁 Finale',  col:'#0057FF' }
   ];
-  html += '<div style="display:flex;gap:6px;margin-bottom:14px">';
+  html += '<div style="display:flex;gap:9px;margin-bottom:12px">';
   phDefs.forEach(function(p){
     var act = phase === p.id;
     var nT = (eps[p.id] && eps[p.id].tables) ? eps[p.id].tables.length : 0;
-    html += '<button onclick="_stolMobSetPhase(\''+p.id+'\')" style="flex:1;padding:11px 4px;border-radius:12px;border:1.5px solid '+(act?p.col:'var(--bdr)')+';background:'+(act?p.col:'transparent')+';color:'+(act?'#fff':'var(--txt2)')+';font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">'+p.lbl+(nT?' ('+nT+')':'')+'</button>';
+    html += '<button onclick="_stolMobSetPhase(\''+p.id+'\')" style="flex:1;min-height:56px;padding:14px 6px;border-radius:14px;border:2px solid '+(act?p.col:'var(--bdr)')+';background:'+(act?p.col:'transparent')+';color:'+(act?'#fff':'var(--txt2)')+';font-size:14.5px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation">'+p.lbl+(nT?' ('+nT+')':'')+'</button>';
   });
   html += '</div>';
+  // ── Filtre par poule : n'ouvrir que les membres de la poule choisie ──
+  var _poulesSet = {};
+  tables.forEach(function(t){ (t.lignes||[]).forEach(function(l){ var pp=(l.poule||'').toString().trim(); if(pp) _poulesSet[pp]=true; }); });
+  var _poules = Object.keys(_poulesSet).sort(function(a,b){ return a.localeCompare(b,undefined,{numeric:true}); });
+  if (_stolMobPoule && _poules.indexOf(_stolMobPoule) === -1) _stolMobPoule = ''; // poule absente de cette phase
+  if (_poules.length) {
+    var _pouleBtn = function(val,lbl){
+      var act = (_stolMobPoule === val);
+      return '<button onclick="_stolMobSetPoule(\''+(val+'').replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')" style="display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:11px 20px;border-radius:24px;border:2px solid '+(act?'var(--stol)':'var(--bdr)')+';background:'+(act?'var(--stol)':'transparent')+';color:'+(act?'#fff':'var(--txt2)')+';font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;white-space:nowrap">'+lbl+'</button>';
+    };
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">';
+    html += _pouleBtn('', 'Toutes');
+    _poules.forEach(function(pp){ html += _pouleBtn(pp, 'Poule '+_escapeHTML(pp)); });
+    html += '</div>';
+  }
   // ── Aucun tableau ──
   if (!tables.length) {
     var phaseLblM = phase==='essais'?'Essais libres':phase==='qualif'?'Qualifications':'Finale';
@@ -34431,15 +34939,16 @@ function _renderStolMobileSaisie(cp) {
     return html + '</div>';
   }
   // ── Tableaux de la phase ──
+  var _anyShown = false;
   tables.forEach(function(table){
     var nbRuns = _stolGetNbRuns(table);
     var titre = table.categorie === 'multiaxes' ? 'MULTIAXES' : 'PENDULAIRE';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin:16px 2px 8px">'
-      + '<span style="font-size:12px;font-weight:800;color:var(--stol);letter-spacing:1px">'+titre+'</span>'
-      + '<span style="font-size:10px;color:var(--txt3);background:var(--navy3);padding:2px 8px;border-radius:10px;font-weight:600">'+nbRuns+' RUN'+(nbRuns>1?'s':'')+' · '+(table.lignes||[]).length+' pilotes</span>'
-      + '</div>';
     // Tri par N° de dossard (les sans-numéro en dernier)
     var sorted = (table.lignes||[]).map(function(l,i){ return { l:l, idx:i }; });
+    // Filtre poule : ne garder que les membres de la poule sélectionnée
+    if (_stolMobPoule) sorted = sorted.filter(function(it){ return (it.l.poule||'').toString().trim() === _stolMobPoule; });
+    if (!sorted.length) return; // aucun compétiteur pour cette poule dans ce tableau → on n'affiche pas le tableau
+    _anyShown = true;
     sorted.sort(function(a,b){
       var na=(a.l.num||'').toString().trim(), nb=(b.l.num||'').toString().trim();
       if (!na && !nb) return ((a.l.nom||'')+'').localeCompare((b.l.nom||'')+'');
@@ -34449,6 +34958,10 @@ function _renderStolMobileSaisie(cp) {
       if (!isNaN(ni)&&!isNaN(mi)) return ni-mi;
       return na.localeCompare(nb,undefined,{numeric:true});
     });
+    html += '<div style="display:flex;align-items:center;gap:8px;margin:16px 2px 8px">'
+      + '<span style="font-size:12px;font-weight:800;color:var(--stol);letter-spacing:1px">'+titre+'</span>'
+      + '<span style="font-size:10px;color:var(--txt3);background:var(--navy3);padding:2px 8px;border-radius:10px;font-weight:600">'+nbRuns+' RUN'+(nbRuns>1?'s':'')+' · '+sorted.length+' pilote'+(sorted.length>1?'s':'')+'</span>'
+      + '</div>';
     sorted.forEach(function(it){
       var ligne = it.l, idx = it.idx;
       var key = table.id+'-'+idx;
@@ -34456,14 +34969,15 @@ function _renderStolMobileSaisie(cp) {
       var open = !!_stolMobOpen[key];
       html += '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;overflow:hidden">';
       // Ligne compétiteur (touchable)
+      var _u = _stolPilotUlm(ligne);
+      var _mm = [_u.marque, _u.modele].filter(Boolean).join(' ').trim();
       html += '<div onclick="_stolMobToggle(\''+key+'\')" style="display:flex;align-items:center;gap:12px;padding:16px 14px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,87,255,.1)">'
-        + '<div style="min-width:52px;height:52px;border-radius:12px;background:var(--stol);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;padding:0 6px">'
-        + '<div style="font-size:7.5px;font-weight:700;letter-spacing:.5px;opacity:.75;text-transform:uppercase;line-height:1">Dossard</div>'
-        + '<div style="font-size:21px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums">'+_escapeHTML((ligne.num||'—').toString())+'</div>'
+        + '<div style="width:52px;min-width:52px;height:52px;border-radius:50%;background:#fff;border:1.5px solid var(--bdr);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+        + '<div style="font-size:22px;font-weight:900;line-height:1;color:var(--stol);font-variant-numeric:tabular-nums">'+_escapeHTML((ligne.num||'—').toString())+'</div>'
         + '</div>'
         + '<div style="flex:1;min-width:0">'
         + '<div style="font-size:16px;font-weight:800;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escapeHTML(((ligne.prenom||'')+' '+(ligne.nom||'')).trim()||'—')+'</div>'
-        + (ligne.poule ? '<div style="font-size:11px;color:var(--txt3);margin-top:2px">Poule '+_escapeHTML(ligne.poule)+'</div>' : '')
+        + (_mm ? '<div style="font-size:11px;color:var(--txt3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escapeHTML(_mm)+'</div>' : '')
         + '</div>'
         + '<div id="stolm-badge-'+key+'" style="font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:'+(ret?'#10b981':'var(--txt3)')+'">'+(ret?fmt(ret):'—')+'</div>'
         + '<svg id="stolm-chev-'+key+'" style="flex-shrink:0;transition:transform .15s;'+(open?'transform:rotate(180deg)':'')+'" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="6 9 12 15 18 9"/></svg>'
@@ -34483,9 +34997,9 @@ function _renderStolMobileSaisie(cp) {
         [['d1','🛫 Décollage 1'],['a1','🛬 Atterrissage 1'],['d2','🛫 Décollage 2'],['a2','🛬 Atterrissage 2']].forEach(function(f){
           html += '<div>'
             + '<div style="font-size:12px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;text-align:center">'+f[1]+'</div>'
-            + '<input type="number" inputmode="decimal" step="0.1" min="0" placeholder="—" value="'+(run[f[0]]||'')+'"'
+            + '<input type="number" inputmode="decimal" step="0.1" min="0" placeholder="—" value="'+(run[f[0]]||'')+'"'+(_canSaisir?'':' readonly')
             + ' onchange="_stolMobUpdate(\''+compId+'\',\''+table.id+'\','+idx+',\''+runKey+'\',\''+f[0]+'\',this.value)"'
-            + ' style="width:100%;padding:18px 8px;background:rgba(255,255,255,.04);border:2px solid var(--bdr);border-radius:12px;color:var(--txt);font-family:inherit;font-size:24px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"'
+            + ' style="width:100%;padding:18px 8px;background:rgba(255,255,255,.04);border:2px solid var(--bdr);border-radius:12px;color:var(--txt);font-family:inherit;font-size:24px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield'+(_canSaisir?'':';opacity:.55')+'"'
             + ' onfocus="this.style.borderColor=\''+col+'\';this.style.background=\''+col+'14\'" onblur="this.style.borderColor=\'var(--bdr)\';this.style.background=\'rgba(255,255,255,.04)\'">'
             + '</div>';
         });
@@ -34500,6 +35014,9 @@ function _renderStolMobileSaisie(cp) {
       html += '</div>'; // fin carte
     });
   });
+  if (!_anyShown && _stolMobPoule) {
+    html += '<div style="padding:24px 16px;text-align:center;color:var(--txt3);font-size:12.5px">Aucun compétiteur dans la poule <b>'+_escapeHTML(_stolMobPoule)+'</b> pour cette phase.</div>';
+  }
   html += '</div>';
   return html;
 }
@@ -34774,12 +35291,13 @@ function _renderStolClassementTable(cat, pilotes, cp) {
   html += '<div style="padding:10px 16px;background:linear-gradient(to right, rgba(124,58,237,.15), rgba(0,87,255,.08));border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">';
   html += '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;font-weight:800;color:#7c3aed;letter-spacing:1px">'+titre+'</span><span style="font-size:11px;color:var(--txt3)">· '+pilotes.length+' pilote(s)</span></div>';
   html += '</div>';
-  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:980px">';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1140px">';
   var th = 'padding:8px 6px;background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-align:center;border-bottom:1px solid var(--bdr)';
   html += '<thead><tr>'
     + '<th style="'+th+';width:36px">Rg</th>'
     + '<th style="'+th+';width:62px">N°</th>'
     + '<th style="'+th+';text-align:left;padding-left:12px">Pilote</th>'
+    + '<th style="'+th+';text-align:left;padding-left:10px;width:160px;border-left:1px solid var(--bdr)">Marque / Modèle</th>'
     + '<th rowspan="2" style="'+th+';background:rgba(16,185,129,.08);border-left:1px solid var(--bdr);width:72px;color:#10b981">Points</th>'
     + '<th colspan="3" style="'+th+';background:rgba(245,158,11,.08);border-left:1px solid var(--bdr)">Essais libres</th>'
     + '<th colspan="3" style="'+th+';background:rgba(59,130,246,.08);border-left:1px solid var(--bdr)">Qualifications</th>'
@@ -34788,6 +35306,7 @@ function _renderStolClassementTable(cat, pilotes, cp) {
     + '<th rowspan="2" style="'+th+';background:rgba(124,58,237,.12);border-left:1px solid var(--bdr);width:78px;color:#7c3aed">Points<br>régions</th>'
     + '</tr><tr>'
     + '<th style="'+th+'"></th><th style="'+th+'"></th><th style="'+th+'"></th>'
+    + '<th style="'+th+';border-left:1px solid var(--bdr)"></th>'
     + '<th style="'+th+';background:rgba(245,158,11,.04);border-left:1px solid var(--bdr);width:46px">Poule</th>'
     + '<th style="'+th+';background:rgba(245,158,11,.04);width:60px">Perf</th>'
     + '<th style="'+th+';background:rgba(245,158,11,.04);width:46px">Place</th>'
@@ -34823,7 +35342,13 @@ function _renderStolClassementTable(cat, pilotes, cp) {
     html += '<tr style="'+trBg+'">'
       + '<td style="'+td+'">'+rgBadge+'</td>'
       + '<td style="'+td+';color:var(--stol);font-weight:800">'+_escapeHTML(p.num||'—')+'</td>'
-      + '<td style="'+tdL+'">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')+'</td>'
+      + '<td style="'+tdL+'"><span style="margin-right:6px;font-size:15px;vertical-align:-1px" title="'+_escapeHTML(_stolPilotPays(p)||'France')+'">'+_paysToFlag(_stolPilotPays(p))+'</span>'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')+'</td>'
+      // Marque / Modèle de l'ULM (colonne dédiée)
+      + (function(){
+          var _u = _stolPilotUlm(p);
+          var _mm = [_u.marque, _u.modele].filter(Boolean).join(' · ').toUpperCase();
+          return '<td style="'+tdL+';border-left:1px solid var(--bdr);font-size:11px;font-weight:600;color:var(--txt2)">'+(_mm ? _escapeHTML(_mm) : '<span style="color:var(--txt3);font-weight:400">—</span>')+'</td>';
+        })()
       // Points (saisissable — "Points au début")
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(16,185,129,.04);padding:4px"><input type="number" step="1" value="'+(ptsDebVal===''?'':ptsDebVal)+'" placeholder="—" onchange="stolSetPointsDebut(\''+cp.id+'\',\''+pKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#10b981;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>'
       // Essais
@@ -34953,9 +35478,9 @@ function printStolPhase(phase, compId) {
       h += '<tr class="'+rowCls+'">'
         + '<td class="cell-rank">'+rankBadge+'</td>'
         + '<td class="cell-num">'+_escapeHTML(p.num||'')+'</td>'
-        + '<td class="cell-name">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>'
-        + '<td class="cell-name" style="font-weight:500;font-size:7.5pt;overflow-wrap:anywhere;word-break:break-word">'+_escapeHTML(_acUlm(p).marque)+'</td>'
-        + '<td class="cell-name" style="font-weight:500;font-size:7.5pt;overflow-wrap:anywhere;word-break:break-word">'+_escapeHTML(_acUlm(p).modele)+'</td>'
+        + '<td class="cell-name"><span style="margin-right:4pt;display:inline-block;vertical-align:middle">'+_stolFlagSvg(_stolPilotPays(p))+'</span>'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>'
+        + '<td class="cell-name" style="font-weight:500;font-size:7.5pt;overflow-wrap:anywhere;word-break:break-word">'+_escapeHTML((_acUlm(p).marque||'').toUpperCase())+'</td>'
+        + '<td class="cell-name" style="font-weight:500;font-size:7.5pt;overflow-wrap:anywhere;word-break:break-word">'+_escapeHTML((_acUlm(p).modele||'').toUpperCase())+'</td>'
         + '<td class="cell-phase cell-phase-poule">'+(p[phase].poule||'')+'</td>';
       for (var ri = 0; ri < maxRuns; ri++) {
         var run = p._runs[ri] || {};
@@ -35109,8 +35634,9 @@ function printStolClassementConsolide(compId) {
       + '<tr>'
       + '<th rowspan="2" style="width:4%">Rg</th>'
       + '<th rowspan="2" style="width:5%">N°</th>'
-      + '<th rowspan="2" style="width:20%;text-align:left;padding-left:8pt">NOM</th>'
-      + '<th rowspan="2" style="width:7%">'+(isPendu?'Points 2025':'Points au début')+'</th>'
+      + '<th rowspan="2" style="width:14%;text-align:left;padding-left:8pt">NOM</th>'
+      + '<th rowspan="2" style="width:14%;text-align:left;padding-left:6pt">Marque / Modèle</th>'
+      + '<th rowspan="2" style="width:6%">'+(isPendu?'Points 2025':'Points au début')+'</th>'
       + '<th colspan="3" class="ph-ess">Essais libres</th>'
       + '<th colspan="3" class="ph-qua">Qualifications</th>'
       + '<th colspan="3" class="ph-fin">Finale</th>'
@@ -35155,7 +35681,15 @@ function printStolClassementConsolide(compId) {
       h += '<tr class="'+rowCls+'">'
         + '<td class="cell-rank">'+rankBadge+'</td>'
         + '<td class="cell-num">'+_escapeHTML(p.num||'')+'</td>'
-        + '<td class="cell-name">'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>'
+        + '<td class="cell-name"><span style="margin-right:4pt;display:inline-block;vertical-align:middle">'+_stolFlagSvg(_stolPilotPays(p))+'</span>'+_escapeHTML(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>'
+        + (function(){
+            var _u = _stolPilotUlm(p);
+            var _mk = (_u.marque||'').toUpperCase(), _mo = (_u.modele||'').toUpperCase();
+            var inner = (_mk||_mo)
+              ? '<div style="line-height:1.05">'+_escapeHTML(_mk)+'</div>'+(_mo?'<div style="line-height:1.05;color:#64748b">'+_escapeHTML(_mo)+'</div>':'')
+              : '—';
+            return '<td style="text-align:left;padding-left:6pt;font-size:9pt;font-weight:500;color:#334155">'+inner+'</td>';
+          })()
         + '<td style="text-align:center;font-weight:600;color:#64748b">'+ptsDebut+'</td>'
         // Essais libres
         + '<td class="cell-phase cell-phase-poule">'+(p.essais && p.essais.poule || '')+'</td>'
@@ -35261,17 +35795,17 @@ function printStolClassementConsolide(compId) {
   } else {
     footerHTML = '<div style="margin-top:8pt;padding-top:6pt;border-top:1px solid #003399;text-align:center;font-size:8pt;color:#003399;font-weight:700">Fédération Française d\'ULM · 96 bis rue Marc Sangnier · 94700 Maisons Alfort</div>';
   }
-  // Hauteur imprimable d'une page A4 portrait moins les marges (297mm - mt - mb)
-  var printableH = 297 - mt - mb;
+  // Hauteur imprimable d'une page A4 PAYSAGE moins les marges (210mm - mt - mb)
+  var printableH = 210 - mt - mb;
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Classement '+_escapeHTML(cp.name||'')+'</title>'
     + '<link rel="preconnect" href="https://fonts.googleapis.com">'
     + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
     + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">'
     + '<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">'
     + '<style>'
-    + '@page{size:A4 portrait;margin:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm}'
+    + '@page{size:A4 landscape;margin:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm}'
     + 'html,body{margin:0;padding:0;height:100%}'
-    + 'body{font-family:"Inter","SF Pro Display","Helvetica Neue",Arial,sans-serif;color:#1e293b;font-size:9.5pt;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}'
+    + 'body{font-family:"Inter","SF Pro Display","Helvetica Neue",Arial,sans-serif;color:#1e293b;font-size:9pt;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}'
     + '.page-wrap{display:flex;flex-direction:column;box-sizing:border-box}'
     + '.page-main{flex:1 0 auto}'
     + '.page-footer{flex-shrink:0;margin-top:auto;padding-top:8pt}'
@@ -35284,38 +35818,39 @@ function printStolClassementConsolide(compId) {
     + '.cat-label{display:block;font-family:"Manrope","Inter",sans-serif;font-size:11.5pt;font-weight:400;color:#0057ff;margin:6pt 0 5pt;letter-spacing:.2pt}'
     + '.cat-count{display:inline-block;margin-left:6pt;color:#94a3b8;font-weight:300;font-size:10pt}'
     + '/* ─── Tableau ─── */'
-    + 'table.classement{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden}'
+    + 'table.classement{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;break-inside:avoid;page-break-inside:avoid}'
+    + '.cat-label{break-after:avoid;page-break-after:avoid}'
     // Header row 1 : NEUTRE par défaut, les groupes Essais/Qualif/Finale auront leur dégradé spécifique
-    + 'table.classement thead tr:first-child th{background:#1e40af;color:#fff;font-family:"Manrope","Inter",sans-serif;font-weight:400;font-size:7.5pt;line-height:1.05;padding:3pt 4pt;border-bottom:1px solid #1e3a8a;border-right:1px solid rgba(255,255,255,.18);letter-spacing:.4pt;text-transform:uppercase}'
+    + 'table.classement thead tr:first-child th{background:#1e40af;color:#fff;font-family:"Manrope","Inter",sans-serif;font-weight:400;font-size:9pt;line-height:1.05;padding:3pt 4pt;border-bottom:1px solid #1e3a8a;border-right:1px solid rgba(255,255,255,.18);letter-spacing:.3pt;text-transform:uppercase}'
     + 'table.classement thead tr:first-child th:last-child{border-right:none}'
     // Dégradé de bleus pour les 3 phases (du plus clair au plus foncé)
     + 'table.classement thead tr:first-child th.ph-ess{background:#60a5fa}'
     + 'table.classement thead tr:first-child th.ph-qua{background:#3b82f6}'
     + 'table.classement thead tr:first-child th.ph-fin{background:#1d4ed8}'
     // Header row 2 : sous-colonnes neutres par défaut
-    + 'table.classement thead tr:nth-child(2) th{background:#f1f5f9;color:#475569;font-family:"Manrope","Inter",sans-serif;font-weight:400;font-size:7pt;line-height:1.05;padding:2pt 2pt;border-bottom:1px solid #cbd5e1;border-right:1px solid #e2e8f0;letter-spacing:.3pt;text-transform:uppercase}'
+    + 'table.classement thead tr:nth-child(2) th{background:#f1f5f9;color:#475569;font-family:"Manrope","Inter",sans-serif;font-weight:400;font-size:8pt;line-height:1.05;padding:2pt 2pt;border-bottom:1px solid #cbd5e1;border-right:1px solid #e2e8f0;letter-spacing:.2pt;text-transform:uppercase}'
     // Sous-colonnes des phases : même couleur que leur titre (mais texte blanc lisible)
     + 'table.classement thead tr:nth-child(2) th.ph-ess{background:#60a5fa;color:#fff;border-bottom-color:#3b82f6}'
     + 'table.classement thead tr:nth-child(2) th.ph-qua{background:#3b82f6;color:#fff;border-bottom-color:#2563eb}'
     + 'table.classement thead tr:nth-child(2) th.ph-fin{background:#1d4ed8;color:#fff;border-bottom-color:#1e40af}'
     + 'table.classement thead tr:nth-child(2) th:last-child{border-right:none}'
-    + 'table.classement tbody td{border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;padding:4pt 3pt}'
+    + 'table.classement tbody td{border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;padding:2.5pt 3pt}'
     + 'table.classement tbody td:last-child{border-right:none}'
     + 'table.classement tbody tr:last-child td{border-bottom:none}'
     + '.row-alt td{background:#fafbfc}'
-    + '.cell-num{text-align:center;font-weight:700;color:#0057ff;font-size:9.5pt}'
+    + '.cell-num{text-align:center;font-weight:700;color:#0057ff;font-size:9pt}'
     + '.cell-name{font-weight:600;font-size:9pt;padding-left:8pt!important;color:#0f172a}'
-    + '.cell-rank{text-align:center;font-weight:700;font-size:10pt}'
-    + '.medal{display:inline-flex;align-items:center;justify-content:center;width:16pt;height:16pt;border-radius:50%;color:#fff;font-weight:700;font-size:8.5pt}'
+    + '.cell-rank{text-align:center;font-weight:700;font-size:9pt}'
+    + '.medal{display:inline-flex;align-items:center;justify-content:center;width:17pt;height:17pt;border-radius:50%;color:#fff;font-weight:700;font-size:10pt}'
     + '.medal-gold{background:#d4a017}'
     + '.medal-silver{background:#94a3b8}'
     + '.medal-bronze{background:#b07c46}'
-    + '.cell-phase{text-align:center;font-size:8.5pt}'
+    + '.cell-phase{text-align:center;font-size:9pt}'
     + '.cell-phase-poule{font-weight:600;color:#475569}'
     + '.cell-phase-perf{font-weight:500;color:#1e293b}'
     + '.cell-phase-place{font-weight:700;color:#1e293b}'
     + '.cell-pts-acquis{text-align:center;font-weight:700;color:#1d4ed8}'
-    + '.cell-pts-total{text-align:center;font-weight:700;color:#0057ff;font-size:10pt;background:#f8fafc}'
+    + '.cell-pts-total{text-align:center;font-weight:700;color:#0057ff;font-size:9pt;background:#f8fafc}'
     + '/* ─── Pied de page ─── */'
     + '.staff-block{padding-top:8pt;border-top:1px solid #cbd5e1}'
     + '.staff-title{font-size:6.5pt;font-weight:700;color:#003399;margin-bottom:3pt;letter-spacing:1.5pt;text-transform:uppercase}'
@@ -35324,7 +35859,7 @@ function printStolClassementConsolide(compId) {
     + '.staff-name{padding:.5pt 0;font-weight:700;color:#1e293b}'
     + '.affiche-wrap{flex:0 0 22mm;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}'
     + '.edit-date{margin-top:8pt;font-size:6.5pt;color:#94a3b8;text-align:center;letter-spacing:1pt;text-transform:uppercase}'
-    + '@media screen{body{background:#f1f5f9;padding:20px}.page-wrap{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm;box-shadow:0 4px 12px rgba(0,0,0,.06);border-radius:6px}}'
+    + '@media screen{body{background:#f1f5f9;padding:20px}.page-wrap{background:#fff;width:297mm;min-height:210mm;margin:0 auto;padding:'+mt+'mm '+mr+'mm '+mb+'mm '+ml+'mm;box-shadow:0 4px 12px rgba(0,0,0,.06);border-radius:6px}}'
     + '@media print{button{display:none!important}.page-wrap{box-shadow:none;min-height:100vh;height:100vh;border-radius:0}}'
     + '</style></head><body>'
     + '<div class="page-wrap">'
@@ -35336,20 +35871,20 @@ function printStolClassementConsolide(compId) {
     + (subTitre?'<div class="head-sub">'+_escapeHTML(subTitre)+'</div>':'')
     + '</div>'
     // Boutons (cachés à l'impression)
-    + '<div style="margin-bottom:10pt;display:flex;justify-content:flex-end;gap:8pt">'
+    + '<div id="cls-noprint" style="margin-bottom:10pt;display:flex;justify-content:flex-end;gap:8pt">'
     + '<button onclick="window.print()" style="padding:8pt 18pt;background:linear-gradient(135deg,#003399,#0057ff);color:#fff;border:none;border-radius:6pt;font-weight:700;cursor:pointer;font-size:10pt;font-family:inherit;box-shadow:0 2px 8px rgba(0,51,153,.25);letter-spacing:.3pt">🖨️ Imprimer</button>'
     + '<button onclick="window.close()" style="padding:8pt 18pt;background:#fff;color:#003399;border:1.5px solid #003399;border-radius:6pt;font-weight:700;cursor:pointer;font-size:10pt;font-family:inherit;letter-spacing:.3pt">✕ Quitter</button>'
     + '</div>'
     + tableHTML('Multiaxe', buildRows(multi), false)
     + tableHTML('Pendulaire', buildRows(pendu), true)
     + '</div>'
-    // ── Bas de page (ancré en bas de la feuille) : Staff + Affiche puis Logo FFPLUM ──
+    // ── Pied de page : logo FFPLUM ancré tout en bas de la page ──
     + '<div class="page-footer">'
-    + staffHTML
     + footerHTML
     + '<div class="edit-date">Édité le '+new Date().toLocaleDateString('fr-FR')+'</div>'
     + '</div>'
-    + '</div></body></html>';
+    + '</div>'
+    + '</body></html>';
   var w = window.open('','_blank');
   if (!w) { toast('Bloqueur de pop-up : autorisez les fenêtres','err'); return; }
   w.document.write(html); w.document.close();
@@ -37187,6 +37722,7 @@ function exportCompFull(compId, fmt) {
     evenements:  (S.evenements||{})[compId] || [],
     budgets:     (S.budgets||{})[compId] || {engagement:[],ressources:[]},
     partenaires: (S.partenaires||{})[compId] || [],
+    deroulement: (S.deroulement||{})[compId] || [],
     messages:    messagesForComp,
     ganttTasks:  (S.ganttTasks||{})[compId] || []
   };
@@ -37234,6 +37770,7 @@ function importCompFull(inp, compId) {
       if (data.evenements) { if(!S.evenements)S.evenements={}; S.evenements[compId] = data.evenements; }
       if (data.budgets) { if(!S.budgets)S.budgets={}; S.budgets[compId] = data.budgets; }
       if (data.partenaires) { if(!S.partenaires)S.partenaires={}; S.partenaires[compId] = data.partenaires; }
+      if (data.deroulement) { if(!S.deroulement)S.deroulement={}; S.deroulement[compId] = data.deroulement; }
       if (data.ganttTasks && data.ganttTasks.length) { if(!S.ganttTasks)S.ganttTasks={}; S.ganttTasks[compId] = data.ganttTasks; }
       if (data.messages && data.messages.length) {
         // S.messages peut être tableau ou objet selon version
@@ -43685,6 +44222,8 @@ function openDossierDialog(compId) {
     {id:'evt',   label:'⚠️ Événements'},
     {id:'budg',  label:'💰 Budget'},
     {id:'part',  label:'🤝 Partenaires'},
+    {id:'derou', label:'📅 Déroulement'},
+    {id:'resul', label:'🏅 Résultats (classement)'},
     {id:'svc',   label:'🏟 Services &amp; Logistique'},
     {id:'gantt', label:'📊 Planning Gantt (paysage)'}
   ];
@@ -43714,7 +44253,7 @@ function openDossierDialog(compId) {
 
 function _dossierPrintFromDialog(compId) {
   var opts = {};
-  ['stats','equip','staff','mat','evt','budg','part','svc','gantt'].forEach(function(id) {
+  ['stats','equip','staff','mat','evt','budg','part','derou','resul','svc','gantt'].forEach(function(id) {
     var cb = document.getElementById('doss-cb-'+id);
     opts[id] = cb ? cb.checked : true;
   });
@@ -43724,7 +44263,7 @@ function _dossierPrintFromDialog(compId) {
 }
 
 function printCompDossier(compId, opts) {
-  opts = opts || {stats:true,equip:true,staff:true,mat:true,evt:true,budg:true,part:true,svc:true,gantt:false};
+  opts = opts || {stats:true,equip:true,staff:true,mat:true,evt:true,budg:true,part:true,derou:true,resul:true,svc:true,gantt:false};
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
 
@@ -44160,6 +44699,79 @@ function printCompDossier(compId, opts) {
   }
   matHtml += '</div>';
 
+  // ── DÉROULEMENT ──────────────────────────────────────────────────────
+  var deroulList = (S.deroulement||{})[compId] || [];
+  var deroulHtml = '<div class="page-sec">'+SH('Déroulement',deroulList.length);
+  if(!deroulList.length){ deroulHtml += emptyRow('Aucune ligne de déroulement enregistrée.'); }
+  else {
+    deroulHtml += '<table><thead><tr><th style="width:15%">Date</th><th style="width:16%">Horaire</th><th style="width:24%">Domaine</th><th>Infos</th></tr></thead><tbody>';
+    deroulList.forEach(function(r){
+      deroulHtml += '<tr><td>'+fd(r.date||'')+'</td>'
+        +'<td>'+esc(r.horaire||'—')+'</td>'
+        +'<td style="font-weight:600">'+esc(r.domaine||'—')+'</td>'
+        +'<td>'+esc(r.infos||'—')+'</td></tr>';
+    });
+    deroulHtml += '</tbody></table>';
+  }
+  deroulHtml += '</div>';
+
+  // ── RÉSULTATS — Classement consolidé (compact) ───────────────────────
+  var resulHtml = '';
+  if (opts.resul) {
+    resulHtml = '<div class="page-sec">'+SH('Résultats — Classement');
+    try {
+      var _eps   = (typeof _getStolEpreuves==='function') ? _getStolEpreuves(compId) : null;
+      var _multi = _eps ? _stolAggregateForClassement(_eps,'multiaxes') : [];
+      var _pendu = _eps ? _stolAggregateForClassement(_eps,'pendulaire') : [];
+      var _effPerf = function(p){
+        if (p.finale && p.finale.perf>0) return p.finale.perf;
+        if (p.qualif && p.qualif.perf>0) return p.qualif.perf;
+        if (p.essais && p.essais.perf>0) return p.essais.perf;
+        return null;
+      };
+      var _buildRows = function(pilotes){
+        var wp=[];
+        pilotes.forEach(function(p){ var e=_effPerf(p); if(e!=null) wp.push({p:p,perf:e}); });
+        wp.sort(function(a,b){ return a.perf-b.perf; });
+        wp.forEach(function(x,i){
+          x.place=i+1;
+          var pdS=_stolGetPointsDebut(compId,x.p);
+          var pd=(pdS!==''&&pdS!==undefined)?parseInt(pdS,10):(parseInt(x.p.ptsSaison||0,10)||0);
+          var paS=_stolGetPointsAcquis(compId,x.p);
+          var paSug=(x.p.finale&&x.p.finale.place)?_stolPointsFor(x.p.finale.place):0;
+          var pg=(paS!==''&&paS!==undefined)?(parseInt(paS,10)||0):paSug;
+          x.pts=(pd||0)+(pg||0);
+        });
+        return wp;
+      };
+      var _catTable = function(label,rows){
+        if(!rows.length) return '';
+        var h='<div style="font-size:9px;font-weight:700;color:#1a3a6e;margin:8px 0 3px">'+esc(label)+' — '+rows.length+' pilote(s)</div>';
+        h+='<table><thead><tr><th style="width:9%">Rg</th><th style="width:8%">N°</th><th>Nom</th><th>Marque / Modèle</th><th style="width:12%;text-align:center">Points</th></tr></thead><tbody>';
+        rows.forEach(function(x){
+          var p=x.p;
+          var u=(typeof _stolPilotUlm==='function')?_stolPilotUlm(p):{};
+          var mm=[u&&u.marque,u&&u.modele].filter(Boolean).join(' / ')||'—';
+          var medal=x.place===1?'🥇 ':x.place===2?'🥈 ':x.place===3?'🥉 ':'';
+          h+='<tr><td style="text-align:center;font-weight:700">'+medal+x.place+'</td>'
+            +'<td style="text-align:center;color:#6b7280">'+esc(p.num||'—')+'</td>'
+            +'<td style="font-weight:600">'+esc((((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())||'—')+'</td>'
+            +'<td style="color:#6b7280">'+esc(mm)+'</td>'
+            +'<td style="text-align:center;font-weight:700;color:#1a3a6e">'+(x.pts||'')+'</td></tr>';
+        });
+        h+='</tbody></table>';
+        return h;
+      };
+      var _mRows=_buildRows(_multi), _pRows=_buildRows(_pendu);
+      if(!_mRows.length && !_pRows.length){ resulHtml += emptyRow('Aucun résultat enregistré.'); }
+      else { resulHtml += _catTable('Multiaxes',_mRows) + _catTable('Pendulaire',_pRows); }
+    } catch(e){
+      console.warn('[Dossier] Résultats non générés :', e);
+      resulHtml += emptyRow('Résultats indisponibles.');
+    }
+    resulHtml += '</div>';
+  }
+
 
   // ── PLANNING GANTT ─────────────────────────────────────────────────────────
   var ganttHtml = '';
@@ -44285,6 +44897,8 @@ function printCompDossier(compId, opts) {
   if(opts.evt)   body += evtHtml;
   if(opts.budg)  body += budgHtml;
   if(opts.part)  body += partHtml;
+  if(opts.derou) body += deroulHtml;
+  if(opts.resul) body += resulHtml;
   if(opts.mat)   body += matHtml;
   if(opts.gantt)  body += ganttHtml;
   body += footerHtml;
