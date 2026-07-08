@@ -3585,12 +3585,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <span style="font-size:13px;font-weight:600;color:var(--txt)">🏆 Résultats</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
-            <input type="checkbox" id="volet-chk-installation" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
-            <span style="font-size:13px;font-weight:600;color:var(--txt)">🏗 Installation</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-etapes" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
-            <span style="font-size:13px;font-weight:600;color:var(--txt)">🗺 Étapes</span>
+            <span style="font-size:13px;font-weight:600;color:var(--txt)">🗺 Site &amp; Étapes</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-materiel" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
@@ -5615,6 +5611,84 @@ function openAddComp() {
   openSheet('sheet-comp');
 }
 
+// ══════════════════════════════════════════════════════
+// API BASULM (FFPLUM) — données officielles des plateformes ULM / aérodromes
+// par code OACI. Appel direct navigateur (CORS ouvert), auth par en-tête.
+// La clé est modifiable dans S.settings.basulmApiKey (sinon valeur par défaut).
+// ══════════════════════════════════════════════════════
+var BASULM_API_KEY_DEFAULT = 'P3I4BZDFL374PYALWM1K';
+function _basulmKey(){ return (S.settings && S.settings.basulmApiKey) || BASULM_API_KEY_DEFAULT; }
+var _basulmCache = {};
+
+// Récupère le détail d'un terrain BASULM par code OACI/fédéral. Résout avec l'objet
+// detail (ou null si introuvable). Ne rejette jamais (erreurs réseau → null + warn).
+function basulmLookup(code) {
+  code = (code||'').trim().toUpperCase();
+  if (!code || code.length < 4) return Promise.resolve(null);
+  if (Object.prototype.hasOwnProperty.call(_basulmCache, code)) return Promise.resolve(_basulmCache[code]);
+  return fetch('https://basulm.ffplum.fr/getbasulm/get/basulm/getByCode?code=' + encodeURIComponent(code), {
+    headers: { 'Authorization': 'api_key ' + _basulmKey() }
+  }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    var d = (j && j.status === 'ok' && j.detail) ? j.detail : null;
+    _basulmCache[code] = d;
+    return d;
+  }).catch(function(e){ console.warn('[BASULM] lookup échoué pour ' + code + ' :', e); return null; });
+}
+
+// Convertit une coordonnée BASULM ("N 48 00 07" / "W 002 22 43") en degrés décimaux.
+function _basulmCoord(str) {
+  if (!str) return null;
+  var m = ('' + str).trim().match(/([NSEW])\s*(\d+)[°\s]+(\d+)['\s]+(\d+(?:[.,]\d+)?)/i);
+  if (!m) return null;
+  var dir = m[1].toUpperCase(), d = +m[2], mi = +m[3], s = parseFloat(('' + m[4]).replace(',', '.'));
+  var dec = d + mi/60 + s/3600;
+  if (dir === 'S' || dir === 'W') dec = -dec;
+  return Math.round(dec * 1e6) / 1e6;
+}
+
+// Construit le panneau HTML récapitulatif d'une fiche BASULM (réutilisé dans
+// l'onglet Installation et dans l'espace d'une étape).
+function _basulmFicheHTML(d) {
+  if (!d) return '';
+  var esc = function(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var line = function(lbl, val){ return val ? '<div style="display:flex;gap:8px;padding:2px 0"><span style="min-width:96px;color:var(--txt3);font-weight:600">'+lbl+'</span><span style="color:var(--txt);flex:1">'+esc(val)+'</span></div>' : ''; };
+  var pistesArr = [];
+  for (var pi=1; pi<=2; pi++){
+    var nat=d['nature_piste_'+pi], lg=d['longueur_piste_'+pi], la=d['largeur_piste_'+pi], or=d['orientation_piste_'+pi];
+    if (nat||lg||or) pistesArr.push('Piste '+pi+' : '+[nat,(lg?lg+'×'+(la||'?')+' m':''),(or?'QFU '+or:'')].filter(Boolean).join(', '));
+  }
+  var pistes = pistesArr.join('  ·  ');
+  var _contact = [d.nom_contact, d.tel_contact_1, d.mail_contact].filter(Boolean).join(' · ');
+  var lat=_basulmCoord(d.latitude), lng=_basulmCoord(d.longitude);
+  return '<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px;background:var(--navy3);font-size:12.5px">'
+    + '<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">✈️ '+esc(d.toponyme||d.code_terrain||'')+'</div>'
+    + line('Type', d.type_terrain)
+    + line('Commune', [d.ville, d.departement, d.region].filter(Boolean).join(', '))
+    + line('Altitude', d.altitude)
+    + line('Radio', d.radio ? '📻 '+d.radio+' MHz' : '')
+    + line('Pistes', pistes || (d.nb_pistes||''))
+    + line('Coordonnées', (lat!=null ? lat+', '+lng : ''))
+    + line('Contact', _contact)
+    + line('Statut', d.statut)
+    + (d.consignes ? '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--bdr);color:var(--txt2);white-space:pre-wrap;font-size:11.5px">'+esc(d.consignes)+'</div>' : '')
+    + '</div>';
+}
+
+// Affiche la fiche BASULM dans l'espace déplié d'une étape (conteneur #etape-basulm-<etId>).
+function _etapeRenderBasulm(compId, etId) {
+  var box = document.getElementById('etape-basulm-'+etId);
+  if (!box) return;
+  var et = S.etapes && S.etapes[compId] && S.etapes[compId].find(function(x){ return x.id===etId; });
+  var oaci = et ? (et.oaci||'').trim().toUpperCase() : '';
+  if (oaci.length < 4) { box.innerHTML = '<div style="color:var(--txt3);font-size:11px;font-style:italic">Saisissez un code OACI pour afficher la fiche BasULM.</div>'; return; }
+  box.innerHTML = '<div style="color:var(--txt3);font-size:12px">⏳ Chargement BasULM '+oaci+'…</div>';
+  basulmLookup(oaci).then(function(d){
+    var b = document.getElementById('etape-basulm-'+etId);
+    if (!b) return;
+    b.innerHTML = d ? _basulmFicheHTML(d) : '<div style="color:#f59e0b;font-size:12px">⚠ '+oaci+' introuvable dans BASULM</div>';
+  });
+}
+
 // Auto-complétion OACI → Lieu + Région dans sheet-comp
 var _OACI_REGION_MAP = {
   'A':'Occitanie','B':'Nouvelle-Aquitaine','C':'Occitanie','D':'Nouvelle-Aquitaine',
@@ -5993,7 +6067,7 @@ function saveComp() {
     saison: (document.getElementById('comp-date-from').value || '').substring(0,4) || '2026',
     voletsConfig: (function(){
       var vc = {};
-      ['infos','staff','gestion','repas','partenaires','resultats','installation','etapes','materiel','evenements','budget'].forEach(function(k){
+      ['infos','staff','gestion','repas','partenaires','resultats','etapes','materiel','evenements','budget'].forEach(function(k){
         var el = document.getElementById('volet-chk-' + k);
         vc[k] = el ? el.checked : true;
       });
@@ -6906,28 +6980,30 @@ function _etapeFormFillOACI(val) {
   if (oaci.length < 4) { if(statusEl) statusEl.textContent=''; return; }
   var lieuEl   = document.getElementById('ef-lieu');
   var regionEl = document.getElementById('ef-region');
-  var aMatch   = (AERODROMES_FR||[]).find(function(a){ return a[0]===oaci; });
+  // 1) Remplissage instantané depuis la liste locale (feedback immédiat)
+  var aMatch = (AERODROMES_FR||[]).find(function(a){ return a[0]===oaci; });
   if (aMatch) {
     if (lieuEl && !lieuEl.value) lieuEl.value = aMatch[1];
     var prefix3 = oaci.length >= 3 ? oaci[2].toUpperCase() : '';
     var region  = _OACI_REGION_MAP[prefix3] || '';
     if (regionEl && !regionEl.value && region) regionEl.value = region;
-    if (statusEl) statusEl.textContent = '✓ ' + aMatch[1];
-    // Fetch coords via Nominatim (pour la carte)
-    var ov = document.getElementById('etape-form-ov');
-    if (ov && !ov.dataset.lat) {
-      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(oaci+' aerodrome france')+'&format=json&limit=1', {headers:{'Accept-Language':'fr'}})
-        .then(function(r){return r.json();})
-        .then(function(d){
-          if (d && d[0] && ov.parentNode) {
-            ov.dataset.lat = d[0].lat;
-            ov.dataset.lng = d[0].lon;
-          }
-        }).catch(function(){});
-    }
-  } else {
-    if (statusEl) statusEl.textContent = oaci.length>=4 ? '⚠ Code OACI non reconnu' : '';
   }
+  if (statusEl) statusEl.textContent = '⏳ Recherche BASULM…';
+  // 2) Enrichissement via l'API officielle BASULM (données exactes + coordonnées)
+  basulmLookup(oaci).then(function(d){
+    if (!document.getElementById('ef-oaci')) return; // formulaire fermé
+    if (!d) {
+      if (statusEl) statusEl.textContent = aMatch ? ('✓ ' + aMatch[1]) : '⚠ Code non trouvé (BASULM ni liste locale)';
+      return;
+    }
+    if (lieuEl   && !lieuEl.value   && d.toponyme) lieuEl.value   = d.toponyme;
+    if (regionEl && !regionEl.value && d.region)   regionEl.value = d.region;
+    var ov = document.getElementById('etape-form-ov');
+    var lat = _basulmCoord(d.latitude), lng = _basulmCoord(d.longitude);
+    if (ov && lat != null && lng != null) { ov.dataset.lat = lat; ov.dataset.lng = lng; }
+    if (statusEl) statusEl.textContent = '✓ ' + (d.toponyme || oaci) + ' — BASULM'
+      + (d.altitude ? ' · ' + d.altitude : '') + (d.radio ? ' · 📻 ' + d.radio : '');
+  });
 }
 
 function _etapeAdd(compId) {
@@ -7154,8 +7230,20 @@ function _etapeMapRefresh(compId) {
           {direction:'top',offset:[0,-14],opacity:1});
     });
   });
-  if (allPts.length > 1) { try{_etapesMap.fitBounds(L.latLngBounds(allPts),{padding:[30,30]});}catch(e){} }
-  else if (allPts.length===1) { _etapesMap.setView(allPts[0],10); }
+  // Cadrage : si tous les points sont en France métropolitaine → vue France + Corse ;
+  // sinon (lieu hors de France) → zoom adapté aux points.
+  var FRANCE_BOUNDS = [[41.3, -5.2], [51.1, 9.7]]; // hexagone + Corse
+  var _inFrance = function(p){ return p[0] >= 41 && p[0] <= 51.5 && p[1] >= -5.5 && p[1] <= 9.8; };
+  var _allFrance = allPts.length > 0 && allPts.every(_inFrance);
+  try {
+    if (!allPts.length || _allFrance) {
+      _etapesMap.fitBounds(FRANCE_BOUNDS); // France + Corse
+    } else if (allPts.length > 1) {
+      _etapesMap.fitBounds(L.latLngBounds(allPts), { padding:[30,30] }); // hors France, plusieurs points
+    } else {
+      _etapesMap.setView(allPts[0], 8); // hors France, un seul point
+    }
+  } catch(e) {}
 }
 
 function _etapeDel(compId, etId) {
@@ -7240,10 +7328,11 @@ function _etapeToggleAcc(etId, compId) {
   var open = acc.style.display !== 'none';
   acc.style.display = open ? 'none' : '';
   if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
-  // À l'ouverture : rafraîchir déroutements et contacts depuis S.etapes courant
+  // À l'ouverture : rafraîchir déroutements, contacts et fiche BasULM depuis S.etapes courant
   if (!open && compId) {
     _etapeDerRender(compId, etId);
     _etapeContactRender(compId, etId);
+    if (typeof _etapeRenderBasulm === 'function') _etapeRenderBasulm(compId, etId);
   }
 }
 
@@ -7252,6 +7341,22 @@ function _etapeFieldSave(compId, etId, field, value) {
   var et = S.etapes[compId].find(function(x){ return x.id === etId; });
   if (!et) return;
   et[field] = value;
+  // Étape "Site" → répercuter vers la compétition (synchro deux sens avec Modifier)
+  if (et._isSite && ['oaci','region','dateFrom','dateTo','date'].indexOf(field) !== -1) {
+    var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+    if (cp) { cp[field] = value; if (typeof _hdpSaveNow === 'function') _hdpSaveNow(); }
+  }
+  saveState();
+}
+
+// Sauvegarde d'un équipement d'installation d'une étape (case cochée + infos)
+function _etapeInstallSave(compId, etId, key, field, value) {
+  if (!S.etapes || !S.etapes[compId]) return;
+  var et = S.etapes[compId].find(function(x){ return x.id === etId; });
+  if (!et) return;
+  if (!et.installations) et.installations = {};
+  if (!et.installations[key]) et.installations[key] = {};
+  et.installations[key][field] = value;
   saveState();
 }
 
@@ -7260,6 +7365,10 @@ function _etapeFieldSaveLieu(compId, etId, value) {
   var et = S.etapes[compId].find(function(x){ return x.id === etId; });
   if (!et) return;
   et.lieu = value; et.nom = value;
+  if (et._isSite) { // synchroniser le lieu vers la compétition
+    var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+    if (cp) { cp.lieu = value; if (typeof _hdpSaveNow === 'function') _hdpSaveNow(); }
+  }
   saveState();
   _etapeMapRefresh(compId);
 }
@@ -7352,40 +7461,39 @@ function _etapeDerOACI(compId, etId, derId, val, inputEl) {
   }
   function _setLieu(v) { var li = _getLieuInput(); if (li) li.value = v; }
   function _derApply(name, lat, lng) {
-    d.lieu = name||''; d.lat = lat||''; d.lng = lng||'';
+    d.lieu = name||''; d.lat = (lat!=null?lat:''); d.lng = (lng!=null?lng:'');
     _setLieu(d.lieu); saveState(); _etapeMapRefresh(compId);
   }
 
-  // Code BasULM (LF + 4 chiffres) — non résolvable automatiquement
-  var _numPart = oaci.replace(/^LF/i,'');
-  var _isBasULM = /^\d{4}$/.test(_numPart) && oaci.length===6;
-  if (_isBasULM) {
-    _setLieu('');
-    toast('Code BasULM '+oaci+' — saisissez le lieu manuellement', 'warn');
-    return;
-  }
-
-  // Overpass : tag icao= seul (sans filtre aeroway — certains terrains ne l'ont pas)
-  _setLieu('⏳ Recherche…');
-  var ovQ = '[out:json][timeout:10];('
-    + 'node["icao"="'+oaci+'"];'
-    + 'way["icao"="'+oaci+'"];'
-    + 'relation["icao"="'+oaci+'"];'
-    + ');out center 1;';
-  fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(ovQ))
-    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function(res) {
-      var el = res.elements && res.elements[0];
-      if (el) {
-        var lat = el.lat || (el.center && el.center.lat);
-        var lng = el.lon || (el.center && el.center.lon);
-        _derApply((el.tags && (el.tags.name||el.tags['name:fr'])) || oaci, lat, lng);
-      } else {
-        _setLieu('');
-        toast('Code '+oaci+' non trouvé — saisissez le lieu manuellement', 'warn');
-      }
-    })
-    .catch(function(){ _setLieu(''); });
+  // 1) API BASULM — résout les codes OACI ET les codes fédéraux LFxxxx
+  _setLieu('⏳ BASULM…');
+  basulmLookup(oaci).then(function(bd){
+    if (bd) {
+      _derApply(bd.toponyme || oaci, _basulmCoord(bd.latitude), _basulmCoord(bd.longitude));
+      return;
+    }
+    // 2) Repli : Overpass (OpenStreetMap) par tag icao=
+    _setLieu('⏳ Recherche…');
+    var ovQ = '[out:json][timeout:10];('
+      + 'node["icao"="'+oaci+'"];'
+      + 'way["icao"="'+oaci+'"];'
+      + 'relation["icao"="'+oaci+'"];'
+      + ');out center 1;';
+    fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(ovQ))
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(res) {
+        var el = res.elements && res.elements[0];
+        if (el) {
+          var lat = el.lat || (el.center && el.center.lat);
+          var lng = el.lon || (el.center && el.center.lon);
+          _derApply((el.tags && (el.tags.name||el.tags['name:fr'])) || oaci, lat, lng);
+        } else {
+          _setLieu('');
+          toast('Code '+oaci+' non trouvé — saisissez le lieu manuellement', 'warn');
+        }
+      })
+      .catch(function(){ _setLieu(''); });
+  });
 }
 
 function _etapeContactRender(compId, etId) {
@@ -7533,11 +7641,43 @@ function _etapesImportFile(compId, input) {
     }; rr2.readAsArrayBuffer(file);
   }
 }
-function _etapesPrint(compId) {
+function _etapesPrint(compId, _skipGeo) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   var etList = ((S.etapes&&S.etapes[compId])||[]).slice().sort(function(a,b){ return (a._order||0)-(b._order||0); });
   if (!etList.length) { toast('Aucune étape à imprimer', 'warn'); return; }
   var compNom = cp ? (cp.name||cp.nom||compId) : compId;
+
+  // ── Pré-étape : fiabiliser les coordonnées via BASULM (les coords stockées ──
+  // peuvent être erronées/anciennes → la carte se cadrait au mauvais endroit). ──
+  if (!_skipGeo && typeof basulmLookup === 'function') {
+    var _hasCode = function(o){ return o && (o.oaci||'').trim().length >= 4; };
+    var _jobs = [];
+    etList.forEach(function(et){
+      if (_hasCode(et)) _jobs.push(basulmLookup(et.oaci).then(function(d){
+        if (!d) return;
+        var la=_basulmCoord(d.latitude), ln=_basulmCoord(d.longitude);
+        if (la!=null && ln!=null) { et.lat=la; et.lng=ln; }
+        if (!et.lieu && d.toponyme) { et.lieu=d.toponyme; et.nom=d.toponyme; }
+      }));
+      (et.derotements||[]).forEach(function(dd){
+        if (_hasCode(dd)) _jobs.push(basulmLookup(dd.oaci).then(function(d){
+          if (!d) return;
+          var la=_basulmCoord(d.latitude), ln=_basulmCoord(d.longitude);
+          if (la!=null && ln!=null) { dd.lat=la; dd.lng=ln; }
+          if (!dd.lieu && d.toponyme) dd.lieu=d.toponyme;
+        }));
+      });
+    });
+    if (_jobs.length) {
+      toast('⏳ Localisation des terrains via BASULM…', '');
+      Promise.all(_jobs).then(function(){
+        saveState();
+        if (typeof _etapeMapRefresh === 'function') { try { _etapeMapRefresh(compId); } catch(e){} }
+        _etapesPrint(compId, true);
+      });
+      return;
+    }
+  }
 
   // Données carte (étapes + déroutements avec coordonnées)
   var mapEtapes = [], mapDers = [], polyPts = [];
@@ -7660,10 +7800,18 @@ function _etapesPrint(compId) {
       +'      .bindTooltip("Dér. "+d.label+(d.lieu&&d.lieu!==d.label?" · "+d.lieu:""),{direction:"top",offset:[0,-13],opacity:.95});'
       +'  });'
       +'  if(poly.length>1) L.polyline(poly,{color:"#0057FF",weight:2.5,dashArray:"8 5",opacity:.85}).addTo(_pMap);'
-      +'  if(allPts.length>1) _pMap.fitBounds(L.latLngBounds(allPts),{padding:[28,28]});'
-      +'  else if(allPts.length===1) _pMap.setView(allPts[0],11);'
-      +'  else _pMap.setView([46.5,2.3],6);'
-      +'  setTimeout(function(){_pMap.invalidateSize();},100);'
+      +'  var _fitPts = allPts.filter(function(p){ return p[0]>=41 && p[0]<=52 && p[1]>=-6 && p[1]<=10; });'  // garde-fou : France métropolitaine
+      +'  if(!_fitPts.length) _fitPts = allPts;'  // aucun point en France → on cadre sur tout
+      +'  function _fit(){'
+      +'    _pMap.invalidateSize();'
+      +'    if(_fitPts.length>1) _pMap.fitBounds(L.latLngBounds(_fitPts),{padding:[30,30],maxZoom:12});'
+      +'    else if(_fitPts.length===1) _pMap.setView(_fitPts[0],11);'
+      +'    else _pMap.setView([46.5,2.3],6);'
+      +'  }'
+      +'  _fit();'
+      +'  setTimeout(_fit,250);'
+      +'  setTimeout(_fit,900);'
+      +'  window.addEventListener("beforeprint",_fit);'   // recadrer au moment de l\'impression (la hauteur carte change en @media print)
       +'}'
       +'if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();'
       +'setTimeout(function(){window.print();},2800);'
@@ -7707,6 +7855,11 @@ function _etapeInlineOACI(compId, etId, val, inputEl) {
   var et = S.etapes[compId].find(function(x){ return x.id === etId; });
   if (!et) return;
   et.oaci = oaci;
+  // Étape "Site" → répercuter le code OACI vers la compétition
+  if (et._isSite) {
+    var _cpS = (S.comps||[]).find(function(c){ return c.id === compId; });
+    if (_cpS) { _cpS.oaci = oaci; if (typeof _hdpSaveNow === 'function') _hdpSaveNow(); }
+  }
   if (oaci.length >= 4) {
     var aMatch = (AERODROMES_FR||[]).find(function(a){ return a[0]===oaci; });
     if (aMatch) {
@@ -7724,11 +7877,33 @@ function _etapeInlineOACI(compId, etId, val, inputEl) {
     }
   }
   saveState();
+  // ── Enrichissement via l'API BASULM (données exactes + coordonnées) ──
+  if (oaci.length >= 4) {
+    var _row = inputEl ? inputEl.closest('tr') : null;
+    basulmLookup(oaci).then(function(d){
+      if (!d) return;
+      var inps = _row ? _row.querySelectorAll('input') : null;
+      if (d.toponyme && !et.lieu) {
+        et.lieu = d.toponyme; et.nom = d.toponyme;
+        if (inps && inps[1] && !inps[1].value) inps[1].value = d.toponyme;
+      }
+      if (d.region && !et.region) {
+        et.region = d.region;
+        if (inps && inps[5] && !inps[5].value) inps[5].value = d.region;
+      }
+      var lat = _basulmCoord(d.latitude), lng = _basulmCoord(d.longitude);
+      if (lat != null && lng != null) { et.lat = lat; et.lng = lng; }
+      saveState();
+      if (typeof _etapeMapRefresh === 'function') _etapeMapRefresh(compId);
+      if (typeof _etapeRenderBasulm === 'function') _etapeRenderBasulm(compId, etId); // maj fiche si accordéon ouvert
+    });
+  }
+  // Repli coordonnées via Nominatim seulement si BASULM n'a rien donné
   if (oaci.length >= 4 && !et.lat) {
     var geoQ = oaci + ' aerodrome france';
     fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(geoQ)+'&format=json&limit=1',{headers:{'Accept-Language':'fr'}})
       .then(function(r){return r.json();})
-      .then(function(d){ if(d&&d[0]){ et.lat=d[0].lat; et.lng=d[0].lon; saveState(); _etapeMapRefresh(compId); } })
+      .then(function(d){ if(d&&d[0]&&!et.lat){ et.lat=d[0].lat; et.lng=d[0].lon; saveState(); _etapeMapRefresh(compId); } })
       .catch(function(){});
   }
 }
@@ -8084,7 +8259,7 @@ function editComp(id) {
   if (delBtn) { delBtn.style.display = 'flex'; }
   // Pré-remplir les cases Volets
   var vc = cp.voletsConfig || {};
-  ['infos','staff','gestion','repas','partenaires','resultats','installation','etapes','materiel','evenements','budget'].forEach(function(k) {
+  ['infos','staff','gestion','repas','partenaires','resultats','etapes','materiel','evenements','budget'].forEach(function(k) {
     var chk = document.getElementById('volet-chk-' + k);
     if (chk) chk.checked = (vc[k] !== false);
   });
@@ -16043,7 +16218,8 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
     var _eqpN = (enrolled&&enrolled.length)?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:rgba(255,255,255,.22);font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">'+enrolled.length+'</span>':'';
     var _vc = cp.voletsConfig || {};
     var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'+_stfN},{id:'gestion',lbl:'Equipage'+_eqpN},{id:'repas',lbl:'🍽 Repas'},{id:'partenaires',lbl:'Partenaires'},{id:'deroulement',lbl:'Déroulement'},{id:'resultats',lbl:'Résultats'}];
-    tabs.push({id:'installation',lbl:'Installation'},{id:'etapes',lbl:'🗺 Étapes'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'});
+    tabs.push({id:'etapes',lbl:'🗺 Site & Étapes'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'});
+    // Onglet "Installation" masqué : ses infos (OACI/lieu/dates + fiche BasULM) sont reprises dans "Site & Étapes".
     tabs = tabs.filter(function(t){ return _vc[t.id] !== false; });
     if (_homeDetailTab === 'modifier' || _homeDetailTab === 'carte' || !tabs.some(function(t){return t.id===_homeDetailTab;})) _homeDetailTab = 'infos';
     html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 12px;flex-shrink:0">';
@@ -18015,6 +18191,42 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       });
       _flushSaveState();
     }
+    // ── Étape « Site » : toujours présente et SYNCHRONISÉE avec les infos du ──
+    // bouton "Modifier" (lieu, code OACI, dates du → au). Elle est en tête, non ──
+    // supprimable, et se met à jour dans les deux sens (voir _etapeFieldSave*). ──
+    (function _ensureSiteEtape(){
+      var list = S.etapes[cp.id];
+      var site = list.find(function(e){ return e && e._isSite; });
+      var changed = false;
+      if (!site) {
+        site = { id:'et_site', _isSite:true, _order:-1, nom:'', lieu:'', oaci:'', club:'', region:'',
+                 responsable:'', gestionnaire:'', contactDSAC:'', notam:false, commentaires:'',
+                 dateFrom:'', dateTo:'', date:'', desc:'', lat:'', lng:'', contacts:[], derotements:[], installations:{} };
+        list.unshift(site);
+        changed = true;
+      }
+      if (site._order !== -1) { site._order = -1; changed = true; } // toujours en tête
+      // Synchronisation compétition → étape site
+      var _o = (cp.oaci||'').toUpperCase().trim();
+      if (site.oaci !== _o) { site.oaci = _o; changed = true; }
+      if ((cp.lieu||'') && site.lieu !== cp.lieu) { site.lieu = cp.lieu; site.nom = cp.lieu; changed = true; }
+      if ((cp.region||'') && site.region !== cp.region) { site.region = cp.region; changed = true; }
+      if (site.dateFrom !== (cp.dateFrom||'')) { site.dateFrom = cp.dateFrom||''; site.date = cp.dateFrom||''; changed = true; }
+      if (site.dateTo !== (cp.dateTo||'')) { site.dateTo = cp.dateTo||''; changed = true; }
+      if (changed) saveState();
+      // Compléter lieu + coordonnées via BASULM si un code OACI est présent
+      if (_o.length >= 4 && (!site.lat || !site.lieu) && typeof basulmLookup === 'function') {
+        basulmLookup(_o).then(function(d){
+          if (!d) return;
+          var e = (S.etapes[cp.id]||[]).find(function(x){ return x._isSite; });
+          if (!e) return; var chg = false;
+          if (!e.lieu && d.toponyme) { e.lieu = d.toponyme; e.nom = d.toponyme; chg = true; }
+          var la=_basulmCoord(d.latitude), ln=_basulmCoord(d.longitude);
+          if (la!=null && ln!=null && !e.lat) { e.lat=la; e.lng=ln; chg = true; }
+          if (chg) { saveState(); if (typeof _currentCompId!=='undefined' && _currentCompId===cp.id && _homeDetailTab==='etapes' && typeof renderHomeDetailPanel==='function') renderHomeDetailPanel(null); }
+        });
+      }
+    })();
     var etList = S.etapes[cp.id].slice();
     // Si aucune étape n'a _order, trier par date puis initialiser _order
     if (etList.every(function(e){ return e._order === undefined; })) {
@@ -18140,7 +18352,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
           +'</td>';
         // Supprimer
         etH += '<td style="'+cellSt+';text-align:center;padding:4px 2px">';
-        if (canEditEt) etH += '<button id="etdel-'+eid+'" onclick="_etapeDel(\''+cid+'\',\''+eid+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:6px;width:22px;height:22px;cursor:pointer;font-size:13px;line-height:1">×</button>';
+        if (canEditEt && !et._isSite) etH += '<button id="etdel-'+eid+'" onclick="_etapeDel(\''+cid+'\',\''+eid+'\')" style="background:rgba(239,68,68,.1);color:#f87171;border:none;border-radius:6px;width:22px;height:22px;cursor:pointer;font-size:13px;line-height:1">×</button>';
+        else if (canEditEt) etH += '<span title="Étape site (liée à la compétition)" style="font-size:11px;color:var(--txt3)">📍</span>';
         etH += '</td></tr>';
         // ── Accordéon infos complémentaires ──────────────────────────────────
         etH += '<tr id="etape-acc-'+eid+'" style="display:none">';
@@ -18182,11 +18395,32 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         }
         etH += '</div>';
         etH += '</div>';
+        // Fiche BasULM (après les contacts, remplie à l'ouverture de l'accordéon)
+        etH += '<div style="grid-column:1/-1">';
+        etH += '<label style="'+accLblSt+';display:block;margin-bottom:6px">Fiche BasULM</label>';
+        etH += '<div id="etape-basulm-'+eid+'"><div style="color:var(--txt3);font-size:11px;font-style:italic">Chargement…</div></div>';
+        etH += '</div>';
         // Notam
         etH += '<div style="display:flex;align-items:center;gap:8px;padding-top:14px">'
           +'<input type="checkbox" id="notam-'+eid+'" '+(et.notam?'checked':'')+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'notam\',this.checked)" style="width:16px;height:16px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">'
           +'<label for="notam-'+eid+'" style="font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;user-select:none">NOTAM déposé</label>'
           +'</div>';
+        // ── Installation : équipements du terrain (case à cocher + infos) ──
+        var _instItems = [['hebergement','Hébergement'],['restauration','Restauration'],['carburant','Carburant'],['sanitaires','Sanitaires WC-Douches'],['briefing','Salle briefing'],['hangar','Hangar'],['wifi','Wifi']];
+        var _inst = et.installations || {};
+        var _instInpSt = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 6px;flex:1;min-width:0;box-sizing:border-box;outline:none';
+        etH += '<div style="grid-column:1/-1;padding-top:14px">';
+        etH += '<label style="'+accLblSt+';display:block;margin-bottom:6px">Installation</label>';
+        etH += '<div style="display:flex;flex-direction:column;gap:2px">';
+        _instItems.forEach(function(it){
+          var k = it[0], lbl = it[1], v = _inst[k] || {};
+          etH += '<div style="display:flex;align-items:center;gap:8px;padding:4px 4px;border-bottom:1px solid rgba(255,255,255,.04)">'
+            + '<input type="checkbox" id="inst-'+eid+'-'+k+'"'+(v.ok?' checked':'')+' onchange="_etapeInstallSave(\''+cid+'\',\''+eid+'\',\''+k+'\',\'ok\',this.checked)" style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">'
+            + '<label for="inst-'+eid+'-'+k+'" style="font-size:12px;font-weight:600;color:var(--txt);width:158px;flex-shrink:0;cursor:pointer;user-select:none">'+lbl+'</label>'
+            + '<input type="text" value="'+esc2(v.infos||'')+'" placeholder="Infos…" style="'+_instInpSt+'" oninput="_etapeInstallSave(\''+cid+'\',\''+eid+'\',\''+k+'\',\'infos\',this.value)">'
+            + '</div>';
+        });
+        etH += '</div></div>';
         // Aérodromes de déroutement (pleine largeur)
         var _ders = et.derotements || [];
         var _derInpSt = 'background:transparent;border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:12px;padding:2px 4px;width:100%;box-sizing:border-box;outline:none';
@@ -18318,10 +18552,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       instH += '<div style="'+colSpan+'">';
       instH += '<div style="'+lbSt+'">'+f.lbl+'</div>';
       if (f.full) {
-        instH += '<textarea rows="2" style="'+iStyle+';resize:vertical" placeholder="'+f.ph+'" '
+        instH += '<textarea id="inst-f-'+f.key+'" rows="2" style="'+iStyle+';resize:vertical" placeholder="'+f.ph+'" '
               +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">'+_escQ(val)+'</textarea>';
       } else {
-        instH += '<input style="'+iStyle+'" placeholder="'+f.ph+'" value="'+_escQ(val)+'" '
+        instH += '<input id="inst-f-'+f.key+'" style="'+iStyle+'" placeholder="'+f.ph+'" value="'+_escQ(val)+'" '
               +  'oninput="saveInstallField(\''+sid+'\',\''+f.key+'\',this.value)">';
       }
       instH += '</div>';
@@ -19102,7 +19336,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!S.evenements[cp.id]) S.evenements[cp.id] = [];
     var evtList = S.evenements[cp.id];
     var canEditEvt = canModify();
-    var EVCOL = 'grid-template-columns:100px minmax(0,1fr) 90px 80px minmax(0,1.2fr) 28px 28px';
+    var EVCOL = 'grid-template-columns:100px minmax(0,1fr) 90px 80px minmax(0,1.2fr) 28px 28px 28px';
     var hStE = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap';
     var iStE = 'background:var(--navy3);border:1.5px solid var(--stol);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box';
     var addBtnE = 'width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--stol),#059669);border:none;color:#fff;font-size:20px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25)';
@@ -19119,7 +19353,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Fixed header (desktop uniquement)
     if (!_isMobEvt) {
     htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    ['Type','Nom / Aéronef','Date','Immat.','Circonstance','',''].forEach(function(h){
+    ['Type','Nom / Aéronef','Date','Immat.','Circonstance','','',''].forEach(function(h){
       htmlEvt += '<div style="'+hStE+'">'+h+'</div>';
     });
     htmlEvt += '</div>';
@@ -19134,6 +19368,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlEvt += '<div><input id="evt-inp-date" type="date" style="'+iStE+'"></div>';
       htmlEvt += '<div><input id="evt-inp-immat" placeholder="Immat…" style="'+iStE+'"></div>';
       htmlEvt += '<div><input id="evt-inp-circ" placeholder="Circonstance…" style="'+iStE+'"></div>';
+      htmlEvt += '<div></div>';
       htmlEvt += '<div></div>';
       htmlEvt += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="hdgAddEvenement(\''+cp.id+'\')" style="'+addBtnE+'" title="Ajouter">+</button></div>';
       htmlEvt += '</div>';
@@ -19161,6 +19396,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlEvt += '<div style="font-size:11px;color:var(--txt3);white-space:nowrap">'+(evt.date||'—')+(evt.horaire?' '+evt.horaire:'')+'</div>';
       htmlEvt += '<div style="font-size:11px;color:var(--amber);font-weight:700;white-space:nowrap">'+(evt.immatriculation||'—')+'</div>';
       htmlEvt += '<div style="font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(evt.circonstance||'—')+'</div>';
+      htmlEvt += '<button onclick="printEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Imprimer la fiche A4 (diffusion interne)" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
       htmlEvt += '<button onclick="exportEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Exporter fiche" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>';
       if (canEditEvt) {
         htmlEvt += '<button onclick="openEvenementModal(\''+cp.id+'\',\''+evt.id+'\')" title="Modifier" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
@@ -24375,7 +24611,7 @@ function renderSitesSportifs() {
   if (canEdit) {
     var pratOpts = '<option value="microlight">Microlight</option><option value="paramoteur">Paramoteur</option><option value="all">Toutes</option>';
     html += '<div style="display:grid;'+COLS+';gap:4px;padding:5px 8px;border-bottom:2px solid var(--stol);background:var(--navy4);align-items:center">';
-    html += '<input id="site-inp-oaci" placeholder="OACI" style="'+iSt+';text-transform:uppercase">';
+    html += '<input id="site-inp-oaci" placeholder="OACI" oninput="this.value=this.value.toUpperCase()" onchange="basulmFillSite(\'inline\')" style="'+iSt+';text-transform:uppercase">';
     html += '<input id="site-inp-lieu" placeholder="Lieu…" style="'+iSt+'">';
     html += '<input id="site-inp-ville" placeholder="Ville…" style="'+iSt+'">';
     html += '<input id="site-inp-region" placeholder="Région…" style="'+iSt+'">';
@@ -24418,8 +24654,35 @@ function addSiteInline() {
   var gestionnaire = g('site-inp-gestionnaire').trim();
   var pratique = g('site-inp-pratique') || 'microlight';
   if (!lieu && !oaci) { toast('Saisissez au moins un lieu ou un code OACI','err'); return; }
-  S.sitesSportifs.push({ id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique });
+  var _newSite = { id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique };
+  if (oaci && _basulmCache[oaci]) _newSite.basulm = _basulmCache[oaci];
+  S.sitesSportifs.push(_newSite);
   saveState(); renderSitesSportifs(); toast('Site ajouté ✓','ok');
+}
+
+// Auto-remplissage d'un site depuis l'API BASULM sur saisie du code OACI.
+function basulmFillSite(scope) {
+  var pfx = (scope === 'modal') ? 'site-modal-' : 'site-inp-';
+  var oaciEl = document.getElementById(pfx + 'oaci');
+  if (!oaciEl) return;
+  var code = (oaciEl.value || '').trim().toUpperCase();
+  var statusEl = document.getElementById('site-modal-basulm-status'); // présent en modale
+  if (code.length < 4) { if (statusEl) statusEl.textContent = ''; return; }
+  if (statusEl) statusEl.textContent = '⏳ Recherche BASULM…';
+  basulmLookup(code).then(function(d){
+    if (!document.getElementById(pfx + 'oaci')) return; // formulaire fermé
+    if (!d) {
+      if (statusEl) statusEl.textContent = '⚠ OACI ' + code + ' introuvable dans BASULM';
+      else toast('OACI ' + code + ' introuvable dans BASULM', 'warn');
+      return;
+    }
+    var set = function(f, v){ var el = document.getElementById(pfx + f); if (el && !el.value && v) el.value = v; };
+    set('lieu',   d.toponyme);
+    set('ville',  d.ville);
+    set('region', d.region);
+    if (statusEl) statusEl.textContent = '✓ ' + (d.toponyme || code) + (d.altitude ? ' · ' + d.altitude : '') + (d.radio ? ' · 📻 ' + d.radio : '');
+    else toast('BASULM : ' + (d.toponyme || code) + ' ✓', 'ok');
+  });
 }
 function openAddSite() {
   _editingSiteId = null;
@@ -24429,6 +24692,7 @@ function openAddSite() {
   document.getElementById('site-modal-region').value = '';
   document.getElementById('site-modal-gestionnaire').value = '';
   document.getElementById('site-modal-pratique').value = 'microlight';
+  var _bs0 = document.getElementById('site-modal-basulm-status'); if (_bs0) _bs0.textContent = '';
   var sh = document.getElementById('sheet-site');
   if (sh) { sh.style.display='flex'; requestAnimationFrame(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }); }
 }
@@ -24443,6 +24707,7 @@ function openEditSite(id) {
   document.getElementById('site-modal-region').value = s.region || '';
   document.getElementById('site-modal-gestionnaire').value = s.gestionnaire || '';
   document.getElementById('site-modal-pratique').value = s.pratique || 'microlight';
+  var _bs1 = document.getElementById('site-modal-basulm-status'); if (_bs1) _bs1.textContent = '';
   var sh = document.getElementById('sheet-site');
   if (sh) { sh.style.display='flex'; requestAnimationFrame(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }); }
 }
@@ -24462,11 +24727,14 @@ function saveSite() {
   var gestionnaire = (document.getElementById('site-modal-gestionnaire').value||'').trim();
   var pratique = (document.getElementById('site-modal-pratique').value||'microlight');
   if (!lieu && !oaci) { toast('Saisissez au moins un lieu ou code OACI','err'); return; }
+  var _bd = (oaci && _basulmCache[oaci]) ? _basulmCache[oaci] : null;
   if (_editingSiteId) {
     var s = S.sitesSportifs.find(function(x){ return x.id===_editingSiteId; });
-    if (s) { s.oaci=oaci; s.lieu=lieu; s.ville=ville; s.region=region; s.gestionnaire=gestionnaire; s.pratique=pratique; }
+    if (s) { s.oaci=oaci; s.lieu=lieu; s.ville=ville; s.region=region; s.gestionnaire=gestionnaire; s.pratique=pratique; if (_bd) s.basulm=_bd; }
   } else {
-    S.sitesSportifs.push({ id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique });
+    var _ns = { id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique };
+    if (_bd) _ns.basulm = _bd;
+    S.sitesSportifs.push(_ns);
   }
   saveState(); closeSiteModal(); renderSitesSportifs(); toast('Site enregistré ✓','ok');
 }
@@ -25227,6 +25495,7 @@ async function sbLogout() {
 // ═══════════════════════════════════════════════════════
 var _syncInProgress = false;
 var _lastSyncAt     = 0;
+var _lastRemoteFileTs = 0; // horodatage SERVEUR du fichier data.json déjà vu (jamais Date.now() client)
 
 // ── SYNC PRINCIPALE ────────────────────────────────────
 // ── Horodater S automatiquement à chaque saveState ──────────────────────────
@@ -26236,9 +26505,22 @@ async function loadFromSupabaseFirst() {
       Object.keys(savedStolResults).forEach(function(cid){
         var localD = savedStolResults[cid];
         var cloudD = S.stolResults[cid];
-        var localUpd = (localD && localD.updated) || 0;
-        var cloudUpd = (cloudD && cloudD.updated) || 0;
-        if (localUpd >= cloudUpd) S.stolResults[cid] = localD;
+        // Décision par CONTENU (nombre de saisies), pas par horodatage : les horloges
+        // entre appareils diffèrent → un timestamp local plus grand faisait rejeter à tort
+        // les saisies remontées du smartphone. On garde le local seulement s'il contient
+        // strictement plus de mesures ; à contenu égal ou inférieur, le cloud (plus frais) gagne.
+        var localFilled = _stolFilledCount(localD);
+        var cloudFilled = _stolFilledCount(cloudD);
+        if (localFilled > cloudFilled) {
+          S.stolResults[cid] = localD;
+        } else if (localFilled === cloudFilled) {
+          // Contenu identique : conserver les métadonnées locales (commissaire, points) si le cloud en manque
+          if (cloudD && localD) {
+            if (localD.commissaire && !cloudD.commissaire) cloudD.commissaire = localD.commissaire;
+            if (localD.pointsDebut && !cloudD.pointsDebut) cloudD.pointsDebut = localD.pointsDebut;
+            if (localD.pointsAcquis && !cloudD.pointsAcquis) cloudD.pointsAcquis = localD.pointsAcquis;
+          }
+        }
       });
     }
     // ✅ Fusionner les tombstones (suppression respectées même après pull)
@@ -27124,8 +27406,39 @@ function closeMatActions() {
 // La compétition est-elle une STOL ?
 function _isCompStol(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
-  if (!cp) return false;
-  return ((cp.discipline||'')+''+(cp.type||'')+''+(cp.name||'')).toLowerCase().indexOf('stol') !== -1;
+  if (cp && ((cp.discipline||'')+''+(cp.type||'')+''+(cp.name||'')).toLowerCase().indexOf('stol') !== -1) return true;
+  // Repli robuste : la compétition possède des tableaux d'épreuves STOL
+  var sr = (S.stolResults||{})[compId];
+  if (sr && sr.epreuves) {
+    if (['essais','qualif','finale'].some(function(ph){ return sr.epreuves[ph] && (sr.epreuves[ph].tables||[]).length; })) return true;
+  }
+  return false;
+}
+
+// Rafraîchit le panneau de détail de la compétition actuellement ouvert (Résultats, etc.),
+// sur ordinateur comme sur smartphone. Ne re-render PAS si l'utilisateur est en train
+// d'éditer un champ DANS ce panneau (évite de perdre sa saisie/son focus).
+function _refreshOpenCompDetail() {
+  try {
+    var ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT') && ae.closest) {
+      if (ae.closest('#comp-detail-body') || ae.closest('#home-detail-comp') || ae.closest('#mcd-content')) return false;
+    }
+    if (window.innerWidth < 768) {
+      var mob = document.getElementById('overlay-comp-mobile');
+      if (mob && mob.style.display !== 'none' && typeof _mobileCompId !== 'undefined' && _mobileCompId && typeof renderMobileCompDetail === 'function') {
+        renderMobileCompDetail(); return true;
+      }
+      return false;
+    }
+    var pcd = document.getElementById('page-comp-detail');
+    var hdc = document.getElementById('home-detail-comp');
+    var open = (pcd && pcd.classList.contains('active')) || (hdc && hdc.style.display && hdc.style.display !== 'none');
+    if (open && typeof _currentCompId !== 'undefined' && _currentCompId && typeof renderHomeDetailPanel === 'function') {
+      renderHomeDetailPanel(null); return true;
+    }
+  } catch(e) { console.warn('[AutoSync] refresh détail échoué:', e); }
+  return false;
 }
 
 // Sommes-nous en train de scorer / saisir une compétition STOL en direct ?
@@ -27152,25 +27465,52 @@ function _autoSyncApplyPull(isLive) {
   _lastSyncAt = Date.now();
   _lastPushFailed = false;
   if (isLive) {
-    var ae = document.activeElement;
-    var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT');
-    if (!typing) {
-      try {
-        if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
-        else if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
-      } catch(e) { console.warn('[AutoSync] re-render live échoué:', e); }
-    }
+    // Mode scoring/saisie live : rafraîchissement silencieux de la vue courante
+    // (pas de re-render global des listes ni de toast répétitif)
+    _refreshOpenCompDetail();
     if (typeof updateSyncTime === 'function') updateSyncTime();
     return;
   }
   var sf = document.getElementById('comp-season-filter');
   if (sf) sf.value = 'all';
   renderHome(); renderCompetitions(); renderPilots(); updateHeader();
+  // Rafraîchir aussi le détail compétition ouvert (Résultats, etc.) — sinon il fallait
+  // recharger la page manuellement pour voir les saisies remontées d'un autre appareil.
+  _refreshOpenCompDetail();
   var btn = document.getElementById('sync-status');
   if (btn) btn.textContent = '🔄';
   updateSyncTime();
   toast('Données mises à jour depuis le cloud ☁️', 'ok');
 }
+
+// Diagnostic synchro : tapez syncDebug() dans la console pour voir chaque décision du poll.
+if (typeof window._syncDebug === 'undefined') window._syncDebug = true; // activé le temps du diagnostic
+window.syncDebug = function(on){ window._syncDebug = (on !== false); console.log('[AutoSync] debug '+(window._syncDebug?'ACTIVÉ':'désactivé')); return window._syncDebug; };
+// État instantané de la synchro — tapez syncStatus() dans la console.
+window.syncStatus = function(){
+  var sb = (typeof getSB==='function') ? getSB() : null;
+  var cur = (typeof _currentCompId!=='undefined') ? _currentCompId : null;
+  var info = {
+    enLigne: navigator.onLine,
+    supabaseConnecte: !!sb,
+    modeLive: (typeof _isStolLiveView==='function') ? _isStolLiveView() : '?',
+    ongletActif: (typeof _homeDetailTab!=='undefined') ? _homeDetailTab : '?',
+    compOuverte: cur || '(aucune)',
+    detecteeSTOL: (cur && typeof _isCompStol==='function') ? _isCompStol(cur) : '?',
+    dernierFichierVu: _lastRemoteFileTs ? new Date(_lastRemoteFileTs).toLocaleTimeString() : '(jamais)',
+    dernierCheckStorage: (typeof _lastAutoCheckAt!=='undefined' && _lastAutoCheckAt) ? new Date(_lastAutoCheckAt).toLocaleTimeString() : '(jamais — Storage non joignable ?)'
+  };
+  try { console.table(info); } catch(e) { console.log(info); }
+  return info;
+};
+// Pull manuel de test — tapez forceSync() dans la console (isole poll vs pull/rendu).
+window.forceSync = function(){
+  console.log('[forceSync] pull manuel en cours…');
+  return pullFromCloud().then(function(){
+    var r = (typeof _refreshOpenCompDetail==='function') ? _refreshOpenCompDetail() : false;
+    console.log('[forceSync] ✓ pull terminé — vue rafraîchie='+r);
+  }).catch(function(e){ console.error('[forceSync] ⛔ échec:', e); });
+};
 
 function startAutoSync() {
   // Boucle auto-adaptative : pendant le scoring/saisie d'une STOL, on vérifie le
@@ -27183,26 +27523,49 @@ function startAutoSync() {
     setTimeout(_autoSyncTick, d);
   }
   function _autoSyncTick() {
-    if (!navigator.onLine || _syncInProgress) { _reschedule(); return; }
-    var sb = getSB(); if (!sb) { _reschedule(); return; }
+    var dbg = window._syncDebug;
+    if (!navigator.onLine) { if(dbg) console.log('[AutoSync] hors-ligne'); _reschedule(); return; }
+    if (_syncInProgress) { if(dbg) console.log('[AutoSync] sync déjà en cours — skip'); _reschedule(); return; }
+    var sb = getSB();
+    if (!sb) { if(dbg) console.warn('[AutoSync] ⛔ getSB() = null — Supabase non configuré/connecté sur ce poste'); _reschedule(); return; }
     var live = _isStolLiveView();
+    if (dbg) console.log('[AutoSync] tick — live='+live+' | tab='+(typeof _homeDetailTab!=='undefined'?_homeDetailTab:'?')+' | comp='+(typeof _currentCompId!=='undefined'?_currentCompId:'?'));
     sb.storage.from('gestappli-sync').list('', { search: 'data.json' })
       .then(function(res){
-        if (res.error || !res.data || !res.data.length) return;
+        if (res.error) { if(dbg) console.warn('[AutoSync] ⛔ list() erreur:', res.error); return; }
+        if (!res.data || !res.data.length) { if(dbg) console.warn('[AutoSync] ⛔ data.json introuvable dans le bucket gestappli-sync'); return; }
         var file = res.data.find(function(f){ return f.name === 'data.json'; });
-        if (!file || !file.updated_at) return;
+        if (!file || !file.updated_at) { if(dbg) console.warn('[AutoSync] ⛔ pas de updated_at sur data.json'); return; }
         _lastAutoCheckAt = Date.now(); // Storage répond → auto-sync actif
         updateSyncHealthPill();
         var remoteTs = new Date(file.updated_at).getTime();
-        if (remoteTs > _lastSyncAt + 5000) { // 5s de marge pour éviter les boucles push/pull
+        if (dbg) console.log('[AutoSync] fichier updated_at='+file.updated_at+' | remoteTs='+remoteTs+' | déjàVu='+_lastRemoteFileTs+' | Δ='+(remoteTs-_lastRemoteFileTs)+'ms');
+        // Décision basée UNIQUEMENT sur l'horodatage serveur du fichier (monotone côté
+        // serveur) — on ne compare jamais avec Date.now() du client, source de bug si les
+        // horloges diffèrent (le PC ne tirait alors jamais les données du smartphone).
+        if (_lastRemoteFileTs === 0) {
+          // Premier passage : en mode live (scoring) on tire tout de suite pour être à jour ;
+          // sinon on prend juste la référence (pas de pull ni toast au démarrage).
+          _lastRemoteFileTs = remoteTs;
+          if (!live) { if(dbg) console.log('[AutoSync] baseline posée (non-live) — pas de pull au démarrage'); return; }
+          if(dbg) console.log('[AutoSync] baseline + pull initial (live)');
+          _autoSyncFails = 0;
+          return pullFromCloud().then(function(){ if(dbg) console.log('[AutoSync] ✓ pull initial appliqué'); _autoSyncApplyPull(true); }).catch(function(e){ console.warn('[AutoSync] pull échoué:', e); });
+        }
+        // Ensuite : ne tirer QUE si le fichier a réellement changé côté serveur (économe).
+        if (remoteTs > _lastRemoteFileTs) {
+          if(dbg) console.log('[AutoSync] ▶ CHANGEMENT détecté → pull en cours');
           _autoSyncFails = 0;
           return pullFromCloud().then(function(){
+            _lastRemoteFileTs = remoteTs;
+            if(dbg) console.log('[AutoSync] ✓ pull appliqué + rafraîchissement vue (live='+live+')');
             _autoSyncApplyPull(live);
           }).catch(function(e){ console.warn('[AutoSync] pull échoué:', e); });
         }
+        if(dbg) console.log('[AutoSync] — aucun changement (fichier inchangé côté serveur)');
       }).catch(function(e){
         _autoSyncFails++;
-        if (_autoSyncFails === 1) console.warn('[AutoSync] Storage list() échoué, fallback stol_shared:', e);
+        if (dbg || _autoSyncFails === 1) console.warn('[AutoSync] ⛔ Storage list() échoué, fallback stol_shared:', e);
         // Fallback : ancienne table PostgreSQL si Storage ne répond pas
         if (_autoSyncFails <= 3) {
           return sb.from('stol_shared').select('updated_at').eq('id','global').single()
@@ -33372,6 +33735,30 @@ function _getStolResults(compId) {
   return S.stolResults[compId];
 }
 
+// Nombre de mesures (décollages/atterrissages) saisies dans un objet stolResults —
+// sert à fusionner par contenu plutôt que par horodatage (robuste au décalage d'horloge).
+function _stolFilledCount(d) {
+  if (!d || !d.epreuves) return 0;
+  var n = 0;
+  ['essais','qualif','finale'].forEach(function(ph){
+    var tables = (d.epreuves[ph] && d.epreuves[ph].tables) || [];
+    tables.forEach(function(t){
+      (t.lignes||[]).forEach(function(l){
+        Object.keys(l).forEach(function(k){
+          if (/^run\d+$/.test(k) && l[k] && typeof l[k] === 'object') {
+            var r = l[k];
+            for (var i=1;i<=10;i++){
+              if (r['d'+i] !== '' && r['d'+i] != null) n++;
+              if (r['a'+i] !== '' && r['a'+i] != null) n++;
+            }
+          }
+        });
+      });
+    });
+  });
+  return n;
+}
+
 /* ══════════════════════════════════════════════════════
    COMMISSAIRE DE SAISIE DÉSIGNÉ (un seul par compétition STOL)
    Le gestionnaire désigne un encadrant : lui seul (connecté à son
@@ -33963,44 +34350,60 @@ function stolNewTable(compId, cat) {
   if (!cat) return;
   cat = cat.trim().toLowerCase();
   if (cat !== 'multiaxes' && cat !== 'pendulaire') return;
-  // Initialiser les équipages depuis le volet Équipage filtrés par catégorie
-  var enrolled = ((S.compEnroll||{})[compId])||[];
-  var equipages = enrolled.map(function(pid){
-    var p = (S.pilots||[]).find(function(x){ return x.id === pid; }) || {};
-    var ulm = ((S.ulms||{})[pid]||[])[0]||{};
-    var classe = (p.classe || ulm.classe || '').toLowerCase();
-    return { pid: pid, prenom: p.prenom||'', nom: p.nom||'', classe: classe };
-  }).filter(function(e){
-    if (cat === 'multiaxes') return e.classe.indexOf('multi') !== -1 || e.classe === 'multiaxes' || !e.classe; // tolérer non renseigné
-    if (cat === 'pendulaire') return e.classe.indexOf('pendu') !== -1;
-    return false;
-  });
-  var reprisCount = 0;
+  // ── Construction de la liste des équipages ──────────────────────────────
+  // Qualif / Finale : reprendre la liste ACTIVÉE de la phase précédente (conforme
+  // aux essais libres) plutôt que tous les inscrits — évite de re-supprimer les
+  // absents. Repli sur le volet Équipage si aucune phase source n'existe.
+  var lignes, toastMsg = '';
+  var _lastOfCat = function(arr){ return (arr||[]).filter(function(t){ return t.categorie === cat; }).slice(-1)[0]; };
+  var srcTable = null, srcLbl = '';
+  if (phase === 'qualif') {
+    srcTable = _lastOfCat(d.essais.tables); srcLbl = 'essais libres';
+  } else if (phase === 'finale') {
+    srcTable = _lastOfCat(d.qualif.tables); srcLbl = 'qualifications';
+    if (!srcTable || !(srcTable.lignes||[]).length) { srcTable = _lastOfCat(d.essais.tables); srcLbl = 'essais libres'; }
+  }
+  if (srcTable && (srcTable.lignes||[]).length) {
+    // Même liste de pilotes que la phase source, N° et poule repris, distances vierges
+    lignes = srcTable.lignes.map(function(l){
+      return { pid:l.pid||null, prenom:l.prenom||'', nom:l.nom||'', num:l.num||'', poule:l.poule||'', run1:{ d1:'', a1:'', d2:'', a2:'' } };
+    });
+    toastMsg = '✓ Tableau créé — liste reprise des '+srcLbl+' ('+lignes.length+' pilote'+(lignes.length>1?'s':'')+')';
+  } else {
+    // Initialiser les équipages depuis le volet Équipage filtrés par catégorie
+    var enrolled = ((S.compEnroll||{})[compId])||[];
+    var equipages = enrolled.map(function(pid){
+      var p = (S.pilots||[]).find(function(x){ return x.id === pid; }) || {};
+      var ulm = ((S.ulms||{})[pid]||[])[0]||{};
+      var classe = (p.classe || ulm.classe || '').toLowerCase();
+      return { pid: pid, prenom: p.prenom||'', nom: p.nom||'', classe: classe };
+    }).filter(function(e){
+      if (cat === 'multiaxes') return e.classe.indexOf('multi') !== -1 || e.classe === 'multiaxes' || !e.classe; // tolérer non renseigné
+      if (cat === 'pendulaire') return e.classe.indexOf('pendu') !== -1;
+      return false;
+    });
+    var reprisCount = 0;
+    lignes = equipages.map(function(e){
+      // Récupérer le N° déjà saisi pour ce pilote dans cette compétition
+      var existingNum = _stolFindExistingNum(compId, e.pid);
+      if (existingNum) reprisCount++;
+      return { pid:e.pid, prenom:e.prenom, nom:e.nom, num:existingNum, poule:'', run1:{ d1:'', a1:'', d2:'', a2:'' } };
+    });
+    if (reprisCount > 0) toastMsg = '✓ Tableau créé — '+reprisCount+' N° de dossard repris';
+  }
   var table = {
     id: 'stbl-'+Date.now(),
     categorie: cat,
     createdAt: Date.now(),
     nbRuns: 1, // RUN 1 par défaut — utilisez "Run +" pour en ajouter
-    lignes: equipages.map(function(e){
-      // Récupérer le N° déjà saisi pour ce pilote dans cette compétition
-      var existingNum = _stolFindExistingNum(compId, e.pid);
-      if (existingNum) reprisCount++;
-      return {
-        pid: e.pid,
-        prenom: e.prenom,
-        nom: e.nom,
-        num: existingNum,
-        poule: '',
-        run1: { d1:'', a1:'', d2:'', a2:'' }
-      };
-    })
+    lignes: lignes
   };
   d[phase].tables.push(table);
   S.stolResults[compId].updated = Date.now();
   saveState();
   _saveStolBackup();
   if (typeof silentPush === 'function') silentPush();
-  if (reprisCount > 0) toast('✓ Tableau créé — '+reprisCount+' N° de dossard repris', 'ok');
+  if (toastMsg) toast(toastMsg, 'ok');
   if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
 }
 
@@ -34877,6 +35280,46 @@ function _stolMobUpdate(compId, tableId, ligneIdx, runKey, sub, val) {
   if (typeof silentPush === 'function') silentPush(true); // push accéléré (2,5s) pour la saisie live
 }
 
+// ── Bouton smartphone : forcer l'envoi immédiat des performances au cloud ──
+// Contourne la temporisation ET la déduplication (qui pouvait sauter un envoi si la
+// taille du JSON n'avait pas changé). Donne un retour clair au commissaire.
+function stolForcePush(compId) {
+  if (typeof getSB !== 'function' || !getSB()) { toast('⛔ Cloud non connecté sur cet appareil', 'err'); return; }
+  if (!navigator.onLine) { toast('⛔ Hors ligne — impossible d\'envoyer', 'err'); return; }
+  try { saveState(); } catch(e){}
+  _lastPushSig = null; // neutralise la déduplication pour garantir l'envoi
+  if (_silentPushTimer) { clearTimeout(_silentPushTimer); _silentPushTimer = null; }
+  toast('⏳ Envoi des performances au cloud…', '');
+  pushToCloud().then(function(){
+    _lastSyncAt = Date.now(); _lastPushOkAt = Date.now(); _lastPushFailed = false;
+    if (typeof updateSyncHealthPill === 'function') updateSyncHealthPill();
+    toast('✅ Performances envoyées — visibles sur l\'ordinateur après « Actualiser »', 'ok');
+  }).catch(function(e){
+    _lastPushFailed = true;
+    toast('⛔ Échec de l\'envoi : ' + (e && e.message || e), 'err');
+    console.error('[stolForcePush] échec:', e);
+  });
+}
+
+// ── Bouton ordinateur : forcer la récupération des résultats depuis le cloud ──
+function stolForcePull() {
+  if (typeof getSB !== 'function' || !getSB()) { toast('⛔ Cloud non connecté', 'err'); return; }
+  if (!navigator.onLine) { toast('⛔ Hors ligne', 'err'); return; }
+  toast('⏳ Actualisation depuis le cloud…', '');
+  pullFromCloud().then(function(){
+    _lastSyncAt = Date.now(); _lastRemoteFileTs = 0; // re-baseline
+    try {
+      if (window.innerWidth < 768 && typeof renderMobileCompDetail === 'function') renderMobileCompDetail();
+      else if (typeof renderHomeDetailPanel === 'function') renderHomeDetailPanel(null);
+    } catch(e){}
+    if (typeof updateSyncHealthPill === 'function') updateSyncHealthPill();
+    toast('✅ Résultats actualisés', 'ok');
+  }).catch(function(e){
+    toast('⛔ Échec : ' + (e && e.message || e), 'err');
+    console.error('[stolForcePull] échec:', e);
+  });
+}
+
 function _renderStolMobileSaisie(cp) {
   var compId = cp.id;
   var eps = _getStolEpreuves(compId);
@@ -34891,6 +35334,10 @@ function _renderStolMobileSaisie(cp) {
     + '<div style="font-size:16px;font-weight:800;color:var(--txt);flex:1;min-width:0">📏 Saisie des performances</div>'
     + (_canSaisir ? '<button onclick="_stolFillMissingDossards(\''+compId+'\')" title="Compléter les N° de dossard manquants" style="padding:8px 11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;touch-action:manipulation">🔢 Dossards</button>' : '')
     + '</div>';
+  // ── Bouton « Valider & envoyer » : force l'envoi immédiat au cloud ──
+  if (_canSaisir) {
+    html += '<button onclick="stolForcePush(\''+compId+'\')" style="width:100%;min-height:52px;margin-bottom:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(16,185,129,.35)">✅ Valider &amp; envoyer au scorer</button>';
+  }
   // ── Bandeau lecture seule si l'utilisateur n'est pas le commissaire désigné ──
   if (!_canSaisir) {
     var _comLbl = _stolCommissaireLabel(compId);
@@ -35076,11 +35523,13 @@ function _renderStolResults(cp) {
     classement: { lbl:'Classement',     col:'#7c3aed', on:'printStolClassementConsolide(\''+cp.id+'\')' }
   };
   var _prB = _prBtns[phase];
+  html += '<div style="display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end">';
+  // Bouton « Actualiser » : force la récupération des saisies remontées du smartphone
+  html += '<button onclick="stolForcePull()" title="Récupérer les dernières saisies du smartphone" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;border:1.5px solid #10b981;background:#10b981;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Actualiser</button>';
   if (_prB) {
-    html += '<div style="display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end">'
-      + '<button onclick="'+_prB.on+'" title="Imprimer '+_prB.lbl+'" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;border:1.5px solid '+_prB.col+';background:'+_prB.col+';color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">'+_prSvg+' Imprimer '+_prB.lbl+'</button>'
-      + '</div>';
+    html += '<button onclick="'+_prB.on+'" title="Imprimer '+_prB.lbl+'" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;border:1.5px solid '+_prB.col+';background:'+_prB.col+';color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">'+_prSvg+' Imprimer '+_prB.lbl+'</button>';
   }
+  html += '</div>';
   html += '</div></div>';
 
   // ── Vue Classement consolidé ──
@@ -35903,8 +36352,12 @@ function _renderStolEpreuveTable(compId, table) {
   var W_IDX = 34, W_NUM = 62, W_PIL = 190, W_POULE = 60;
   var L_IDX = 0, L_NUM = W_IDX, L_PIL = W_IDX + W_NUM, L_POULE = W_IDX + W_NUM + W_PIL;
   var EDGE_SHADOW = ';box-shadow:4px 0 6px -4px rgba(0,0,0,.45)';
+  var RIGHT_SHADOW = ';box-shadow:-4px 0 6px -4px rgba(0,0,0,.45)';
   function stickyTh(left, extra){ return 'position:sticky;left:'+left+'px;z-index:3;background:var(--navy3)'+(extra||''); }
   function stickyTd(left, extra){ return 'position:sticky;left:'+left+'px;z-index:2;background:var(--navy2)'+(extra||''); }
+  // Colonne « supprimer » figée à droite : toujours visible même quand les RUN débordent
+  var stickyThR = 'position:sticky;right:0;z-index:3;background:var(--navy3)' + RIGHT_SHADOW;
+  var stickyTdR = 'position:sticky;right:0;z-index:2;background:var(--navy2)' + RIGHT_SHADOW;
   var html = '<div style="margin-bottom:16px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
   // En-tête tableau
   html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(0,87,255,.08);border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:6px">';
@@ -35970,7 +36423,7 @@ function _renderStolEpreuveTable(compId, table) {
     html += '<th colspan="'+(2*nbEssais+1)+'" style="'+th+';background:'+hex2rgba(col,0.08)+';border-left:1px solid var(--bdr)">RUN '+ri+'</th>';
   }
   html += '<th style="'+th+';background:rgba(0,87,255,.12);border-left:1px solid var(--bdr);width:64px;color:var(--stol)">Retenue</th>'
-    + '<th style="'+th+';width:38px"></th>'
+    + '<th style="'+th+';width:44px;'+stickyThR+'"></th>'
     + '</tr><tr>'
     + '<th style="'+th+';'+stickyTh(L_IDX)+'"></th><th style="'+th+';'+stickyTh(L_NUM)+'"></th><th style="'+th+';'+stickyTh(L_PIL)+'"></th><th style="'+th+';'+stickyTh(L_POULE, EDGE_SHADOW)+'"></th>';
   // En-tête ligne 2 : Déc.1 Att.1 … Déc.N Att.N Perf (N = nbEssais)
@@ -35983,7 +36436,7 @@ function _renderStolEpreuveTable(compId, table) {
     html += '<th style="'+th+';background:'+hex2rgba(c2,0.12)+';width:80px;color:'+c2+'">Perf '+ri2+'</th>';
   }
   html += '<th style="'+th+';border-left:1px solid var(--bdr);width:84px"></th>'
-    + '<th style="'+th+'"></th>'
+    + '<th style="'+th+';'+stickyThR+'"></th>'
     + '</tr></thead><tbody>';
   var td = 'padding:7px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
   var tdL = 'padding:7px 10px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600';
@@ -36063,7 +36516,7 @@ function _renderStolEpreuveTable(compId, table) {
       html += '<td id="stol-perf'+ri3+'-'+table.id+'-'+idx+'" style="'+td+';background:'+bgPerf+';font-weight:800;color:'+rcol+'">'+fmt(perfRi)+'</td>';
     }
     html += '<td id="stol-retenue-'+table.id+'-'+idx+'" style="'+td+';background:rgba(0,87,255,.15);border-left:1px solid var(--bdr);font-weight:800;color:var(--stol);font-size:12.5px">'+fmt(retenue)+'</td>'
-      + '<td style="'+td+';padding:4px"><button onclick="stolDeleteLigne(\''+compId+'\',\''+table.id+'\','+idx+')" title="Retirer cet équipage" style="width:26px;height:26px;border:1px solid rgba(239,68,68,.3);border-radius:6px;background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></td>'
+      + '<td style="'+td+';padding:4px;'+stickyTdR+'"><button onclick="stolDeleteLigne(\''+compId+'\',\''+table.id+'\','+idx+')" title="Retirer cet équipage" style="width:26px;height:26px;border:1px solid rgba(239,68,68,.3);border-radius:6px;background:rgba(239,68,68,.08);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></td>'
       + '</tr>';
   });
   html += '</tbody></table></div></div>';
@@ -38511,6 +38964,77 @@ function printAllEvenements(compId) {
   var win = window.open('','_blank'); if(!win) return;
   win.document.write(html); win.document.close();
   setTimeout(function(){ win.print(); }, 400);
+}
+
+// ── Imprimer UN événement — fiche A4 officielle (diffusion interne) ─────────
+function printEvenement(compId, evtId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
+  var ev = ((S.evenements||{})[compId]||[]).find(function(x){ return x.id===evtId; });
+  if (!ev) { if (typeof toast==='function') toast('Événement introuvable','err'); return; }
+  var esc = function(s){ return (s==null?'':(''+s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var nl2br = function(s){ return esc(s).replace(/\n/g,'<br>'); };
+  var typeColors = {'Sécurité':'#ef4444','Matériel':'#f59e0b','Médical':'#3b82f6','Météo':'#8b5cf6','Administratif':'#10b981','Mécanique':'#f97316','Autre':'#6b7280'};
+  var tc = typeColors[ev.typeIncident]||'#6b7280';
+  var logo = (typeof _getAppLogo==='function') ? _getAppLogo() : '';
+  var sig = (S.docSettings||{}).signataire || {};
+  var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var fdate = function(d){ if(!d) return '—'; var p=(''+d).split('-'); return (p.length===3 && p[0].length===4) ? p[2]+'/'+p[1]+'/'+p[0] : d; };
+  var dl = cp.dateFrom ? (fdate(cp.dateFrom)+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+fdate(cp.dateTo):'')) : '';
+  var ref = 'ÉVT-'+(''+evtId).replace(/[^a-zA-Z0-9]/g,'').slice(-6).toUpperCase();
+  var row = function(label, val){ return '<tr><td class="k">'+label+'</td><td class="v">'+val+'</td></tr>'; };
+
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche événement — '+esc(ev.nom||ref)+'</title><style>';
+  html += '@page{size:A4 portrait;margin:16mm 16mm}';
+  html += '*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1a1a1a;line-height:1.5;margin:0}';
+  html += '.sheet{max-width:180mm;margin:0 auto}';
+  html += '.hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:3px solid #1e3a5f;padding-bottom:12px}';
+  html += '.hdr .org{font-size:15px;font-weight:800;color:#1e3a5f;margin:0}.hdr .sub{font-size:11px;color:#555;margin:2px 0 0}';
+  html += '.logo{max-height:60px;max-width:120px;object-fit:contain}';
+  html += '.diffuse{display:inline-block;margin-top:14px;padding:3px 12px;border:1.5px solid #1e3a5f;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:1px;color:#1e3a5f;text-transform:uppercase}';
+  html += '.title{font-size:22px;font-weight:800;color:#1e3a5f;margin:10px 0 2px;letter-spacing:.5px}';
+  html += '.ref{font-size:11px;color:#888;margin-bottom:16px}';
+  html += '.ctx{background:#f3f7fb;border-left:4px solid #1e3a5f;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:12px}.ctx b{color:#1e3a5f}';
+  html += 'table.det{width:100%;border-collapse:collapse;margin-bottom:16px}';
+  html += 'table.det td{padding:8px 10px;border:1px solid #d6dee8;vertical-align:top}';
+  html += 'table.det td.k{width:38%;background:#eef3f8;font-weight:700;color:#33475b;font-size:11px;text-transform:uppercase;letter-spacing:.3px}';
+  html += 'table.det td.v{font-size:13px}';
+  html += '.badge{display:inline-block;padding:3px 12px;border-radius:12px;font-size:11px;font-weight:700;color:#fff}';
+  html += '.block{margin-bottom:16px}.block h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#1e3a5f;margin:0 0 6px;border-bottom:1px solid #d6dee8;padding-bottom:4px}';
+  html += '.block .body{min-height:60px;border:1px solid #d6dee8;border-radius:6px;padding:10px 12px;font-size:13px;white-space:pre-wrap}';
+  html += '.sign{margin-top:30px;display:flex;justify-content:flex-end}.sign .box{width:70mm;text-align:center}';
+  html += '.sign .loc{font-size:12px;color:#333;margin-bottom:42px;text-align:right}';
+  html += '.sign .who{font-weight:700;font-size:12px;border-top:1px solid #999;padding-top:6px}.sign .role{font-size:11px;color:#555}';
+  html += '.foot{margin-top:24px;border-top:1px solid #ddd;padding-top:6px;font-size:9px;color:#999;text-align:center}';
+  html += '@media print{.noprint{display:none}}';
+  html += '</style></head><body><div class="sheet">';
+  html += '<div class="hdr"><div>';
+  html += '<p class="org">'+esc(sig.organisation||'Fédération Française d\'ULM')+'</p>';
+  html += '<p class="sub">'+esc(sig.titre||'Direction Technique Nationale')+'</p>';
+  html += '</div>';
+  if (logo) html += '<img class="logo" src="'+logo+'">'; else html += '<div style="font-size:30px">🛩</div>';
+  html += '</div>';
+  html += '<div class="diffuse">Diffusion interne</div>';
+  html += '<div class="title">Fiche d\'événement</div>';
+  html += '<div class="ref">Édité le '+now+'</div>';
+  html += '<div class="ctx"><b>Compétition :</b> '+esc(cp.name||'—')+(dl?' &nbsp;·&nbsp; '+dl:'')+(cp.oaci?' &nbsp;·&nbsp; '+esc(cp.oaci):'')+(cp.lieu?' &nbsp;·&nbsp; '+esc(cp.lieu):'')+'</div>';
+  html += '<table class="det">';
+  html += row('Type d\'événement','<span class="badge" style="background:'+tc+'">'+esc(ev.typeIncident||'—')+'</span>');
+  html += row('Date de l\'événement','<b>'+fdate(ev.date)+'</b>'+(ev.horaire?' &nbsp; à '+esc(ev.horaire):''));
+  html += row('Personne / aéronef concerné', esc(ev.nom||'—'));
+  if (ev.immatriculation) html += row('Immatriculation','<b style="color:#b45309">'+esc(ev.immatriculation)+'</b>');
+  html += '</table>';
+  html += '<div class="block"><h3>Circonstances</h3><div class="body">'+(ev.circonstance? nl2br(ev.circonstance) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Commentaires / suites données</h3><div class="body">'+(ev.commentaires? nl2br(ev.commentaires) : '—')+'</div></div>';
+  html += '<div class="sign"><div class="box">';
+  html += '<div class="loc">Fait à '+esc(sig.ville||'—')+', le '+now+'</div>';
+  html += '<div class="who">'+(esc(((sig.prenom||'')+' '+(sig.nom||'')).trim())||'&nbsp;')+'</div>';
+  html += '<div class="role">'+esc(sig.titre||'')+'</div>';
+  html += '</div></div>';
+  html += '<div class="noprint" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:9px 26px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨 Imprimer</button></div>';
+  html += '</div></body></html>';
+  var win = window.open('','_blank'); if(!win){ if(typeof toast==='function') toast('Autorisez les pop-ups pour imprimer','err'); return; }
+  win.document.write(html); win.document.close();
+  setTimeout(function(){ try{ win.print(); }catch(e){} }, 400);
 }
 
 // ── Export CSV événements ──────────────────────────────────────────────────
@@ -43690,7 +44214,35 @@ function updateInstOACI(compId) {
   h += '  </div>';
   h += '  <div id="hdp-map" style="height:280px;border-radius:10px;overflow:hidden;background:var(--navy3)"></div>';
   h += '</div>';
+  // Zone d'infos BASULM (remplie par l'API)
+  h += '<div id="inst-basulm-info" style="margin-top:12px;font-size:12.5px;color:var(--txt3)">⏳ Chargement de la fiche BASULM…</div>';
   bloc.innerHTML = h;
+
+  // ── Appel API BASULM : affiche la fiche + remplit les compléments d'infos ──
+  basulmLookup(oaci).then(function(d){
+    var info = document.getElementById('inst-basulm-info');
+    if (!info) return; // onglet changé
+    if (!d) { info.innerHTML = '<span style="color:#f59e0b">⚠ Terrain '+oaci+' introuvable dans BASULM</span>'; return; }
+    // Remplir les champs d'identité + détails si vides
+    var setF = function(elId, key, val){
+      if (!val) return;
+      var el = document.getElementById(elId);
+      if (el && !el.value) { el.value = val; saveInstallField(compId, key, val); }
+    };
+    setF('inst-lieu',   'lieu',   d.toponyme);
+    setF('inst-region', 'region', d.region);
+    var _piste = [d.nature_piste_1, (d.longueur_piste_1?d.longueur_piste_1+' m':''), (d.orientation_piste_1?'QFU '+d.orientation_piste_1:'')].filter(Boolean).join(' · ');
+    setF('inst-f-typePiste', 'typePiste', d.nature_piste_1||'');
+    setF('inst-f-longPiste', 'longPiste', d.longueur_piste_1 ? (d.longueur_piste_1+' m'+(d.largeur_piste_1?' × '+d.largeur_piste_1+' m':'')+(d.orientation_piste_1?' — QFU '+d.orientation_piste_1:'')) : '');
+    var _contact = [d.nom_contact, d.tel_contact_1, d.mail_contact].filter(Boolean).join(' · ');
+    setF('inst-f-contactClub', 'contactClub', _contact);
+    var _services = [].concat(Array.isArray(d.facilities)?d.facilities:[], d.carburant?['Carburant : '+d.carburant]:[]).join(', ');
+    setF('inst-f-services', 'services', _services);
+    setF('inst-f-remarquesSite', 'remarquesSite', d.consignes||'');
+    // Fiche récapitulative affichée (fonction commune, partagée avec l'espace Étape)
+    info.innerHTML = _basulmFicheHTML(d)
+      + '<div style="margin-top:6px;font-size:10px;color:var(--txt3)">✓ Données BASULM — champs vides complétés automatiquement</div>';
+  });
 }
 
 // ═══════════════════════════════════════════════════
@@ -44225,6 +44777,7 @@ function openDossierDialog(compId) {
     {id:'derou', label:'📅 Déroulement'},
     {id:'resul', label:'🏅 Résultats (classement)'},
     {id:'svc',   label:'🏟 Services &amp; Logistique'},
+    {id:'etapes',label:'🗺 Site &amp; Étapes'},
     {id:'gantt', label:'📊 Planning Gantt (paysage)'}
   ];
 
@@ -44253,7 +44806,7 @@ function openDossierDialog(compId) {
 
 function _dossierPrintFromDialog(compId) {
   var opts = {};
-  ['stats','equip','staff','mat','evt','budg','part','derou','resul','svc','gantt'].forEach(function(id) {
+  ['stats','equip','staff','mat','evt','budg','part','derou','resul','svc','etapes','gantt'].forEach(function(id) {
     var cb = document.getElementById('doss-cb-'+id);
     opts[id] = cb ? cb.checked : true;
   });
@@ -44263,7 +44816,7 @@ function _dossierPrintFromDialog(compId) {
 }
 
 function printCompDossier(compId, opts) {
-  opts = opts || {stats:true,equip:true,staff:true,mat:true,evt:true,budg:true,part:true,derou:true,resul:true,svc:true,gantt:false};
+  opts = opts || {stats:true,equip:true,staff:true,mat:true,evt:true,budg:true,part:true,derou:true,resul:true,svc:true,etapes:true,gantt:false};
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; });
   if (!cp) return;
 
@@ -44584,7 +45137,7 @@ function printCompDossier(compId, opts) {
   // ── SERVICES & LOGISTIQUE ────────────────────────────────────────────
   var svcFields=[{k:'clubOrga',l:'Club organisateur'},{k:'contactClub',l:'Contact club'},{k:'typePiste',l:'Type de piste'},{k:'longPiste',l:'Longueur de piste'},{k:'services',l:'Services disponibles'},{k:'acteursLocaux',l:'Acteurs locaux'}];
   var hasSvc=svcFields.some(function(f){return !!cp[f.k];})||!!cp.remarquesSite;
-  var svcHtml = '<div class="page-sec">'+SH('Services &amp; logistique');
+  var svcHtml = '<div class="page-sec">'+SH('Services & logistique');
   if(!hasSvc){ svcHtml += emptyRow('Aucune information de site renseignée.'); }
   else {
     svcHtml += '<table><thead><tr><th style="width:36%">Rubrique</th><th>Information</th></tr></thead><tbody>';
@@ -44659,7 +45212,7 @@ function printCompDossier(compId, opts) {
   budgHtml += '</div>';
 
   // ── PARTENAIRES ──────────────────────────────────────────────────────
-  var partHtml = '<div class="page-sec">'+SH('Partenaires &amp; Acteurs locaux',partList.length);
+  var partHtml = '<div class="page-sec">'+SH('Partenaires & Acteurs locaux',partList.length);
   if(!partList.length){ partHtml += emptyRow('Aucun partenaire enregistré.'); }
   else {
     partHtml += '<table><thead><tr><th>Type</th><th>Organisme</th><th>Représentant</th><th>Téléphone</th><th>Email</th></tr></thead><tbody>';
@@ -44714,6 +45267,34 @@ function printCompDossier(compId, opts) {
     deroulHtml += '</tbody></table>';
   }
   deroulHtml += '</div>';
+
+  // ── SITE & ÉTAPES (+ aérodromes de déroutement) ──────────────────────
+  var etapesList = ((S.etapes||{})[compId]||[]).slice().sort(function(a,b){
+    var oa=(a._order!==undefined?a._order:9999), ob=(b._order!==undefined?b._order:9999);
+    if (oa!==ob) return oa-ob;
+    return (a.dateFrom||a.date||'9999') < (b.dateFrom||b.date||'9999') ? -1 : 1;
+  });
+  var hasEtapes = etapesList.length > 0;
+  var etapesHtml = '<div class="page-sec">'+SH('Site & Étapes', etapesList.length);
+  if (hasEtapes) {
+    etapesHtml += '<table><thead><tr><th style="width:5%">#</th><th style="width:9%">OACI</th><th>Lieu / Aérodrome</th><th style="width:20%">Dates</th><th style="width:16%">Région</th><th>Aérodromes de déroutement</th></tr></thead><tbody>';
+    etapesList.forEach(function(et, i){
+      var dts = fd(et.dateFrom||et.date||'') + (et.dateTo && et.dateTo!==et.dateFrom ? ' → '+fd(et.dateTo) : '');
+      var ders = (et.derotements||[]).map(function(d){
+        return esc([(d.oaci||''), (d.lieu||'')].filter(Boolean).join(' — '));
+      }).filter(Boolean).join('<br>');
+      etapesHtml += '<tr>'
+        + '<td style="text-align:center;font-weight:700;color:#1a3a6e">'+(i+1)+'</td>'
+        + '<td style="font-weight:700;color:#1a3a6e">'+esc(et.oaci||'—')+'</td>'
+        + '<td style="font-weight:600">'+esc(et.lieu||et.nom||'—')+'</td>'
+        + '<td style="white-space:nowrap">'+(dts||'—')+'</td>'
+        + '<td>'+esc(et.region||'—')+'</td>'
+        + '<td style="font-size:9px">'+(ders||'—')+'</td>'
+        + '</tr>';
+    });
+    etapesHtml += '</tbody></table>';
+  }
+  etapesHtml += '</div>';
 
   // ── RÉSULTATS — Classement consolidé (compact) ───────────────────────
   var resulHtml = '';
@@ -44889,18 +45470,23 @@ function printCompDossier(compId, opts) {
     +'</div>';
 
   // ── ASSEMBLAGE ───────────────────────────────────────────────────────
+  // On n'affiche un volet (et son titre) que s'il contient des données.
+  var _sr = (S.stolResults||{})[compId];
+  var hasResul = !!(_sr && _sr.epreuves && ['essais','qualif','finale'].some(function(ph){ return _sr.epreuves[ph] && (_sr.epreuves[ph].tables||[]).length; }));
+  var hasGantt = (((S.ganttTasks||{})[compId])||[]).length > 0;
   var body = hdrHtml;
-  if(opts.stats) body += chartsHtml;
-  if(opts.staff) body += staffHtml;
-  if(opts.svc)   body += svcHtml;
-  if(opts.equip) body += equipHtml;
-  if(opts.evt)   body += evtHtml;
-  if(opts.budg)  body += budgHtml;
-  if(opts.part)  body += partHtml;
-  if(opts.derou) body += deroulHtml;
-  if(opts.resul) body += resulHtml;
-  if(opts.mat)   body += matHtml;
-  if(opts.gantt)  body += ganttHtml;
+  if(opts.stats)                       body += chartsHtml;   // Stats/KPI : toujours pertinent
+  if(opts.staff  && staffList.length)  body += staffHtml;
+  if(opts.svc    && hasSvc)            body += svcHtml;
+  if(opts.equip  && enrolled.length)   body += equipHtml;
+  if(opts.etapes && hasEtapes)         body += etapesHtml;
+  if(opts.evt    && evtList.length)    body += evtHtml;
+  if(opts.budg   && hasBgt)            body += budgHtml;
+  if(opts.part   && partList.length)   body += partHtml;
+  if(opts.derou  && deroulList.length) body += deroulHtml;
+  if(opts.resul  && hasResul)          body += resulHtml;
+  if(opts.mat    && matList.length)    body += matHtml;
+  if(opts.gantt  && hasGantt)          body += ganttHtml;
   body += footerHtml;
 
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
@@ -48677,11 +49263,49 @@ function _collectifRenderCF() {
 }
 
 var _shnFilter = '';
+var _shnFilterPrat = '';
+var _shnFilterDisc = '';
 function _shnSetFilter(val, btn) {
   _shnFilter = val;
   document.querySelectorAll('.shn-filter-btn').forEach(function(b){ b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   renderSHNList();
+}
+function _shnSetFilterPrat(val) { _shnFilterPrat = val || ''; renderSHNList(); }
+function _shnSetFilterDisc(val) { _shnFilterDisc = val || ''; renderSHNList(); }
+
+// Clic sur le nom d'un sportif SHN → ouvre la boîte de dialogue d'édition.
+// Membres issus du Collectif France → modale CF complète ; membres saisis
+// manuellement → modale CF si une fiche existe (par licence), sinon édition en ligne.
+function shnOpenEdit(source, id) {
+  if (source === 'cf') {
+    var origId = (id.indexOf('cf-') === 0) ? id.slice(3) : id;
+    if (typeof openCfEditModal === 'function') openCfEditModal(origId);
+    return;
+  }
+  var m = (S.shn||[]).find(function(x){ return x.id === id; });
+  if (m && m.licence) {
+    var cf = (S.collectif||[]).find(function(x){ return x.licence && String(x.licence) === String(m.licence); });
+    if (cf && typeof openCfEditModal === 'function') { openCfEditModal(cf.id); return; }
+  }
+  if (typeof window.shnEditRow === 'function') window.shnEditRow(id);
+}
+
+// Enregistre un champ (aideP / smr) d'un sportif SHN, qu'il soit saisi manuellement
+// (S.shn) ou issu du Collectif France (S.collectif).
+function shnSetField(source, id, field, val) {
+  var rec = null;
+  if (source === 'cf') {
+    var origId = (id.indexOf('cf-') === 0) ? id.slice(3) : id;
+    rec = (S.collectif||[]).find(function(x){ return x.id === origId; });
+  } else {
+    rec = (S.shn||[]).find(function(x){ return x.id === id; });
+  }
+  if (!rec) return;
+  rec[field] = val;
+  rec._updatedAt = Date.now();
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
 }
 
 function _collectifRenderSHN() {
@@ -48693,6 +49317,15 @@ function _collectifRenderSHN() {
   var triOpts = statuts.map(function(s){
     return '<option value="'+s+'"'+(_shnFilter===s?' selected':'')+'>'+(s||'Tous les statuts')+'</option>';
   }).join('');
+  var _pratLbl = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur' };
+  var _discLbl = { classic:'Classic', slalom:'Slalom', stol:'STOL' };
+  var pratFilterOpts = ['','microlight','paramotor'].map(function(v){
+    return '<option value="'+v+'"'+(_shnFilterPrat===v?' selected':'')+'>'+(v?_pratLbl[v]:'Toutes pratiques')+'</option>';
+  }).join('');
+  var discFilterOpts = ['','classic','slalom','stol'].map(function(v){
+    return '<option value="'+v+'"'+(_shnFilterDisc===v?' selected':'')+'>'+(v?_discLbl[v]:'Toutes disciplines')+'</option>';
+  }).join('');
+  var _shnSelCss = 'height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer';
   var _isMob = window.innerWidth < 768;
   if (_isMob) {
     // ── Version mobile : filtre statut sur une ligne, pas de bouton Actions,
@@ -48700,7 +49333,9 @@ function _collectifRenderSHN() {
     body.innerHTML =
       '<div style="padding:8px 12px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">'
       + '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;flex-shrink:0">Tri</span>'
-      + '<select onchange="_shnSetFilter(this.value,null)" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer;flex-shrink:0">'+triOpts+'</select>'
+      + '<select onchange="_shnSetFilter(this.value,null)" style="'+_shnSelCss+';flex-shrink:0">'+triOpts+'</select>'
+      + '<select onchange="_shnSetFilterPrat(this.value)" style="'+_shnSelCss+';flex-shrink:0">'+pratFilterOpts+'</select>'
+      + '<select onchange="_shnSetFilterDisc(this.value)" style="'+_shnSelCss+';flex-shrink:0">'+discFilterOpts+'</select>'
       + '</div>'
       + '<div id="shn-mob-list" style="flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch"></div>';
     renderSHNList();
@@ -48709,7 +49344,9 @@ function _collectifRenderSHN() {
   body.innerHTML =
     '<div style="padding:10px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     + '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Tri</span>'
-    + '<select onchange="_shnSetFilter(this.value,null)" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer">'+triOpts+'</select>'
+    + '<select onchange="_shnSetFilter(this.value,null)" style="'+_shnSelCss+'">'+triOpts+'</select>'
+    + '<select onchange="_shnSetFilterPrat(this.value)" style="'+_shnSelCss+'">'+pratFilterOpts+'</select>'
+    + '<select onchange="_shnSetFilterDisc(this.value)" style="'+_shnSelCss+'">'+discFilterOpts+'</select>'
     + '<div style="margin-left:auto;position:relative;flex-shrink:0" id="shn-act-wrap">'
     + '<button onclick="_shnActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>Actions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>'
     + '<div id="shn-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">'
@@ -48732,6 +49369,8 @@ function _collectifRenderSHN() {
     + '<th style="'+thSt+'">Email</th>'
     + '<th style="'+thSt+'">Téléphone</th>'
     + '<th style="'+thSt+'">Statut</th>'
+    + '<th style="'+thSt+';text-align:right;width:110px">Aide P. (€)</th>'
+    + '<th style="'+thSt+';text-align:center;width:90px">SMR</th>'
     + '</tr></thead>'
     + '<tbody id="shn-table-body"></tbody>'
     + '</table>'
@@ -48815,10 +49454,13 @@ function renderSHNList() {
       id: 'cf-'+m.id, nom: (m.prenom||'')+' '+(m.nom||''), licence: m.licence||'',
       pratique: m.pratique||'', discipline: m.discipline||'',
       club: m.club||'', region: m.region||'', email: m.email||'', tel: m.tel||'',
-      statut: m.statut_shn, _source:'cf'
+      statut: m.statut_shn, aideP: m.aideP||'', smr: m.smr||'', _source:'cf'
     }; });
   var list = manualList.concat(cfList);
-  if (_shnFilter) list = list.filter(function(m){ return m.statut === _shnFilter; });
+  var _lowF = function(s){ return (s||'').toString().toLowerCase(); };
+  if (_shnFilter)     list = list.filter(function(m){ return m.statut === _shnFilter; });
+  if (_shnFilterPrat) list = list.filter(function(m){ return _lowF(m.pratique) === _lowF(_shnFilterPrat); });
+  if (_shnFilterDisc) list = list.filter(function(m){ return _lowF(m.discipline) === _lowF(_shnFilterDisc); });
 
   if (!list.length) {
     var _emptyMsg = 'Aucun sportif'
@@ -48828,7 +49470,7 @@ function renderSHNList() {
       mobEl.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</div>';
       return;
     }
-    tbody.innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</td></tr>';
     return;
   }
 
@@ -48850,7 +49492,9 @@ function renderSHNList() {
       var _meta = [];
       if (m.pratique)   _meta.push(m.pratique);
       if (m.discipline) _meta.push(m.discipline);
-      return '<div style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--bdr)">'
+      if (m.aideP)      _meta.push('Aide '+esc(String(m.aideP))+'€');
+      if (m.smr)        _meta.push('SMR '+esc(m.smr));
+      return '<div data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" onclick="shnOpenEdit(this.dataset.src,this.dataset.id)" style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--bdr);cursor:pointer">'
         + _mav
         + '<div style="flex:1;min-width:0">'
         + '<div style="font-size:13.5px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(m.nom)+'</div>'
@@ -48892,8 +49536,8 @@ function renderSHNList() {
       ? '<img src="'+photo+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid var(--bdr);flex-shrink:0">'
       : '<div style="width:30px;height:30px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini)+'</div>';
     var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
-    return '<tr style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
-      +'<td style="padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle">'
+    return '<tr id="shn-row-'+esc(m.id)+'" style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
+      +'<td style="padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle;cursor:pointer" title="Ouvrir la fiche" data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" onclick="shnOpenEdit(this.dataset.src,this.dataset.id)">'
         +'<div style="display:flex;align-items:center;gap:8px">'+avatar
         +'<span style="font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.nom)+sourceBadge+'</span></div></td>'
       +'<td style="'+cellSt+';font-family:monospace">'+(esc(m.licence)||'—')+'</td>'
@@ -48904,6 +49548,25 @@ function renderSHNList() {
       +'<td style="'+cellSt+'"><a href="mailto:'+esc(email)+'" style="color:var(--txt2);text-decoration:none">'+(esc(email)||'—')+'</a></td>'
       +'<td style="'+cellSt+'">'+(esc(tel)||'—')+'</td>'
       +'<td style="'+cellSt+'"><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+esc(m.statut)+'</span></td>'
+      +'<td style="'+cellSt+';text-align:right">'
+        +'<input type="number" min="0" step="100" inputmode="numeric" value="'+esc(m.aideP||'')+'" placeholder="—" '
+        +'data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" '
+        +'onchange="shnSetField(this.dataset.src,this.dataset.id,\'aideP\',this.value)" '
+        +'style="width:82px;text-align:right;background:var(--navy);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;-moz-appearance:textfield;appearance:textfield">'
+      +'</td>'
+      +'<td style="'+cellSt+';text-align:center">'
+        +(function(){
+          var v = (m.smr||'');
+          var col = v==='Oui' ? '#10b981' : (v==='Non' ? '#ef4444' : 'var(--txt2)');
+          return '<select data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" '
+            +'onchange="shnSetField(this.dataset.src,this.dataset.id,\'smr\',this.value);this.style.color=this.value===\'Oui\'?\'#10b981\':(this.value===\'Non\'?\'#ef4444\':\'var(--txt2)\')" '
+            +'style="background:var(--navy);border:1px solid var(--bdr);border-radius:6px;font-family:inherit;font-size:12px;font-weight:700;padding:5px 6px;outline:none;cursor:pointer;color:'+col+'">'
+            +'<option value=""'+(v===''?' selected':'')+'>—</option>'
+            +'<option value="Oui"'+(v==='Oui'?' selected':'')+'>Oui</option>'
+            +'<option value="Non"'+(v==='Non'?' selected':'')+'>Non</option>'
+            +'</select>';
+        })()
+      +'</td>'
       +'</tr>';
   }).join('');
 
@@ -55221,6 +55884,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     <div style="margin-top:12px"><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Commentaires détaillés</label><textarea id="evt-modal-comm" rows="4" placeholder="Détails supplémentaires, actions prises…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;resize:vertical;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></textarea></div>
     <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
       <button onclick="deleteEvenementFromModal()" style="padding:9px 16px;border:1px solid #ef4444;border-radius:8px;background:none;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:auto">Supprimer</button>
+      <button onclick="saveEvenementSheet();printEvenement(_evtModalCompId,_evtModalId)" title="Enregistrer puis imprimer la fiche A4 (diffusion interne)" style="padding:9px 16px;border:1px solid var(--stol);border-radius:8px;background:none;color:var(--stol);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Imprimer</button>
       <button onclick="closeEvenementModal()" style="padding:9px 18px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>
       <button onclick="saveEvenementSheet()" style="padding:9px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--stol),#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.2)">Enregistrer</button>
     </div>
@@ -55235,7 +55899,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       <button onclick="closeSiteModal()" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;line-height:1;padding:4px">×</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Code OACI</label><input id="site-modal-oaci" placeholder="Ex: LFBD" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;text-transform:uppercase" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Code OACI</label><input id="site-modal-oaci" placeholder="Ex: LFBD" oninput="this.value=this.value.toUpperCase()" onchange="basulmFillSite('modal')" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;text-transform:uppercase" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div><div id="site-modal-basulm-status" style="font-size:11px;color:var(--stol);margin-top:3px;min-height:15px"></div>
       <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Lieu</label><input id="site-modal-lieu" placeholder="Nom du site" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
       <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Ville</label><input id="site-modal-ville" placeholder="Ville" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
       <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Région</label><input id="site-modal-region" placeholder="Région" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
