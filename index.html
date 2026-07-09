@@ -34170,6 +34170,9 @@ function _stolGetRuns(ligne, nbRuns) {
 
 // Calculer la retenue d'une ligne en fonction du nombre de runs du tableau
 function _stolLigneRetenue(ligne, nbRuns) {
+  // Perf saisie manuellement dans le CLASSEMENT → prioritaire (override).
+  var pm = parseFloat(ligne && ligne._perfM);
+  if (!isNaN(pm) && pm > 0) return pm;
   return _stolCalcRetenue.apply(null, _stolGetRuns(ligne, nbRuns));
 }
 
@@ -35624,13 +35627,14 @@ function _stolAggregateForClassement(eps, categorie) {
         var p = pilotesMap[key];
         if (!p.num && l.num) p.num = l.num;
         var pl = (l.poule||'').toUpperCase();
-        var ret = _stolLigneRetenue(l, nbR);
+        var measuredRet = _stolCalcRetenue.apply(null, _stolGetRuns(l, nbR)); // perf réellement mesurée (déco/attéro)
+        var ret = _stolLigneRetenue(l, nbR);                                  // mesurée, sinon perf manuelle
         var place = 0;
         if (pl && byPoule[pl]) {
           var entry = byPoule[pl].find(function(x){ return x.l === l; });
           place = (entry && entry.place) || 0;
         }
-        p[ph] = { poule: pl, perf: ret, place: place };
+        p[ph] = { poule: pl, perf: ret, place: place, measured: measuredRet > 0 };
       });
     });
   });
@@ -35657,6 +35661,35 @@ function _stolAggregateForClassement(eps, categorie) {
 function _stolPiloteKey(pilote) {
   return pilote.pid || ((pilote.prenom||'')+'_'+(pilote.nom||'')).toLowerCase();
 }
+
+// Saisie/modification manuelle d'une performance depuis le CLASSEMENT (Essais,
+// Qualifications ou Finale). Stockée sur la ligne de la phase (_perfM, prioritaire)
+// et prise en compte par _stolLigneRetenue → alimente perf, place, rang et points.
+function stolSetPhasePerf(compId, phase, pilotKey, value) {
+  if (['essais','qualif','finale'].indexOf(phase) === -1) return;
+  var eps = _getStolEpreuves(compId);
+  var tables = (eps[phase] && eps[phase].tables) || [];
+  var v = parseFloat((''+(value||'')).replace(',', '.'));
+  var setV = (!isNaN(v) && v > 0) ? v : null;
+  var found = false;
+  tables.forEach(function(t){
+    (t.lignes||[]).forEach(function(l){
+      if (_stolPiloteKey(l) === pilotKey) {
+        if (setV === null) delete l._perfM; else l._perfM = setV;
+        found = true;
+      }
+    });
+  });
+  var phaseLbl = { essais:'Essais libres', qualif:'Qualifications', finale:'Finale' }[phase] || phase;
+  if (!found) { toast('Ce pilote n\'a pas de ligne en ' + phaseLbl + ' — créez d\'abord le tableau', 'warn'); return; }
+  if (S.stolResults[compId]) S.stolResults[compId].updated = Date.now();
+  saveState();
+  if (typeof _saveStolBackup === 'function') _saveStolBackup();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof showHomeCompDetail === 'function') showHomeCompDetail(compId);
+}
+// Compat : ancien nom
+function stolSetFinalePerf(compId, pilotKey, value) { return stolSetPhasePerf(compId, 'finale', pilotKey, value); }
 
 // ─── Points régions (saisissable) ───
 function _stolGetPointsRegion(compId, pilote) {
@@ -35770,6 +35803,11 @@ function _renderStolClassementTable(cat, pilotes, cp) {
   var tdL = 'padding:8px 12px;text-align:left;border-bottom:1px solid var(--bdr);font-weight:600';
   var fmt = function(v){ if (!v) return '—'; return (Math.round(v*10)/10).toString(); };
   var fmtP = function(v){ return v ? v : '—'; };
+  // Style des champs Perf éditables du classement (visible en thème clair ET sombre)
+  var perfInpSt = 'width:58px;padding:6px 4px;background:rgba(0,87,255,.08);border:1.5px solid var(--stol);border-radius:6px;color:var(--stol);font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield;cursor:text';
+  var perfCell = function(phase, val, bg, pKey){
+    return '<td style="'+td+';background:'+bg+';padding:4px"><input type="number" step="0.1" min="0" inputmode="decimal" value="'+(val||'')+'" placeholder="saisir" title="Saisir/modifier la performance" onchange="stolSetPhasePerf(\''+cp.id+'\',\''+phase+'\',\''+pKey+'\',this.value)" style="'+perfInpSt+'"></td>';
+  };
   pilotes.forEach(function(p, idx) {
     var rg = idx + 1;
     var rgBadge = '';
@@ -35800,17 +35838,17 @@ function _renderStolClassementTable(cat, pilotes, cp) {
         })()
       // Points (saisissable — "Points au début")
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(16,185,129,.04);padding:4px"><input type="number" step="1" value="'+(ptsDebVal===''?'':ptsDebVal)+'" placeholder="—" onchange="stolSetPointsDebut(\''+cp.id+'\',\''+pKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#10b981;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>'
-      // Essais
+      // Essais — Perf éditable
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(245,158,11,.03);color:var(--txt2);font-weight:700">'+(p.essais.poule||'—')+'</td>'
-      + '<td style="'+td+';background:rgba(245,158,11,.03)">'+fmt(p.essais.perf)+'</td>'
+      + perfCell('essais', p.essais.perf, 'rgba(245,158,11,.03)', pKey)
       + '<td style="'+td+';background:rgba(245,158,11,.03);font-weight:800;color:#f59e0b">'+fmtP(p.essais.place)+'</td>'
-      // Qualif
+      // Qualif — Perf éditable
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(59,130,246,.03);color:var(--txt2);font-weight:700">'+(p.qualif.poule||'—')+'</td>'
-      + '<td style="'+td+';background:rgba(59,130,246,.03)">'+fmt(p.qualif.perf)+'</td>'
+      + perfCell('qualif', p.qualif.perf, 'rgba(59,130,246,.03)', pKey)
       + '<td style="'+td+';background:rgba(59,130,246,.03);font-weight:800;color:#3b82f6">'+fmtP(p.qualif.place)+'</td>'
-      // Finale
+      // Finale — Perf éditable
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(0,87,255,.05);color:var(--txt2);font-weight:700">'+(p.finale.poule||'—')+'</td>'
-      + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:700">'+fmt(p.finale.perf)+'</td>'
+      + perfCell('finale', p.finale.perf, 'rgba(0,87,255,.05)', pKey)
       + '<td style="'+td+';background:rgba(0,87,255,.05);font-weight:800;color:var(--stol)">'+fmtP(p.finale.place)+'</td>'
       // Points acquis (saisissable — pré-rempli avec la suggestion auto basée sur la place finale)
       + '<td style="'+td+';border-left:1px solid var(--bdr);background:rgba(34,197,94,.08);padding:4px"><input type="number" step="1" value="'+(ptsAcqVal===''?(ptsAcqSuggest?ptsAcqSuggest:''):ptsAcqVal)+'" placeholder="—" onchange="stolSetPointsAcquis(\''+cp.id+'\',\''+pKey+'\',this.value)" style="width:100%;padding:6px 4px;background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:5px;color:#22c55e;font-family:inherit;font-size:12px;font-weight:800;text-align:center;outline:none;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield"></td>'
