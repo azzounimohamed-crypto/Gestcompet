@@ -1344,7 +1344,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- Onglets -->
       <div class="class-tabs" id="pilots-class-tabs" style="margin:0 12px 4px">
         <button class="class-tab active" onclick="setPilotsClass('pilotes',this)">Pilotes</button>
-        <button class="class-tab" onclick="setPilotsClass('divers',this)">Divers</button>
+        <button class="class-tab" onclick="setPilotsClass('classement-stol',this)">🏆 Classement STOL</button>
       </div>
       <!-- Barre d'actions : + / recherche / actions (visible onglet Pilotes uniquement) -->
       <div id="pilots-action-bar" style="display:flex;align-items:center;gap:8px;padding:8px 16px 10px">
@@ -21767,11 +21767,11 @@ function renderPilots() {
   updatePilotsToggleBtn();
   var cont = document.getElementById('pilots-list'); if (!cont) return;
   cont.innerHTML = '';
-  if (_pilotsClass === 'divers') {
-    var divEl = document.createElement('div');
-    divEl.style.cssText = 'color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px';
-    divEl.textContent = 'Contenu à définir';
-    cont.appendChild(divEl); return;
+  if (_pilotsClass === 'classement-stol') {
+    if (title) title.textContent = 'Classement STOL';
+    if (subtitle) subtitle.textContent = 'National — cumul des points acquis en compétition';
+    _renderStolNational(cont);
+    return;
   }
   var list = S.pilots.filter(function(p){ return p.statut === 'pilote'; });
   if (_pilotsSearch) {
@@ -33727,6 +33727,170 @@ function _stolPointsFor(place) {
   var p = parseInt(place,10);
   if (!p) return 0;
   return _STOL_POINTS[p] || 0;
+}
+
+// ══════════════════════════════════════════════════════
+// CLASSEMENT NATIONAL STOL — cumul des points acquis en compétition.
+// Saison = de la compétition qui suit le CDF de l'année précédente jusqu'au CDF
+// de l'année (le CDF clôt la saison). Points = points acquis par compétition.
+// ══════════════════════════════════════════════════════
+var _stolNatSeason = null; // année de saison sélectionnée
+
+function _stolIsStolComp(c){ return c && (((c.discipline||'')+''+(c.type||'')+''+(c.name||'')).toLowerCase().indexOf('stol') !== -1); }
+function _stolIsCDF(c){ return (c.type||'') === 'cdf' || /championnat\s+de\s+france|(^|[^a-z])cdf([^a-z]|$)/i.test(c.name||''); }
+function _stolCompYear(d){ var m=(''+(d||'')).match(/^(\d{4})/); return m?parseInt(m[1],10):null; }
+function _stolAllComps(){ return (S.comps||[]).filter(_stolIsStolComp).slice().sort(function(a,b){ return (a.dateFrom||'')<(b.dateFrom||'')?-1:1; }); }
+
+// Saison d'une compétition = année du 1er CDF STOL à sa date ou après (le CDF clôt la saison)
+function _stolSeasonOf(comp, cdfs){
+  var d = comp.dateFrom || comp.date || '';
+  for (var i=0;i<cdfs.length;i++){ if ((cdfs[i].dateFrom||'') >= d) return _stolCompYear(cdfs[i].dateFrom); }
+  if (cdfs.length) return (_stolCompYear(cdfs[cdfs.length-1].dateFrom)||new Date().getFullYear())+1; // après le dernier CDF
+  return _stolCompYear(d) || new Date().getFullYear(); // aucun CDF → année civile
+}
+function _stolNatSeasons(){
+  var comps=_stolAllComps(), cdfs=comps.filter(_stolIsCDF), set={};
+  comps.forEach(function(c){ var s=_stolSeasonOf(c,cdfs); if(s) set[s]=true; });
+  var arr=Object.keys(set).map(Number).sort(function(a,b){ return b-a; });
+  return arr.length?arr:[new Date().getFullYear()];
+}
+function _stolCompsOfSeason(season){
+  var comps=_stolAllComps(), cdfs=comps.filter(_stolIsCDF);
+  return comps.filter(function(c){ return _stolSeasonOf(c,cdfs) === season; });
+}
+// Abréviation d'une compétition pour l'en-tête de colonne (OACI sinon nom court)
+function _stolCompShort(c){ return (c.oaci||'').toUpperCase() || (c.name||'?').replace(/comp[ée]tition|r[ée]gionale?|nationale?|stol/gi,'').replace(/\s+/g,' ').trim().slice(0,10) || '?'; }
+
+// Points acquis par pilote pour une compétition + catégorie
+function _stolCompPointsByPilot(compId, categorie){
+  var eps=_getStolEpreuves(compId), agg=_stolAggregateForClassement(eps, categorie), res={};
+  agg.forEach(function(p){
+    var key=_stolPiloteKey(p);
+    var paVal=_stolGetPointsAcquis(compId, p);
+    var pts=(paVal!=='' && paVal!==undefined) ? (parseInt(paVal,10)||0)
+          : ((p.finale && p.finale.place) ? _stolPointsFor(p.finale.place) : 0);
+    res[key]={ pid:p.pid, num:p.num||'', prenom:p.prenom||'', nom:p.nom||'', points:pts };
+  });
+  return res;
+}
+// Classement national d'une saison + catégorie
+function _stolNationalRanking(season, categorie){
+  var comps=_stolCompsOfSeason(season), pilots={};
+  comps.forEach(function(c){
+    var byPilot=_stolCompPointsByPilot(c.id, categorie);
+    Object.keys(byPilot).forEach(function(k){
+      var d=byPilot[k];
+      if (!pilots[k]) pilots[k]={ key:k, pid:d.pid, num:d.num, prenom:d.prenom, nom:d.nom, perComp:{}, total:0 };
+      pilots[k].perComp[c.id]=d.points;
+      pilots[k].total += (d.points||0);
+      if (!pilots[k].num && d.num) pilots[k].num=d.num;
+    });
+  });
+  var list=Object.keys(pilots).map(function(k){ return pilots[k]; }).filter(function(p){ return Object.keys(p.perComp).length; });
+  list.sort(function(a,b){ return b.total - a.total; });
+  return { comps:comps, rows:list };
+}
+
+function _stolNatSetSeason(v){ _stolNatSeason = parseInt(v,10); renderPilots(); }
+
+// Rendu écran du classement national (dans l'onglet Pilotes → Classement STOL)
+function _renderStolNational(cont){
+  var seasons=_stolNatSeasons();
+  if (_stolNatSeason==null || seasons.indexOf(_stolNatSeason)===-1) _stolNatSeason=seasons[0];
+  var esc=escH;
+  var html='';
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--bdr);background:var(--navy2);position:sticky;top:0;z-index:5">';
+  html += '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Saison</span>';
+  html += '<select onchange="_stolNatSetSeason(this.value)" style="height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;outline:none;cursor:pointer">';
+  seasons.forEach(function(s){ html += '<option value="'+s+'"'+(s===_stolNatSeason?' selected':'')+'>Saison '+s+'</option>'; });
+  html += '</select><div style="flex:1"></div>';
+  html += '<button onclick="printStolNational()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Imprimer A4</button>';
+  html += '</div>';
+  html += '<div style="padding:14px 16px 40px">';
+  var comps=_stolCompsOfSeason(_stolNatSeason);
+  var m=_stolNationalRanking(_stolNatSeason,'multiaxes'), p=_stolNationalRanking(_stolNatSeason,'pendulaire');
+  if (!m.rows.length && !p.rows.length){
+    html += '<div style="text-align:center;color:var(--txt3);font-size:13px;padding:40px 20px">Aucun point acquis pour la saison '+_stolNatSeason+'.'+(comps.length?'':'<br>Aucune compétition STOL rattachée à cette saison.')+'</div>';
+  } else {
+    if (m.rows.length) html += _stolNatTableHTML('multiaxes', m);
+    if (p.rows.length) html += _stolNatTableHTML('pendulaire', p);
+  }
+  html += '</div>';
+  cont.innerHTML = html;
+}
+function _stolNatTableHTML(cat, rk){
+  var titre=cat==='multiaxes'?'MULTIAXES':'PENDULAIRE', esc=escH;
+  var html='<div style="margin-bottom:18px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
+  html += '<div style="padding:10px 16px;background:linear-gradient(to right, rgba(124,58,237,.15), rgba(0,87,255,.08));border-bottom:1px solid var(--bdr)"><span style="font-size:13px;font-weight:800;color:#7c3aed;letter-spacing:1px">'+titre+'</span> <span style="font-size:11px;color:var(--txt3)">· '+rk.rows.length+' pilote(s)</span></div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:'+(430+rk.comps.length*66)+'px">';
+  var th='padding:8px 6px;background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;text-align:center;border-bottom:1px solid var(--bdr)';
+  html += '<thead><tr><th style="'+th+';width:36px">Rg</th><th style="'+th+';width:52px">N°</th><th style="'+th+';text-align:left;padding-left:12px">Pilote</th><th style="'+th+';text-align:left;width:150px">Marque / Modèle</th>';
+  rk.comps.forEach(function(c){ html += '<th style="'+th+';width:60px" title="'+esc(c.name||'')+'">'+esc(_stolCompShort(c))+'</th>'; });
+  html += '<th style="'+th+';background:rgba(16,185,129,.12);width:70px;color:#10b981">Total</th></tr></thead><tbody>';
+  var td='padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
+  rk.rows.forEach(function(p,i){
+    var rg=i+1, medal=rg===1?'🥇':rg===2?'🥈':rg===3?'🥉':rg;
+    var u=_stolPilotUlm(p), mm=[u.marque,u.modele].filter(Boolean).join(' · ').toUpperCase();
+    html += '<tr'+(i%2?' style="background:rgba(255,255,255,.015)"':'')+'>';
+    html += '<td style="'+td+';font-weight:800">'+medal+'</td>';
+    html += '<td style="'+td+';color:var(--stol);font-weight:800">'+esc(p.num||'—')+'</td>';
+    html += '<td style="'+td+';text-align:left;padding-left:12px;font-weight:600">'+esc(((p.prenom||'')+' '+(p.nom||'')).trim()||'—')+'</td>';
+    html += '<td style="'+td+';text-align:left;font-size:11px;color:var(--txt2)">'+(mm?esc(mm):'—')+'</td>';
+    rk.comps.forEach(function(c){ var v=p.perComp[c.id]; html += '<td style="'+td+'">'+(v?v:'<span style="color:var(--txt3)">—</span>')+'</td>'; });
+    html += '<td style="'+td+';background:rgba(16,185,129,.08);font-weight:800;color:#10b981;font-size:14px">'+p.total+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+// Impression A4 du classement national STOL (colonnes = compétitions)
+function printStolNational(){
+  var season = _stolNatSeason || _stolNatSeasons()[0];
+  var logo = (typeof _getAppLogo==='function' ? _getAppLogo() : '') || 'https://ffplum.fr/templates/ffplum/images/logo.png';
+  var esc = function(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var body='', anyRows=false;
+  [['multiaxes','MULTIAXES'],['pendulaire','PENDULAIRE']].forEach(function(cc){
+    var rk=_stolNationalRanking(season, cc[0]);
+    if (!rk.rows.length) return;
+    anyRows=true;
+    body += '<div class="cat">'+cc[1]+' <span class="cnt">'+rk.rows.length+' pilotes</span></div>';
+    body += '<table><thead><tr><th class="rg">Rg</th><th class="num">N°</th><th class="nom">NOM</th><th class="ac">Marque / Modèle</th>';
+    rk.comps.forEach(function(c){ body += '<th class="cp">'+esc(_stolCompShort(c))+'</th>'; });
+    body += '<th class="tot">Total</th></tr></thead><tbody>';
+    rk.rows.forEach(function(p,i){
+      var u=_stolPilotUlm(p), mm=[u.marque,u.modele].filter(Boolean).join(' / ').toUpperCase();
+      body += '<tr'+(i%2?' class="alt"':'')+'><td class="rg">'+(i+1)+'</td><td class="num">'+esc(p.num||'')+'</td>'
+        +'<td class="nom">'+esc(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td><td class="ac">'+esc(mm)+'</td>';
+      rk.comps.forEach(function(c){ var v=p.perComp[c.id]; body += '<td>'+(v?v:'')+'</td>'; });
+      body += '<td class="tot">'+p.total+'</td></tr>';
+    });
+    body += '</tbody></table>';
+    body += '<div class="leg"><b>Compétitions :</b> '+rk.comps.map(function(c){ return esc(_stolCompShort(c))+' = '+esc(c.name||''); }).join(' &nbsp;·&nbsp; ')+'</div>';
+  });
+  if (!anyRows){ if(typeof toast==='function') toast('Aucun classement pour la saison '+season,'warn'); return; }
+  var now=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var html='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Classement National STOL '+season+'</title><style>'
+    +'@page{size:A4 landscape;margin:11mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;margin:0}'
+    +'.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #003399;padding-bottom:8px;margin-bottom:6px}'
+    +'.hdr h1{font-size:17px;color:#003399;margin:0}.hdr .sub{font-size:11px;color:#555;margin-top:3px}.logo{max-height:54px}'
+    +'.cat{font-size:12px;font-weight:800;color:#7c3aed;letter-spacing:1px;margin:12px 0 4px}.cat .cnt{font-size:9px;color:#888;font-weight:400}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:3px}'
+    +'th{background:#003399;color:#fff;padding:5px 4px;font-size:9px;text-transform:uppercase;text-align:center;border:1px solid #012a80}'
+    +'td{padding:4px;border:1px solid #d0d7e2;text-align:center;font-variant-numeric:tabular-nums}tr.alt td{background:#f4f7fb}'
+    +'th.nom,td.nom{text-align:left;padding-left:8px;font-weight:700}th.ac,td.ac{text-align:left;font-size:8px;color:#555}'
+    +'td.num{color:#003399;font-weight:700}td.tot,th.tot{background:#e8f5ee;font-weight:800;color:#0a7a43}'
+    +'.leg{font-size:8px;color:#666;margin:1px 0 6px}.foot{margin-top:10px;font-size:9px;color:#999;text-align:right;border-top:1px solid #ddd;padding-top:4px}'
+    +'@media print{.noprint{display:none}}'
+    +'</style></head><body>'
+    +'<div class="hdr"><div><h1>Classement National STOL — Saison '+season+'</h1><div class="sub">Cumul des points acquis en compétition · Édité le '+now+'</div></div>'
+    +(logo?'<img class="logo" src="'+logo+'">':'')+'</div>'
+    +body
+    +'<div class="foot">FFPLUM · Classement National STOL · '+now+'</div>'
+    +'<div class="noprint" style="text-align:center;margin-top:12px"><button onclick="window.print()" style="padding:8px 22px;background:#003399;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🖨 Imprimer</button></div>'
+    +'</body></html>';
+  var w=window.open('','_blank'); if(!w){ if(typeof toast==='function') toast('Autorisez les pop-ups','err'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(function(){ try{w.print();}catch(e){} }, 500);
 }
 
 function _getStolResults(compId) {
