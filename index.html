@@ -1344,7 +1344,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <!-- Onglets -->
       <div class="class-tabs" id="pilots-class-tabs" style="margin:0 12px 4px">
         <button class="class-tab active" onclick="setPilotsClass('pilotes',this)">Pilotes</button>
-        <button class="class-tab" onclick="setPilotsClass('classement-stol',this)">🏆 Classement STOL</button>
+        <button class="class-tab" onclick="setPilotsClass('classement-stol',this)">🏆 Classement national STOL</button>
       </div>
       <!-- Barre d'actions : + / recherche / actions (visible onglet Pilotes uniquement) -->
       <div id="pilots-action-bar" style="display:flex;align-items:center;gap:8px;padding:8px 16px 10px">
@@ -1969,6 +1969,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <div class="card">
               <div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Retire le mot <strong>« Pilote »</strong> (ou « Copilote ») saisi par erreur dans le champ <strong>N° de licence</strong> des compétiteurs et encadrants. Un aperçu est affiché avant validation.</div>
               <button class="btn btn-sm" style="width:100%;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#d97706;font-weight:700" onclick="cleanupLicencePilote()">🧹 Nettoyer « Pilote » dans les N° de licence</button>
+              <div style="font-size:12px;color:var(--txt2);margin:14px 0 10px">Fusionne les compétiteurs présents <strong>plusieurs fois avec le même N° de licence</strong> en une seule fiche, en recollant tout l'historique (compétitions, résultats, inscriptions). Aperçu avant validation.</div>
+              <button class="btn btn-sm" style="width:100%;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);color:#3b82f6;font-weight:700" onclick="mergePilotDuplicatesByLicence()">👥 Fusionner les doublons de pilotes (même licence)</button>
             </div>
           </div>
         </div>
@@ -5113,6 +5115,7 @@ function _flushSaveState() {
     ganttTasks:S.ganttTasks||{}, docSettings:S.docSettings||{},
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
+    stolNatExcluded:S.stolNatExcluded||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -16651,7 +16654,9 @@ function _stolPilotPays(p){
   var pil = null;
   if (p && p.pid) pil = (S.pilots||[]).find(function(x){ return x.id === p.pid; });
   if (!pil && p) pil = (S.pilots||[]).find(function(x){ return ((x.prenom||'')+'|'+(x.nom||'')).toLowerCase() === ((p.prenom||'')+'|'+(p.nom||'')).toLowerCase(); });
-  return pil ? (pil.pays||'') : '';
+  // Source unique : « pays » sinon « Région / Pays » si étranger → drapeau correct
+  // même si le champ pays a été perdu, et cohérent avec l'exclusion du classement.
+  return pil ? (typeof _stolCountryOf==='function' ? _stolCountryOf(pil) : (pil.pays||'')) : '';
 }
 
 // Marque + modèle de l'ULM d'un pilote de classement STOL (via pid, sinon prénom|nom)
@@ -26296,6 +26301,9 @@ async function loadFromSupabaseFirst() {
     var localPhotos   = {};
     (S.comps   || []).forEach(function(c){ if (c.affiche && c.affiche.startsWith('data:')) localAffiches[c.id] = c.affiche; });
     (S.pilots  || []).forEach(function(p){ if (p.photo  && p.photo.startsWith('data:'))   localPhotos[p.id]   = p.photo;   });
+    // GARANTIE DES SAISIES : snapshot des pilotes locaux AVANT écrasement par le cloud,
+    // pour ne jamais perdre un N° de licence (ni l'identité) saisi localement.
+    var _localPilotsSnapshot = (S.pilots || []).slice();
 
     // ── Garde anti-perte : comparer les compteurs locaux vs cloud ──
     var localStaff    = _countStaff(S);
@@ -26446,6 +26454,27 @@ async function loadFromSupabaseFirst() {
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedTodos)   S.homeTodosByComp = savedTodos;
     if (savedPilots)  S.pilots = savedPilots;
+    // ✅ GARANTIE DES SAISIES : une valeur CLOUD VIDE ne doit JAMAIS écraser une saisie
+    // locale renseignée. On restaure, pilote par pilote (par id sinon par nom), le N° de
+    // licence et les champs d'identité que le cloud aurait blanchis. Pas de bouton : c'est
+    // durable et automatique à chaque synchronisation.
+    (function(){
+      if (!Array.isArray(S.pilots) || !_localPilotsSnapshot.length) return;
+      var _nk=function(p){ return (p&&p.prenom||'').trim().toLowerCase()+'|'+(p&&p.nom||'').trim().toLowerCase(); };
+      var byId={}, byName={};
+      _localPilotsSnapshot.forEach(function(p){ if(!p) return; if(p.id) byId[p.id]=p; var k=_nk(p); if(k!=='|') byName[k]=p; });
+      var sticky=['licence','licenceFai','pays','pilotType','region','club','clubNum','ddn','email','tel','adresse','genre','numeroDossier'];
+      S.pilots.forEach(function(p){
+        if(!p) return;
+        var src=(p.id&&byId[p.id]) || byName[_nk(p)];
+        if(!src) return;
+        sticky.forEach(function(f){
+          var cur=(p[f]==null?'':(''+p[f])).trim();
+          var loc=(src[f]==null?'':(''+src[f])).trim();
+          if(!cur && loc) p[f]=src[f];   // le cloud a effacé → on restaure la saisie locale
+        });
+      });
+    })();
     // ✅ Fusionner collectif local avec cloud : local gagne membre par membre (plus récent)
     if (savedCollectif) {
       if (!S.collectif || !S.collectif.length) {
@@ -28542,7 +28571,10 @@ function savePilotManual() {
   var pmPhotoData = pmPhotoInp ? (pmPhotoInp._data || null) : null;
   // Préserver la photo existante si pas de nouvelle
   var existingPilot = S.pilots.find(function(p){ return p.id === pilotId; });
-  var pilot = {
+  // IMPORTANT : FUSIONNER dans la fiche existante (ne PAS la remplacer) — sinon
+  // tous les champs absents du formulaire (pays, pilotType, licenceFai, clubNum,
+  // identifiants base44, contacts d'urgence…) seraient effacés à chaque édition.
+  var pilot = Object.assign({}, existingPilot || {}, {
     id: pilotId,
     genre: document.getElementById('pm-genre').value,
     pratique: (document.getElementById('pm-pratique')||{}).value || '',
@@ -28558,10 +28590,13 @@ function savePilotManual() {
     maillot: document.getElementById('pm-maillot').value,
     role: (document.getElementById('pm-role')||{value:'Pilote'}).value || 'Pilote',
     statut: 'pilote',
+    _updatedAt: Date.now(),
     photo: pmPhotoData === '__deleted__' ? null
          : pmPhotoData || (existingPilot ? existingPilot.photo : null)
-  };
-  var ulm = {
+  });
+  // ULM : fusionner aussi dans la 1re machine existante (préserve les champs annexes)
+  var existingUlm = ((S.ulms||{})[pilotId] || [])[0] || {};
+  var ulm = Object.assign({}, existingUlm, {
     classe: document.getElementById('pm-classe').value,
     aile: document.getElementById('pm-aile').value,
     places: document.getElementById('pm-places').value,
@@ -28570,7 +28605,7 @@ function savePilotManual() {
     moteur: document.getElementById('pm-moteur').value.trim(),
     immat: document.getElementById('pm-immat').value.toUpperCase().trim(),
     categorie: document.getElementById('pm-categorie').value
-  };
+  });
   // Sauvegarder pilote
   if (editId) {
     var idx = S.pilots.findIndex(function(p){ return p.id === editId; });
@@ -28580,7 +28615,7 @@ function savePilotManual() {
   }
   // Sauvegarder ULM
   if (!S.ulms[pilotId]) S.ulms[pilotId] = [];
-  if (editId) S.ulms[pilotId] = [ulm]; // remplacer
+  if (editId) S.ulms[pilotId] = [ulm].concat((S.ulms[pilotId]||[]).slice(1)); // MAJ 1re machine, garde les autres
   else S.ulms[pilotId].push(ulm);
   saveState();
   closeSheet('sheet-pilot-manual');
@@ -28679,6 +28714,103 @@ function cleanupLicencePilote() {
   if (typeof silentPush === 'function') silentPush(true);
   if (typeof renderPilots === 'function') renderPilots();
   toast(targets.length+' fiche(s) nettoyée(s) ✓', 'ok');
+}
+
+// ── Fusion des doublons de pilotes ayant le MÊME N° de licence ──────────────
+// Recolle tout l'historique (compétitions, résultats STOL, inscriptions, encadrants,
+// podiums, machines) sur une seule fiche conservée. Aperçu + confirmation.
+function mergePilotDuplicatesByLicence() {
+  if (typeof canModify === 'function' && !canModify()) { toast('Réservé au gestionnaire', 'err'); return; }
+  // 1. Grouper par licence valide (numérique)
+  var groups = {};
+  (S.pilots||[]).forEach(function(p){
+    var lic = _stolIsValidLicence(p && p.licence);
+    if (!lic) return;
+    (groups[lic] = groups[lic] || []).push(p);
+  });
+  // Historique = nb de compétitions où le pilote apparaît (runs + inscriptions)
+  function histCount(pid){
+    var n=0;
+    Object.keys(S.runs||{}).forEach(function(cid){ if ((S.runs[cid]||[]).some(function(r){ return r.pilotId===pid; })) n++; });
+    Object.keys(S.compEnroll||{}).forEach(function(cid){ if ((S.compEnroll[cid]||[]).indexOf(pid)>=0) n++; });
+    return n;
+  }
+  function fillCount(p){ var n=0; ['prenom','nom','genre','ddn','email','tel','adresse','club','region','photo'].forEach(function(f){ if (p[f]) n++; }); return n; }
+
+  var dupGroups = Object.keys(groups).map(function(l){ return { lic:l, pilots:groups[l] }; }).filter(function(g){ return g.pilots.length>1; });
+  if (!dupGroups.length){ toast('Aucun doublon de pilote (même licence) détecté', 'ok'); return; }
+
+  var totalMerge=0, apercu=[];
+  dupGroups.forEach(function(g){
+    g.pilots.sort(function(a,b){
+      var ha=histCount(a.id), hb=histCount(b.id); if (hb!==ha) return hb-ha;
+      var fa=fillCount(a), fb=fillCount(b); if (fb!==fa) return fb-fa;
+      return (b._updatedAt||0)-(a._updatedAt||0);
+    });
+    g.keeper=g.pilots[0]; g.losers=g.pilots.slice(1); totalMerge += g.losers.length;
+    apercu.push('• Licence '+g.lic+' : '+g.pilots.map(function(p){ return ((p.prenom||'')+' '+(p.nom||'')).trim()||p.id; }).join(' + ')+' → conserve « '+(((g.keeper.prenom||'')+' '+(g.keeper.nom||'')).trim())+' »');
+  });
+  var msg='Fusionner '+totalMerge+' doublon(s) de pilote dans '+dupGroups.length+' groupe(s) (même N° de licence) ?\n\n'
+    +'Tout l\'historique (compétitions, résultats, inscriptions, encadrants, podiums, machines) sera recollé sur la fiche conservée.\n\n'
+    +apercu.slice(0,10).join('\n')+(apercu.length>10?'\n… +'+(apercu.length-10)+' groupe(s)':'')
+    +'\n\n⚠️ Se resynchronise vers Supabase.';
+  if (!confirm(msg)) return;
+
+  // Table de remappage id perdant → id conservé
+  var remap={}; dupGroups.forEach(function(g){ g.losers.forEach(function(l){ remap[l.id]=g.keeper.id; }); });
+
+  // Runs
+  Object.keys(S.runs||{}).forEach(function(cid){ (S.runs[cid]||[]).forEach(function(r){ if (remap[r.pilotId]) r.pilotId=remap[r.pilotId]; }); });
+  // Résultats STOL : lignes.pid + points-par-pid
+  Object.keys(S.stolResults||{}).forEach(function(cid){
+    var eps=(S.stolResults[cid]||{}).epreuves||{};
+    ['essais','qualif','finale'].forEach(function(ph){
+      ((eps[ph]&&eps[ph].tables)||[]).forEach(function(t){ (t.lignes||[]).forEach(function(li){ if (remap[li.pid]) li.pid=remap[li.pid]; }); });
+    });
+    ['pointsAcquis','pointsRegion','pointsDebut'].forEach(function(pk){
+      var obj=(S.stolResults[cid]||{})[pk]; if (!obj) return;
+      Object.keys(obj).forEach(function(k){ if (remap[k]){ if (obj[remap[k]]===undefined) obj[remap[k]]=obj[k]; delete obj[k]; } });
+    });
+  });
+  // Inscriptions
+  Object.keys(S.compEnroll||{}).forEach(function(cid){
+    var seen={};
+    S.compEnroll[cid]=(S.compEnroll[cid]||[]).map(function(pid){ return remap[pid]||pid; }).filter(function(pid){ if(!pid||seen[pid])return false; seen[pid]=true; return true; });
+  });
+  // Encadrants
+  Object.keys(S.staff||{}).forEach(function(cid){ (S.staff[cid]||[]).forEach(function(s){ if (s && remap[s.pilotId]) s.pilotId=remap[s.pilotId]; }); });
+  // Métadonnées d'inscription (podium / niveau)
+  Object.keys(S.enrollMeta||{}).forEach(function(cid){
+    var m=S.enrollMeta[cid]; if (!m) return;
+    Object.keys(m).forEach(function(pid){
+      var tgt=remap[pid]; if (!tgt) return;
+      if (!m[tgt]) m[tgt]={};
+      Object.keys(m[pid]||{}).forEach(function(f){ if ((m[tgt][f]===undefined||m[tgt][f]==='') && m[pid][f]) m[tgt][f]=m[pid][f]; });
+      delete m[pid];
+    });
+  });
+  // Machines (ULM) : regrouper sous le conservé
+  dupGroups.forEach(function(g){
+    var arr=((S.ulms||{})[g.keeper.id]||[]).slice();
+    g.losers.forEach(function(l){ (((S.ulms||{})[l.id])||[]).forEach(function(u){ arr.push(u); }); if (S.ulms) delete S.ulms[l.id]; });
+    if (arr.length){ if(!S.ulms) S.ulms={}; S.ulms[g.keeper.id]=arr; }
+  });
+  // Fiche : remplir les champs vides du conservé depuis les perdants, puis retirer les perdants
+  var loserIds={};
+  dupGroups.forEach(function(g){
+    g.losers.forEach(function(l){
+      loserIds[l.id]=true;
+      Object.keys(l).forEach(function(f){ if (f==='id') return; if ((g.keeper[f]===undefined||g.keeper[f]===''||g.keeper[f]===null) && l[f]) g.keeper[f]=l[f]; });
+    });
+    g.keeper._updatedAt=Date.now();
+  });
+  S.pilots=S.pilots.filter(function(p){ return !loserIds[p.id]; });
+
+  saveState();
+  if (typeof silentPush === 'function') silentPush(true);
+  if (typeof updateNationalRanking === 'function') updateNationalRanking();
+  if (typeof renderPilots === 'function') renderPilots();
+  toast(totalMerge+' doublon(s) de pilote fusionné(s) ✓', 'ok');
 }
 
 // ─── Auto-fill licence FFPLUM à la frappe (nom + prénom) ───
@@ -28896,7 +29028,13 @@ function pmAutoRegion(val) {
   var region = regionFromCP(match[1]);
   if (!region) return;
   var sel = document.getElementById('pm-region');
-  if (sel) sel.value = region;
+  if (!sel) return;
+  // Ne JAMAIS écraser un PAYS ÉTRANGER saisi manuellement (il détermine l'éligibilité
+  // au classement national) : l'auto-région ne s'applique que si le champ est vide
+  // ou déjà une région française.
+  var cur = (sel.value||'').trim();
+  if (cur && typeof _stolRegionIsFrench === 'function' && !_stolRegionIsFrench(cur)) return;
+  sel.value = region;
 }
 
 // ─── Auto-set Classe → Paramoteur quand Catégorie est renseignée ───
@@ -33773,10 +33911,13 @@ function exportRunsFmt(fmt, compId) {
 // ═══════════════════════════════════════════════════════
 
 // Barème de points STOL : place → points
-var _STOL_POINTS = {1:25, 2:18, 3:15, 4:12, 5:10, 6:8, 7:6, 8:5, 9:4, 10:3, 11:2, 12:1};
+// Barème officiel FFPLUM STOL « Points manche » (place → points).
+// Places 1 à 14 explicites ; « 15 et + » = 1 point (tout pilote classé marque).
+var _STOL_POINTS = {1:25, 2:18, 3:15, 4:12, 5:11, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2};
 function _stolPointsFor(place) {
   var p = parseInt(place,10);
-  if (!p) return 0;
+  if (!p || p < 1) return 0;
+  if (p >= 15) return 1;              // « 15 et + » = 1 point
   return _STOL_POINTS[p] || 0;
 }
 
@@ -33817,21 +33958,115 @@ function _stolCompShort(c){ return (c.oaci||'').toUpperCase() || (c.name||'?').r
 // Req 4b : en-tête de colonne = lieu + date de la compétition
 function _stolCompLieu(c){ return (((c.lieu||c.name||c.nom||'')+'').replace(/comp[ée]tition|r[ée]gionale?|nationale?|stol/gi,'').replace(/\s+/g,' ').trim()) || (c.oaci||'').toUpperCase() || '?'; }
 function _stolCompDateShort(c){ var m=(''+((c&&(c.dateFrom||c.date))||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1].slice(2)):''; }
+function _stolDateFR(d){ var m=(''+(d||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1].slice(2)):''; }
+// Plage de dates d'une compétition : « du JJ/MM/AA au JJ/MM/AA » (ou seule si pas de date fin)
+function _stolCompDateRange(c){
+  var d1=_stolDateFR(c&&(c.dateFrom||c.date)), d2=_stolDateFR(c&&c.dateTo);
+  if (!d1) return '';
+  if (!d2 || d2===d1) return 'du '+d1;
+  return 'du '+d1+' au '+d2;
+}
 // Req 4 : la référence d'un pilote est son N° de licence (via le registre), pas le nom ni la machine.
 // Seule une licence *numérique valide* sert de clé de fusion : une valeur parasite
 // (ex. « Pilote » saisie par erreur) ne doit PAS fusionner des pilotes distincts.
 function _stolIsValidLicence(v){ v=(''+(v==null?'':v)).trim(); return /^\d{2,}$/.test(v) ? v : ''; }
 function _stolPilotLicence(pid){ if(!pid) return ''; var p=(S.pilots||[]).find(function(x){ return x.id===pid; }); return _stolIsValidLicence(p&&p.licence); }
+// Éligibilité au classement national : règlement → seuls les pilotes résidant en
+// France sont retenus. On se base d'abord sur le champ éditable « Région / Pays »
+// (region) de la fiche : une région française = réside en France = éligible ; un
+// pays étranger = écarté. Repli sur le champ importé « pays » si region est vide.
+function _stolNormTxt(s){ return (''+(s==null?'':s)).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+function _stolPaysIsFrench(pays){
+  if (!pays) return true;
+  var c = (typeof _paysCanon==='function') ? _paysCanon(pays) : (''+pays).trim();
+  return !c || /^france$/i.test(c);
+}
+function _stolRegionIsFrench(reg){
+  if (!reg) return true;
+  var rn=_stolNormTxt(reg);
+  return (_FR_REGIONS||[]).some(function(r){ return _stolNormTxt(r)===rn; });
+}
+// Retrouve la fiche registre d'une ligne de classement : par pid, sinon par nom.
+function _stolResolvePilot(row){
+  if (!row) return null;
+  if (row.pid){ var byId=(S.pilots||[]).find(function(x){ return x.id===row.pid; }); if (byId) return byId; }
+  var nk=_stolNormTxt((row.prenom||'')+'|'+(row.nom||''));
+  if (nk==='|') return null;
+  return (S.pilots||[]).find(function(x){ return _stolNormTxt((x.prenom||'')+'|'+(x.nom||''))===nk; }) || null;
+}
+// PAYS DU PILOTE — source unique qui pilote À LA FOIS le drapeau (Résultats) ET
+// l'éligibilité au classement national. On lit le champ « pays » (identification /
+// drapeau) en priorité, sinon la « Région / Pays » si c'est un pays étranger.
+// '' = considéré français.
+function _stolCountryOf(pil){
+  if (!pil) return '';
+  var pays=(''+(pil.pays||'')).trim();
+  if (pays) return pays;                                 // identification explicite (France ou étranger)
+  var reg=(''+(pil.region||'')).trim();
+  if (reg && !_stolRegionIsFrench(reg)) return reg;      // « Région / Pays » = pays étranger
+  return '';                                             // français
+}
+// Étranger = pays du pilote renseigné et ≠ France.
+function _stolNatForeignLabel(p){
+  var c=_stolCountryOf(p);
+  return _stolPaysIsFrench(c) ? '' : c;
+}
+// Clé stable d'une ligne de classement (licence valide sinon nom normalisé) —
+// sert à mémoriser une exclusion MANUELLE indépendamment de la fiche registre.
+function _stolNatRowKey(row){
+  if (!row) return '';
+  var lic=_stolIsValidLicence(row.num);
+  if (!lic){ var p=_stolResolvePilot(row); if (p) lic=_stolIsValidLicence(p.licence); }
+  return lic ? ('lic:'+lic) : ('nom:'+_stolNormTxt((row.prenom||'')+'|'+(row.nom||'')));
+}
+function _stolPilotEligibleNat(row){
+  var key=_stolNatRowKey(row);
+  if (key && S.stolNatExcluded && S.stolNatExcluded[key]) return false; // EXCLUSION MANUELLE — garantie
+  var p=_stolResolvePilot(row);
+  if (!p) return true;                    // hors registre → impossible de juger, on garde
+  return _stolPaysIsFrench(_stolCountryOf(p));  // AUTO : France/vide → retenu ; pays étranger → écarté
+}
+// Interrupteur manuel : exclure / réintégrer un pilote du classement national.
+function _stolNatToggleExclude(key){
+  if (!key) return;
+  if (!S.stolNatExcluded) S.stolNatExcluded = {};
+  if (S.stolNatExcluded[key]) delete S.stolNatExcluded[key]; else S.stolNatExcluded[key] = true;
+  if (typeof saveState === 'function') saveState();
+  if (typeof silentPush === 'function') silentPush(true);
+  if (typeof _stolNatDiagnostic === 'function') _stolNatDiagnostic();
+  if (typeof renderPilots === 'function') renderPilots();
+}
 
+// Meilleure perf disponible d'un pilote sur la compétition (finale, sinon
+// qualif, sinon essais) — sert au classement SCRATCH (toutes poules confondues).
+function _stolEffectivePerf(p){
+  if (p.finale && p.finale.perf > 0) return p.finale.perf;
+  if (p.qualif && p.qualif.perf > 0) return p.qualif.perf;
+  if (p.essais && p.essais.perf > 0) return p.essais.perf;
+  return 0;
+}
+// Place SCRATCH par pilote : tous les pilotes de la classe triés globalement
+// par meilleure perf croissante (règlement : « basé sur le classement SCRATCH »),
+// et NON par la place dans la poule.
+function _stolScratchPlaces(agg){
+  var scratch = agg.map(function(p){ return { key:_stolPiloteKey(p), perf:_stolEffectivePerf(p) }; })
+                   .filter(function(x){ return x.perf > 0; });
+  scratch.sort(function(a,b){ return a.perf - b.perf; });
+  var place = {};
+  scratch.forEach(function(x,i){ place[x.key] = i+1; });
+  return place;
+}
 // Points acquis par pilote pour une compétition + catégorie
 function _stolCompPointsByPilot(compId, categorie){
-  var eps=_getStolEpreuves(compId), agg=_stolAggregateForClassement(eps, categorie), res={};
+  var eps=_getStolEpreuves(compId), agg=_stolAggregateForClassement(eps, categorie, compId), res={};
+  var scratch=_stolScratchPlaces(agg); // place au classement scratch (règlement)
   agg.forEach(function(p){
     var key=_stolPiloteKey(p);
     var paVal=_stolGetPointsAcquis(compId, p);
+    var sp=scratch[key]||0;
     var pts=(paVal!=='' && paVal!==undefined) ? (parseInt(paVal,10)||0)
-          : ((p.finale && p.finale.place) ? _stolPointsFor(p.finale.place) : 0);
-    res[key]={ pid:p.pid, num:p.num||'', prenom:p.prenom||'', nom:p.nom||'', points:pts };
+          : (sp ? _stolPointsFor(sp) : 0);
+    res[key]={ pid:p.pid, num:p.num||'', prenom:p.prenom||'', nom:p.nom||'', points:pts, scratchPlace:sp };
   });
   return res;
 }
@@ -33847,13 +34082,16 @@ function _stolNationalRanking(season, categorie){
     compsRes.push(c);
     keys.forEach(function(k){
       var d=byPilot[k];
-      // Req 4 : identifier le pilote par son N° de licence (via le registre) ;
-      // repli sur l'id interne puis le nom seulement si la licence est inconnue.
-      var lic=_stolPilotLicence(d.pid);
+      // Req 4 : identifier le pilote par son N° de licence. Priorité à la licence de
+      // la fiche registre, SINON au N° saisi dans la compétition (d.num) — car dans
+      // les résultats STOL, la colonne « N° » EST le numéro de licence. Ainsi un
+      // compétiteur avec un N° saisi n'est plus considéré « sans licence ».
+      var lic=_stolPilotLicence(d.pid) || _stolIsValidLicence(d.num);
       var rk = lic ? ('lic_'+lic) : (d.pid ? ('pid_'+d.pid) : ('nom_'+k));
-      if (!pilots[rk]) pilots[rk]={ key:rk, pid:d.pid, num:lic||d.num||'', licence:lic, prenom:d.prenom, nom:d.nom, perComp:{}, total:0 };
+      if (!pilots[rk]) pilots[rk]={ key:rk, pid:d.pid, num:lic||d.num||'', licence:lic, prenom:d.prenom, nom:d.nom, perComp:{}, perCompPlace:{}, total:0 };
       var e=pilots[rk];
       e.perComp[c.id]=(e.perComp[c.id]||0)+(d.points||0);
+      if (d.scratchPlace) e.perCompPlace[c.id]=d.scratchPlace; // place au scratch (pour l'affichage)
       e.total += (d.points||0);
       if (lic){ e.licence=lic; e.num=lic; }
       else if (!e.num && d.num) e.num=d.num;
@@ -33864,13 +34102,25 @@ function _stolNationalRanking(season, categorie){
   });
   // Req 3 : ne garder que les compétiteurs ayant participé à la saison évaluée
   // (au moins une compétition à résultats dans la saison).
-  var list=Object.keys(pilots).map(function(k){ return pilots[k]; }).filter(function(p){ return Object.keys(p.perComp).length; });
+  var all=Object.keys(pilots).map(function(k){ return pilots[k]; }).filter(function(p){ return Object.keys(p.perComp).length; });
+  // Éligibilité (règlement) : écarter les étrangers non-résidents (Pays ≠ France).
+  // Le pilote a tout de même « consommé » sa place au scratch de chaque manche ;
+  // il est simplement retiré du classement national.
+  var list=[], excluded=[];
+  all.forEach(function(p){
+    if (_stolPilotEligibleNat(p)) list.push(p);
+    else {
+      p.pays=_stolNatForeignLabel(_stolResolvePilot(p))||'Étranger';
+      excluded.push(p);
+    }
+  });
   list.sort(function(a,b){ return b.total - a.total; });
-  return { comps:compsRes, rows:list };
+  excluded.sort(function(a,b){ return b.total - a.total; });
+  return { comps:compsRes, rows:list, excluded:excluded };
 }
 
 // Le classement national n'affiche que les 15 premiers (podium publié).
-var _STOL_NAT_TOP = 15;
+var _STOL_NAT_TOP = 20;
 function _stolNatSetSeason(v){ _stolNatSeason = parseInt(v,10); renderPilots(); }
 
 // ── Validation avant nettoyage : depuis le classement, ouvrir la fiche
@@ -33892,6 +34142,83 @@ function _stolNatOpenPilot(pid, compId){
   if (typeof toast === 'function') toast('Aucune fiche disponible pour ce compétiteur', 'warn');
 }
 
+// Diagnostic : pour la saison sélectionnée, montre POUR CHAQUE PILOTE les valeurs
+// qui décident de son éligibilité (type d'inscription / pays / région) + le détail
+// perf → place scratch → points par compétition. Sert à comprendre pourquoi un
+// pilote est écarté ou pourquoi il n'a pas de points.
+function _stolNatDiagnostic(){
+  var season=_stolNatSeason||_stolNatSeasons()[0];
+  var esc=escH, comps=_stolCompsOfSeason(season);
+  var fmt=function(v){ return v?(Math.round(v*10)/10):''; };
+  function buildCat(categorie){
+    var pilots={};
+    comps.forEach(function(c){
+      var eps=_getStolEpreuves(c.id), agg=_stolAggregateForClassement(eps, categorie, c.id);
+      var scratch=_stolScratchPlaces(agg);
+      agg.forEach(function(p){
+        var key=_stolPiloteKey(p), lic=_stolPilotLicence(p.pid);
+        var rk=lic?('lic_'+lic):(p.pid?('pid_'+p.pid):('nom_'+key));
+        if(!pilots[rk]) pilots[rk]={pid:p.pid,prenom:p.prenom,nom:p.nom,lic:lic,num:p.num||'',perComp:{},total:0};
+        if(!pilots[rk].pid&&p.pid) pilots[rk].pid=p.pid;
+        var sp=scratch[key]||0, perf=_stolEffectivePerf(p);
+        var paVal=_stolGetPointsAcquis(c.id,p);
+        var manual=(paVal!==''&&paVal!==undefined);
+        var pts=manual?(parseInt(paVal,10)||0):(sp?_stolPointsFor(sp):0);
+        pilots[rk].perComp[c.id]={perf:perf,place:sp,pts:pts,manual:manual};
+        pilots[rk].total+=pts;
+      });
+    });
+    return Object.keys(pilots).map(function(k){ return pilots[k]; }).sort(function(a,b){ return b.total-a.total; });
+  }
+  var th='padding:6px 8px;background:#1e293b;color:#cbd5e1;font-size:10px;font-weight:700;text-transform:uppercase;border:1px solid #334155;white-space:nowrap;position:sticky;top:0';
+  var td='padding:5px 8px;border:1px solid #334155;font-size:11px;white-space:nowrap';
+  function tableFor(label, categorie){
+    var rows=buildCat(categorie);
+    if(!rows.length) return '';
+    var h='<div style="font-size:13px;font-weight:800;color:#7c3aed;margin:14px 0 6px">'+esc(label)+' · '+rows.length+' pilote(s)</div>';
+    h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-variant-numeric:tabular-nums">';
+    h+='<thead><tr><th style="'+th+'">Pilote</th><th style="'+th+'">Licence</th><th style="'+th+'">Type inscr.</th><th style="'+th+'">Pays</th><th style="'+th+'">Région</th><th style="'+th+'">Éligible ?</th><th style="'+th+'">Action</th>';
+    comps.forEach(function(c){ var d=_stolCompDateShort(c); h+='<th style="'+th+'">'+esc(_stolCompLieu(c))+(d?'<br>'+esc(d):'')+'</th>'; });
+    h+='<th style="'+th+';background:#065f46">Total</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      var pil=_stolResolvePilot(r);
+      var elig=_stolPilotEligibleNat(r);
+      var key=_stolNatRowKey(r);
+      var isManual=!!(S.stolNatExcluded && S.stolNatExcluded[key]);
+      var typ=(pil&&pil.pilotType)||'', pays=(pil&&pil.pays)||'', reg=(pil&&pil.region)||'';
+      var rowBg=elig?'':'background:rgba(239,68,68,.12)';
+      h+='<tr style="'+rowBg+'">';
+      h+='<td style="'+td+';font-weight:700;color:#e2e8f0">'+esc(((r.prenom||'')+' '+(r.nom||'')).trim()||'—')+'</td>';
+      h+='<td style="'+td+';color:#93c5fd">'+esc(r.lic||r.num||'—')+'</td>';
+      h+='<td style="'+td+';color:'+(/etrang|foreign/i.test(typ)?'#f87171':'#cbd5e1')+'">'+esc(typ||'—')+'</td>';
+      h+='<td style="'+td+'">'+esc(pays||'—')+'</td>';
+      h+='<td style="'+td+'">'+esc(reg||'—')+'</td>';
+      h+='<td style="'+td+';font-weight:800;color:'+(elig?'#34d399':'#f87171')+'">'+(elig?'✓ oui':'✗ écarté')+(isManual?'<br><span style="font-size:8px;color:#f87171">(manuel)</span>':'')+'</td>';
+      h+='<td style="'+td+';text-align:center"><button onclick="_stolNatToggleExclude(\''+_stolNatJsq(key)+'\')" style="padding:4px 8px;border-radius:6px;border:1px solid '+(isManual?'#10b981':'#ef4444')+';background:'+(isManual?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)')+';color:'+(isManual?'#34d399':'#f87171')+';font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">'+(isManual?'↩ Réintégrer':'✗ Exclure')+'</button></td>';
+      comps.forEach(function(c){
+        var v=r.perComp[c.id];
+        if(!v){ h+='<td style="'+td+';color:#64748b;text-align:center">—</td>'; return; }
+        var detail=(v.perf?('perf '+fmt(v.perf)):'perf —')+' · '+(v.place?('pl.'+v.place):'pl.—')+(v.manual?' (saisi)':'');
+        h+='<td style="'+td+';text-align:center" title="'+esc(detail)+'"><b style="color:'+(v.pts?'#e2e8f0':'#64748b')+'">'+(v.pts||0)+'</b><br><span style="font-size:9px;color:#64748b">'+esc((v.perf?fmt(v.perf):'—')+'/pl'+(v.place||'—'))+'</span></td>';
+      });
+      h+='<td style="'+td+';font-weight:800;color:#34d399;background:rgba(16,185,129,.08)">'+r.total+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    return h;
+  }
+  var body=tableFor('MULTIAXE','multiaxes')+tableFor('PENDULAIRE','pendulaire');
+  if(!body) body='<div style="color:#94a3b8;padding:20px">Aucune donnée pour la saison '+season+'.</div>';
+  var ov=document.getElementById('stol-nat-diag'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='stol-nat-diag';
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;background:#0b1220;overflow:auto;padding:16px 18px 40px';
+  ov.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#0b1220;padding:6px 0 12px;z-index:2">'
+    +'<div style="font-size:15px;font-weight:800;color:#e2e8f0">🔎 Diagnostic classement national — Saison '+season+'</div>'
+    +'<button onclick="document.getElementById(\'stol-nat-diag\').remove()" style="padding:8px 16px;border-radius:8px;border:none;background:#334155;color:#e2e8f0;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✕ Fermer</button></div>'
+    +'<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;line-height:1.6">Chaque cellule compétition : <b style="color:#e2e8f0">points</b> puis <i>perf/place scratch</i>. Ligne rouge = pilote écarté (étranger). La colonne « Type inscr. » vient de l\'inscription (Français/Étranger) ; « Pays »/« Région » sont les replis.</div>'
+    +body;
+  document.body.appendChild(ov);
+}
+
 // Rendu écran du classement national (dans l'onglet Pilotes → Classement STOL)
 function _renderStolNational(cont){
   var seasons=_stolNatSeasons();
@@ -33903,6 +34230,7 @@ function _renderStolNational(cont){
   html += '<select onchange="_stolNatSetSeason(this.value)" style="height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;font-weight:700;outline:none;cursor:pointer">';
   seasons.forEach(function(s){ html += '<option value="'+s+'"'+(s===_stolNatSeason?' selected':'')+'>Saison '+s+'</option>'; });
   html += '</select><div style="flex:1"></div>';
+  html += '<button onclick="_stolNatDiagnostic()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔎 Diagnostic</button>';
   html += '<button onclick="exportStolNationalXLSX()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:8px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.12);color:#10b981;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⬇️ Exporter Excel</button>';
   html += '<button onclick="printStolNational()" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Imprimer A4</button>';
   html += '</div>';
@@ -33913,14 +34241,36 @@ function _renderStolNational(cont){
     html += '<div style="text-align:center;color:var(--txt3);font-size:13px;padding:40px 20px">Aucun point acquis pour la saison '+_stolNatSeason+'.'+(comps.length?'':'<br>Aucune compétition STOL rattachée à cette saison.')+'</div>';
   } else {
     html += _stolNatCleanupBanner(_stolNatSeason, m, p);
-    html += '<div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">💡 Astuce : cliquez sur l\'en-tête d\'une <b style="color:var(--stol)">compétition</b> ou sur le <b style="color:var(--stol)">nom</b> d\'un compétiteur pour ouvrir sa fiche, la vérifier et supprimer un éventuel doublon.</div>';
-    if (m.rows.length) html += _stolNatTableHTML('multiaxes', m);
-    if (p.rows.length) html += _stolNatTableHTML('pendulaire', p);
+    html += _stolNatExcludedBanner(m, p);
+    html += '<div style="font-size:11px;color:var(--txt3);margin-bottom:12px;line-height:1.5">💡 Astuce : cliquez sur l\'en-tête d\'une <b style="color:var(--stol)">compétition</b> ou sur le <b style="color:var(--stol)">nom</b> d\'un compétiteur pour ouvrir sa fiche. Dans chaque case : <b>place</b> puis <b style="color:#10b981">points</b>.</div>';
+    // Colonnes de compétitions COMMUNES aux deux tableaux (union), pour les aligner.
+    var _cmap={}; m.comps.concat(p.comps).forEach(function(c){ if(c&&c.id) _cmap[c.id]=c; });
+    var sharedComps=Object.keys(_cmap).map(function(k){ return _cmap[k]; }).sort(function(a,b){ return (a.dateFrom||'')<(b.dateFrom||'')?-1:1; });
+    if (m.rows.length) html += _stolNatTableHTML('multiaxes', m, sharedComps);
+    if (p.rows.length) html += _stolNatTableHTML('pendulaire', p, sharedComps);
   }
   html += '</div>';
   cont.innerHTML = html;
 }
 
+// Bandeau des pilotes écartés du classement national : règlement → seuls les
+// résidents en France sont retenus. Étrangers (Pays ≠ France) écartés. Cliquable
+// pour ouvrir la fiche et corriger le Pays si nécessaire.
+function _stolNatExcludedBanner(m, p){
+  var esc=escH, seen={}, exc=[];
+  [m,p].forEach(function(rk){ (rk.excluded||[]).forEach(function(r){ if (!seen[r.key]){ seen[r.key]=1; exc.push(r); } }); });
+  if (!exc.length) return '';
+  var html='<div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:12px 14px;margin-bottom:14px">';
+  html+='<div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:6px">🌍 '+exc.length+' pilote(s) écarté(s) du classement national</div>';
+  html+='<div style="font-size:11.5px;color:var(--txt2);margin-bottom:8px;line-height:1.5">Conformément au règlement, seuls les pilotes résidant en France sont classés. Ces pilotes ont un <b>Pays ≠ France</b> — cliquez pour ouvrir la fiche et corriger le pays si besoin :</div>';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  exc.forEach(function(r){
+    var _fc=Object.keys(r.perComp||{})[0]||'';
+    html+='<span onclick="_stolNatOpenPilot(\''+_stolNatJsq(r.pid)+'\',\''+_stolNatJsq(_fc)+'\')" style="cursor:pointer;font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;background:var(--navy3);border:1px solid var(--bdr);color:var(--txt2)" title="Ouvrir la fiche">'+esc(((r.prenom||'')+' '+(r.nom||'')).trim()||'—')+(r.pays?' · '+esc(r.pays):'')+'</span>';
+  });
+  html+='</div></div>';
+  return html;
+}
 // Détection d'aide au nettoyage : compétitions potentiellement en double
 // (même lieu/OACI + même date) et compétiteurs sans N° de licence (souvent des
 // saisies de test). Purement informatif — la suppression se fait sur la fiche.
@@ -33969,18 +34319,19 @@ function _stolNatCleanupBanner(season, m, p){
   html+='</div>';
   return html;
 }
-function _stolNatTableHTML(cat, rk){
+function _stolNatTableHTML(cat, rk, sharedComps){
   var titre=cat==='multiaxes'?'MULTIAXES':'PENDULAIRE', esc=escH;
+  var comps=sharedComps||rk.comps; // colonnes communes (alignement des 2 tableaux)
   var rows=(rk.rows||[]).slice(0, _STOL_NAT_TOP);
   var countLbl=rows.length+' pilote(s)'+(rk.rows.length>rows.length?' (sur '+rk.rows.length+')':'');
   var html='<div style="margin-bottom:18px;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;overflow:hidden">';
   html += '<div style="padding:10px 16px;background:linear-gradient(to right, rgba(124,58,237,.15), rgba(0,87,255,.08));border-bottom:1px solid var(--bdr)"><span style="font-size:13px;font-weight:800;color:#7c3aed;letter-spacing:1px">'+titre+'</span> <span style="font-size:11px;color:var(--txt3)">· '+countLbl+'</span></div>';
-  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:'+(450+rk.comps.length*78)+'px">';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:'+(450+comps.length*84)+'px">';
   var th='padding:8px 6px;background:var(--navy3);color:var(--txt3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;text-align:center;border-bottom:1px solid var(--bdr)';
   html += '<thead><tr><th style="'+th+';width:36px">Rg</th><th style="'+th+';width:64px">N° licence</th><th style="'+th+';text-align:left;padding-left:12px">Pilote</th><th style="'+th+';text-align:left;width:150px">Marque / Modèle</th>';
-  rk.comps.forEach(function(c){
+  comps.forEach(function(c){
     var _cl=_stolCompLieu(c), _cd=_stolCompDateShort(c);
-    html += '<th onclick="_stolNatOpenComp(\''+_stolNatJsq(c.id)+'\')" style="'+th+';width:74px;cursor:pointer" title="Ouvrir la fiche « '+esc(c.name||c.nom||_cl)+' »'+(_cd?' ('+esc(_cd)+')':'')+' pour vérifier / supprimer un doublon"><div style="font-weight:800;line-height:1.15;white-space:normal;color:var(--stol)">'+esc(_cl)+'</div>'+(_cd?'<div style="font-size:9px;font-weight:600;color:var(--txt3);margin-top:2px">'+esc(_cd)+'</div>':'')+'</th>';
+    html += '<th onclick="_stolNatOpenComp(\''+_stolNatJsq(c.id)+'\')" style="'+th+';width:80px;cursor:pointer" title="Ouvrir la fiche « '+esc(c.name||c.nom||_cl)+' »'+(_cd?' ('+esc(_cd)+')':'')+'"><div style="font-weight:800;line-height:1.15;white-space:normal;color:var(--stol)">'+esc(_cl)+'</div>'+(_cd?'<div style="font-size:9px;font-weight:600;color:var(--txt3);margin-top:3px">'+esc(_cd)+'</div>':'')+'<div style="font-size:8px;font-weight:600;color:var(--txt3);margin-top:5px">place · pts</div></th>';
   });
   html += '<th style="'+th+';background:rgba(16,185,129,.12);width:70px;color:#10b981">Total</th></tr></thead><tbody>';
   var td='padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
@@ -33994,7 +34345,11 @@ function _stolNatTableHTML(cat, rk){
     html += '<td style="'+td+';color:var(--stol);font-weight:800">'+esc(p.num||'—')+'</td>';
     html += '<td onclick="_stolNatOpenPilot(\''+_stolNatJsq(p.pid)+'\',\''+_stolNatJsq(_firstComp)+'\')" style="'+td+';text-align:left;padding-left:12px;font-weight:600;cursor:pointer" title="Ouvrir la fiche du compétiteur pour vérifier / supprimer"><span style="color:var(--stol);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">'+esc(_pnom)+'</span></td>';
     html += '<td style="'+td+';text-align:left;font-size:11px;color:var(--txt2)">'+(mm?esc(mm):'—')+'</td>';
-    rk.comps.forEach(function(c){ var v=p.perComp[c.id]; html += '<td style="'+td+'">'+(v?v:'<span style="color:var(--txt3)">—</span>')+'</td>'; });
+    comps.forEach(function(c){
+      var v=p.perComp[c.id], pl=(p.perCompPlace||{})[c.id];
+      if (!v){ html += '<td style="'+td+';color:var(--txt3)">—</td>'; return; }
+      html += '<td style="'+td+'"><span style="display:inline-flex;align-items:baseline;gap:6px"><span style="color:var(--txt3)" title="place">'+(pl?pl:'·')+'</span><b style="color:#10b981" title="points">'+v+'</b></span></td>';
+    });
     html += '<td style="'+td+';background:rgba(16,185,129,.08);font-weight:800;color:#10b981;font-size:14px">'+p.total+'</td></tr>';
   });
   html += '</tbody></table></div></div>';
@@ -34022,21 +34377,28 @@ function printStolNational(){
   var headerHTML = headerImg ? '<div style="text-align:'+alignH+';margin-bottom:6pt"><img src="'+headerImg+'" style="height:'+headerH+'mm;max-width:100%;object-fit:contain"></div>' : '';
   var footerHTML = footerImg ? '<div style="text-align:left"><img src="'+footerImg+'" style="height:'+footerH+'mm;max-width:100%;object-fit:contain;object-position:left center;display:block;margin:0"></div>' : '';
 
+  var m=_stolNationalRanking(season,'multiaxes'), p=_stolNationalRanking(season,'pendulaire');
+  // Colonnes de compétitions COMMUNES aux deux tableaux (union), pour les aligner.
+  var _compMap={};
+  m.comps.concat(p.comps).forEach(function(c){ if(c&&c.id) _compMap[c.id]=c; });
+  var sharedComps=Object.keys(_compMap).map(function(k){ return _compMap[k]; })
+    .sort(function(a,b){ return (a.dateFrom||'')<(b.dateFrom||'')?-1:1; });
+
   var body='', anyRows=false;
-  [['multiaxes','MULTIAXES'],['pendulaire','PENDULAIRE']].forEach(function(cc){
-    var rk=_stolNationalRanking(season, cc[0]);
+  [['MULTIAXES',m],['PENDULAIRE',p]].forEach(function(cc){
+    var rk=cc[1];
     if (!rk.rows.length) return;
     anyRows=true;
     var rows=rk.rows.slice(0, _STOL_NAT_TOP);
-    body += '<div class="cat">'+cc[1]+' <span class="cnt">'+rows.length+' pilotes'+(rk.rows.length>rows.length?' (sur '+rk.rows.length+')':'')+'</span></div>';
+    body += '<div class="cat">'+cc[0]+' <span class="cnt">'+rows.length+' pilotes'+(rk.rows.length>rows.length?' (sur '+rk.rows.length+')':'')+'</span></div>';
     body += '<table><thead><tr><th class="rg">Rg</th><th class="num">N° licence</th><th class="nom">NOM</th>';
-    rk.comps.forEach(function(c){ var _cd=_stolCompDateShort(c); body += '<th class="cp">'+esc(_stolCompLieu(c))+(_cd?'<br><span style="font-weight:400;font-size:8px">'+esc(_cd)+'</span>':'')+'</th>'; });
+    sharedComps.forEach(function(c){ var _dr=_stolCompDateRange(c); body += '<th class="cp">'+esc(_stolCompLieu(c))+(_dr?'<div style="font-weight:400;font-size:7.5px;margin-top:2px">'+esc(_dr)+'</div>':'')+'<div style="font-weight:400;font-size:7px;opacity:.8;margin-top:3px"><span style="display:inline-flex;gap:1cm"><span>place</span><span>pts</span></span></div></th>'; });
     body += '<th class="tot">Total</th></tr></thead><tbody>';
-    rows.forEach(function(p,i){
-      body += '<tr'+(i%2?' class="alt"':'')+'><td class="rg">'+(i+1)+'</td><td class="num">'+esc(p.num||'')+'</td>'
-        +'<td class="nom">'+esc(((p.prenom||'')+' '+(p.nom||'')).trim().toUpperCase())+'</td>';
-      rk.comps.forEach(function(c){ var v=p.perComp[c.id]; body += '<td>'+(v?v:'')+'</td>'; });
-      body += '<td class="tot">'+p.total+'</td></tr>';
+    rows.forEach(function(pl,i){
+      body += '<tr'+(i%2?' class="alt"':'')+'><td class="rg">'+(i+1)+'</td><td class="num">'+esc(pl.num||'')+'</td>'
+        +'<td class="nom">'+esc(((pl.prenom||'')+' '+(pl.nom||'')).trim().toUpperCase())+'</td>';
+      sharedComps.forEach(function(c){ var v=pl.perComp[c.id], plc=(pl.perCompPlace||{})[c.id]; body += '<td>'+(v?('<span style="display:inline-flex;align-items:baseline;gap:1cm"><span style="color:#94a3b8">'+(plc||'')+'</span><b>'+v+'</b></span>'):'')+'</td>'; });
+      body += '<td class="tot">'+pl.total+'</td></tr>';
     });
     body += '</tbody></table>';
   });
@@ -34059,7 +34421,7 @@ function printStolNational(){
     +'</style></head><body>'
     +'<div class="page-wrap"><div class="page-main">'
     + headerHTML
-    +'<div class="hdr"><h1>Classement National STOL — Saison '+season+'</h1><div class="sub">Cumul des points acquis en compétition · Édité le '+now+'</div></div>'
+    +'<div class="hdr"><h1>Classement National STOL — Saison '+season+'</h1><div class="sub">Cumul des points acquis en compétition en référence au règlement sportif, seuls les nationaux sont classés. · Édité le '+now+'</div></div>'
     + body
     +'</div>'
     + (footerHTML ? '<div class="page-footer">'+footerHTML+'</div>' : '')
@@ -35938,7 +36300,7 @@ function _renderStolClassementView(cp) {
   var html = '';
   // Pour chaque catégorie : agréger tous les pilotes
   ['multiaxes','pendulaire'].forEach(function(cat){
-    var agg = _stolAggregateForClassement(eps, cat);
+    var agg = _stolAggregateForClassement(eps, cat, cp&&cp.id);
     if (!agg.length) return;
     html += _renderStolClassementTable(cat, agg, cp);
   });
@@ -35956,7 +36318,12 @@ function _renderStolClassementView(cp) {
 }
 
 // Agréger tous les pilotes d'une catégorie sur les 3 phases
-function _stolAggregateForClassement(eps, categorie) {
+function _stolAggregateForClassement(eps, categorie, compId) {
+  // Pilotes retirés de l'Équipage (compEnroll) → exclus des résultats et du
+  // classement, même si leurs lignes subsistent (non destructif, réversible si
+  // le pilote est réinscrit).
+  var _tomb = (compId && S._deletedEnroll && S._deletedEnroll[compId]) ? S._deletedEnroll[compId] : null;
+  function _isTomb(l){ return !!(_tomb && l && l.pid && _tomb[l.pid]); }
   // Collecter tous les pilotes uniques par pid OU par nom normalisé
   function normalize(s) {
     return (s||'').toString().toLowerCase()
@@ -35974,6 +36341,7 @@ function _stolAggregateForClassement(eps, categorie) {
       // Calculer les places dans chaque poule de ce tableau pour cette phase
       var byPoule = {};
       (t.lignes||[]).forEach(function(l){
+        if (_isTomb(l)) return; // pilote retiré de l'Équipage
         var pl = (l.poule||'').toUpperCase();
         var ret = _stolLigneRetenue(l, nbR);
         if (!byPoule[pl]) byPoule[pl] = [];
@@ -35986,6 +36354,7 @@ function _stolAggregateForClassement(eps, categorie) {
         withPerf.forEach(function(x, idx){ x.place = idx + 1; });
       });
       (t.lignes||[]).forEach(function(l){
+        if (_isTomb(l)) return; // pilote retiré de l'Équipage
         var key = l.pid || normalize((l.prenom||'')+' '+(l.nom||''));
         if (!key) return;
         if (!pilotesMap[key]) {
@@ -36246,8 +36615,8 @@ function printStolPhase(phase, compId) {
   var phaseLabels = { essais:'Essais libres', qualif:'Qualifications', finale:'Finale' };
   var phaseLabel  = phaseLabels[phase] || phase;
   var eps  = _getStolEpreuves(compId);
-  var multi = _stolAggregateForClassement(eps, 'multiaxes');
-  var pendu = _stolAggregateForClassement(eps, 'pendulaire');
+  var multi = _stolAggregateForClassement(eps, 'multiaxes', compId);
+  var pendu = _stolAggregateForClassement(eps, 'pendulaire', compId);
 
   function frDate(s){ if(!s) return ''; var m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'/'+m[2]+'/'+m[1]):s; }
   var dateLbl = frDate(cp.dateFrom||'') + (cp.dateTo && cp.dateTo !== cp.dateFrom ? ' & '+frDate(cp.dateTo) : '');
@@ -36454,8 +36823,8 @@ function printStolClassementConsolide(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
   if (!cp) { toast('Compétition introuvable','err'); return; }
   var eps = _getStolEpreuves(compId);
-  var multi = _stolAggregateForClassement(eps, 'multiaxes');
-  var pendu = _stolAggregateForClassement(eps, 'pendulaire');
+  var multi = _stolAggregateForClassement(eps, 'multiaxes', compId);
+  var pendu = _stolAggregateForClassement(eps, 'pendulaire', compId);
   if (!multi.length && !pendu.length) { toast('Aucune donnée à imprimer','err'); return; }
   // Date format français
   function frDate(s){ if(!s) return ''; var m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m? (m[3]+'/'+m[2]+'/'+m[1]) : s; }
@@ -36524,11 +36893,12 @@ function printStolClassementConsolide(compId) {
       // "Points" : priorité à la valeur saisie (colonne Points du tableau Classement)
       var ptsDebutSaisi = _stolGetPointsDebut(compId, p);
       var ptsDebut = (ptsDebutSaisi !== '' && ptsDebutSaisi !== undefined) ? parseInt(ptsDebutSaisi, 10) : (parseInt(p.ptsSaison || 0, 10) || 0);
-      // "Points acquis" : MÊME calcul que dans la page Classement
+      // "Points acquis" : MÊME calcul que dans la page Classement national
       //   1. Valeur saisie en priorité
-      //   2. Sinon : barème STOL selon la place dans la poule de Finale (p.finale.place)
+      //   2. Sinon : barème STOL selon la place au SCRATCH (rg = place globale,
+      //      toutes poules confondues), conformément au règlement.
       var ptsAcquisSaisi = _stolGetPointsAcquis(compId, p);
-      var ptsAcqSuggest = (p.finale && p.finale.place) ? _stolPointsFor(p.finale.place) : 0;
+      var ptsAcqSuggest = rg ? _stolPointsFor(rg) : 0;
       var ptsGagnes = (ptsAcquisSaisi !== '' && ptsAcquisSaisi !== undefined) ? (parseInt(ptsAcquisSaisi, 10)||0) : ptsAcqSuggest;
       var ptsTotal = ptsDebut + ptsGagnes;
       // Colonne "Points Total" = Points (début) + Points acquis (auto, ne plus saisir)
@@ -39823,7 +40193,14 @@ function renderEnrolledPilots() {
 function unenrollPilot(pid) {
   if (!_currentCompId || !S.compEnroll || !S.compEnroll[_currentCompId]) return;
   S.compEnroll[_currentCompId] = S.compEnroll[_currentCompId].filter(function(id){ return id !== pid; });
-  saveState(); renderManagePanel(); toast('Pilote retiré', '');
+  // Marqueur de suppression : exclut le pilote des résultats/classement de cette
+  // compétition (réversible : réinscrire l'efface). Voir _stolAggregateForClassement.
+  if (!S._deletedEnroll) S._deletedEnroll = {};
+  if (!S._deletedEnroll[_currentCompId]) S._deletedEnroll[_currentCompId] = {};
+  S._deletedEnroll[_currentCompId][pid] = Date.now();
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  renderManagePanel(); toast('Pilote retiré', '');
 }
 
 // ═══════════════════════════════════
@@ -45715,8 +46092,8 @@ function printCompDossier(compId, opts) {
     resulHtml = '<div class="page-sec">'+SH('Résultats — Classement');
     try {
       var _eps   = (typeof _getStolEpreuves==='function') ? _getStolEpreuves(compId) : null;
-      var _multi = _eps ? _stolAggregateForClassement(_eps,'multiaxes') : [];
-      var _pendu = _eps ? _stolAggregateForClassement(_eps,'pendulaire') : [];
+      var _multi = _eps ? _stolAggregateForClassement(_eps,'multiaxes', compId) : [];
+      var _pendu = _eps ? _stolAggregateForClassement(_eps,'pendulaire', compId) : [];
       var _effPerf = function(p){
         if (p.finale && p.finale.perf>0) return p.finale.perf;
         if (p.qualif && p.qualif.perf>0) return p.qualif.perf;
