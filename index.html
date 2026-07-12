@@ -21745,6 +21745,8 @@ function setPilotsClass(cls, btn) {
   if (btn) btn.classList.add('active');
   var bar = document.getElementById('pilots-action-bar');
   if (bar) bar.style.display = cls === 'pilotes' ? 'flex' : 'none';
+  // À l'ouverture du classement national : afficher la saison EN COURS par défaut.
+  if (cls === 'classement-stol' && typeof _stolCurrentSeason === 'function') _stolNatSeason = _stolCurrentSeason();
   renderPilots();
 }
 
@@ -33949,6 +33951,15 @@ function _stolNatSeasons(){
   var arr=Object.keys(set).map(Number).sort(function(a,b){ return b-a; });
   return arr.length?arr:[new Date().getFullYear()];
 }
+// Saison EN COURS : celle dans laquelle tombe la date du jour (même logique que
+// pour les compétitions). Repli sur la saison la plus récente si absente.
+function _stolCurrentSeason(){
+  var seasons=_stolNatSeasons();
+  var cdfs=_stolAllComps().filter(_stolIsCDF);
+  var today=new Date().toISOString().slice(0,10);
+  var cur=_stolSeasonOf({dateFrom:today}, cdfs);
+  return (seasons.indexOf(cur)!==-1) ? cur : seasons[0];
+}
 function _stolCompsOfSeason(season){
   var comps=_stolAllComps(), cdfs=comps.filter(_stolIsCDF);
   return comps.filter(function(c){ return _stolSeasonOf(c,cdfs) === season; });
@@ -34121,6 +34132,15 @@ function _stolNationalRanking(season, categorie){
 
 // Le classement national n'affiche que les 15 premiers (podium publié).
 var _STOL_NAT_TOP = 20;
+// Rang « competition ranking » (1, 2, 2, 4) : à points totaux égaux → même rang ;
+// le rang suivant tient compte du nombre d'ex æquo. rows doit être trié par total décroissant.
+function _stolCompRanks(rows){
+  var ranks=[];
+  for (var i=0;i<rows.length;i++){
+    ranks[i] = (i>0 && rows[i].total===rows[i-1].total) ? ranks[i-1] : (i+1);
+  }
+  return ranks;
+}
 function _stolNatSetSeason(v){ _stolNatSeason = parseInt(v,10); renderPilots(); }
 
 // ── Validation avant nettoyage : depuis le classement, ouvrir la fiche
@@ -34222,7 +34242,7 @@ function _stolNatDiagnostic(){
 // Rendu écran du classement national (dans l'onglet Pilotes → Classement STOL)
 function _renderStolNational(cont){
   var seasons=_stolNatSeasons();
-  if (_stolNatSeason==null || seasons.indexOf(_stolNatSeason)===-1) _stolNatSeason=seasons[0];
+  if (_stolNatSeason==null || seasons.indexOf(_stolNatSeason)===-1) _stolNatSeason=_stolCurrentSeason();
   var esc=escH;
   var html='';
   html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--bdr);background:var(--navy2);position:sticky;top:0;z-index:5">';
@@ -34335,8 +34355,9 @@ function _stolNatTableHTML(cat, rk, sharedComps){
   });
   html += '<th style="'+th+';background:rgba(16,185,129,.12);width:70px;color:#10b981">Total</th></tr></thead><tbody>';
   var td='padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums';
+  var _ranks=_stolCompRanks(rows);
   rows.forEach(function(p,i){
-    var rg=i+1, medal=rg===1?'🥇':rg===2?'🥈':rg===3?'🥉':rg;
+    var rg=_ranks[i], medal=rg===1?'🥇':rg===2?'🥈':rg===3?'🥉':rg;
     var u=_stolPilotUlm(p), mm=[u.marque,u.modele].filter(Boolean).join(' · ').toUpperCase();
     var _firstComp=Object.keys(p.perComp||{})[0]||'';
     var _pnom=((p.prenom||'')+' '+(p.nom||'')).trim()||'—';
@@ -34394,8 +34415,9 @@ function printStolNational(){
     body += '<table><thead><tr><th class="rg">Rg</th><th class="num">N° licence</th><th class="nom">NOM</th>';
     sharedComps.forEach(function(c){ var _dr=_stolCompDateRange(c); body += '<th class="cp">'+esc(_stolCompLieu(c))+(_dr?'<div style="font-weight:400;font-size:7.5px;margin-top:2px">'+esc(_dr)+'</div>':'')+'<div style="font-weight:400;font-size:7px;opacity:.8;margin-top:3px"><span style="display:inline-flex;gap:1cm"><span>place</span><span>pts</span></span></div></th>'; });
     body += '<th class="tot">Total</th></tr></thead><tbody>';
+    var _pranks=_stolCompRanks(rows);
     rows.forEach(function(pl,i){
-      body += '<tr'+(i%2?' class="alt"':'')+'><td class="rg">'+(i+1)+'</td><td class="num">'+esc(pl.num||'')+'</td>'
+      body += '<tr'+(i%2?' class="alt"':'')+'><td class="rg">'+_pranks[i]+'</td><td class="num">'+esc(pl.num||'')+'</td>'
         +'<td class="nom">'+esc(((pl.prenom||'')+' '+(pl.nom||'')).trim().toUpperCase())+'</td>';
       sharedComps.forEach(function(c){ var v=pl.perComp[c.id], plc=(pl.perCompPlace||{})[c.id]; body += '<td>'+(v?('<span style="display:inline-flex;align-items:baseline;gap:1cm"><span style="color:#94a3b8">'+(plc||'')+'</span><b>'+v+'</b></span>'):'')+'</td>'; });
       body += '<td class="tot">'+pl.total+'</td></tr>';
@@ -34450,9 +34472,10 @@ function exportStolNationalXLSX(){
       [],
       header
     ];
-    rk.rows.slice(0, _STOL_NAT_TOP).forEach(function(p,i){
+    var _xrows=rk.rows.slice(0, _STOL_NAT_TOP), _xranks=_stolCompRanks(_xrows);
+    _xrows.forEach(function(p,i){
       var u=_stolPilotUlm(p), mm=[u.marque,u.modele].filter(Boolean).join(' / ').toUpperCase();
-      var row=[i+1, p.num||'', ((p.prenom||'')+' '+(p.nom||'')).trim(), mm];
+      var row=[_xranks[i], p.num||'', ((p.prenom||'')+' '+(p.nom||'')).trim(), mm];
       rk.comps.forEach(function(c){ var v=p.perComp[c.id]; row.push(v?v:''); });
       row.push(p.total);
       aoa.push(row);
