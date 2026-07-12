@@ -2668,11 +2668,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <div style="flex:1;text-align:center;font-size:20px;font-weight:900;color:var(--txt)">🎓 Formations</div>
     <div style="min-width:80px"></div>
   </div>
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--txt3)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="64" height="64" style="opacity:.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-    <div style="font-size:15px;font-weight:700;color:var(--txt)">Formations</div>
-    <div style="font-size:13px;text-align:center;line-height:1.7;max-width:320px">Module en cours de développement.<br>Ce volet traitera des cursus de formation<br>et des qualifications des pratiquants ULM.</div>
-  </div>
+  <div id="formations-body" style="flex:1;overflow-y:auto"></div>
 </div>
 
 <!-- Module Accès aux pratiques -->
@@ -5116,6 +5112,7 @@ function _flushSaveState() {
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
     stolNatExcluded:S.stolNatExcluded||{},
+    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false,
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -26306,6 +26303,8 @@ async function loadFromSupabaseFirst() {
     // GARANTIE DES SAISIES : snapshot des pilotes locaux AVANT écrasement par le cloud,
     // pour ne jamais perdre un N° de licence (ni l'identité) saisi localement.
     var _localPilotsSnapshot = (S.pilots || []).slice();
+    // Module Formations : snapshot pour fusion (union par id) après application cloud.
+    var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded };
 
     // ── Garde anti-perte : comparer les compteurs locaux vs cloud ──
     var localStaff    = _countStaff(S);
@@ -26526,11 +26525,38 @@ async function loadFromSupabaseFirst() {
         S.notesfrais[uid] = (S.notesfrais[uid]||[]).filter(function(n){ return !_ndfTombs[n.id]; });
       });
     }
-    // ✅ Fusionner securiteEvents locaux avec cloud (union par id)
+    // ✅ Module Formations : fusion union par id (le plus récent _updatedAt gagne),
+    // pour ne jamais perdre les types/sessions/inscriptions/qualifs saisis localement.
+    (function(){
+      ['formTypes','formSessions','formInscriptions','formQualifs'].forEach(function(k){
+        if (!Array.isArray(S[k])) S[k]=[];
+        var byId={}; S[k].forEach(function(x){ if(x&&x.id) byId[x.id]=x; });
+        (_formSnap[k]||[]).forEach(function(loc){
+          if(!loc||!loc.id) return;
+          var ex=byId[loc.id];
+          if(!ex){ S[k].push(loc); byId[loc.id]=loc; }
+          else if((loc._updatedAt||0) >= (ex._updatedAt||0)){ Object.assign(ex, loc); }
+        });
+      });
+      if (_formSnap.seeded) S._formSeeded = true;
+    })();
+    // ✅ Fusionner securiteEvents locaux avec cloud — champ par champ, sans perte.
+    // Un événement présent des deux côtés : la version la plus récente (_updatedAt)
+    // gagne ; et on ne laisse JAMAIS le cloud effacer une référence BEA saisie
+    // localement (garantie de durabilité des saisies, comme pour les licences).
     if (savedSecuriteEvents) {
       if (!S.securiteEvents) S.securiteEvents = [];
-      savedSecuriteEvents.forEach(function(ev) {
-        if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
+      var _seById = {};
+      S.securiteEvents.forEach(function(ev){ if (ev && ev.id) _seById[ev.id] = ev; });
+      savedSecuriteEvents.forEach(function(loc) {
+        if (!loc || !loc.id) return;
+        var cloud = _seById[loc.id];
+        if (!cloud) { S.securiteEvents.push(loc); _seById[loc.id] = loc; return; }
+        if ((loc._updatedAt||0) >= (cloud._updatedAt||0)) {
+          Object.assign(cloud, loc);                       // local plus récent → gagne
+        } else if (!cloud.refBEA && loc.refBEA) {
+          cloud.refBEA = loc.refBEA;                        // ne pas perdre la réf. BEA locale
+        }
       });
     }
     // ✅ Fusionner aides fédérales locales avec cloud (_updatedAt/_createdAt gagne)
@@ -51074,6 +51100,10 @@ function _dtnShowPanel(module) {
       + '</div></div>';
     return;
   }
+  if (module === 'formations') {
+    if (typeof renderFormationsModule === 'function') { try { renderFormationsModule(); } catch(e){ if(wb) wb.innerHTML='<div style="padding:40px;color:#f87171">Erreur module Formations : '+(e&&e.message||e)+'</div>'; } }
+    return;
+  }
   wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding-top:80px;color:var(--txt3)">'
     + p.icon
@@ -51387,58 +51417,63 @@ function _renderRegistreEvenement() {
 
 function _renderReferencesBEA() {
   if (!S.securiteEvents) S.securiteEvents = [];
-  var evs = S.securiteEvents.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var _all = S.securiteEvents.slice();
+  var doneCount = _all.filter(function(e){ return !!e.refBEA; }).length;
+  // Ne montrer QUE les événements NON traités (sans référence BEA). Les traités
+  // restent accessibles via le Registre Événement.
+  var evs = _all.filter(function(e){ return !e.refBEA; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
 
-  var optBEAHtml = '<option value="">— Non classifié —</option>'
+  var optBEAHtml = '<option value="" selected>— Non classifié —</option>'
     + _BEA_REFS.map(function(r){ return '<option value="'+r.replace(/"/g,'&quot;')+'">'+r+'</option>'; }).join('');
 
-  var _sel = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:11px;padding:5px 8px;cursor:pointer;outline:none';
+  // Même police/taille que la colonne « Premiers éléments » (12px)
+  var _sel = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;cursor:pointer;outline:none';
 
   var html = '<div style="margin-bottom:14px">'
-    + '<div style="font-size:13px;color:var(--txt3)">Associer une référence BEA à chaque événement · <b style="color:var(--txt)">'+evs.length+'</b> événements</div>'
-    + '<div style="font-size:11px;color:var(--txt3);margin-top:4px">Les références validées alimentent le graphique Origines et sont modifiables ici ou dans le formulaire.</div>'
+    + '<div style="font-size:13px;color:var(--txt3)">À référencer · <b style="color:var(--txt)">'+evs.length+'</b> à traiter'+(doneCount?' · <span style="color:#10b981;font-weight:700">'+doneCount+' traité(s)</span>':'')+'</div>'
+    + '<div style="font-size:11px;color:var(--txt3);margin-top:4px">Un événement validé quitte cette liste et le curseur passe automatiquement à la ligne suivante. Retrouvez les événements traités dans le <b>Registre Événement</b>.</div>'
     + '</div>';
 
   if (!evs.length) {
     html += '<div style="padding:40px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">'
-      + '<div style="font-size:32px;margin-bottom:10px">📋</div>Aucun événement à référencer.<br>Déclarez des événements dans le Registre.</div>';
+      + '<div style="font-size:32px;margin-bottom:10px">✅</div>'
+      + (doneCount ? 'Tous les événements sont référencés ('+doneCount+').<br>Retrouvez-les dans le Registre Événement.' : 'Aucun événement à référencer.<br>Déclarez des événements dans le Registre.')
+      + '</div>';
     return html;
   }
 
   var _thB = 'padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:2;background:var(--navy3)';
   html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
     + '<div style="overflow-x:auto;max-height:calc(100vh - 280px);overflow-y:auto">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;table-layout:fixed">'
     + '<thead><tr style="color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
-    + '<th style="'+_thB+';width:90px">Date</th>'
-    + '<th style="'+_thB+'">Premiers éléments</th>'
-    + '<th style="'+_thB+';color:#6366f1;width:360px">Référence BEA</th>'
+    + '<th style="'+_thB+';width:84px">Date</th>'
+    + '<th style="'+_thB+';width:48%">Premiers éléments</th>'
+    + '<th style="'+_thB+';color:#6366f1;width:48%">Référence BEA</th>'
     + '</tr></thead><tbody>';
 
   evs.forEach(function(ev, i) {
     var d = ev.date ? ev.date.split('-').reverse().join('/') : '—';
     var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
     var descCourt = ev.description || '';
-    var opts = optBEAHtml.replace('value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'"', 'value="'+(ev.refBEA||'').replace(/"/g,'&quot;')+'" selected');
     var selId = 'sev-beasel-'+ev.id;
 
-    var suggestions = _beaSuggest(ev.description, 3).filter(function(r){ return r !== ev.refBEA; });
+    var suggestions = _beaSuggest(ev.description, 3);
     var suggHtml = suggestions.length
-      ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'
+      ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'
         + suggestions.map(function(r){
-            return '<button type="button" onclick="_sevApplyBeaSuggestion(\''+ev.id+'\',\''+r.replace(/'/g,"\\'")+'\',\''+selId+'\')" title="Appliquer cette suggestion" style="font-size:9px;padding:3px 8px;border-radius:99px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-family:inherit;cursor:pointer;white-space:nowrap">💡 '+r+'</button>';
+            return '<button type="button" onclick="_sevApplyBeaSuggestion(\''+ev.id+'\',\''+r.replace(/'/g,"\\'")+'\','+i+')" title="Appliquer cette suggestion" style="font-size:10px;padding:3px 9px;border-radius:99px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-family:inherit;cursor:pointer;white-space:nowrap">💡 '+r+'</button>';
           }).join('')
         + '</div>'
       : '';
 
     html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr)">'
       + '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap;vertical-align:top">'+d+'</td>'
-      + '<td style="padding:8px 10px;color:var(--txt2);vertical-align:top;line-height:1.5">'+descCourt+'</td>'
+      + '<td style="padding:8px 10px;color:var(--txt2);vertical-align:top;line-height:1.5;font-size:12px;word-break:break-word">'+descCourt+'</td>'
       + '<td style="padding:6px 8px;vertical-align:top">'
-      + '<select id="'+selId+'" style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value)">'
-      + opts
+      + '<select id="'+selId+'" data-sevrow="'+i+'" style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value,'+i+')">'
+      + optBEAHtml
       + '</select>'
-      + (ev.refBEA?'<div style="font-size:9px;color:#6366f1;margin-top:3px;padding-left:2px">✓ validé</div>':'')
       + suggHtml
       + '</td>'
       + '</tr>';
@@ -51447,38 +51482,41 @@ function _renderReferencesBEA() {
   html += '</tbody></table></div></div>';
   return html;
 }
+// Après validation d'une référence : le volet se recharge (l'événement traité
+// disparaît) et le curseur se place sur la ligne suivante (même index).
+function _sevRefreshRefsAndAdvance(rowIndex) {
+  openSecuriteEvents('refs');
+  setTimeout(function(){
+    var sels = document.querySelectorAll('#dtn-workspace-body select[data-sevrow]');
+    if (!sels.length) return;
+    var idx = (typeof rowIndex === 'number') ? rowIndex : 0;
+    var target = sels[idx] || sels[sels.length-1];
+    if (target) { try { target.scrollIntoView({block:'center', behavior:'smooth'}); target.focus(); } catch(e){} }
+  }, 60);
+}
 
-function _sevApplyBeaSuggestion(evId, ref, selId) {
-  var sel = document.getElementById(selId);
-  if (sel) sel.value = ref;
+function _sevApplyBeaSuggestion(evId, ref, rowIndex) {
   if (!S.securiteEvents) return;
   var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
   if (!ev) return;
   ev.refBEA = ref || null;
   ev._updatedAt = Date.now();
   saveState();
-  openSecuriteEvents('refs');
+  if (typeof silentPush === 'function') silentPush();
+  _sevRefreshRefsAndAdvance(rowIndex);
 }
 
-function _sevSaveRefBEA(evId, val) {
+function _sevSaveRefBEA(evId, val, rowIndex) {
   if (!S.securiteEvents) return;
   var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
   if (!ev) return;
   ev.refBEA = val || null;
   ev._updatedAt = Date.now();
   saveState();
-  // Rafraîchir juste la ligne "validé" sans recharger le volet entier
-  var sel = document.querySelector('select[onchange="_sevSaveRefBEA(\''+evId+'\',this.value)"]');
-  if (sel) {
-    var badge = sel.nextSibling;
-    if (badge && badge.tagName === 'DIV') badge.remove();
-    if (val) {
-      var div = document.createElement('div');
-      div.style.cssText = 'font-size:9px;color:#6366f1;margin-top:3px;padding-left:2px';
-      div.textContent = '✓ validé';
-      sel.parentNode.appendChild(div);
-    }
-  }
+  if (typeof silentPush === 'function') silentPush();
+  // Si une référence a été validée, l'événement quitte la liste ; on recharge et on
+  // passe à la ligne suivante. Si « Non classifié » (val vide), on ne bouge pas.
+  if (val) _sevRefreshRefsAndAdvance(rowIndex);
 }
 
 // ── Coordonnées centroides des départements (lat, lon) ──
@@ -53021,6 +53059,331 @@ function openDTNModule(module) {
       _dtnSetActiveNav(module);
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODULE FORMATIONS (FFPLUM) — Types · Sessions · Inscriptions · Qualifications · Tableau de bord
+// Fondation évolutive : types de formation créables librement, sessions,
+// inscriptions et qualifications reliées. Persistance : IndexedDB (état complet),
+// localStorage (payload) et fusion cloud (union par id).
+// ═══════════════════════════════════════════════════════════════════
+var _formTab = 'types';
+function _formInit(){
+  if (!S.formTypes)        S.formTypes = [];
+  if (!S.formSessions)     S.formSessions = [];
+  if (!S.formInscriptions) S.formInscriptions = [];
+  if (!S.formQualifs)      S.formQualifs = [];
+  if (!S.formTypes.length && !S._formSeeded){
+    S._formSeeded = true;
+    ['Directeur de vol','Pilote de démo','Qualif Sport','Commissaire','Instructeur','Examinateur'].forEach(function(n){
+      S.formTypes.push({ id:_formUid('ft'), nom:n, description:'', dureeValidite:null, actif:true, _updatedAt:Date.now() });
+    });
+  }
+}
+function _formUid(p){ return (p||'f')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _formEsc(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _formSave(){ if(typeof saveState==='function') saveState(); if(typeof silentPush==='function') silentPush(); }
+function _formTypeById(id){ return (S.formTypes||[]).find(function(t){ return t.id===id; }) || null; }
+function _formSessionById(id){ return (S.formSessions||[]).find(function(s){ return s.id===id; }) || null; }
+function _formSessionCount(sessionId){ return (S.formInscriptions||[]).filter(function(x){ return x.sessionId===sessionId && x.statut!=='annule'; }).length; }
+function _formFrDate(d){ var m=(''+(d||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(d||''); }
+
+function renderFormationsModule(tab){
+  _formInit();
+  if (tab) _formTab = tab;
+  var body = document.getElementById('dtn-workspace-body') || document.getElementById('formations-body');
+  if (!body) return;
+  var tabs=[['types','Types de formation'],['sessions','Sessions'],['inscriptions','Inscriptions'],['qualifs','Qualifications'],['dashboard','Tableau de bord']];
+  var head='<div style="font-size:17px;font-weight:900;color:var(--txt);text-align:center;margin-bottom:16px">🎓 Formations</div>';
+  var nav='<div style="display:flex;gap:3px;padding:3px;background:var(--navy3);border-radius:10px;width:fit-content;margin:0 auto 22px;flex-wrap:wrap">';
+  tabs.forEach(function(t){ var a=_formTab===t[0]; nav+='<button onclick="renderFormationsModule(\''+t[0]+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt3)')+';font-size:12px;font-weight:'+(a?'800':'600')+';font-family:inherit;cursor:pointer;transition:all .15s">'+t[1]+'</button>'; });
+  nav+='</div>';
+  var content = _formTab==='types' ? _formRenderTypes()
+              : _formTab==='sessions' ? _formRenderSessions()
+              : _formTab==='inscriptions' ? _formRenderInscriptions()
+              : '<div style="text-align:center;color:var(--txt3);padding:70px 20px;font-size:13px;border:1px dashed var(--bdr);border-radius:14px">🛠 Onglet « '+_formEsc((tabs.find(function(x){return x[0]===_formTab;})||[])[1])+' » — à venir (phase suivante).</div>';
+  body.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:24px 28px 70px">'+head+nav+content+'</div>';
+}
+
+// ── ONGLET 1 : TYPES DE FORMATION ──────────────────────────────────
+function _formRenderTypes(){
+  var types=(S.formTypes||[]).slice().sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
+    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Types de formation</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Créez librement de nouveaux types — immédiatement disponibles dans les sessions.</div></div>'
+    + '<button onclick="_formEditType(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau type</button>'
+    + '</div>';
+  if (!types.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucun type de formation. Cliquez sur « + Nouveau type ».</div>';
+  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3)';
+  var td='padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:top';
+  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:640px">'
+    + '<thead><tr><th style="'+th+'">Nom</th><th style="'+th+'">Description</th><th style="'+th+';width:120px">Validité</th><th style="'+th+';width:90px">État</th><th style="'+th+';width:110px;text-align:right">Actions</th></tr></thead><tbody>';
+  types.forEach(function(t){
+    var val = (t.dureeValidite!=null && t.dureeValidite!=='') ? (t.dureeValidite+' mois') : '<span style="color:var(--txt3)">—</span>';
+    var badge = t.actif
+      ? '<span style="font-size:11px;font-weight:700;color:#10b981;background:rgba(16,185,129,.12);padding:2px 9px;border-radius:20px">Actif</span>'
+      : '<span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(239,68,68,.12);padding:2px 9px;border-radius:20px">Inactif</span>';
+    h+='<tr><td style="'+td+';font-weight:700;color:var(--txt)">'+_formEsc(t.nom)+'</td>'
+      + '<td style="'+td+';color:var(--txt2)">'+(t.description?_formEsc(t.description):'<span style="color:var(--txt3)">—</span>')+'</td>'
+      + '<td style="'+td+'">'+val+'</td>'
+      + '<td style="'+td+'"><span onclick="_formToggleType(\''+t.id+'\')" style="cursor:pointer" title="Activer / désactiver">'+badge+'</span></td>'
+      + '<td style="'+td+';text-align:right;white-space:nowrap">'
+      + '<button onclick="_formEditType(\''+t.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">✏️</button> '
+      + '<button onclick="_formDeleteType(\''+t.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button>'
+      + '</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+function _formToggleType(id){ var t=_formTypeById(id); if(!t)return; t.actif=!t.actif; t._updatedAt=Date.now(); _formSave(); renderFormationsModule(); }
+function _formDeleteType(id){
+  var t=_formTypeById(id); if(!t)return;
+  var used=(S.formSessions||[]).some(function(s){ return s.typeId===id; });
+  if(!confirm('Supprimer le type « '+t.nom+' » ?'+(used?'\n\n⚠️ Des sessions utilisent ce type — elles conserveront le nom mais ne seront plus reliées.':''))) return;
+  S.formTypes=(S.formTypes||[]).filter(function(x){ return x.id!==id; });
+  _formSave(); renderFormationsModule();
+}
+function _formEditType(id){
+  var t=id?_formTypeById(id):null;
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='form-modal';
+  ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(460px,100%);box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(t?'Modifier le type':'Nouveau type de formation')+'</div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Nom *</label><input id="ft-nom" value="'+_formEsc(t?t.nom:'')+'" placeholder="Ex : Directeur de vol" style="'+fSt+'"></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Description</label><textarea id="ft-desc" rows="3" style="'+fSt+';resize:vertical">'+_formEsc(t?t.description:'')+'</textarea></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Durée de validité (mois, optionnel)</label><input id="ft-val" type="number" min="0" value="'+(t&&t.dureeValidite!=null?t.dureeValidite:'')+'" placeholder="Ex : 24 — laisser vide si sans expiration" style="'+fSt+'"></div>'
+    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:18px;cursor:pointer;font-size:13px;color:var(--txt)"><input id="ft-actif" type="checkbox" '+(!t||t.actif?'checked':'')+' style="width:16px;height:16px;cursor:pointer"> Actif</label>'
+    + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_formSaveType(\''+(t?t.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){ var el=document.getElementById('ft-nom'); if(el)el.focus(); },60);
+}
+function _formSaveType(id){
+  var nom=(document.getElementById('ft-nom')||{}).value||''; nom=nom.trim();
+  if(!nom){ if(typeof toast==='function')toast('Le nom est requis','err'); return; }
+  var desc=((document.getElementById('ft-desc')||{}).value||'').trim();
+  var valRaw=((document.getElementById('ft-val')||{}).value||'').trim();
+  var val = valRaw==='' ? null : (parseInt(valRaw,10)||0);
+  var actif=!!(document.getElementById('ft-actif')||{}).checked;
+  var t=id?_formTypeById(id):null;
+  if(t){ t.nom=nom; t.description=desc; t.dureeValidite=val; t.actif=actif; t._updatedAt=Date.now(); }
+  else { S.formTypes.push({ id:_formUid('ft'), nom:nom, description:desc, dureeValidite:val, actif:actif, _updatedAt:Date.now() }); }
+  _formSave();
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  renderFormationsModule('types');
+  if(typeof toast==='function')toast(t?'Type mis à jour ✓':'Type créé ✓','ok');
+}
+
+// ── ONGLET 2 : SESSIONS DE FORMATION ───────────────────────────────
+function _formRenderSessions(){
+  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
+    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Sessions de formation</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Planifiez les sessions ; inscrits et places restantes se calculent automatiquement.</div></div>'
+    + '<button onclick="_formEditSession(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouvelle session</button>'
+    + '</div>';
+  var actifs=(S.formTypes||[]).filter(function(t){ return t.actif; });
+  if(!actifs.length) h='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#d97706">⚠️ Créez d\'abord au moins un <b>type de formation actif</b> (onglet Types).</div>'+h;
+  if(!sessions.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucune session. Cliquez sur « + Nouvelle session ».</div>';
+  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3);white-space:nowrap';
+  var td='padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:top';
+  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">'
+    + '<thead><tr><th style="'+th+'">Réf.</th><th style="'+th+'">Type</th><th style="'+th+'">Dates</th><th style="'+th+'">Mode</th><th style="'+th+'">Lieu</th><th style="'+th+'">Responsable</th><th style="'+th+';text-align:right">Tarif</th><th style="'+th+';text-align:center">Inscrits</th><th style="'+th+';text-align:center">Restantes</th><th style="'+th+';width:100px;text-align:right">Actions</th></tr></thead><tbody>';
+  sessions.forEach(function(s){
+    var type=_formTypeById(s.typeId); var typeName=type?type.nom:(s.typeName||'—');
+    var inscrits=_formSessionCount(s.id);
+    var max=(s.maxParticipants!=null&&s.maxParticipants!=='')?parseInt(s.maxParticipants,10):null;
+    var rest = max!=null ? Math.max(0,max-inscrits) : '∞';
+    var dates=_formFrDate(s.dateFrom)+(s.dateTo&&s.dateTo!==s.dateFrom?' → '+_formFrDate(s.dateTo):'');
+    var mode = s.mode==='distance' ? '💻 À distance' : '📍 Présentiel';
+    h+='<tr><td style="'+td+';font-weight:700;color:var(--stol);white-space:nowrap">'+_formEsc(s.ref||'—')+'</td>'
+      + '<td style="'+td+';font-weight:600">'+_formEsc(typeName)+'</td>'
+      + '<td style="'+td+';white-space:nowrap">'+_formEsc(dates)+'</td>'
+      + '<td style="'+td+';white-space:nowrap">'+mode+'</td>'
+      + '<td style="'+td+'">'+(s.mode==='distance'?'<span style="color:var(--txt3)">—</span>':_formEsc(s.lieu||'—'))+'</td>'
+      + '<td style="'+td+'">'+_formEsc(s.responsable||'—')+'</td>'
+      + '<td style="'+td+';text-align:right;white-space:nowrap">'+(s.tarif?_formEsc(s.tarif)+' €':'<span style="color:var(--txt3)">—</span>')+'</td>'
+      + '<td style="'+td+';text-align:center;font-weight:700">'+inscrits+'</td>'
+      + '<td style="'+td+';text-align:center;font-weight:700;color:'+(max!=null&&rest===0?'#f87171':'#10b981')+'">'+rest+'</td>'
+      + '<td style="'+td+';text-align:right;white-space:nowrap"><button onclick="_formEditSession(\''+s.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">✏️</button> <button onclick="_formDeleteSession(\''+s.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button></td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+function _formDeleteSession(id){
+  var s=_formSessionById(id); if(!s)return;
+  var n=_formSessionCount(id);
+  if(!confirm('Supprimer cette session '+(s.ref||'')+' ?'+(n?'\n\n⚠️ '+n+' inscription(s) y sont rattachées.':''))) return;
+  S.formSessions=(S.formSessions||[]).filter(function(x){ return x.id!==id; });
+  _formSave(); renderFormationsModule('sessions');
+}
+function _formNextSessionRef(){
+  var y=new Date().getFullYear();
+  var n=(S.formSessions||[]).filter(function(s){ return (s.ref||'').indexOf('SF-'+y+'-')===0; }).length + 1;
+  return 'SF-'+y+'-'+('00'+n).slice(-3);
+}
+function _formEditSession(id){
+  var s=id?_formSessionById(id):null;
+  var actifs=(S.formTypes||[]).filter(function(t){ return t.actif || (s&&s.typeId===t.id); });
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='form-modal';
+  ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
+  var typeOpts='<option value="">— Choisir un type —</option>'+actifs.map(function(t){ return '<option value="'+t.id+'"'+(s&&s.typeId===t.id?' selected':'')+'>'+_formEsc(t.nom)+'</option>'; }).join('');
+  var modeDist = s&&s.mode==='distance';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(560px,100%);max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(s?'Modifier la session':'Nouvelle session')+(s?' <span style="color:var(--stol)">'+_formEsc(s.ref||'')+'</span>':'')+'</div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Type de formation *</label><select id="fs-type" style="'+fSt+';cursor:pointer">'+typeOpts+'</select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"><div><label style="'+lSt+'">Date du *</label><input id="fs-from" type="date" value="'+(s?s.dateFrom||'':'')+'" style="'+fSt+'"></div><div><label style="'+lSt+'">Date au</label><input id="fs-to" type="date" value="'+(s?s.dateTo||'':'')+'" style="'+fSt+'"></div></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Mode</label><select id="fs-mode" onchange="var l=document.getElementById(\'fs-lieu-row\');if(l)l.style.display=this.value===\'distance\'?\'none\':\'block\'" style="'+fSt+';cursor:pointer"><option value="presentiel"'+(!modeDist?' selected':'')+'>📍 Présentiel</option><option value="distance"'+(modeDist?' selected':'')+'>💻 À distance</option></select></div>'
+    + '<div id="fs-lieu-row" style="margin-bottom:12px;display:'+(modeDist?'none':'block')+'"><label style="'+lSt+'">Lieu</label><input id="fs-lieu" value="'+_formEsc(s?s.lieu:'')+'" placeholder="Ville / aérodrome" style="'+fSt+'"></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Responsable de formation</label><input id="fs-resp" value="'+_formEsc(s?s.responsable:'')+'" style="'+fSt+'"></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px"><div><label style="'+lSt+'">Tarif (€)</label><input id="fs-tarif" type="number" min="0" step="0.01" value="'+(s&&s.tarif!=null?s.tarif:'')+'" style="'+fSt+'"></div><div><label style="'+lSt+'">Nb max participants</label><input id="fs-max" type="number" min="0" value="'+(s&&s.maxParticipants!=null?s.maxParticipants:'')+'" style="'+fSt+'"></div></div>'
+    + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_formSaveSession(\''+(s?s.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+function _formSaveSession(id){
+  var typeId=(document.getElementById('fs-type')||{}).value||'';
+  var from=(document.getElementById('fs-from')||{}).value||'';
+  if(!typeId){ if(typeof toast==='function')toast('Choisissez un type de formation','err'); return; }
+  if(!from){ if(typeof toast==='function')toast('La date de début est requise','err'); return; }
+  var mode=(document.getElementById('fs-mode')||{}).value||'presentiel';
+  var data={
+    typeId:typeId,
+    typeName:(_formTypeById(typeId)||{}).nom||'',
+    dateFrom:from,
+    dateTo:(document.getElementById('fs-to')||{}).value||'',
+    mode:mode,
+    lieu:mode==='distance'?'':((document.getElementById('fs-lieu')||{}).value||'').trim(),
+    responsable:((document.getElementById('fs-resp')||{}).value||'').trim(),
+    tarif:((document.getElementById('fs-tarif')||{}).value||'').trim(),
+    maxParticipants:((document.getElementById('fs-max')||{}).value||'').trim(),
+    _updatedAt:Date.now()
+  };
+  var s=id?_formSessionById(id):null;
+  if(s){ Object.assign(s,data); }
+  else { data.id=_formUid('fs'); data.ref=_formNextSessionRef(); S.formSessions.push(data); }
+  _formSave();
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  renderFormationsModule('sessions');
+  if(typeof toast==='function')toast(s?'Session mise à jour ✓':'Session créée ✓','ok');
+}
+
+// ── ONGLET 3 : INSCRIPTIONS ────────────────────────────────────────
+var _FORM_STATUTS_INSC = [['inscrit','Inscrit','#3b82f6'],['confirme','Confirmé','#10b981'],['present','Présent','#22c55e'],['absent','Absent','#f59e0b'],['annule','Annulé','#ef4444']];
+var _formInscFilter = '';
+function _formStatutLabel(v){ var s=_FORM_STATUTS_INSC.find(function(x){return x[0]===v;}); return s?s[1]:(v||'—'); }
+function _formStatutColor(v){ var s=_FORM_STATUTS_INSC.find(function(x){return x[0]===v;}); return s?s[2]:'#94a3b8'; }
+function _formPilotInfo(pilotId){
+  var p=(S.pilots||[]).find(function(x){ return x.id===pilotId; });
+  if(!p) return null;
+  return { nom:((p.prenom||'')+' '+(p.nom||'')).trim()||p.nom||p.prenom||'', licence:p.licence||'', region:p.region||'' };
+}
+function _formSessionLabel(s){
+  if(!s) return '—';
+  var t=_formTypeById(s.typeId); var tn=t?t.nom:(s.typeName||'');
+  return (s.ref||'')+(tn?' · '+tn:'')+' · '+_formFrDate(s.dateFrom);
+}
+function _formRenderInscriptions(){
+  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
+    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Inscriptions</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Inscrivez un licencié à une session — nom, N° de licence et région sont renseignés automatiquement.</div></div>'
+    + '<button onclick="_formEditInscription(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouvelle inscription</button>'
+    + '</div>';
+  if(!sessions.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Créez d\'abord une <b>session</b> (onglet Sessions).</div>';
+  // Filtre par session
+  if(_formInscFilter && !sessions.some(function(s){return s.id===_formInscFilter;})) _formInscFilter='';
+  var filterOpts='<option value="">Toutes les sessions</option>'+sessions.map(function(s){ return '<option value="'+s.id+'"'+(_formInscFilter===s.id?' selected':'')+'>'+_formEsc(_formSessionLabel(s))+'</option>'; }).join('');
+  h+='<div style="margin-bottom:12px"><select onchange="_formInscFilter=this.value;renderFormationsModule(\'inscriptions\')" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 10px;cursor:pointer;max-width:100%">'+filterOpts+'</select></div>';
+  var list=(S.formInscriptions||[]).filter(function(x){ return !_formInscFilter || x.sessionId===_formInscFilter; })
+    .sort(function(a,b){ return (''+((_formPilotInfo(a.pilotId)||{}).nom||a.nom||'')).localeCompare((_formPilotInfo(b.pilotId)||{}).nom||b.nom||''); });
+  if(!list.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucune inscription'+(_formInscFilter?' pour cette session':'')+'. Cliquez sur « + Nouvelle inscription ».</div>';
+  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3);white-space:nowrap';
+  var td='padding:9px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:middle';
+  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:820px">'
+    + '<thead><tr><th style="'+th+'">Nom</th><th style="'+th+'">N° licence</th><th style="'+th+'">Région</th><th style="'+th+'">Session</th><th style="'+th+';width:150px">Statut</th><th style="'+th+';width:70px;text-align:right">Actions</th></tr></thead><tbody>';
+  var _selSt='background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 8px;cursor:pointer;font-weight:700';
+  list.forEach(function(x){
+    var info=_formPilotInfo(x.pilotId)||{ nom:x.nom, licence:x.licence, region:x.region };
+    var sess=_formSessionById(x.sessionId);
+    var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+(x.statut===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+    h+='<tr><td style="'+td+';font-weight:700;color:var(--txt)">'+_formEsc(info.nom||'—')+'</td>'
+      + '<td style="'+td+';color:var(--stol);font-weight:700">'+_formEsc(info.licence||'—')+'</td>'
+      + '<td style="'+td+';color:var(--txt2)">'+_formEsc(info.region||'—')+'</td>'
+      + '<td style="'+td+';color:var(--txt2);font-size:12px">'+_formEsc(sess?_formSessionLabel(sess):'—')+'</td>'
+      + '<td style="'+td+'"><select onchange="_formSetInscStatut(\''+x.id+'\',this.value)" style="'+_selSt+';color:'+_formStatutColor(x.statut)+'">'+stOpts+'</select></td>'
+      + '<td style="'+td+';text-align:right"><button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button></td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+function _formSetInscStatut(id, val){
+  var x=(S.formInscriptions||[]).find(function(e){ return e.id===id; }); if(!x)return;
+  x.statut=val; x._updatedAt=Date.now(); _formSave(); renderFormationsModule('inscriptions');
+}
+function _formDeleteInscription(id){
+  var x=(S.formInscriptions||[]).find(function(e){ return e.id===id; }); if(!x)return;
+  var info=_formPilotInfo(x.pilotId)||{nom:x.nom};
+  if(!confirm('Retirer l\'inscription de « '+(info.nom||'ce licencié')+' » ?')) return;
+  S.formInscriptions=(S.formInscriptions||[]).filter(function(e){ return e.id!==id; });
+  _formSave(); renderFormationsModule('inscriptions');
+}
+function _formInscPilotPreview(){
+  var id=(document.getElementById('fi-pilot')||{}).value||'';
+  var info=_formPilotInfo(id);
+  var el=document.getElementById('fi-preview'); if(!el) return;
+  el.innerHTML = info ? ('N° licence : <b style="color:var(--stol)">'+(_formEsc(info.licence)||'—')+'</b> &nbsp;·&nbsp; Région : <b>'+(_formEsc(info.region)||'—')+'</b>') : '<span style="color:var(--txt3)">Sélectionnez un licencié</span>';
+}
+function _formEditInscription(id){
+  var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
+  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
+  var pilots=(S.pilots||[]).slice().sort(function(a,b){ return ((a.nom||'')+(a.prenom||'')).toLowerCase().localeCompare(((b.nom||'')+(b.prenom||'')).toLowerCase()); });
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='form-modal';
+  ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
+  var sessOpts='<option value="">— Choisir une session —</option>'+sessions.map(function(s){ return '<option value="'+s.id+'"'+(x&&x.sessionId===s.id?' selected':(_formInscFilter===s.id&&!x?' selected':''))+'>'+_formEsc(_formSessionLabel(s))+'</option>'; }).join('');
+  var pilotOpts='<option value="">— Choisir un licencié —</option>'+pilots.map(function(p){ var nm=((p.nom||'')+' '+(p.prenom||'')).trim(); var lic=p.licence?' ('+p.licence+')':''; return '<option value="'+p.id+'"'+(x&&x.pilotId===p.id?' selected':'')+'>'+_formEsc(nm+lic)+'</option>'; }).join('');
+  var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+((x?x.statut:'inscrit')===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(520px,100%);max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(x?'Modifier l\'inscription':'Nouvelle inscription')+'</div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Session *</label><select id="fi-session" style="'+fSt+';cursor:pointer">'+sessOpts+'</select></div>'
+    + '<div style="margin-bottom:8px"><label style="'+lSt+'">Licencié * (base des licenciés)</label><select id="fi-pilot" onchange="_formInscPilotPreview()" style="'+fSt+';cursor:pointer">'+pilotOpts+'</select></div>'
+    + '<div id="fi-preview" style="font-size:12px;color:var(--txt2);background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:8px 11px;margin-bottom:14px"></div>'
+    + '<div style="margin-bottom:18px"><label style="'+lSt+'">Statut</label><select id="fi-statut" style="'+fSt+';cursor:pointer">'+stOpts+'</select></div>'
+    + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_formSaveInscription(\''+(x?x.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  _formInscPilotPreview();
+}
+function _formSaveInscription(id){
+  var sessionId=(document.getElementById('fi-session')||{}).value||'';
+  var pilotId=(document.getElementById('fi-pilot')||{}).value||'';
+  var statut=(document.getElementById('fi-statut')||{}).value||'inscrit';
+  if(!sessionId){ if(typeof toast==='function')toast('Choisissez une session','err'); return; }
+  if(!pilotId){ if(typeof toast==='function')toast('Choisissez un licencié','err'); return; }
+  var info=_formPilotInfo(pilotId)||{};
+  var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
+  // Anti-doublon : même licencié déjà inscrit à cette session
+  var dup=(S.formInscriptions||[]).some(function(e){ return e!==x && e.sessionId===sessionId && e.pilotId===pilotId; });
+  if(dup){ if(typeof toast==='function')toast('Ce licencié est déjà inscrit à cette session','warn'); return; }
+  var data={ sessionId:sessionId, pilotId:pilotId, nom:info.nom||'', licence:info.licence||'', region:info.region||'', statut:statut, _updatedAt:Date.now() };
+  if(x){ Object.assign(x,data); }
+  else { data.id=_formUid('fi'); S.formInscriptions.push(data); }
+  _formSave();
+  var ov=document.getElementById('form-modal'); if(ov)ov.remove();
+  renderFormationsModule('inscriptions');
+  if(typeof toast==='function')toast(x?'Inscription mise à jour ✓':'Inscription ajoutée ✓','ok');
 }
 
 function injectCalendrier2026() {
