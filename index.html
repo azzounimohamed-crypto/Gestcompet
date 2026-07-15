@@ -4819,6 +4819,10 @@ async function loadState() {
               if (!S.securiteEvents.find(function(x){ return x.id === ev.id; })) S.securiteEvents.push(ev);
             });
           }
+          if (typeof _sevDedupList === 'function') S.securiteEvents = _sevDedupList(S.securiteEvents); // doublons retirés au chargement
+          if (S._deletedSecurite && Object.keys(S._deletedSecurite).length) { // événements supprimés non réajoutés
+            S.securiteEvents = S.securiteEvents.filter(function(e){ return !(e && e.id && S._deletedSecurite[e.id]); });
+          }
         }
         // Restaurer notesfrais depuis IDB (objet keyed par userId)
         if (idbData.notesfrais && typeof idbData.notesfrais === 'object' && !Array.isArray(idbData.notesfrais)) {
@@ -5119,7 +5123,7 @@ function _flushSaveState() {
     _deletedEnroll:S._deletedEnroll||{}, _enrollResetAt:S._enrollResetAt||{},
     agendaEvents:S.agendaEvents||[],
     notesfrais:S.notesfrais||{},
-    securiteEvents:S.securiteEvents||[],
+    securiteEvents:S.securiteEvents||[], _deletedSecurite:S._deletedSecurite||{},
     budgetDTN:S.budgetDTN||{previsionnel:[],realise:[]},
     aides:S.aides||[],
     _deletedAides:S._deletedAides||{},
@@ -26305,6 +26309,8 @@ async function loadFromSupabaseFirst() {
     var _localPilotsSnapshot = (S.pilots || []).slice();
     // Module Formations : snapshot pour fusion (union par id) après application cloud.
     var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded };
+    // Tombstones d'événements sécurité supprimés (pour ne pas les réajouter).
+    var _delSecuSnap = Object.assign({}, S._deletedSecurite||{});
 
     // ── Garde anti-perte : comparer les compteurs locaux vs cloud ──
     var localStaff    = _countStaff(S);
@@ -26558,6 +26564,14 @@ async function loadFromSupabaseFirst() {
           cloud.refBEA = loc.refBEA;                        // ne pas perdre la réf. BEA locale
         }
       });
+      // Dédoublonnage AUTOMATIQUE après fusion : les doublons (mêmes date+éléments)
+      // ré-apportés par le cloud sont retirés durablement — plus besoin du bouton manuel.
+      if (typeof _sevDedupList === 'function') S.securiteEvents = _sevDedupList(S.securiteEvents);
+      // Tombstones : union cloud + local, puis retrait des événements supprimés.
+      S._deletedSecurite = Object.assign({}, (S._deletedSecurite||{}), _delSecuSnap);
+      if (Object.keys(S._deletedSecurite).length) {
+        S.securiteEvents = S.securiteEvents.filter(function(e){ return !(e && e.id && S._deletedSecurite[e.id]); });
+      }
     }
     // ✅ Fusionner aides fédérales locales avec cloud (_updatedAt/_createdAt gagne)
     if (savedAides) {
@@ -29372,8 +29386,11 @@ function cfSetStatutShn(id, val) {
   var m = (S.collectif||[]).find(function(x){ return x.id === id; });
   if (!m) return;
   m.statut_shn = val;
+  m._updatedAt = Date.now();
   saveState();
-  if (document.getElementById('shn-table-body')) renderSHNList();
+  try { var _cfLS=S.collectif.map(function(x){if(!x.photo||!x.photo.startsWith('data:'))return x;var c=Object.assign({},x);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } catch(e) {}
+  if (typeof silentPush === 'function') silentPush();
+  if (document.getElementById('shn-table-body') || document.getElementById('shn-mob-list')) renderSHNList();
 }
 
 function cfClearEFR(id) {
@@ -41351,29 +41368,27 @@ function _printNDFLines(list, titre, commentaires) {
       rows += '<tr style="height:24px;'+ bg +'">';
       rows += '<td style="text-align:center;color:#777;font-size:8pt">'+(i+1)+'</td>';
       rows += '<td style="text-align:center;white-space:nowrap;font-size:8pt">'+_fmtFR(n.date)+'</td>';
-      rows += '<td style="text-align:left;padding-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9pt">'+esc(n.objet||'')+'</td>';
-      rows += '<td></td>';
+      rows += '<td style="text-align:left;padding-left:4px;white-space:normal;word-break:break-word;line-height:1.25;font-size:7pt">'+esc(n.objet||'')+'</td>';
       rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.lieuDe||'')+'</td>';
       rows += '<td style="text-align:left;font-size:8pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.lieuA||'')+'</td>';
       rows += '<td></td>';
-      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(taxi ? taxi.toFixed(2)+' €' : '')+'</td>';
-      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(sncf ? sncf.toFixed(2)+' €' : '')+'</td>';
-      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(repas ? repas.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;color:#003875;font-weight:bold;font-size:8pt">'+(taxi ? taxi.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;color:#003875;font-weight:bold;font-size:8pt">'+(sncf ? sncf.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;color:#003875;font-weight:bold;font-size:8pt">'+(repas ? repas.toFixed(2)+' €' : '')+'</td>';
       rows += '<td style="text-align:center;font-size:8pt">'+(n.nbInvites||'')+'</td>';
-      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(hotel ? hotel.toFixed(2)+' €' : '')+'</td>';
-      rows += '<td style="text-align:right;color:#003875;font-weight:bold;font-size:9pt">'+(div ? div.toFixed(2)+' €' : '')+'</td>';
-      rows += '<td style="text-align:right;font-weight:bold;background:#fffae0;font-size:9pt">'+(tot ? tot.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;color:#003875;font-weight:bold;font-size:8pt">'+(hotel ? hotel.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;color:#003875;font-weight:bold;font-size:8pt">'+(div ? div.toFixed(2)+' €' : '')+'</td>';
+      rows += '<td style="text-align:right;white-space:nowrap;font-weight:bold;background:#fffae0;font-size:8pt">'+(tot ? tot.toFixed(2)+' €' : '')+'</td>';
       rows += '<td></td><td></td>';
       rows += '</tr>';
     });
   }
 
-  var _colgroup = '<colgroup><col style="width:14px"><col style="width:86px"><col style="width:180px"><col style="width:22px"><col style="width:62px"><col style="width:62px"><col style="width:28px"><col style="width:34px"><col style="width:38px"><col style="width:34px"><col style="width:22px"><col style="width:58px"><col style="width:44px"><col style="width:52px"><col style="width:48px"><col style="width:22px"></colgroup>';
+  var _colgroup = '<colgroup><col style="width:14px"><col style="width:86px"><col style="width:200px"><col style="width:62px"><col style="width:62px"><col style="width:28px"><col style="width:38px"><col style="width:42px"><col style="width:38px"><col style="width:24px"><col style="width:60px"><col style="width:48px"><col style="width:58px"><col style="width:48px"><col style="width:22px"></colgroup>';
   var _thead = '<thead><tr>'
     +'<th rowspan="2">N°</th>'
     +'<th rowspan="2">DATE</th>'
     +'<th rowspan="2">OBJET</th>'
-    +'<th rowspan="2">CBF*</th>'
     +'<th colspan="3" style="border-bottom:1px solid #7f9fc8">LIEUX</th>'
     +'<th rowspan="2">Taxi</th>'
     +'<th rowspan="2">SNCF<br>2<sup>e</sup> cl.</th>'
@@ -41387,26 +41402,26 @@ function _printNDFLines(list, titre, commentaires) {
     +'</tr><tr><th>de</th><th>à</th><th>Km</th></tr></thead>';
 
   var _totalsRows = '<tr style="font-weight:bold;background:#dce6f1">'
-    +'<td colspan="6" style="text-align:right;padding-right:6px;font-size:8pt;color:#555">Totaux →</td>'
+    +'<td colspan="5" style="text-align:right;padding-right:6px;font-size:8pt;color:#555">Totaux →</td>'
     +'<td></td>'
-    +'<td style="text-align:right;color:#003875">'+(totalTaxi?totalTaxi.toFixed(2)+' €':'')+'</td>'
-    +'<td style="text-align:right;color:#003875">'+(totalSncf?totalSncf.toFixed(2)+' €':'')+'</td>'
-    +'<td style="text-align:right;font-weight:bold;color:#003875">'+(totalRepas?totalRepas.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;white-space:nowrap;color:#003875">'+(totalTaxi?totalTaxi.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;white-space:nowrap;color:#003875">'+(totalSncf?totalSncf.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;white-space:nowrap;font-weight:bold;color:#003875">'+(totalRepas?totalRepas.toFixed(2)+' €':'')+'</td>'
     +'<td></td>'
-    +'<td style="text-align:right;color:#003875">'+(totalHotel?totalHotel.toFixed(2)+' €':'')+'</td>'
-    +'<td style="text-align:right;font-weight:bold;color:#003875">'+(totalDivers?totalDivers.toFixed(2)+' €':'')+'</td>'
-    +'<td style="text-align:right;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+' €</td>'
+    +'<td style="text-align:right;white-space:nowrap;color:#003875">'+(totalHotel?totalHotel.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;white-space:nowrap;font-weight:bold;color:#003875">'+(totalDivers?totalDivers.toFixed(2)+' €':'')+'</td>'
+    +'<td style="text-align:right;white-space:nowrap;font-weight:900;font-size:9.5pt;background:#fffae0;color:#003875">'+totalGeneral.toFixed(2)+' €</td>'
     +'<td style="background:#dce6f1"></td><td style="background:#dce6f1"></td>'
     +'</tr>'
     +'<tr>'
-    +'<td colspan="13" style="border:none;background:transparent;padding:4px 6px;vertical-align:top">'
+    +'<td colspan="12" style="border:none;background:transparent;padding:4px 6px;vertical-align:top">'
     +(commentaires ? '<div style="font-size:7.5pt;font-weight:bold;color:#003875;text-transform:uppercase;margin-bottom:3px">Commentaires :</div><div style="font-size:8.5pt;color:#222;white-space:pre-wrap;line-height:1.5">'+esc(commentaires)+'</div>' : '')
     +'</td>'
-    +'<td style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">'
-    +'<div style="font-size:13pt;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:4px 2px;background:#fffae0;text-align:center">'
+    +'<td colspan="3" style="border:none;background:transparent;text-align:center;padding:2px 0;vertical-align:middle">'
+    +'<div style="display:inline-block;font-weight:900;color:#003875;border:1.5px solid #003875;border-radius:6px;padding:5px 12px;background:#fffae0;text-align:center;white-space:nowrap">'
     +'<div style="font-size:7pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">TOTAL À PAYER</div>'
-    +'<div style="font-size:14pt;font-weight:900;line-height:1">'+totalGeneral.toFixed(2)+' €</div>'
-    +'</div></td><td style="border:none"></td><td style="border:none"></td></tr>';
+    +'<div style="font-size:15pt;font-weight:900;line-height:1;white-space:nowrap">'+totalGeneral.toFixed(2)+' €</div>'
+    +'</div></td></tr>';
 
   var logoHtml = logo
     ? '<img src="'+logo+'" style="max-width:100px;max-height:70px;object-fit:contain;display:block">'
@@ -45486,12 +45501,11 @@ function printEFList() {
 }
 
 function printSHNList() {
-  var manualList = (S.shn||[]).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
-  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
   var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
-    .filter(function(m){ return !m.licence||manualLicences.indexOf((m.licence||'').trim())===-1; })
     .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn}; });
-  var list = manualList.concat(cfList);
+  var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var manualList = (S.shn||[]).filter(function(m){ return !m.licence||cfLicences.indexOf((m.licence||'').trim())===-1; }).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
+  var list = cfList.concat(manualList);
   if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
   if (!list.length) { toast('Aucun sportif à imprimer','warn'); return; }
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
@@ -45506,12 +45520,11 @@ function printSHNList() {
 }
 
 function exportSHNFmt(fmt) {
-  var manualList = (S.shn||[]).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
-  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
   var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
-    .filter(function(m){ return !m.licence||manualLicences.indexOf((m.licence||'').trim())===-1; })
     .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn,_source:'cf'}; });
-  var list = manualList.concat(cfList);
+  var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var manualList = (S.shn||[]).filter(function(m){ return !m.licence||cfLicences.indexOf((m.licence||'').trim())===-1; }).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
+  var list = cfList.concat(manualList);
   if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
   if (!list.length) { toast('Aucun sportif à exporter','err'); return; }
   var dateStr = new Date().toISOString().substring(0,10);
@@ -50283,19 +50296,23 @@ function renderSHNList() {
   var discOpts = function(sel){ return ['','classic','slalom','stol'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+(v||'— Toutes —')+'</option>'; }).join(''); };
   var statOpts = function(sel){ return ['Elite','Relève','Espoir','Sénior','Collectifs Nationaux'].map(function(v){ return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>'; }).join(''); };
 
-  // Fusionner S.shn (saisis manuellement) + membres CF avec statut_shn
-  var manualList = (S.shn || []).map(function(m){ return Object.assign({}, m, {_source:'shn'}); });
-  var manualLicences = manualList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  // Collectif France = SOURCE DE VÉRITÉ (toujours à jour). On liste d'abord les
+  // membres CF ayant un statut SHN ; les entrées MANUELLES (S.shn) ne sont ajoutées
+  // que pour les personnes ABSENTES du Collectif France (par licence). Ainsi toute
+  // modification faite dans Collectif France se reflète immédiatement ici.
   var cfList = (S.collectif || [])
     .filter(function(m){ return m.statut_shn; })
-    .filter(function(m){ return !m.licence || manualLicences.indexOf((m.licence||'').trim()) === -1; })
     .map(function(m){ return {
       id: 'cf-'+m.id, nom: (m.prenom||'')+' '+(m.nom||''), licence: m.licence||'',
       pratique: m.pratique||'', discipline: m.discipline||'',
       club: m.club||'', region: m.region||'', email: m.email||'', tel: m.tel||'',
       statut: m.statut_shn, aideP: m.aideP||'', smr: m.smr||'', _source:'cf'
     }; });
-  var list = manualList.concat(cfList);
+  var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
+  var manualList = (S.shn || [])
+    .filter(function(m){ return !m.licence || cfLicences.indexOf((m.licence||'').trim()) === -1; })
+    .map(function(m){ return Object.assign({}, m, {_source:'shn'}); });
+  var list = cfList.concat(manualList);
   var _lowF = function(s){ return (s||'').toString().toLowerCase(); };
   if (_shnFilter)     list = list.filter(function(m){ return m.statut === _shnFilter; });
   if (_shnFilterPrat) list = list.filter(function(m){ return _lowF(m.pratique) === _lowF(_shnFilterPrat); });
@@ -52954,14 +52971,27 @@ function importSecuriteEvents(input) {
   else reader.readAsArrayBuffer(file);
 }
 
+// Clé de doublon d'un événement (date + début de description, sinon lieu/dept/victimes).
+function _sevDedupKey(e){
+  var desc = (e&&e.description||'').trim().slice(0,60);
+  return (e&&e.date||'') + '|' + (desc.length > 5 ? desc : ((e&&e.lieu||'') + '|' + (e&&e.dept||'') + '|' + (e&&e.nbTues||0) + '|' + (e&&e.nbBlesses||0)));
+}
+// Dédoublonnage d'une liste d'événements — conserve la 1re occurrence et ne perd
+// pas la référence BEA si une copie en possède une. Réutilisé à la fusion cloud.
+function _sevDedupList(list){
+  if (!Array.isArray(list)) return list;
+  var byKey = {}, out = [];
+  list.forEach(function(e){
+    var k = _sevDedupKey(e);
+    if (!byKey[k]) { byKey[k] = e; out.push(e); }
+    else { var kept = byKey[k]; if (!kept.refBEA && e && e.refBEA) kept.refBEA = e.refBEA; }
+  });
+  return out;
+}
 function _sevDeduplicateRegistre() {
   if (!S.securiteEvents || !S.securiteEvents.length) { toast('Aucun événement dans le registre', 'ok'); return; }
-  var seen = {}, kept = [], removed = 0;
-  S.securiteEvents.forEach(function(e) {
-    var desc = (e.description||'').trim().slice(0,60);
-    var key = (e.date||'') + '|' + (desc.length > 5 ? desc : ((e.lieu||'') + '|' + (e.dept||'') + '|' + (e.nbTues||0) + '|' + (e.nbBlesses||0)));
-    if (seen[key]) { removed++; } else { seen[key] = true; kept.push(e); }
-  });
+  var kept = _sevDedupList(S.securiteEvents);
+  var removed = S.securiteEvents.length - kept.length;
   if (!removed) { toast('Aucun doublon détecté ✓', 'ok'); return; }
   var btn = document.querySelector('[onclick="_sevDeduplicateRegistre()"]');
   if (btn && btn.dataset.confirm !== '1') {
@@ -52973,6 +53003,7 @@ function _sevDeduplicateRegistre() {
   }
   S.securiteEvents = kept;
   saveState();
+  if (typeof silentPush === 'function') silentPush(true);
   openSecuriteEvents('registre');
   toast(removed + ' doublon' + (removed > 1 ? 's' : '') + ' supprimé' + (removed > 1 ? 's' : '') + ' ✓', 'ok');
 }
@@ -52992,7 +53023,12 @@ function _securiteEventDelete(evId) {
     return;
   }
   S.securiteEvents = (S.securiteEvents||[]).filter(function(e){ return e.id!==evId; });
+  // Marqueur de suppression (tombstone) : empêche le cloud/IDB de réajouter
+  // l'événement à la synchro ou à la réouverture — suppression durable.
+  if (!S._deletedSecurite) S._deletedSecurite = {};
+  S._deletedSecurite[evId] = Date.now();
   saveState();
+  if (typeof silentPush === 'function') silentPush(true);
   var ov = document.getElementById('sev-form-ov'); if(ov) ov.remove();
   openSecuriteEvents('registre');
   toast('Événement supprimé','ok');
