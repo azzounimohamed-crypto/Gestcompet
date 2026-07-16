@@ -4465,7 +4465,8 @@ var S = {
   notesfrais: {},
   budgetDTN: {previsionnel:[], realise:[]},
   aides: [],
-  _deletedAides: {}
+  _deletedAides: {},
+  territoires: {}
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -5130,6 +5131,7 @@ function _flushSaveState() {
     _deletedAides:S._deletedAides||{},
     collectif:S.collectif||[], _deletedCollectif:S._deletedCollectif||[],
     shn:S.shn||[], _deletedSHN:S._deletedSHN||[],
+    territoires:S.territoires||{},
     etapes:S.etapes||{}
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
@@ -6825,6 +6827,9 @@ function renderMobileCompDetail() {
   var contentEl = document.getElementById('mcd-content');
   if (contentEl) {
     contentEl.innerHTML = renderHDPTabContent(cp, sec.id, runs, enrolled, staffList);
+    if (sec.id === 'etapes') {
+      setTimeout(function(){ try { _etapeAutoOpenFirst(cp.id); } catch(e){} }, 230);
+    }
     if (sec.id === 'infos') {
       setTimeout(function(){ try { initInfosMaps(cp, enrolled); } catch(e){ console.warn('[GestSTOL] initInfosMaps:', e); } }, 100);
       setTimeout(function(){ try { initInfosCharts(); } catch(e){ console.warn('[GestSTOL] initInfosCharts:', e); } }, 180);
@@ -7364,6 +7369,16 @@ function _etapeToggleAcc(etId, compId) {
     _etapeContactRender(compId, etId);
     if (typeof _etapeRenderBasulm === 'function') _etapeRenderBasulm(compId, etId);
   }
+}
+
+// À l'ouverture du volet « Site & Étapes » : déplier automatiquement la première
+// étape pour visualiser d'emblée toutes ses informations (fiche BasULM, etc.).
+function _etapeAutoOpenFirst(compId) {
+  var list = (S.etapes && S.etapes[compId]) || [];
+  if (!list.length) return;
+  var first = list[0];
+  var acc = document.getElementById('etape-acc-' + first.id);
+  if (acc && acc.style.display === 'none') _etapeToggleAcc(first.id, compId);
 }
 
 function _etapeFieldSave(compId, etId, field, value) {
@@ -16276,6 +16291,7 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
   detail.innerHTML = html;
   if (_homeDetailTab === 'etapes') {
     setTimeout(function(){ try { _etapeMapInit(cp.id); } catch(e){ console.warn('[GestSTOL] _etapeMapInit:', e); } }, 150);
+    setTimeout(function(){ try { _etapeAutoOpenFirst(cp.id); } catch(e){ console.warn('[GestSTOL] _etapeAutoOpenFirst:', e); } }, 230);
   }
   if (_homeDetailTab === 'infos') {
     setTimeout(function(){ try { initInfosMaps(cp, enrolled); } catch(e){ console.warn('[GestSTOL] initInfosMaps:', e); } }, 150);
@@ -24716,7 +24732,149 @@ function basulmFillSite(scope) {
     set('region', d.region);
     if (statusEl) statusEl.textContent = '✓ ' + (d.toponyme || code) + (d.altitude ? ' · ' + d.altitude : '') + (d.radio ? ' · 📻 ' + d.radio : '');
     else toast('BASULM : ' + (d.toponyme || code) + ' ✓', 'ok');
+    // Rafraîchir la fiche détaillée dans la modale Site aéro
+    if (scope === 'modal') { var fe = document.getElementById('site-modal-basulm-fiche'); if (fe) fe.innerHTML = _basulmFicheHTML(d); }
   });
+}
+// ── Rubriques d'évaluation d'un site aéro (libellé, infos libres, note 0→5 ★) ──
+var _SITE_RUBRICS = [
+  ['statut','Statut'],
+  ['accueil','Accueil général'],
+  ['hangar','Hangar'],
+  ['salles','Salles'],
+  ['hebergement','Hébergement'],
+  ['restauration','Restauration'],
+  ['espaceAerien','Espace aérien'],
+  ['decoParamoteur','Espace décollage paramoteur'],
+  ['servicesProximite','Services de proximité'],
+  ['divers','Divers']
+];
+var _siteRubData = {}; // état d'édition courant : clé → { infos, note }
+function _siteRubStars(key, note){
+  var out='';
+  for (var i=1;i<=5;i++){
+    out += '<span onclick="_siteRubSetStar(\''+key+'\','+i+')" title="'+i+' / 5" style="cursor:pointer;font-size:18px;line-height:1;color:'+(i<=note?'#f59e0b':'var(--txt3)')+'">'+(i<=note?'★':'☆')+'</span>';
+  }
+  return out;
+}
+function _siteRubSetStar(key, n){
+  if (!_siteRubData[key]) _siteRubData[key] = {infos:'',note:0};
+  _siteRubData[key].note = (_siteRubData[key].note === n) ? 0 : n; // reclic sur la même étoile → remise à 0
+  var box = document.getElementById('site-rub-stars-'+key);
+  if (box) box.innerHTML = _siteRubStars(key, _siteRubData[key].note);
+}
+function _siteRubInfos(key, val){ if (!_siteRubData[key]) _siteRubData[key] = {infos:'',note:0}; _siteRubData[key].infos = val; }
+function _siteModalRenderRubriques(s){
+  _siteRubData = {};
+  var rub = (s && s.rubriques) || {};
+  _SITE_RUBRICS.forEach(function(r){ var v = rub[r[0]] || {}; _siteRubData[r[0]] = {infos:v.infos||'', note:v.note||0}; });
+  var el = document.getElementById('site-modal-rubriques'); if (!el) return;
+  var _mob = window.innerWidth < 640;
+  var rowSt = 'display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bdr);flex-wrap:'+(_mob?'wrap':'nowrap');
+  var lblSt = 'width:'+(_mob?'100%':'180px')+';flex-shrink:0;font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.3px';
+  var inSt  = 'flex:1;min-width:120px;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12.5px;padding:6px 9px;outline:none;box-sizing:border-box';
+  el.innerHTML = _SITE_RUBRICS.map(function(r){ var v = _siteRubData[r[0]];
+    return '<div style="'+rowSt+'">'
+      + '<span style="'+lblSt+'">'+r[1]+'</span>'
+      + '<input value="'+_territEsc(v.infos)+'" oninput="_siteRubInfos(\''+r[0]+'\',this.value)" placeholder="Infos…" style="'+inSt+'" onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'">'
+      + '<span id="site-rub-stars-'+r[0]+'" style="flex-shrink:0;white-space:nowrap;display:inline-flex;gap:2px">'+_siteRubStars(r[0], v.note)+'</span>'
+      + '</div>';
+  }).join('');
+}
+function _siteModalRenderFiche(s){
+  var el = document.getElementById('site-modal-basulm-fiche'); if (!el) return;
+  var oaci = ((s && s.oaci) || (document.getElementById('site-modal-oaci')||{}).value || '').trim().toUpperCase();
+  if (oaci.length < 4){ el.innerHTML = '<div style="color:var(--txt3);font-size:11px;font-style:italic">Saisissez un code OACI pour afficher la fiche BasULM détaillée.</div>'; return; }
+  var cached = (s && s.basulm) || _basulmCache[oaci];
+  if (cached){ el.innerHTML = _basulmFicheHTML(cached); return; }
+  el.innerHTML = '<div style="color:var(--txt3);font-size:12px">⏳ Chargement BasULM '+oaci+'…</div>';
+  basulmLookup(oaci).then(function(d){ var b = document.getElementById('site-modal-basulm-fiche'); if (!b) return; b.innerHTML = d ? _basulmFicheHTML(d) : '<div style="color:#f59e0b;font-size:12px">⚠ '+oaci+' introuvable dans BASULM</div>'; });
+}
+// Mini-carte de France (SVG) pour l'impression : région du site surlignée +
+// marqueur aux coordonnées exactes. Réutilise la géométrie embarquée
+// (_FR_REGION_GEO) ; la projection lat/lon → viewBox est ajustée par régression
+// linéaire sur les centroïdes connus des régions.
+function _frMiniMapSVG(regionKey, lat, lng){
+  var G = (typeof _FR_REGION_GEO !== 'undefined') ? _FR_REGION_GEO : null; if (!G) return '';
+  var hi = (regionKey && G.regions[regionKey]) ? regionKey : null;
+  var lons=[],xs=[],lats=[],ys=[];
+  Object.keys(G.regions).forEach(function(n){
+    var c = (typeof _REGION_COORDS !== 'undefined') ? _REGION_COORDS[n] : null; if (!c) return;
+    var r = G.regions[n]; lons.push(c[1]); xs.push(r.cx); lats.push(c[0]); ys.push(r.cy);
+  });
+  var fit = function(X,Y){ var n=X.length,sx=0,sy=0,sxy=0,sxx=0; for(var i=0;i<n;i++){ sx+=X[i]; sy+=Y[i]; sxy+=X[i]*Y[i]; sxx+=X[i]*X[i]; } var d=n*sxx-sx*sx; if(!d) return null; var a=(n*sxy-sx*sy)/d; return [a,(sy-a*sx)/n]; };
+  var fx=fit(lons,xs), fy=fit(lats,ys);
+  var pt=null;
+  if (fx && fy && lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) pt=[fx[0]*lng+fx[1], fy[0]*lat+fy[1]];
+  var svg = '<svg viewBox="'+G.viewBox+'" width="120" style="display:block">';
+  Object.keys(G.regions).forEach(function(n){ var r=G.regions[n]; var on=(n===hi);
+    svg += '<path d="'+r.d+'" fill="'+(on?'#1d4ed8':'#e8eef6')+'" stroke="#94a3b8" stroke-width="1.4" stroke-linejoin="round"/>';
+  });
+  if (pt) svg += '<circle cx="'+pt[0].toFixed(0)+'" cy="'+pt[1].toFixed(0)+'" r="17" fill="#ef4444" stroke="#fff" stroke-width="5"/>';
+  else if (hi){ var c=G.regions[hi]; svg += '<circle cx="'+c.cx+'" cy="'+c.cy+'" r="17" fill="#ef4444" stroke="#fff" stroke-width="5"/>'; }
+  svg += '</svg>';
+  return svg;
+}
+// Impression A4 portrait de la fiche site aéro : logo FFPLUM, identité,
+// fiche BasULM détaillée et évaluations (infos + étoiles).
+function _sitePrintFiche(){
+  var g = function(id){ return ((document.getElementById(id)||{}).value||'').trim(); };
+  var oaci = g('site-modal-oaci').toUpperCase(), lieu = g('site-modal-lieu'), ville = g('site-modal-ville');
+  var region = g('site-modal-region'), gest = g('site-modal-gestionnaire');
+  var pratEl = document.getElementById('site-modal-pratique');
+  var prat = pratEl ? pratEl.options[pratEl.selectedIndex].text : '';
+  if (!lieu && !oaci){ toast('Renseignez au moins un lieu ou un code OACI','warn'); return; }
+  var esc = _territEsc;
+  var logo = (window._FFPLUM_LOGO_SRC || (typeof _getAppLogo==='function' && _getAppLogo()) || '');
+  var d = (oaci && _basulmCache[oaci]) ? _basulmCache[oaci] : null;
+  var dateStr = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  // Identité
+  var idRow = function(k,v){ return v ? '<div><span class="k">'+esc(k)+' :</span> '+esc(v)+'</div>' : ''; };
+  var idHtml = '<div class="idgrid">'+idRow('Code OACI',oaci)+idRow('Lieu',lieu)+idRow('Ville',ville)+idRow('Région',region)+idRow('Gestionnaire',gest)+idRow('Pratique',prat)+'</div>';
+  // BasULM détaillée
+  var bl = function(k,v){ return v ? '<tr><td class="k">'+esc(k)+'</td><td>'+esc(v)+'</td></tr>' : ''; };
+  var pistes=[]; for (var i=1;i<=2;i++){ var nat=d&&d['nature_piste_'+i],lg=d&&d['longueur_piste_'+i],la=d&&d['largeur_piste_'+i],or=d&&d['orientation_piste_'+i]; if(nat||lg||or) pistes.push('Piste '+i+' : '+[nat,(lg?lg+'×'+(la||'?')+' m':''),(or?'QFU '+or:'')].filter(Boolean).join(', ')); }
+  var basulmHtml = d
+    ? '<table class="tbl">'+bl('Terrain',d.toponyme||d.code_terrain)+bl('Type',d.type_terrain)
+      +bl('Commune',[d.ville,d.departement,d.region].filter(Boolean).join(', '))+bl('Altitude',d.altitude)
+      +bl('Radio',d.radio?d.radio+' MHz':'')+bl('Pistes',pistes.join('  ·  ')||(d.nb_pistes||''))
+      +bl('Coordonnées',(_basulmCoord(d.latitude)!=null?_basulmCoord(d.latitude)+', '+_basulmCoord(d.longitude):''))
+      +bl('Contact',[d.nom_contact,d.tel_contact_1,d.mail_contact].filter(Boolean).join(' · '))
+      +bl('Statut',d.statut)+'</table>'
+      +(d.consignes?'<div class="consignes">'+esc(d.consignes)+'</div>':'')
+    : '<div class="muted">Aucune fiche BasULM (code OACI non renseigné ou introuvable).</div>';
+  // Évaluations (infos + étoiles)
+  var stars = function(n){ n=n||0; var o=''; for(var s=1;s<=5;s++){ o+='<span class="'+(s<=n?'on':'off')+'">'+(s<=n?'★':'☆')+'</span>'; } return o; };
+  var rubRows = _SITE_RUBRICS.map(function(r){ var v=(_siteRubData&&_siteRubData[r[0]])||{};
+    return '<tr><td class="rlbl">'+esc(r[1])+'</td><td class="rinf">'+esc(v.infos||'')+'</td><td class="rstar">'+stars(v.note||0)+'</td></tr>'; }).join('');
+  var css = '@page{size:A4 portrait;margin:12mm}'
+    +'*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'body{font-family:"Segoe UI",Arial,sans-serif;color:#0f172a;margin:0}'
+    +'.head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #1d4ed8;padding-bottom:12px;margin-bottom:16px}'
+    +'.head img{height:66px;width:66px;object-fit:contain;flex-shrink:0}'
+    +'.head h1{margin:0;font-size:20px;font-weight:800}.head .sub{color:#64748b;font-size:12px;margin-top:3px}'
+    +'.sec{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1d4ed8;margin:18px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}'
+    +'.idgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;font-size:13px}'
+    +'.idgrid .k{color:#64748b;font-weight:600}'
+    +'.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl td{padding:5px 8px;border-bottom:1px solid #eef2f7;vertical-align:top}.tbl td.k{color:#64748b;font-weight:600;width:150px}'
+    +'.consignes{margin-top:8px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;white-space:pre-wrap;font-size:12px}'
+    +'.rub{width:100%;border-collapse:collapse;font-size:13px}.rub td{padding:7px 8px;border-bottom:1px solid #eef2f7;vertical-align:middle}'
+    +'.rub td.rlbl{font-weight:700;text-transform:uppercase;font-size:11px;color:#334155;width:190px}.rub td.rinf{color:#0f172a}.rub td.rstar{width:120px;white-space:nowrap;text-align:right;font-size:17px;letter-spacing:2px}'
+    +'.rub .on{color:#f59e0b}.rub .off{color:#cbd5e1}'
+    +'.muted{color:#64748b;font-size:12px;font-style:italic}'
+    +'.foot{margin-top:22px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:10px;color:#94a3b8;text-align:right}';
+  var logoHtml = logo ? '<img src="'+logo+'" alt="FFPLUM">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8">FFPLUM</div>';
+  var titre = lieu || oaci || 'Site aéro';
+  var subParts = [oaci, ville, region].filter(Boolean).join(' · ');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche site — '+esc(titre)+'</title><style>'+css+'</style></head><body>'
+    +'<div class="head">'+logoHtml+'<div><h1>Fiche site aéro — '+esc(titre)+'</h1><div class="sub">'+esc(subParts)+'</div></div></div>'
+    +'<div class="sec">Identification</div>'+idHtml
+    +'<div class="sec">Fiche BasULM détaillée</div>'+basulmHtml
+    +'<div class="sec">Évaluations &amp; informations</div><table class="rub">'+rubRows+'</table>'
+    +'<div class="foot">Édité le '+esc(dateStr)+' · Gest\'DTN · FFPLUM</div>'
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);};<\/scr'+'ipt></body></html>';
+  var w = window.open('','_blank','width=850,height=1000'); if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer','warn'); return; }
+  w.document.write(html); w.document.close();
 }
 function openAddSite() {
   _editingSiteId = null;
@@ -24727,6 +24885,8 @@ function openAddSite() {
   document.getElementById('site-modal-gestionnaire').value = '';
   document.getElementById('site-modal-pratique').value = 'microlight';
   var _bs0 = document.getElementById('site-modal-basulm-status'); if (_bs0) _bs0.textContent = '';
+  _siteModalRenderFiche(null);
+  _siteModalRenderRubriques(null);
   var sh = document.getElementById('sheet-site');
   if (sh) { sh.style.display='flex'; requestAnimationFrame(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }); }
 }
@@ -24742,6 +24902,8 @@ function openEditSite(id) {
   document.getElementById('site-modal-gestionnaire').value = s.gestionnaire || '';
   document.getElementById('site-modal-pratique').value = s.pratique || 'microlight';
   var _bs1 = document.getElementById('site-modal-basulm-status'); if (_bs1) _bs1.textContent = '';
+  _siteModalRenderFiche(s);
+  _siteModalRenderRubriques(s);
   var sh = document.getElementById('sheet-site');
   if (sh) { sh.style.display='flex'; requestAnimationFrame(function(){ sh.style.opacity='1'; sh.style.transform='translateY(0)'; }); }
 }
@@ -24762,11 +24924,12 @@ function saveSite() {
   var pratique = (document.getElementById('site-modal-pratique').value||'microlight');
   if (!lieu && !oaci) { toast('Saisissez au moins un lieu ou code OACI','err'); return; }
   var _bd = (oaci && _basulmCache[oaci]) ? _basulmCache[oaci] : null;
+  var _rub = JSON.parse(JSON.stringify(_siteRubData || {}));
   if (_editingSiteId) {
     var s = S.sitesSportifs.find(function(x){ return x.id===_editingSiteId; });
-    if (s) { s.oaci=oaci; s.lieu=lieu; s.ville=ville; s.region=region; s.gestionnaire=gestionnaire; s.pratique=pratique; if (_bd) s.basulm=_bd; }
+    if (s) { s.oaci=oaci; s.lieu=lieu; s.ville=ville; s.region=region; s.gestionnaire=gestionnaire; s.pratique=pratique; s.rubriques=_rub; if (_bd) s.basulm=_bd; }
   } else {
-    var _ns = { id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique };
+    var _ns = { id:'site-'+Date.now(), oaci:oaci, lieu:lieu, ville:ville, region:region, gestionnaire:gestionnaire, pratique:pratique, rubriques:_rub };
     if (_bd) _ns.basulm = _bd;
     S.sitesSportifs.push(_ns);
   }
@@ -25815,6 +25978,7 @@ async function pushToCloud() {
     agendaEvents:         S.agendaEvents         || [],
     aides:                S.aides                || [],
     _deletedAides:        S._deletedAides        || {},
+    territoires:          S.territoires          || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26427,6 +26591,8 @@ async function loadFromSupabaseFirst() {
     // ✅ GARDE COLLECTIF : le local est toujours plus récent que Supabase (les modifs ne sont pas encore poussées)
     var savedCollectif = (S.collectif && S.collectif.length) ? S.collectif.slice() : null;
     var savedShn = (S.shn && S.shn.length) ? S.shn.slice() : null;
+    // ✅ GARDE TERRITOIRES : comités régionaux + divers (le local ne doit pas être écrasé par un cloud plus ancien)
+    var savedTerritoires = (S.territoires && S.territoires.comites && S.territoires.comites.length) ? JSON.parse(JSON.stringify(S.territoires)) : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -26505,6 +26671,18 @@ async function loadFromSupabaseFirst() {
           else { S.shn[idx] = m; }
         });
       }
+    }
+    // ✅ Fusionner territoires local avec cloud : comité par comité (local gagne), divers local conservé
+    if (savedTerritoires) {
+      if (!S.territoires || typeof S.territoires !== 'object') S.territoires = {};
+      if (!Array.isArray(S.territoires.comites)) S.territoires.comites = [];
+      savedTerritoires.comites.forEach(function(c) {
+        var idx = S.territoires.comites.findIndex(function(x){ return x.id === c.id; });
+        if (idx === -1) { S.territoires.comites.push(c); }
+        else { S.territoires.comites[idx] = c; }
+      });
+      if (typeof savedTerritoires.divers === 'string' && savedTerritoires.divers) S.territoires.divers = savedTerritoires.divers;
+      if (savedTerritoires._seeded) S.territoires._seeded = true;
     }
     // Fusionner les événements agenda locaux non présents dans le cloud
     if (localAgendaEvents.length) {
@@ -51703,12 +51881,295 @@ function _dtnShowPanel(module) {
     if (typeof renderFormationsModule === 'function') { try { renderFormationsModule(); } catch(e){ if(wb) wb.innerHTML='<div style="padding:40px;color:#f87171">Erreur module Formations : '+(e&&e.message||e)+'</div>'; } }
     return;
   }
+  if (module === 'territoires') {
+    _territTab = 'chiffres'; // ouverture prioritaire sur Chiffres & cartographies
+    if (typeof renderTerritoiresModule === 'function') { try { renderTerritoiresModule(); } catch(e){ if(wb) wb.innerHTML='<div style="padding:40px;color:#f87171">Erreur module Territoires : '+(e&&e.message||e)+'</div>'; } }
+    return;
+  }
   wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding-top:80px;color:var(--txt3)">'
     + p.icon
     + '<div style="font-size:17px;font-weight:800;color:var(--txt)">' + p.title + '</div>'
     + '<div style="font-size:13px;text-align:center;line-height:1.7;max-width:360px;color:var(--txt2)">Module en cours de développement.<br>' + p.desc + '</div>'
     + '</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODULE TERRITOIRES — Chiffres & cartographies · Comités régionaux · Divers
+// Persistance : état complet (localStorage + cloud). Données de comités
+// pré-remplies au premier lancement (modifiables, import/export JSON & Excel).
+// ═══════════════════════════════════════════════════════════
+var _territTab = 'chiffres';
+function _territUid(){ return 'ter_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _territEsc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _territInit(){
+  if(!S.territoires || typeof S.territoires!=='object') S.territoires = {};
+  if(!Array.isArray(S.territoires.comites)) S.territoires.comites = [];
+  if(typeof S.territoires.divers!=='string') S.territoires.divers = '';
+  if(!S.territoires.comites.length && !S.territoires._seeded){
+    S.territoires._seeded = true;
+    var seed=[
+      ['AUVERGNE-RHÔNE-ALPES','Bruno GALLERANI','bgallerani@ffplum.org'],
+      ['BOURGOGNE FRANCHE-COMTÉ','Jean-Pierre CAUMONT','jpcaumont@ffplum.org'],
+      ['BRETAGNE','Pascal RIBOT','pribot@ffplum.org'],
+      ['CENTRE VAL DE LOIRE','Gérard Vlaminck','gvlaminck@ffplum.org'],
+      ['CORSE (MODALITÉS LOCALES)','Jean-Laurent SANTONI','jlsantoni@ffplum.org'],
+      ['GRAND-EST','Mathieu CHAMPON','mchampon@ffplum.org'],
+      ['GUYANE','Maurice GLAS','mglas@ffplum.org'],
+      ['HAUTS-DE-FRANCE','Jean-Marc KETTELS','Jmkettels@ffplum.org'],
+      ['ÎLE-DE-FRANCE','Dominique CERVO','dcervo@ffplum.org'],
+      ['LA RÉUNION','Marcel GUERY (représentant clubs)','appelaprojets@ffplum.org'],
+      ['NORMANDIE','Alain DELAUNAY','adelaunay@ffplum.org'],
+      ['NOUVELLE-AQUITAINE','Jean François BAILLY','jfbailly@ffplum.org'],
+      ['OCCITANIE','Bruno RASCALOU','brascalou@ffplum.org'],
+      ["RÉGION SUD PROVENCE-ALPES-CÔTE D'AZUR",'Xavier ULLIANA','xulliana@ffplum.org'],
+      ['PAYS DE LA LOIRE','Jack GAUDIN','jgaudin@ffplum.org']
+    ];
+    seed.forEach(function(r){ S.territoires.comites.push({ id:_territUid(), crulm:r[0], president:r[1], tel:'', email:r[2] }); });
+    saveState();
+  }
+}
+
+function renderTerritoiresModule(){
+  _territInit();
+  var wb=document.getElementById('dtn-workspace-body'); if(!wb) return;
+  var tabs=[['chiffres','📊 Chiffres & cartographies'],['comites','🏛️ Comités régionaux'],['divers','🗂️ Divers']];
+  var tabBar=tabs.map(function(t){ var a=_territTab===t[0];
+    return '<button onclick="_territSetTab(\''+t[0]+'\')" class="class-tab'+(a?' active':'')+'" style="flex:none;min-width:180px;text-align:center">'+t[1]+'</button>';
+  }).join('');
+  var _mi='display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left';
+  var _dl='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  var _ul='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+  var actBtn='<button onclick="_territActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>Actions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>'
+    +'<div id="territ-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:230px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">'
+    +'<button onclick="exportTerritFmt(\'json\');_territActClose()" style="'+_mi+'" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_dl+'<span>Exporter JSON</span></button>'
+    +'<button onclick="exportTerritFmt(\'excel\');_territActClose()" style="'+_mi+'" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_dl+'<span>Exporter Excel</span></button>'
+    +'<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    +'<label style="'+_mi+'" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">'+_ul+'<span>Importer (JSON / Excel)</span><input type="file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importTerrit(this);_territActClose()"></label>'
+    +'</div>';
+  wb.innerHTML =
+    '<div style="display:flex;flex-direction:column;height:100%">'
+    + '<div style="padding:20px 28px 0;flex-shrink:0">'
+    +   '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    +     '<div style="font-size:22px">📍</div>'
+    +     '<div><div style="font-size:18px;font-weight:900;color:var(--txt)">Territoires</div>'
+    +     '<div style="font-size:11px;color:var(--txt3)">Comités régionaux ULM, chiffres &amp; cartographies</div></div>'
+    +     '<div style="margin-left:auto;position:relative" id="territ-act-wrap">'+actBtn+'</div>'
+    +   '</div>'
+    +   '<div style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px">'+tabBar+'</div>'
+    + '</div>'
+    + '<div id="territ-content" style="flex:1;overflow:auto;min-height:0;padding:18px 28px 48px"></div>'
+    + '</div>';
+  _territRenderTab();
+}
+function _territSetTab(t){ _territTab=t||'chiffres'; renderTerritoiresModule(); }
+function _territActMenu(){ if(typeof _makeActMenu==='function') _makeActMenu('territ-act-menu','territ-act-wrap'); else { var m=document.getElementById('territ-act-menu'); if(m) m.style.display=m.style.display==='none'?'block':'none'; } }
+function _territActClose(){ var m=document.getElementById('territ-act-menu'); if(m) m.style.display='none'; }
+
+function _territRenderTab(){
+  if(_territTab==='comites') return _territRenderComites();
+  if(_territTab==='divers')  return _territRenderDivers();
+  return _territRenderChiffres();
+}
+
+// ── Onglet Comités régionaux : tableau éditable ──
+function _territRenderComites(){
+  var el=document.getElementById('territ-content'); if(!el) return;
+  var list=S.territoires.comites||[];
+  var thSt='padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;background:var(--navy3)';
+  var inSt='width:100%;background:transparent;border:1px solid transparent;border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:6px 8px;outline:none;box-sizing:border-box';
+  var mkIn=function(c,field,extra){ return '<input value="'+_territEsc(c[field])+'" onchange="_territSet(\''+c.id+'\',\''+field+'\',this.value)" style="'+inSt+(extra||'')+'" onfocus="this.style.borderColor=\'var(--stol)\';this.style.background=\'var(--navy)\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'">'; };
+  var rows=list.map(function(c,i){
+    return '<tr style="border-bottom:1px solid var(--bdr);'+(i%2?'background:rgba(255,255,255,.02)':'')+'">'
+      +'<td style="padding:3px 6px">'+mkIn(c,'crulm',';font-weight:700')+'</td>'
+      +'<td style="padding:3px 6px">'+mkIn(c,'president')+'</td>'
+      +'<td style="padding:3px 6px">'+mkIn(c,'tel')+'</td>'
+      +'<td style="padding:3px 6px">'+mkIn(c,'email')+'</td>'
+      +'<td style="padding:3px 6px;text-align:center;width:44px"><button onclick="_territDel(\''+c.id+'\')" title="Supprimer" style="width:30px;height:30px;border:1px solid rgba(239,68,68,.3);border-radius:8px;background:rgba(239,68,68,.08);color:#f87171;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button></td>'
+      +'</tr>';
+  }).join('');
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--txt3)">'+list.length+' comité'+(list.length>1?'s':'')+' régional'+(list.length>1?'aux':'')+'</div>'
+    + '<button onclick="_territAdd()" style="padding:8px 16px;border:none;border-radius:9px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter un comité</button>'
+    + '</div>'
+    + '<div style="overflow:auto;border:1px solid var(--bdr);border-radius:12px;max-width:1000px">'
+    + '<table style="width:100%;border-collapse:collapse;min-width:720px">'
+    + '<thead><tr>'
+    +   '<th style="'+thSt+';width:32%">CRULM</th>'
+    +   '<th style="'+thSt+';width:24%">Président</th>'
+    +   '<th style="'+thSt+';width:16%">Téléphone</th>'
+    +   '<th style="'+thSt+';width:24%">Email</th>'
+    +   '<th style="'+thSt+';width:44px"></th>'
+    + '</tr></thead>'
+    + '<tbody>'+ (rows||'<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--txt3);font-size:13px">Aucun comité — cliquez sur « Ajouter un comité »</td></tr>') +'</tbody>'
+    + '</table></div>';
+}
+function _territSet(id,field,val){
+  var c=(S.territoires.comites||[]).find(function(x){ return x.id===id; }); if(!c) return;
+  c[field]=val; c._updatedAt=Date.now(); saveState();
+  if(typeof silentPush==='function') silentPush();
+}
+function _territAdd(){
+  S.territoires.comites.push({ id:_territUid(), crulm:'', president:'', tel:'', email:'' });
+  saveState(); if(typeof silentPush==='function') silentPush();
+  _territRenderComites();
+}
+function _territDel(id){
+  var c=(S.territoires.comites||[]).find(function(x){ return x.id===id; });
+  var lbl=c&&(c.crulm||c.president)?(' « '+(c.crulm||c.president)+' »'):'';
+  if(!confirm('Supprimer ce comité'+lbl+' ?')) return;
+  S.territoires.comites=(S.territoires.comites||[]).filter(function(x){ return x.id!==id; });
+  saveState(); if(typeof silentPush==='function') silentPush();
+  _territRenderComites();
+}
+
+// ── Onglet Divers : bloc-notes libre ──
+function _territRenderDivers(){
+  var el=document.getElementById('territ-content'); if(!el) return;
+  el.innerHTML =
+    '<div style="max-width:820px">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Notes &amp; informations diverses</div>'
+    + '<textarea id="territ-divers-txt" oninput="_territSaveDivers(this.value)" placeholder="Notes libres relatives aux territoires (modalités locales, contacts, remarques…)" style="width:100%;min-height:340px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;color:var(--txt);font-family:inherit;font-size:13px;line-height:1.6;padding:14px 16px;outline:none;box-sizing:border-box;resize:vertical" onfocus="this.style.borderColor=\'var(--stol)\'" onblur="this.style.borderColor=\'var(--bdr)\'">'+_territEsc(S.territoires.divers||'')+'</textarea>'
+    + '</div>';
+}
+var _territDiversTmr=null;
+function _territSaveDivers(v){
+  S.territoires.divers=v;
+  clearTimeout(_territDiversTmr);
+  _territDiversTmr=setTimeout(function(){ saveState(); if(typeof silentPush==='function') silentPush(); }, 500);
+}
+
+// ── Onglet Chiffres & cartographies ──
+function _territRenderChiffres(){
+  var el=document.getElementById('territ-content'); if(!el) return;
+  var list=S.territoires.comites||[];
+  var _cSt='background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px';
+  // Rattacher chaque comité à une région métropolitaine connue (via _collNormRegion)
+  var G=(typeof _FR_REGION_GEO!=='undefined')?_FR_REGION_GEO:null;
+  var covered={}; var metroCount=0, domCount=0, mailCount=0, telCount=0;
+  var byRegionPres={};
+  list.forEach(function(c){
+    if(c.email) mailCount++; if(c.tel) telCount++;
+    var rg=(typeof _collNormRegion==='function')?_collNormRegion(c.crulm||''):(c.crulm||'');
+    if(G && G.regions[rg]){ covered[rg]=(covered[rg]||0)+1; byRegionPres[rg]=c.president||''; metroCount++; }
+    else domCount++;
+  });
+  var kpis=[
+    {v:list.length, l:'Comités régionaux', c:'#8b5cf6'},
+    {v:metroCount,  l:'Régions métropole', c:'#0891b2'},
+    {v:domCount,    l:'Outre-mer / autres', c:'#f59e0b'},
+    {v:mailCount+' / '+list.length, l:'Emails renseignés', c:'#10b981'}
+  ];
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;max-width:1000px">'
+    +kpis.map(function(k){ return '<div style="'+_cSt+';padding:12px 14px;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+k.c+'"></div>'
+      +'<div style="font-size:24px;font-weight:900;color:'+k.c+';line-height:1;margin-bottom:4px">'+k.v+'</div>'
+      +'<div style="font-size:9px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px">'+k.l+'</div></div>'; }).join('')
+    +'</div>';
+  // Carte SVG des régions couvertes par un comité
+  var mapHtml='';
+  if(G){
+    var SHORT={'Auvergne-Rhône-Alpes':'ARA','Bourgogne-Franche-Comté':'BFC','Bretagne':'BRE','Centre-Val de Loire':'CVL','Corse':'COR','Grand Est':'GES','Hauts-de-France':'HDF','Île-de-France':'IDF','Normandie':'NOR','Nouvelle-Aquitaine':'NAQ','Occitanie':'OCC','Pays de la Loire':'PDL',"Provence-Alpes-Côte d'Azur":'PACA'};
+    var svg='<svg viewBox="'+G.viewBox+'" style="width:100%;max-width:540px;display:block;margin:0 auto">';
+    Object.keys(G.regions).forEach(function(n){ var r=G.regions[n]; var has=!!covered[n];
+      svg+='<path d="'+r.d+'" fill="'+(has?'rgba(139,92,246,.72)':'rgba(148,163,184,.12)')+'" stroke="rgba(100,116,139,.55)" stroke-width="1" stroke-linejoin="round"><title>'+_territEsc(n)+(has?' — '+_territEsc(byRegionPres[n]||''):' — pas de comité rattaché')+'</title></path>';
+    });
+    Object.keys(G.regions).forEach(function(n){ var r=G.regions[n]; var has=!!covered[n];
+      svg+='<text x="'+r.cx+'" y="'+(r.cy+4)+'" text-anchor="middle" font-family="inherit" font-size="15" font-weight="700" fill="'+(has?'#fff':'rgba(148,163,184,.75)')+'"'+(has?' paint-order="stroke" stroke="rgba(0,0,0,.35)" stroke-width="2.5"':'')+'>'+(SHORT[n]||n)+'</text>';
+    });
+    svg+='</svg>';
+    // Comités hors métropole (non représentés sur la carte)
+    var others=list.filter(function(c){ var rg=(typeof _collNormRegion==='function')?_collNormRegion(c.crulm||''):(c.crulm||''); return !(G.regions[rg]); })
+      .map(function(c){ return _territEsc(c.crulm||''); }).filter(Boolean);
+    var footer=others.length?'<div style="margin-top:10px;font-size:11px;color:var(--txt3);text-align:center">Hors métropole&nbsp;: '+others.join(' · ')+'</div>':'';
+    mapHtml='<div style="'+_cSt+';max-width:640px"><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Couverture des comités régionaux</div>'
+      +'<div style="border:1px solid var(--bdr);border-radius:10px;padding:10px;background:rgba(127,127,127,.03)">'+svg+'</div>'+footer+'</div>';
+  }
+  el.innerHTML = kpiHtml + mapHtml;
+}
+
+// ── Import / Export ──
+function exportTerritFmt(fmt){
+  _territInit();
+  var list=S.territoires.comites||[];
+  if(!list.length){ toast('Aucun comité à exporter','err'); return; }
+  var dateStr=new Date().toISOString().slice(0,10);
+  if(fmt==='json'){
+    var payload={ territoires:{ comites:list, divers:S.territoires.divers||'' } };
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='territoires_comites_'+dateStr+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+    toast('Export JSON téléchargé ('+list.length+' comités)','ok');
+    return;
+  }
+  var cols=['crulm','president','tel','email']; var headers=['CRULM','Président','Téléphone','Email'];
+  var rows=list.map(function(c){ return cols.map(function(k){ return c[k]||''; }); });
+  if(fmt==='excel' && typeof XLSX!=='undefined'){
+    var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Comités régionaux');
+    XLSX.writeFile(wb,'territoires_comites_'+dateStr+'.xlsx');
+    toast('Export Excel téléchargé ('+list.length+' comités)','ok');
+  } else {
+    var csv=[headers].concat(rows).map(function(r){ return r.map(function(c){ return '"'+(c+'').replace(/"/g,'""')+'"'; }).join(';'); }).join('\r\n');
+    var blob2=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+    var a2=document.createElement('a'); a2.href=URL.createObjectURL(blob2); a2.download='territoires_comites_'+dateStr+'.csv';
+    document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); URL.revokeObjectURL(a2.href);
+    toast('Export CSV téléchargé ('+list.length+' comités)','ok');
+  }
+}
+function _territNormKey(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+function _territMergeComites(rows){
+  _territInit();
+  var existing=S.territoires.comites;
+  var added=0, updated=0;
+  rows.forEach(function(r){
+    var crulm=(r.crulm||'').toString().trim(); if(!crulm && !r.president && !r.email) return;
+    var key=_territNormKey(crulm);
+    var found=key?existing.find(function(x){ return _territNormKey(x.crulm)===key; }):null;
+    if(found){ if(r.president) found.president=r.president; if(r.tel) found.tel=r.tel; if(r.email) found.email=r.email; found._updatedAt=Date.now(); updated++; }
+    else { existing.push({ id:_territUid(), crulm:crulm, president:r.president||'', tel:r.tel||'', email:r.email||'' }); added++; }
+  });
+  saveState(); if(typeof silentPush==='function') silentPush();
+  toast('Import : '+added+' ajouté'+(added>1?'s':'')+', '+updated+' mis à jour','ok');
+  if(_territTab==='comites') _territRenderComites(); else if(_territTab==='chiffres') _territRenderChiffres();
+}
+function importTerrit(input){
+  var file=input && input.files && input.files[0]; if(!file) return;
+  var name=(file.name||'').toLowerCase();
+  var reader=new FileReader();
+  var mapRow=function(r){
+    var out={}; Object.keys(r).forEach(function(k){
+      var nk=_territNormKey(k);
+      if(nk.indexOf('crulm')>=0||nk.indexOf('region')>=0||nk==='nom') out.crulm=r[k];
+      else if(nk.indexOf('president')>=0||nk.indexOf('nom')>=0) out.president=r[k];
+      else if(nk.indexOf('tel')>=0||nk.indexOf('phone')>=0) out.tel=r[k];
+      else if(nk.indexOf('mail')>=0||nk.indexOf('courriel')>=0) out.email=r[k];
+    });
+    return out;
+  };
+  if(name.match(/\.json$/)){
+    reader.onload=function(e){ try{
+      var d=JSON.parse(e.target.result);
+      var comites = d && d.territoires && Array.isArray(d.territoires.comites) ? d.territoires.comites
+                  : Array.isArray(d.comites) ? d.comites
+                  : Array.isArray(d) ? d : [];
+      if(d && d.territoires && typeof d.territoires.divers==='string'){ _territInit(); S.territoires.divers=d.territoires.divers; }
+      if(!comites.length){ toast('Aucun comité trouvé dans le fichier','err'); return; }
+      _territMergeComites(comites.map(mapRow));
+    }catch(err){ toast('JSON invalide : '+err.message,'err'); } input.value=''; };
+    reader.readAsText(file);
+  } else if(typeof XLSX!=='undefined'){
+    reader.onload=function(e){ try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){ toast('Fichier vide','err'); return; }
+      _territMergeComites(rows.map(mapRow));
+    }catch(err){ toast('Import Excel impossible : '+err.message,'err'); } input.value=''; };
+    reader.readAsArrayBuffer(file);
+  } else { toast('Format non supporté','err'); input.value=''; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -57688,23 +58149,34 @@ document.addEventListener('DOMContentLoaded', async function() {
   </div>
 </div>
 
-<!-- ══ MODAL SITE SPORTIF ══ -->
-<div id="sheet-site" style="display:none;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
-  <div style="background:var(--navy2);border-radius:16px;padding:24px;width:min(480px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <h3 style="margin:0;font-size:16px;font-weight:800;color:var(--txt)">Site sportif</h3>
+<!-- ══ MODAL SITE AÉRO ══ -->
+<div id="sheet-site" style="display:none;opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px">
+  <div style="background:var(--navy2);border-radius:16px;width:min(840px,97vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 24px 14px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+      <h3 style="margin:0;font-size:16px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px"><span style="font-size:20px">📍</span>Site aéro</h3>
       <button onclick="closeSiteModal()" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;line-height:1;padding:4px">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Code OACI</label><input id="site-modal-oaci" placeholder="Ex: LFBD" oninput="this.value=this.value.toUpperCase()" onchange="basulmFillSite('modal')" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;text-transform:uppercase" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div><div id="site-modal-basulm-status" style="font-size:11px;color:var(--stol);margin-top:3px;min-height:15px"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Lieu</label><input id="site-modal-lieu" placeholder="Nom du site" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Ville</label><input id="site-modal-ville" placeholder="Ville" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Région</label><input id="site-modal-region" placeholder="Région" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Gestionnaire</label><input id="site-modal-gestionnaire" placeholder="Nom du gestionnaire" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Pratique</label><select id="site-modal-pratique" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"><option value="microlight">Microlight</option><option value="paramoteur">Paramoteur</option><option value="all">Toutes pratiques</option></select></div>
+    <div style="flex:1;overflow-y:auto;padding:18px 24px">
+      <!-- Section 1 : Identification -->
+      <div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Identification</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Code OACI</label><input id="site-modal-oaci" placeholder="Ex: LFBD" oninput="this.value=this.value.toUpperCase()" onchange="basulmFillSite('modal')" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;text-transform:uppercase" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"><div id="site-modal-basulm-status" style="font-size:11px;color:var(--stol);margin-top:3px;min-height:15px"></div></div>
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Lieu</label><input id="site-modal-lieu" placeholder="Nom du site" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Ville</label><input id="site-modal-ville" placeholder="Ville" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Région</label><input id="site-modal-region" placeholder="Région" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Gestionnaire</label><input id="site-modal-gestionnaire" placeholder="Nom du gestionnaire" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+        <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Pratique</label><select id="site-modal-pratique" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"><option value="microlight">Microlight</option><option value="paramoteur">Paramoteur</option><option value="all">Toutes pratiques</option></select></div>
+      </div>
+      <!-- Section 2 : Fiche BasULM détaillée -->
+      <div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px">Fiche BasULM détaillée</div>
+      <div id="site-modal-basulm-fiche"></div>
+      <!-- Section 3 : Évaluations & informations -->
+      <div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 6px;display:flex;align-items:center;justify-content:space-between"><span>Évaluations &amp; informations</span><span style="font-weight:600;letter-spacing:0;text-transform:none;color:var(--txt3);font-size:10px">Infos · Note (0 à 5 ★)</span></div>
+      <div id="site-modal-rubriques"></div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
+    <div style="display:flex;gap:10px;padding:14px 24px;border-top:1px solid var(--bdr);justify-content:flex-end;flex-shrink:0;flex-wrap:wrap">
       <button onclick="deleteSite()" style="padding:9px 16px;border:1px solid #ef4444;border-radius:8px;background:none;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:auto">Supprimer</button>
+      <button onclick="_sitePrintFiche()" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimer A4</button>
       <button onclick="closeSiteModal()" style="padding:9px 18px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>
       <button onclick="saveSite()" style="padding:9px 22px;border:none;border-radius:8px;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>
     </div>
