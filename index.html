@@ -2815,6 +2815,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   </div>
   <!-- Onglets -->
   <div id="collectif-tab-bar" style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;margin:8px 22px 4px;flex-shrink:0">
+    <button id="collectif-tab-stats" class="class-tab" onclick="_collectifSetPage('stats')" style="flex:none;min-width:150px;text-align:center">📊 Chiffres &amp; stats</button>
     <button id="collectif-tab-cf" class="class-tab active" onclick="_collectifSetPage('collectif-france')" style="flex:none;min-width:160px;text-align:center">🇫🇷 Collectif France</button>
     <button id="collectif-tab-ef" class="class-tab" onclick="_collectifSetPage('equipes-france')" style="flex:none;min-width:160px;text-align:center">🏅 Équipes de France</button>
     <button id="collectif-tab-shn" class="class-tab" onclick="_collectifSetPage('shn')" style="flex:none;min-width:160px;text-align:center">⭐ SHN</button>
@@ -29497,11 +29498,11 @@ function renderCollectifList() {
   }
 
   var thSt = 'padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px';
-  var colCount = 10 + (showPrat ? 1 : 0) + (showDisc ? 2 : 0);
+  var colCount = 11 + (showPrat ? 1 : 0) + (showDisc ? 2 : 0);
 
   var thead = document.getElementById('cf-thead-row');
   if (thead) {
-    thead.innerHTML = '<th style="'+thSt+'">Prénom Nom</th>'
+    thead.innerHTML = _collSelHeadTh('cf') + '<th style="'+thSt+'">Prénom Nom</th>'
       + '<th style="'+thSt+'">N° Licence</th>'
       + '<th style="'+thSt+'">Club</th>'
       + (showPrat ? '<th style="'+thSt+'">Pratique</th>' : '')
@@ -29559,6 +29560,7 @@ function renderCollectifList() {
       ? '<img src="'+_photo+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--bdr)">'
       : '<div style="width:30px;height:30px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0">'+_ini+'</div>';
     html += '<tr id="cf-row-'+esc(m.id)+'" style="border-bottom:1px solid var(--bdr);'+bg+'">'
+      + _collSelCell('cf', m.email)
       + '<td style="padding:6px 10px;cursor:pointer" onclick="openCfEditModal(\''+esc(m.id)+'\')">'
       + '<div style="display:flex;align-items:center;gap:8px"><div style="flex-shrink:0">'+_avatar+'</div>'
       + '<span style="font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.prenom)+' '+esc(m.nom)+'</span></div></td>'
@@ -30799,6 +30801,40 @@ function _confirmPilotsImport() {
 /* ══════════ EXPORT / IMPORT COLLECTIF FRANCE ══════════ */
 function exportCollectif() { exportCollectifFmt('csv'); }
 
+// ── Exports « toutes rubriques » — schéma complet partagé CF / EF / SHN ──
+var _COLL_EXPORT_COLS = [
+  ['prenom','Prénom'],['nom','Nom'],['licence','N° Licence'],['genre','Genre'],
+  ['ddn','Date de naissance'],['club','Club'],['region','Région'],
+  ['pratique','Pratique'],['discipline','Discipline'],['discipline2','Discipline 2'],
+  ['saison','Saison'],['statut_shn','Statut SHN'],['equipe_france','Équipe de France'],
+  ['efr1','EFR 1'],['efr2','EFR 2'],['niveau','Niveau'],
+  ['email','Email'],['tel','Téléphone'],['aideP','Aide perso (€)'],['smr','SMR']
+];
+// Normalise un membre (CF/EF/SHN, y compris SHN manuel) vers le schéma complet
+function _collExportNormalize(m, source){
+  var o = Object.assign({}, m);
+  if (source === 'shn') {
+    if (o.statut && !o.statut_shn) o.statut_shn = o.statut;      // SHN manuel : .statut
+    if (o.nom && !o.prenom && (''+o.nom).indexOf(' ') > 0) {      // nom complet → prénom/nom
+      var p = (''+o.nom).trim().split(/\s+/); o.prenom = p[0]; o.nom = p.slice(1).join(' ');
+    }
+  }
+  return o;
+}
+// Retourne { headers, rows } pour aoa_to_sheet / CSV avec toutes les rubriques
+function _collExportAOA(list, source){
+  var headers = _COLL_EXPORT_COLS.map(function(c){ return c[1]; });
+  var rows = list.map(function(m){
+    var o = _collExportNormalize(m, source);
+    return _COLL_EXPORT_COLS.map(function(c){
+      var v = o[c[0]];
+      if (c[0] === 'equipe_france') return v ? 'Oui' : '';
+      return (v === undefined || v === null) ? '' : v;
+    });
+  });
+  return { headers: headers, rows: rows };
+}
+
 function exportCollectifFmt(fmt) {
   var list = (S.collectif||[]).filter(function(m){
     if (_cfFilters.saison     && m.saison     !== _cfFilters.saison)     return false;
@@ -30816,9 +30852,8 @@ function exportCollectifFmt(fmt) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
     toast('Export JSON téléchargé ('+list.length+' membres)', 'ok');
   } else {
-    var cols = ['prenom','nom','licence','club','pratique','discipline','discipline2','saison','email','tel','region'];
-    var headers = ['Prénom','Nom','N° Licence','Club','Pratique','Discipline','Discipline 2','Saison','Email','Téléphone','Région'];
-    var rows = list.map(function(m){ return cols.map(function(c){ return m[c]||''; }); });
+    var _aoa = _collExportAOA(list, 'cf');
+    var headers = _aoa.headers, rows = _aoa.rows;
     if (fmt === 'excel') {
       var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
       var wb2 = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb2, ws, 'Collectif France');
@@ -30844,7 +30879,7 @@ function _normalizeCollectifRows(rows) {
     'nom':'_nomComplet','name':'_nomComplet',
     'prénom':'prenom','prenom':'prenom','firstname':'prenom','first name':'prenom',
     'nom famille':'nom','last name':'nom','lastname':'nom',
-    'date de naissance':'dateNaissance','naissance':'dateNaissance','dob':'dateNaissance',
+    'date de naissance':'ddn','naissance':'ddn','dob':'ddn','ddn':'ddn','datenaissance':'ddn',
     'région':'region','region':'region','ligue':'region',
     'genre':'genre','sexe':'genre','sex':'genre','gender':'genre','civilité':'genre','civilite':'genre',
     'email':'email','mail':'email','courriel':'email',
@@ -30855,6 +30890,11 @@ function _normalizeCollectifRows(rows) {
     'saison':'saison','year':'saison','année':'saison','annee':'saison',
     'région sportive':'regionSportive','region sportive':'regionSportive',
     'statut':'statut','status':'statut',
+    'statut shn':'statut_shn','statut_shn':'statut_shn','statut s.h.n':'statut_shn',
+    'equipe de france':'equipe_france','équipe de france':'equipe_france','ef':'equipe_france','equipe france':'equipe_france',
+    'efr 1':'efr1','efr1':'efr1','efr 2':'efr2','efr2':'efr2',
+    'aide perso (€)':'aideP','aide perso':'aideP','aide personnalisee':'aideP','aide personnalisée':'aideP','aidep':'aideP','aide p':'aideP','aide p.':'aideP',
+    'smr':'smr',
     'niveau':'niveau','level':'niveau',
     'téléphone':'tel','telephone':'tel','tel':'tel','phone':'tel'
   };
@@ -30891,17 +30931,30 @@ function _normalizeCollectifRows(rows) {
       if (mapped) out[mapped] = normVal(r[rawKey]);
     });
 
-    // Si _nomComplet présent et pas de prenom séparé : splitter
+    // Colonne « Nom » : si une colonne « Prénom » distincte existe déjà, « Nom » est
+    // le nom de famille ; sinon c'est un nom complet à découper en prénom + nom.
     if (out._nomComplet) {
-      var parts = out._nomComplet.trim().split(/\s+/);
-      if (!out.prenom) out.prenom = parts[0] || '';
-      if (!out.nom)    out.nom    = parts.slice(1).join(' ') || '';
+      if (out.prenom) {
+        if (!out.nom) out.nom = out._nomComplet;
+      } else {
+        var parts = out._nomComplet.trim().split(/\s+/);
+        out.prenom = parts[0] || '';
+        if (!out.nom) out.nom = parts.slice(1).join(' ') || '';
+      }
       delete out._nomComplet;
     }
 
     // Normaliser pratique / discipline
     if (out.pratique)   out.pratique   = normPratique(out.pratique);
     if (out.discipline) out.discipline = normDiscipline(out.discipline);
+    if (out.discipline2) out.discipline2 = normDiscipline(out.discipline2);
+    if (out.efr1) out.efr1 = normDiscipline(out.efr1);
+    if (out.efr2) out.efr2 = normDiscipline(out.efr2);
+    // Équipe de France : "Oui"/"1"/"x"/"vrai" → true
+    if (out.equipe_france !== undefined) {
+      var _ef = String(out.equipe_france).toLowerCase().trim();
+      out.equipe_france = (_ef==='oui'||_ef==='yes'||_ef==='1'||_ef==='x'||_ef==='true'||_ef==='vrai'||_ef==='✓');
+    }
 
     // Assigner saison par défaut si manquante
     if (!out.saison) out.saison = defaultSaison;
@@ -30950,6 +31003,10 @@ function importCollectif(input) {
     var text = e.target.result;
     try {
       var imported = JSON.parse(text);
+      // Accepter aussi les exports internes { collectif|equipes_france|shn: [...] }
+      if (!Array.isArray(imported) && imported && typeof imported === 'object') {
+        imported = imported.collectif || imported.equipes_france || imported.shn || imported.membres || null;
+      }
       if (!Array.isArray(imported)) throw new Error('not array');
       // JSON interne : pas de normalisation si les champs existent déjà
       var firstKey = imported[0] ? Object.keys(imported[0])[0] : '';
@@ -30992,6 +31049,91 @@ function _mergeCollectif(rows) {
   saveState();
   renderCollectifList();
   toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
+}
+
+// Lecture générique d'un fichier (xlsx/json/csv/tsv) → lignes normalisées, puis callback.
+// Réutilisé par les imports Équipes de France et SHN.
+function _collImportFile(input, done) {
+  var file = input.files[0]; if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  var unwrap = function(imported){
+    if (!Array.isArray(imported) && imported && typeof imported === 'object')
+      imported = imported.collectif || imported.equipes_france || imported.shn || imported.membres || null;
+    return Array.isArray(imported) ? imported : null;
+  };
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée', 'err'); return; }
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+        if (!rows.length) { toast('Feuille vide', 'err'); return; }
+        done(_normalizeCollectifRows(rows));
+      } catch(err) { toast('Erreur lecture Excel : ' + err.message, 'err'); }
+    };
+    reader.readAsArrayBuffer(file); input.value = ''; return;
+  }
+  var reader2 = new FileReader();
+  reader2.onload = function(e) {
+    var text = e.target.result;
+    try {
+      var imported = unwrap(JSON.parse(text));
+      if (!imported) throw new Error('not array');
+      var firstKey = imported[0] ? Object.keys(imported[0])[0] : '';
+      var needsNorm = firstKey && !['id','nom','prenom','licence','saison'].includes(firstKey);
+      done(needsNorm ? _normalizeCollectifRows(imported) : imported);
+    } catch(err) {
+      var sep = ext === 'tsv' ? '\t' : ';';
+      if (ext === 'csv') {
+        var firstLine = text.split('\n')[0] || '';
+        if ((firstLine.match(/,/g)||[]).length > (firstLine.match(/;/g)||[]).length) sep = ',';
+      }
+      var lines = text.replace(/\r/g,'').split('\n').filter(function(l){ return l.trim(); });
+      if (lines.length < 2) { toast('Fichier vide ou invalide', 'err'); return; }
+      var headers = lines[0].split(sep).map(function(h){ return h.replace(/^"|"$/g,'').trim(); });
+      var rows = [];
+      for (var i=1; i<lines.length; i++) {
+        var cells = lines[i].split(sep).map(function(c){ return c.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
+        var obj = {}; headers.forEach(function(h,j){ obj[h] = cells[j]||''; }); rows.push(obj);
+      }
+      done(_normalizeCollectifRows(rows));
+    }
+  };
+  reader2.readAsText(file, 'UTF-8'); input.value = '';
+}
+
+// Import Équipes de France : fusionne dans le Collectif en marquant equipe_france
+function importEF(input) {
+  _collImportFile(input, function(rows){
+    rows.forEach(function(r){ if (r.equipe_france === undefined) r.equipe_france = true; });
+    _mergeCollectif(rows);
+    if (typeof _collectifCurrentPage !== 'undefined' && _collectifCurrentPage === 'equipes-france') _collectifRenderEF();
+  });
+}
+
+// Import SHN : fusionne dans S.shn (toutes rubriques)
+function importSHN(input) {
+  _collImportFile(input, function(rows){
+    if (!S.shn) S.shn = [];
+    var added = 0, updated = 0;
+    rows.forEach(function(r){
+      var nom = ((r.prenom||'') + ' ' + (r.nom||'')).trim() || r.nom || '';
+      if (!nom && !r.licence) return;
+      var rec = {
+        id: r.id || ('shn_' + (r.licence || Date.now()) + '_' + Math.random().toString(36).slice(2,6)),
+        nom: nom, licence: r.licence||'', pratique: r.pratique||'', discipline: r.discipline||'',
+        saison: r.saison||'', statut: r.statut_shn || r.statut || '', club: r.club||'', region: r.region||'',
+        email: r.email||'', tel: r.tel||'', ddn: r.ddn||'', genre: r.genre||'', aideP: r.aideP||'', smr: r.smr||''
+      };
+      var idx = S.shn.findIndex(function(x){ return x.id===rec.id || (x.licence && rec.licence && String(x.licence)===String(rec.licence)); });
+      if (idx >= 0) { S.shn[idx] = Object.assign(S.shn[idx], rec); updated++; }
+      else { S.shn.push(rec); added++; }
+    });
+    saveState();
+    if (typeof _collectifCurrentPage !== 'undefined' && _collectifCurrentPage === 'shn') renderSHNList();
+    toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
+  });
 }
 
 function cfMessageStarter(entryId) {
@@ -40942,6 +41084,17 @@ function openGanttModal(compId) {
 // NOTES DE FRAIS
 // ═══════════════════════════════════════════════
 var _ndfCurrentId = null;
+var _ndfSeasonFilter = ''; // '' = toutes les saisons ; sinon année (YYYY)
+
+// Saison d'une NDF = année de sa date (YYYY). Retourne '' si date absente/invalide.
+function _ndfSeason(doc) {
+  var y = (doc && doc.date || '').slice(0, 4);
+  return /^\d{4}$/.test(y) ? y : '';
+}
+function _ndfSetSeason(val) {
+  _ndfSeasonFilter = val || '';
+  renderNDFList();
+}
 
 function _ndfUserId() { return S.user && S.user.id; }
 
@@ -40999,12 +41152,39 @@ function closeNDF() {
 function renderNDFList() {
   var body = document.getElementById('ndf-list-body');
   if (!body) return;
-  var docs = _ndfUserNDFs();
-  var sub = document.getElementById('ndf-subtitle');
-  var totalGlobal = docs.reduce(function(s,d){ return s+(d.lignes||[]).reduce(function(ss,l){ return ss+(l.total||0); },0); },0);
-  if (sub) sub.textContent = docs.length+' note'+(docs.length!==1?'s':'')+' de frais · Total : '+totalGlobal.toFixed(2)+' €';
+  var allDocs = _ndfUserNDFs();
 
-  if (!docs.length) {
+  // ── Saisons disponibles (années présentes dans les NDF de l'utilisateur) ──
+  var seasons = [];
+  allDocs.forEach(function(d){ var s=_ndfSeason(d); if (s && seasons.indexOf(s)===-1) seasons.push(s); });
+  seasons.sort(function(a,b){ return b.localeCompare(a); });
+  // Filtre pointant sur une saison qui n'existe plus → réinitialisation
+  if (_ndfSeasonFilter && seasons.indexOf(_ndfSeasonFilter)===-1) _ndfSeasonFilter='';
+
+  var docs = _ndfSeasonFilter
+    ? allDocs.filter(function(d){ return _ndfSeason(d)===_ndfSeasonFilter; })
+    : allDocs;
+
+  var _docTotal = function(d){ return (d.lignes||[]).reduce(function(ss,l){ return ss+(l.total||0); },0); };
+  var totalGlobal = docs.reduce(function(s,d){ return s+_docTotal(d); },0);
+  var sub = document.getElementById('ndf-subtitle');
+  if (sub) sub.textContent = docs.length+' note'+(docs.length!==1?'s':'')+' de frais'
+    +(_ndfSeasonFilter?' · saison '+_ndfSeasonFilter:'')+' · Total : '+totalGlobal.toFixed(2)+' €';
+
+  // ── Barre de tri par saison (visible dès qu'une NDF existe) ──
+  var _selSt = 'height:34px;padding:0 32px 0 12px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer';
+  var seasonBar = allDocs.length
+    ? '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;max-width:820px;flex-wrap:wrap">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Saison</span>'
+      +'<select onchange="_ndfSetSeason(this.value)" style="'+_selSt+'">'
+      +'<option value=""'+(_ndfSeasonFilter?'':' selected')+'>Toutes les saisons</option>'
+      +seasons.map(function(s){ return '<option value="'+s+'"'+(_ndfSeasonFilter===s?' selected':'')+'>'+s+'</option>'; }).join('')
+      +'</select>'
+      +(_ndfSeasonFilter?'<button onclick="_ndfSetSeason(\'\')" style="height:34px;padding:0 12px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕ Tout afficher</button>':'')
+      +'</div>'
+    : '';
+
+  if (!allDocs.length) {
     body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--txt3);text-align:center;gap:12px">'
       +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity:.3"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="9" y2="15"/><line x1="11" y1="15" x2="16" y2="15"/></svg>'
       +'<div style="font-size:14px;font-weight:700">Aucune note de frais</div>'
@@ -41013,10 +41193,20 @@ function renderNDFList() {
     return;
   }
 
+  if (!docs.length) {
+    body.innerHTML = seasonBar
+      +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:160px;color:var(--txt3);text-align:center;gap:10px;max-width:820px">'
+      +'<div style="font-size:13px;font-weight:700">Aucune note de frais pour la saison '+_ndfSeasonFilter+'</div>'
+      +'<div style="font-size:12px">Sélectionnez « Toutes les saisons » pour tout afficher</div>'
+      +'</div>';
+    return;
+  }
+
   var sorted = docs.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  body.innerHTML = '<div style="max-width:820px">'
+  var _totalLbl = _ndfSeasonFilter ? 'Total saison '+_ndfSeasonFilter : 'Total toutes NDF';
+  body.innerHTML = seasonBar + '<div style="max-width:820px">'
     +'<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Total toutes NDF</div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">'+_totalLbl+'</div>'
     +'<div style="font-size:20px;font-weight:900;color:#10b981">'+totalGlobal.toFixed(2)+' €</div>'
     +'</div>'
     +'<div style="display:flex;flex-direction:column;gap:8px">'
@@ -45451,9 +45641,8 @@ function exportEFFmt(fmt) {
   });
   if (!list.length) { toast('Aucun membre à exporter','err'); return; }
   var dateStr = new Date().toISOString().substring(0,10);
-  var cols    = ['prenom','nom','licence','club','pratique','discipline','discipline2','saison','email','tel','region','efr1','efr2'];
-  var headers = ['Prénom','Nom','N° Licence','Club','Pratique','Discipline','Discipline 2','Saison','Email','Téléphone','Région','EFR 1','EFR 2'];
-  var rows = list.map(function(m){ return cols.map(function(c){ return m[c]||''; }); });
+  var _aoa = _collExportAOA(list, 'ef');
+  var headers = _aoa.headers, rows = _aoa.rows;
   var sais = _efFilters.saison || new Date().getFullYear();
   if (fmt==='json') {
     var blob=new Blob([JSON.stringify({equipes_france:list},null,2)],{type:'application/json'});
@@ -45506,7 +45695,7 @@ function printSHNList() {
   var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
   var manualList = (S.shn||[]).filter(function(m){ return !m.licence||cfLicences.indexOf((m.licence||'').trim())===-1; }).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
   var list = cfList.concat(manualList);
-  if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
+  list = list.filter(function(m){ return _shnStatutMatch(m.statut); });
   if (!list.length) { toast('Aucun sportif à imprimer','warn'); return; }
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
   var rows = list.map(function(m){
@@ -45514,23 +45703,22 @@ function printSHNList() {
   }).join('');
   var w = window.open('','_blank','width=900,height=700');
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>SHN</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th{background:#1a3a8f;color:#fff;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even)td{background:#f8fafc}@media print{button{display:none}}</style></head><body>');
-  w.document.write('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">Sportifs de Haut Niveau'+(_shnFilter?' — '+_shnFilter:'')+'</h2><button onclick="window.print()" style="padding:6px 14px;background:#1a3a8f;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button></div>');
+  w.document.write('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">Sportifs de Haut Niveau'+(_shnFilter?' — '+_shnFilterLabel():'')+'</h2><button onclick="window.print()" style="padding:6px 14px;background:#1a3a8f;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button></div>');
   w.document.write('<table><thead><tr><th>Nom</th><th>N° Licence</th><th>Pratique</th><th>Discipline</th><th>Saison</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table>');
   w.document.write('</body></html>'); w.document.close();
 }
 
 function exportSHNFmt(fmt) {
   var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
-    .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn,_source:'cf'}; });
+    .map(function(m){ return Object.assign({}, m, {statut:m.statut_shn, _source:'cf'}); });
   var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
   var manualList = (S.shn||[]).filter(function(m){ return !m.licence||cfLicences.indexOf((m.licence||'').trim())===-1; }).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
   var list = cfList.concat(manualList);
-  if (_shnFilter) list = list.filter(function(m){ return m.statut===_shnFilter; });
+  list = list.filter(function(m){ return _shnStatutMatch(m.statut); });
   if (!list.length) { toast('Aucun sportif à exporter','err'); return; }
   var dateStr = new Date().toISOString().substring(0,10);
-  var cols    = ['nom','licence','pratique','discipline','saison','statut'];
-  var headers = ['Nom','N° Licence','Pratique','Discipline','Saison','Statut SHN'];
-  var rows = list.map(function(m){ return cols.map(function(c){ return m[c]||''; }); });
+  var _aoa = _collExportAOA(list, 'shn');
+  var headers = _aoa.headers, rows = _aoa.rows;
   if (fmt==='json') {
     var blob=new Blob([JSON.stringify({shn:list},null,2)],{type:'application/json'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='shn_'+dateStr+'.json';
@@ -49845,21 +50033,324 @@ function closeCollectifModule() {
   if (ov) ov.style.display = 'none';
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  Collectif & SHN — helpers partagés (stats, sélection e-mail, exports)
+// ═══════════════════════════════════════════════════════════════════════
+
+var _COLL_PRAT_L = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur' };
+var _COLL_DISC_L = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+var _COLL_STAT_PAL = ['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#ec4899','#ef4444','#f97316','#3b82f6','#a855f7'];
+
+// Centroïdes approximatifs des régions (métropole + DOM) pour la carte Leaflet
+var _REGION_COORDS = {
+  'Auvergne-Rhône-Alpes':[45.5,4.5], 'Bourgogne-Franche-Comté':[47.2,4.8],
+  'Bretagne':[48.2,-2.9], 'Centre-Val de Loire':[47.5,1.7], 'Corse':[42.15,9.1],
+  'Grand Est':[48.6,5.6], 'Hauts-de-France':[50.0,2.8], 'Île-de-France':[48.7,2.5],
+  'Normandie':[49.1,0.2], 'Nouvelle-Aquitaine':[45.2,0.2], 'Occitanie':[43.7,2.0],
+  'Pays de la Loire':[47.5,-0.8], "Provence-Alpes-Côte d'Azur":[43.9,6.0],
+  'Guadeloupe':[16.25,-61.55], 'Guyane':[4.0,-53.0], 'La Réunion':[-21.1,55.5],
+  'Martinique':[14.64,-61.02], 'Mayotte':[-12.8,45.15]
+};
+// Normalise un libellé de région saisi librement vers une clé connue
+function _collNormRegion(r){
+  var raw=(r||'').trim(); if(!raw) return '';
+  if(_REGION_COORDS[raw]) return raw;
+  var n=raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  var found='';
+  Object.keys(_REGION_COORDS).forEach(function(k){
+    var kn=k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if(kn===n || kn.indexOf(n)===0 || n.indexOf(kn)===0) found=k;
+  });
+  return found || raw;
+}
+// Genre normalisé : 'H' | 'F' | '' (M./Mme., Homme/Femme, M/F…)
+function _collGenre(m){
+  var g=(m.genre||m.sexe||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(!g) return '';
+  if(g[0]==='f' || g.indexOf('mme')===0) return 'F';
+  if(g[0]==='m' || g[0]==='h') return 'H';
+  return '';
+}
+// Âge (années révolues) depuis ddn/dateNaissance ; null si indisponible
+function _collAge(m){
+  var d=(m.ddn||m.dateNaissance||m.naissance||'').toString().trim(); if(!d) return null;
+  var yr=null, mo=null, da=null, mm;
+  if((mm=d.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))){ yr=+mm[1]; mo=+mm[2]; da=+mm[3]; }
+  else if((mm=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))){ da=+mm[1]; mo=+mm[2]; yr=+mm[3]; }
+  else if((mm=d.match(/(\d{4})/))){ yr=+mm[1]; mo=1; da=1; }
+  if(!yr||yr<1900||yr>2100) return null;
+  var now=new Date(), age=now.getFullYear()-yr;
+  if(mo){ if(now.getMonth()+1<mo || (now.getMonth()+1===mo && now.getDate()<da)) age--; }
+  return (age>=0&&age<=120)?age:null;
+}
+
+// ── Périmètre des stats : cf | ef | shn, + filtre saison ──
+var _statsScope = 'cf';
+var _statsSaison = '';
+function _statsSetScope(v){ _statsScope=v||'cf'; _collectifRenderStats(); }
+function _statsSetSaison(v){ _statsSaison=v||''; _collectifRenderStats(); }
+
+// Liste unifiée des membres du périmètre sélectionné (+ filtre saison)
+function _statsMembers(){
+  var sais=_statsSaison;
+  var okSais=function(m){ return !sais || String(m.saison)===String(sais); };
+  if(_statsScope==='ef'){
+    return (S.collectif||[]).filter(function(m){ return (m.equipe_france||m.efr1||m.efr2) && okSais(m); });
+  }
+  if(_statsScope==='shn'){
+    var cf=(S.collectif||[]).filter(function(m){ return m.statut_shn && okSais(m); });
+    var cfLic=cf.map(function(m){return (m.licence||'').trim();}).filter(Boolean);
+    var manual=(S.shn||[]).filter(function(m){ return (!m.licence||cfLic.indexOf((m.licence||'').trim())===-1) && okSais(m); });
+    return cf.concat(manual);
+  }
+  return (S.collectif||[]).filter(okSais);
+}
+
+// Rendu du volet « Chiffres & stats »
+function _collectifRenderStats(){
+  var body=document.getElementById('collectif-body'); if(!body) return;
+  var _isMob=window.innerWidth<768;
+  var esc=function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var members=_statsMembers();
+
+  // Saisons disponibles (union collectif + shn)
+  var saisonsSet={};
+  (S.collectif||[]).forEach(function(m){ if(m.saison) saisonsSet[m.saison]=1; });
+  (S.shn||[]).forEach(function(m){ if(m.saison) saisonsSet[m.saison]=1; });
+  var saisons=Object.keys(saisonsSet).sort(function(a,b){ return String(b).localeCompare(String(a)); });
+
+  var selCss='height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;font-weight:600;outline:none;cursor:pointer';
+  var scopeL={ cf:'Collectif France', ef:'Équipe de France', shn:'SHN' };
+  var scopeOpts=['cf','ef','shn'].map(function(v){ return '<option value="'+v+'"'+(_statsScope===v?' selected':'')+'>'+scopeL[v]+'</option>'; }).join('');
+  var saisonOpts='<option value="">Toutes saisons</option>'+saisons.map(function(s){ return '<option value="'+esc(s)+'"'+(String(_statsSaison)===String(s)?' selected':'')+'>'+esc(s)+'</option>'; }).join('');
+
+  var controls='<div style="padding:'+(_isMob?'8px 12px':'12px 22px')+';border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Périmètre</span>'
+    +'<select onchange="_statsSetScope(this.value)" style="'+selCss+'">'+scopeOpts+'</select>'
+    +'<select onchange="_statsSetSaison(this.value)" style="'+selCss+'">'+saisonOpts+'</select>'
+    +'<span style="margin-left:auto;font-size:12px;font-weight:800;color:var(--txt2)">'+members.length+' membre'+(members.length>1?'s':'')+'</span>'
+    +'</div>';
+
+  if(!members.length){
+    body.innerHTML=controls+'<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:13px;text-align:center;padding:30px">Aucun membre dans ce périmètre'+(_statsSaison?' pour la saison '+esc(_statsSaison):'')+'.</div>';
+    return;
+  }
+
+  // ── Agrégats ──
+  var nbH=0,nbF=0,nbGInc=0;
+  var prat={}, disc={}, clubs={}, regions={}, ages=[];
+  var trancheDefs=[['–17',0,17],['18–25',18,25],['26–35',26,35],['36–45',36,45],['46–55',46,55],['56–65',56,65],['66+',66,200]];
+  var tranches={}; trancheDefs.forEach(function(t){ tranches[t[0]]=0; });
+  members.forEach(function(m){
+    var g=_collGenre(m); if(g==='H')nbH++; else if(g==='F')nbF++; else nbGInc++;
+    var p=(m.pratique||'').toString().toLowerCase(); if(p){ var pl=_COLL_PRAT_L[p]||m.pratique; prat[pl]=(prat[pl]||0)+1; }
+    [m.discipline,m.discipline2].forEach(function(d){ if(d){ var dl=_COLL_DISC_L[(''+d).toLowerCase()]||d; disc[dl]=(disc[dl]||0)+1; } });
+    if(m.club){ clubs[m.club]=(clubs[m.club]||0)+1; }
+    var rg=_collNormRegion(m.region||m.ligue||''); if(rg){ regions[rg]=(regions[rg]||0)+1; }
+    var a=_collAge(m); if(a!==null){ ages.push(a); for(var i=0;i<trancheDefs.length;i++){ if(a>=trancheDefs[i][1]&&a<=trancheDefs[i][2]){ tranches[trancheDefs[i][0]]++; break; } } }
+  });
+  var ageMoy=ages.length?Math.round(ages.reduce(function(s,a){return s+a;},0)/ages.length):null;
+  var ageMin=ages.length?Math.min.apply(null,ages):null, ageMax=ages.length?Math.max.apply(null,ages):null;
+  var total=members.length;
+
+  // ── Helpers de rendu ──
+  var _cSt='background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px';
+  var _tSt='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px';
+  var _bar=function(lbl,n,mx,col){
+    var w=mx>0?Math.round(n/mx*100):0, pct=total>0?Math.round(n/total*100):0;
+    return '<div style="margin-bottom:9px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+      +'<span style="font-size:12px;font-weight:600;color:var(--txt)">'+esc(lbl)+'</span>'
+      +'<span style="font-size:12px;font-weight:800;color:'+col+'">'+n+'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:4px">'+pct+'%</span></span></div>'
+      +'<div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div></div>';
+  };
+  // Anneau (donut) SVG
+  var _donut=function(segs,cols,cx,cy,r,sw){
+    var tot=segs.reduce(function(s,d){return s+(d.v||0);},0); if(!tot) return '';
+    var C=2*Math.PI*r, cum=0, out='';
+    out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="'+sw+'"/>';
+    segs.forEach(function(d,i){
+      if(!(d.v>0)) return;
+      var frac=d.v/tot, dl=frac*C, off=C*(1-cum);
+      out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+cols[i%cols.length]+'" stroke-width="'+sw+'" stroke-dasharray="'+dl+' '+(C-dl)+'" stroke-dashoffset="'+off+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+      cum+=frac;
+    });
+    return out;
+  };
+  // Carte en anneau + légende (utilisée quand peu de catégories → plus visuel)
+  var _donutCard=function(title,keys,obj,cols){
+    var tot=keys.reduce(function(s,k){return s+obj[k];},0);
+    var segs=keys.map(function(k){return {v:obj[k]};});
+    cols=cols||keys.map(function(k,i){return _COLL_STAT_PAL[i%_COLL_STAT_PAL.length];});
+    var svg='<svg viewBox="0 0 150 150" style="width:118px;flex-shrink:0">'
+      +_donut(segs,cols,75,75,55,20)
+      +'<text x="75" y="72" text-anchor="middle" font-family="inherit" font-size="30" font-weight="900" fill="var(--txt)">'+tot+'</text>'
+      +'<text x="75" y="90" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">total</text></svg>';
+    var legend='<div style="flex:1;min-width:110px;display:flex;flex-direction:column;gap:8px">'
+      +keys.map(function(k,i){ var pct=tot>0?Math.round(obj[k]/tot*100):0;
+        return '<div style="display:flex;align-items:center;gap:8px">'
+          +'<span style="width:10px;height:10px;border-radius:3px;background:'+cols[i%cols.length]+';flex-shrink:0"></span>'
+          +'<span style="flex:1;font-size:12px;font-weight:600;color:var(--txt)">'+esc(k)+'</span>'
+          +'<b style="font-size:13px;font-weight:800;color:'+cols[i%cols.length]+'">'+obj[k]+'</b>'
+          +'<span style="font-size:10px;color:var(--txt3);width:34px;text-align:right">'+pct+'%</span></div>'; }).join('')
+      +'</div>';
+    return '<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div>'
+      +'<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">'+svg+legend+'</div></div>';
+  };
+  // Choisit automatiquement : anneau si < 4 catégories (plus visuel), sinon barres
+  var _barsCard=function(title,obj,limit){
+    var keys=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a];});
+    if(limit) keys=keys.slice(0,limit);
+    if(!keys.length) return '<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">—</div></div>';
+    if(keys.length<4) return _donutCard(title,keys,obj);
+    var mx=obj[keys[0]];
+    var inner=keys.map(function(k,i){return _bar(k,obj[k],mx,_COLL_STAT_PAL[i%_COLL_STAT_PAL.length]);}).join('');
+    return '<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div>'+inner+'</div>';
+  };
+
+  // KPI tiles
+  var kpis=[
+    {v:total, l:'Membres', c:'#0891b2'},
+    {v:nbH,   l:'Hommes',  c:'#3b82f6'},
+    {v:nbF,   l:'Femmes',  c:'#ec4899'},
+    {v:(ageMoy!==null?ageMoy+' ans':'—'), l:'Âge moyen', c:'#8b5cf6', sub:(ageMin!==null?'min '+ageMin+' · max '+ageMax:'')}
+  ];
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+(_isMob?2:4)+',1fr);gap:10px;margin-bottom:14px">'
+    +kpis.map(function(k){ return '<div style="'+_cSt+';padding:12px 14px;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+k.c+'"></div>'
+      +'<div style="font-size:26px;font-weight:900;color:'+k.c+';line-height:1;margin-bottom:4px">'+k.v+'</div>'
+      +'<div style="font-size:9px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px">'+k.l+'</div>'
+      +(k.sub?'<div style="font-size:10px;color:var(--txt3);margin-top:2px">'+k.sub+'</div>':'')
+      +'</div>'; }).join('')
+    +'</div>';
+
+  // H/F en anneau (2-3 catégories → toujours plus visuel en donut)
+  var hfObj={ 'Hommes':nbH, 'Femmes':nbF }; if(nbGInc) hfObj['Non renseigné']=nbGInc;
+  var hfColMap={ 'Hommes':'#3b82f6','Femmes':'#ec4899','Non renseigné':'#64748b' };
+  var hfKeys=Object.keys(hfObj).filter(function(k){ return hfObj[k]>0; });
+  var hfCard=hfKeys.length
+    ? _donutCard('Répartition H / F', hfKeys, hfObj, hfKeys.map(function(k){ return hfColMap[k]; }))
+    : '<div style="'+_cSt+'"><div style="'+_tSt+'">Répartition H / F</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">—</div></div>';
+  // Tranches d'âge en barres
+  var trMx=Math.max.apply(null,trancheDefs.map(function(t){return tranches[t[0]];}).concat([1]));
+  var ageCard='<div style="'+_cSt+'"><div style="'+_tSt+'">Tranches d\'âge</div>'
+    +(ages.length?trancheDefs.map(function(t,i){return _bar(t[0]+' ans',tranches[t[0]],trMx,_COLL_STAT_PAL[i%_COLL_STAT_PAL.length]);}).join('')
+      :'<div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune date de naissance renseignée</div>')
+    +'</div>';
+
+  var _statCols = _isMob ? 1 : (window.innerWidth < 1100 ? 2 : 4);
+  var grid='<div style="display:grid;grid-template-columns:repeat('+_statCols+',1fr);grid-auto-flow:dense;gap:12px;align-items:start">'
+    + _barsCard('Pratiques',prat) + _barsCard('Disciplines',disc)
+    + hfCard + ageCard
+    + _barsCard('Clubs (top 15)',clubs,15)
+    + _collStatsRegionSVG(regions)
+    + '</div>';
+
+  body.innerHTML=controls+'<div style="flex:1;overflow-y:auto;min-height:0;padding:'+(_isMob?'14px 12px':'16px 22px')+'">'+kpiHtml+grid+'</div>';
+}
+
+// Carte SVG autonome (aucune tuile externe → pas d'erreur 403) des régions
+// d'origine + liste unifiée « région → effectif ». Métropole dessinée en fond,
+// une bulle proportionnelle par région ; les régions hors métropole sont listées.
+function _collStatsRegionSVG(regions){
+  var _cSt='background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px';
+  var _tSt='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px';
+  var esc=function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var SHORT={'Auvergne-Rhône-Alpes':'ARA','Bourgogne-Franche-Comté':'BFC','Bretagne':'BRE','Centre-Val de Loire':'CVL','Corse':'COR','Grand Est':'GES','Hauts-de-France':'HDF','Île-de-France':'IDF','Normandie':'NOR','Nouvelle-Aquitaine':'NAQ','Occitanie':'OCC','Pays de la Loire':'PDL',"Provence-Alpes-Côte d'Azur":'PACA'};
+  var keys=Object.keys(regions).sort(function(a,b){ return regions[b]-regions[a]; });
+  if(!keys.length) return '<div style="'+_cSt+';grid-column:1/-1"><div style="'+_tSt+'">Régions d\'origine</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune région renseignée</div></div>';
+  var mx=Math.max.apply(null,keys.map(function(k){ return regions[k]; }));
+  var inMetro=function(c){ return c && c[0]>=41 && c[0]<=52 && c[1]>=-6 && c[1]<=10; };
+  var kx=0.66, raw=function(lat,lon){ return [lon*kx, -lat]; };
+  var FR_OUTLINE=[[51.0,2.5],[49.9,4.2],[49.5,5.5],[48.6,7.8],[47.6,7.6],[46.3,6.1],[45.9,6.9],[44.1,7.4],[43.5,6.9],[43.3,5.4],[43.4,4.0],[42.5,3.1],[42.7,1.4],[43.0,-0.5],[43.4,-1.6],[44.7,-1.2],[45.6,-1.1],[46.5,-1.8],[47.3,-2.5],[47.6,-3.5],[48.4,-4.8],[48.7,-3.6],[48.6,-1.9],[49.7,-1.9],[49.5,-0.2],[50.1,1.6],[51.0,2.5]];
+  var rawPts=FR_OUTLINE.map(function(p){ return raw(p[0],p[1]); });
+  var metroKeys=keys.filter(function(k){ return inMetro(_REGION_COORDS[k]); });
+  metroKeys.forEach(function(k){ var c=_REGION_COORDS[k]; rawPts.push(raw(c[0],c[1])); });
+  var xs=rawPts.map(function(p){ return p[0]; }), ys=rawPts.map(function(p){ return p[1]; });
+  var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+  var W=470,H=430,pad=30, sc=Math.min((W-2*pad)/(maxX-minX||1),(H-2*pad)/(maxY-minY||1));
+  var offX=pad+((W-2*pad)-(maxX-minX)*sc)/2, offY=pad+((H-2*pad)-(maxY-minY)*sc)/2;
+  var P=function(lat,lon){ var r=raw(lat,lon); return [offX+(r[0]-minX)*sc, offY+(r[1]-minY)*sc]; };
+  var outline=FR_OUTLINE.map(function(p,i){ var xy=P(p[0],p[1]); return (i?'L':'M')+xy[0].toFixed(1)+' '+xy[1].toFixed(1); }).join(' ')+' Z';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;display:block;margin:0 auto">';
+  svg+='<path d="'+outline+'" fill="rgba(8,145,178,.08)" stroke="rgba(255,255,255,.18)" stroke-width="1.2" stroke-linejoin="round"/>';
+  metroKeys.forEach(function(k){
+    var c=_REGION_COORDS[k], xy=P(c[0],c[1]), n=regions[k], r=Math.max(11,Math.min(34,11+n/mx*22));
+    svg+='<circle cx="'+xy[0].toFixed(1)+'" cy="'+xy[1].toFixed(1)+'" r="'+r.toFixed(1)+'" fill="rgba(8,145,178,.78)" stroke="#fff" stroke-width="1.2"/>';
+    svg+='<text x="'+xy[0].toFixed(1)+'" y="'+(xy[1]+1).toFixed(1)+'" text-anchor="middle" dominant-baseline="middle" font-family="inherit" font-size="'+Math.max(9,Math.min(15,r*0.72)).toFixed(0)+'" font-weight="800" fill="#fff">'+n+'</text>';
+    svg+='<text x="'+xy[0].toFixed(1)+'" y="'+(xy[1]+r+11).toFixed(1)+'" text-anchor="middle" font-family="inherit" font-size="9" font-weight="700" fill="var(--txt2)">'+(SHORT[k]||esc(k))+'</text>';
+  });
+  svg+='</svg>';
+  var list='<div style="display:flex;flex-direction:column;gap:7px">'
+    +keys.map(function(k){ var loc=inMetro(_REGION_COORDS[k]);
+      return '<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="width:9px;height:9px;border-radius:50%;background:'+(loc?'#0891b2':'#64748b')+';flex-shrink:0"></span>'
+        +'<span style="flex:1;font-size:12px;font-weight:600;color:var(--txt)">'+esc(k)+(loc?'':' <span style="font-size:9px;color:var(--txt3)">(hors métropole)</span>')+'</span>'
+        +'<b style="font-size:13px;font-weight:800;color:#0891b2">'+regions[k]+'</b></div>'; }).join('')
+    +'</div>';
+  return '<div style="'+_cSt+';grid-column:span 2"><div style="'+_tSt+'">Régions d\'origine — carte & effectifs</div>'
+    +'<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">'
+    +'<div style="flex:1;min-width:220px">'+svg+'</div>'
+    +'<div style="flex:1;min-width:180px">'+list+'</div></div></div>';
+}
+
+// ── Sélection par cases à cocher + envoi d'e-mail aux membres cochés ──
+// La sélection est portée par les cases du tableau (attribut data-email) : pas
+// d'état persistant, elle vaut pour la vue courante (filtres appliqués).
+function _collSelAll(source, on){
+  document.querySelectorAll('input.collsel-'+source).forEach(function(cb){ cb.checked=on; });
+  _collSelSync(source);
+}
+function _collSelSync(source){
+  var boxes=[].slice.call(document.querySelectorAll('input.collsel-'+source));
+  var n=boxes.filter(function(cb){ return cb.checked; }).length;
+  var head=document.getElementById('collsel-all-'+source);
+  if(head){ head.checked=(n>0 && n===boxes.length); head.indeterminate=(n>0 && n<boxes.length); }
+  var badge=document.getElementById('collsel-count-'+source);
+  if(badge) badge.textContent = n ? (n+' coché'+(n>1?'s':'')) : '';
+}
+// Cellule case à cocher d'une ligne (email transporté par la case)
+function _collSelCell(source, email){
+  return '<td style="padding:0 6px 0 10px;text-align:center;vertical-align:middle;width:30px" onclick="event.stopPropagation()">'
+    +'<input type="checkbox" class="collsel-'+source+'" data-email="'+((email||'')+'').replace(/"/g,'&quot;')+'" onchange="_collSelSync(\''+source+'\')" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol)"></td>';
+}
+// En-tête « tout (dé)cocher »
+function _collSelHeadTh(source){
+  return '<th style="padding:9px 6px 9px 10px;width:30px;text-align:center"><input type="checkbox" id="collsel-all-'+source+'" onchange="_collSelAll(\''+source+'\',this.checked)" title="Tout cocher / décocher" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol)"></th>';
+}
+// Envoi e-mail aux membres cochés : destinataires en Cci, compte en Cc (copie)
+function _collEmail(source){
+  var boxes=[].slice.call(document.querySelectorAll('input.collsel-'+source+':checked'));
+  if(!boxes.length){ toast('Cochez au moins un membre dans la liste','warn'); return; }
+  var emails=[], missing=0;
+  boxes.forEach(function(cb){ var e=(cb.getAttribute('data-email')||'').trim(); if(e && /@/.test(e)){ if(emails.indexOf(e)===-1) emails.push(e); } else missing++; });
+  if(!emails.length){ toast('Aucune adresse e-mail valide dans la sélection','err'); return; }
+  var acct=(S.user&&S.user.email)||'';
+  var url='mailto:?bcc='+encodeURIComponent(emails.join(','));
+  if(acct) url+='&cc='+encodeURIComponent(acct);
+  try{ window.location.href=url; }catch(e){ window.open(url,'_blank'); }
+  toast(emails.length+' destinataire(s)'+(acct?' · copie à '+acct:'')+(missing?' · '+missing+' sans e-mail':''),'ok');
+}
+
 function _collectifSetPage(page) {
   _collectifCurrentPage = page;
+  var tabStats = document.getElementById('collectif-tab-stats');
   var tabCf  = document.getElementById('collectif-tab-cf');
   var tabEf  = document.getElementById('collectif-tab-ef');
   var tabShn = document.getElementById('collectif-tab-shn');
   var sub    = document.getElementById('collectif-subtitle');
   var tabBar = document.getElementById('collectif-tab-bar');
-  [tabCf, tabEf, tabShn].forEach(function(b){ if(b) b.classList.remove('active'); });
+  [tabStats, tabCf, tabEf, tabShn].forEach(function(b){ if(b) b.classList.remove('active'); });
+  if (page === 'stats'            && tabStats) tabStats.classList.add('active');
   if (page === 'collectif-france' && tabCf)  tabCf.classList.add('active');
   if (page === 'equipes-france'   && tabEf)  tabEf.classList.add('active');
   if (page === 'shn'              && tabShn) tabShn.classList.add('active');
-  if (sub) sub.textContent = page === 'collectif-france' ? 'Membres du Collectif France'
+  if (sub) sub.textContent = page === 'stats'            ? 'Chiffres & statistiques'
+                           : page === 'collectif-france' ? 'Membres du Collectif France'
                            : page === 'equipes-france'   ? 'Équipes de France par saison, pratique et discipline'
                            : 'Sportifs de Haut Niveau';
-  if (page === 'collectif-france') _collectifRenderCF();
+  if (page === 'stats') _collectifRenderStats();
+  else if (page === 'collectif-france') _collectifRenderCF();
   else if (page === 'equipes-france') _collectifRenderEF();
   else _collectifRenderSHN();
 }
@@ -49900,6 +50391,8 @@ function _collectifRenderEF() {
     + '<button onclick="exportEFFmt(\'excel\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>'
     + '<button onclick="exportEFFmt(\'csv\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="_collEmail(\'ef\');_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg><span>Envoyer un e-mail (cochés)</span></button>'
+    + '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importEF(this);_efActClose()"></label>'
     + '<button onclick="printEFList();_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
     + '<button onclick="cfClearAllEFR();_efActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(239,68,68,.08)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.6"/></svg><span>Tout réinitialiser</span></button>'
@@ -49911,7 +50404,8 @@ function _collectifRenderEF() {
     + '<select style="'+selStyle+'" onchange="_efFilters.saison=this.value;_efRenderList()">'+saionOpts+'</select>'
     + '<select style="'+selStyle+'" onchange="_efFilters.pratique=this.value;_efRenderList()">'+pratOpts+'</select>'
     + '<select style="'+selStyle+'" onchange="_efFilters.discipline=this.value;_efRenderList()">'+discOpts+'</select>'
-    + '<span id="ef-counter" style="margin-left:auto;font-size:12px;font-weight:700;color:var(--txt3)'+(_isMob?';white-space:nowrap;flex-shrink:0;padding-left:8px':'')+'"></span>'
+    + '<span id="collsel-count-ef" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--stol)'+(_isMob?';white-space:nowrap;flex-shrink:0':'')+'"></span>'
+    + '<span id="ef-counter" style="font-size:12px;font-weight:700;color:var(--txt3)'+(_isMob?';white-space:nowrap;flex-shrink:0;padding-left:8px':';padding-left:8px')+'"></span>'
     + (_isMob ? '' : actBtn)
     + '</div>';
   if (_isMob) {
@@ -49920,6 +50414,7 @@ function _collectifRenderEF() {
   html += '<div style="flex:1;overflow-y:auto;padding:0">'
     + '<table style="width:100%;border-collapse:collapse" id="ef-table">'
     + '<thead><tr style="background:var(--navy3);position:sticky;top:0;z-index:2;border-bottom:2px solid var(--bdr)">'
+    + _collSelHeadTh('ef')
     + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Prénom Nom</th>'
     + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">N° Licence</th>'
     + '<th style="padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px">Club</th>'
@@ -49972,7 +50467,7 @@ function _efRenderList() {
       mobEl.innerHTML = '<div style="text-align:center;padding:40px 16px;color:var(--txt3);font-size:13px">'+msg+'</div>';
       return;
     }
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">'+msg+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">'+msg+'</td></tr>';
     return;
   }
 
@@ -50019,6 +50514,7 @@ function _efRenderList() {
     if (m.efr2) efrBadges += '<span style="margin-left:4px;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">EFR '+(discL2[m.efr2]||m.efr2)+'</span>';
 
     return '<tr style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
+      + _collSelCell('ef', m.email)
       + '<td style="'+clickSt+'" onclick="openCfEditModal(\''+esc(m.id)+'\')">'
         + '<div style="display:flex;align-items:center;gap:8px">'+avatar
         + '<span style="font-size:13px;font-weight:600;color:var(--txt)">'
@@ -50061,6 +50557,7 @@ function _collectifRenderCF() {
     '<div style="padding:10px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0;background:#ffffff">'
     + '<div id="cf-counter" style="font-size:12px;font-weight:700;color:var(--txt3)">0 membre</div>'
     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    + '<span id="collsel-count-cf" style="font-size:11px;font-weight:700;color:var(--stol)"></span>'
     + '<div style="position:relative;flex-shrink:0" id="cf-act-wrap">'
     + '<button onclick="_cfActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .12s" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>'
@@ -50072,6 +50569,7 @@ function _collectifRenderCF() {
     + '<button onclick="exportCollectifFmt(\'excel\');_cfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>'
     + '<button onclick="exportCollectifFmt(\'csv\');_cfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="_collEmail(\'cf\');_cfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg><span>Envoyer un e-mail (cochés)</span></button>'
     + '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" id="cf-import-file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importCollectif(this);_cfActClose()"></label>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
     + '<button onclick="printCollectifList();_cfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
@@ -50117,6 +50615,18 @@ function _collectifRenderCF() {
 var _shnFilter = '';
 var _shnFilterPrat = '';
 var _shnFilterDisc = '';
+// Retourne true si le statut passe le filtre de tri courant.
+// '__no_cn__' = tous sauf « Collectifs Nationaux ».
+function _shnStatutMatch(statut) {
+  if (!_shnFilter) return true;
+  if (_shnFilter === '__no_cn__') return statut !== 'Collectifs Nationaux';
+  return statut === _shnFilter;
+}
+// Libellé lisible du filtre courant (pour titres/impression).
+function _shnFilterLabel() {
+  if (_shnFilter === '__no_cn__') return 'Tous sauf collectifs Nationaux';
+  return _shnFilter;
+}
 function _shnSetFilter(val, btn) {
   _shnFilter = val;
   document.querySelectorAll('.shn-filter-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -50169,6 +50679,9 @@ function _collectifRenderSHN() {
   var triOpts = statuts.map(function(s){
     return '<option value="'+s+'"'+(_shnFilter===s?' selected':'')+'>'+(s||'Tous les statuts')+'</option>';
   }).join('');
+  // Option supplémentaire : tout afficher SAUF le statut « Collectifs Nationaux »
+  triOpts = triOpts.replace('</option>',
+    '</option><option value="__no_cn__"'+(_shnFilter==='__no_cn__'?' selected':'')+'>Tous sauf collectifs Nationaux</option>');
   var _pratLbl = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur' };
   var _discLbl = { classic:'Classic', slalom:'Slalom', stol:'STOL' };
   var pratFilterOpts = ['','microlight','paramotor'].map(function(v){
@@ -50199,19 +50712,24 @@ function _collectifRenderSHN() {
     + '<select onchange="_shnSetFilter(this.value,null)" style="'+_shnSelCss+'">'+triOpts+'</select>'
     + '<select onchange="_shnSetFilterPrat(this.value)" style="'+_shnSelCss+'">'+pratFilterOpts+'</select>'
     + '<select onchange="_shnSetFilterDisc(this.value)" style="'+_shnSelCss+'">'+discFilterOpts+'</select>'
-    + '<div style="margin-left:auto;position:relative;flex-shrink:0" id="shn-act-wrap">'
+    + '<span id="collsel-count-shn" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--stol)"></span>'
+    + '<span id="shn-counter" style="font-size:12px;font-weight:700;color:var(--txt3)">0 sportif</span>'
+    + '<div style="position:relative;flex-shrink:0" id="shn-act-wrap">'
     + '<button onclick="_shnActMenu()" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.background=\'var(--navy4)\'" onmouseout="this.style.background=\'var(--navy3)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>Actions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>'
     + '<div id="shn-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">'
     + '<button onclick="exportSHNFmt(\'json\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>'
     + '<button onclick="exportSHNFmt(\'excel\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>'
     + '<button onclick="exportSHNFmt(\'csv\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="_collEmail(\'shn\');_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg><span>Envoyer un e-mail (cochés)</span></button>'
+    + '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importSHN(this);_shnActClose()"></label>'
     + '<button onclick="printSHNList();_shnActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
     + '</div></div>'
     + '</div>'
     + '<div style="flex:1;overflow-y:auto;min-height:0">'
     + '<table style="width:100%;border-collapse:collapse">'
     + '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--navy3);border-bottom:2px solid var(--bdr)">'
+    + _collSelHeadTh('shn')
     + '<th style="'+thSt+'">Prénom Nom</th>'
     + '<th style="'+thSt+'">N° Licence</th>'
     + '<th style="'+thSt+'">Pratique</th>'
@@ -50314,19 +50832,22 @@ function renderSHNList() {
     .map(function(m){ return Object.assign({}, m, {_source:'shn'}); });
   var list = cfList.concat(manualList);
   var _lowF = function(s){ return (s||'').toString().toLowerCase(); };
-  if (_shnFilter)     list = list.filter(function(m){ return m.statut === _shnFilter; });
+  list = list.filter(function(m){ return _shnStatutMatch(m.statut); });
   if (_shnFilterPrat) list = list.filter(function(m){ return _lowF(m.pratique) === _lowF(_shnFilterPrat); });
   if (_shnFilterDisc) list = list.filter(function(m){ return _lowF(m.discipline) === _lowF(_shnFilterDisc); });
 
+  var _shnCnt = document.getElementById('shn-counter');
+  if (_shnCnt) _shnCnt.textContent = list.length + ' sportif' + (list.length>1?'s':'');
+
   if (!list.length) {
     var _emptyMsg = 'Aucun sportif'
-      +(_shnFilter ? ' avec le statut « '+_shnFilter+' »' : ' SHN')
+      +(_shnFilter ? ' avec le statut « '+_shnFilterLabel()+' »' : ' SHN')
       +' — assignez un statut SHN dans le volet Collectif France';
     if (mobEl) {
       mobEl.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</div>';
       return;
     }
-    tbody.innerHTML = '<tr><td colspan="11" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="padding:28px;text-align:center;color:var(--txt3);font-size:12px">'+_emptyMsg+'</td></tr>';
     return;
   }
 
@@ -50393,6 +50914,7 @@ function renderSHNList() {
       : '<div style="width:30px;height:30px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini)+'</div>';
     var bg = i%2 ? 'background:rgba(255,255,255,.02)' : '';
     return '<tr id="shn-row-'+esc(m.id)+'" style="'+bg+'" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+(i%2?'rgba(255,255,255,.02)':'')+'\'">'
+      + _collSelCell('shn', email)
       +'<td style="padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle;cursor:pointer" title="Ouvrir la fiche" data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" onclick="shnOpenEdit(this.dataset.src,this.dataset.id)">'
         +'<div style="display:flex;align-items:center;gap:8px">'+avatar
         +'<span style="font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.nom)+sourceBadge+'</span></div></td>'
@@ -51776,7 +52298,7 @@ function _renderSecuriteStats() {
   html+='</div>';
 
   // ── Grille 4 colonnes × 2 lignes — hauteur contrainte pour tenir dans le viewport ──
-  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:10px;height:calc(100vh - 370px);overflow:hidden">';
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;grid-auto-flow:dense;gap:10px;height:calc(100vh - 370px);overflow:hidden">';
 
   // ── Card 1 : Par année (toujours toutes les saisons, indépendamment du filtre) ──
   (function(){
@@ -51864,27 +52386,30 @@ function _renderSecuriteStats() {
     html+=_card('Corporel / Mortel','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD3+leg3+'</div>');
   })();
 
-  // ── Card 4 : Classes ULM (barres horizontales) ──
+  // ── Card 4+5 : Classes ULM + Type de vol partagent une seule cellule (moitié / moitié) ──
   (function(){
-    var counts={};
-    evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';counts[c]=(counts[c]||0)+1;});
-    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,8);
-    var cols=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#a855f7'];
-    var mx=items.length?counts[items[0]]:1;
-    var s=items.length
-      ? items.map(function(k,i){ return _bRow(k,counts[k],mx,total,cols[i%cols.length]); }).join('')
+    var _subTitle = function(t){ return '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:11px;flex-shrink:0">'+t+'</div>'; };
+    // Classes ULM (barres horizontales)
+    var cC={};
+    evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';cC[c]=(cC[c]||0)+1;});
+    var iC=Object.keys(cC).sort(function(a,b){return cC[b]-cC[a];}).slice(0,8);
+    var colsC=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#a855f7'];
+    var mxC=iC.length?cC[iC[0]]:1;
+    var sC=iC.length
+      ? iC.map(function(k,i){ return _bRow(k,cC[k],mxC,total,colsC[i%colsC.length]); }).join('')
       : '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>';
-    html+=_card('Classes ULM',s);
-  })();
-
-  // ── Card 5 : Type de vol (bRow) ──
-  (function(){
-    var counts={};
-    evs.forEach(function(e){var tv=(e.typeVol||'Non renseigné').trim()||'Non renseigné';counts[tv]=(counts[tv]||0)+1;});
-    var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];});
-    var mx=counts[items[0]]||1, s='';
-    items.forEach(function(k,i){s+=_bRow(k,counts[k],mx,total,_PAL[i%_PAL.length]);});
-    html+=_card('Type de vol',s||'<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>');
+    // Type de vol (barres horizontales)
+    var cV={};
+    evs.forEach(function(e){var tv=(e.typeVol||'Non renseigné').trim()||'Non renseigné';cV[tv]=(cV[tv]||0)+1;});
+    var iV=Object.keys(cV).sort(function(a,b){return cV[b]-cV[a];});
+    var mxV=cV[iV[0]]||1, sV='';
+    iV.forEach(function(k,i){sV+=_bRow(k,cV[k],mxV,total,_PAL[i%_PAL.length]);});
+    if(!sV) sV='<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>';
+    html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:row;gap:14px;min-height:0">'
+      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('Classes ULM')+'<div style="flex:1;overflow:auto;min-height:0">'+sC+'</div></div>'
+      +'<div style="width:1px;background:var(--bdr);flex-shrink:0;align-self:stretch"></div>'
+      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('Type de vol')+'<div style="flex:1;overflow:auto;min-height:0">'+sV+'</div></div>'
+      +'</div>';
   })();
 
   // ── Card 6 : Origines — Treemap SVG (réf. BEA uniquement) ──
@@ -51898,11 +52423,11 @@ function _renderSecuriteStats() {
     var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
     var footer='<div style="font-size:9px;color:#6366f1;margin-top:6px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
     if(!items.length){
-      html+=_card('Origines','<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer);
+      html+=_card('Origines','<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer,2);
       return;
     }
-    // Treemap slice-and-dice
-    var W=240,H=155,sum=items.reduce(function(a,k){return a+counts[k];},0);
+    // Treemap slice-and-dice — cellule doublée : viewBox élargi pour garder une hauteur correcte
+    var W=490,H=155,sum=items.reduce(function(a,k){return a+counts[k];},0);
     var rects=[],rem=items.slice(),x=0,y=0,rw=W,rh=H,horiz=true;
     while(rem.length){
       var batch=rem.splice(0,Math.max(1,Math.ceil(rem.length/2)));
@@ -51956,7 +52481,7 @@ function _renderSecuriteStats() {
       s+='</g>';
     });
     s+='</svg>';
-    html+=_card('Origines',s+footer);
+    html+=_card('Origines',s+footer,2);
   })();
 
   // ── Card 7 : Instructeur à bord (donut) ──
