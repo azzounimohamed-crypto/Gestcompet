@@ -774,12 +774,15 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <span style="color:var(--txt)">Gest'</span><span style="color:var(--stol,#0057FF)">DTN</span>
   </div>
   <div style="font-size:13px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--txt2);margin-bottom:48px;text-align:center">Direction Technique Nationale</div>
-  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px">
-    <button class="btn btn-primary btn-full" style="font-size:16px;padding:14px;border-radius:12px" onclick="welcomeConnect()">🔑 Se connecter</button>
-    <button class="btn btn-secondary btn-full" style="font-size:16px;padding:14px;border-radius:12px" onclick="welcomeCreateAccount()">✉️ Ouvrir un compte</button>
-    <button class="btn btn-full" style="font-size:15px;padding:14px;border-radius:12px;background:transparent;border:1px solid var(--bdr);color:var(--txt2)" onclick="welcomeWithoutAccount()">👁 Accéder sans compte</button>
+  <div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--txt2);text-align:center;margin-bottom:2px">J'ai un code d'accès</div>
+    <input id="acces-login-email" type="email" placeholder="Votre email" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('acces-login-code').focus()" style="width:100%;padding:13px 14px;border-radius:12px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt);font-family:inherit;font-size:15px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+    <input id="acces-login-code" type="text" placeholder="Code d'accès" autocomplete="off" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')_accesDoWelcomeLogin()" style="width:100%;padding:13px 14px;border-radius:12px;border:1px solid var(--bdr);background:var(--navy2);color:var(--txt);font-family:inherit;font-size:16px;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:3px;text-align:center;font-weight:800" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'">
+    <div id="acces-login-err" style="display:none;color:#f87171;font-size:12px;text-align:center;line-height:1.4"></div>
+    <button class="btn btn-primary btn-full" style="font-size:16px;padding:14px;border-radius:12px" onclick="_accesDoWelcomeLogin()">🔑 Accéder</button>
+    <button class="btn btn-full" style="font-size:14px;padding:13px;border-radius:12px;background:transparent;border:1px solid var(--bdr);color:var(--txt2)" onclick="welcomeWithoutAccount()">👁 Accéder sans compte</button>
   </div>
-  <div style="font-size:11px;color:var(--txt3);margin-top:40px">v1.0.8 · 2026</div>
+  <div style="font-size:11px;color:var(--txt3);margin-top:36px">v1.0.8 · 2026</div>
 </div>
 
 <!-- ═══════════════ MODALE AGENDA SAISONNIER ═══════════════ -->
@@ -2008,79 +2011,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
       <!-- TAB UTILISATEURS (gestionnaire uniquement) -->
       <div id="stab-utilisateurs-panel" style="display:none;overflow-y:auto">
-
-        <!-- Documentation Gestion des accès -->
-        <div class="card" style="margin:12px 12px 0;font-size:13px;color:var(--txt2);line-height:1.9">
-          <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:6px">🔐 Processus d'accès</div>
-          <ol style="padding-left:18px;margin:0 0 10px;line-height:2">
-            <li>Le gestionnaire crée l'utilisateur et génère un <b>code d'invitation</b></li>
-            <li>Le code est transmis à l'utilisateur (SMS, WhatsApp, email…)</li>
-            <li>L'utilisateur clique sur <b>Rejoindre avec un code</b> sur l'écran de connexion</li>
-            <li>Il saisit son email, le code et choisit son mot de passe</li>
-          </ol>
-          <div style="font-size:11px;color:var(--txt3);border-top:1px solid var(--bdr);padding-top:8px">
-            ℹ️ Le compte d'accès est indépendant des fiches Encadrement et Équipage — un utilisateur peut exister sans y être référencé, et inversement.
-          </div>
-        </div>
-
-        <!-- Formulaire création utilisateur -->
-        <div id="util-create-form" style="margin:12px 12px 0;background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;overflow:hidden">
-          <div onclick="toggleUtilCreateForm()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer">
-            <div style="font-size:13px;font-weight:700;color:var(--stol)">➕ Créer un utilisateur</div>
-            <span id="util-create-ico" style="font-size:13px;color:var(--txt3)">▸</span>
-          </div>
-          <div id="util-create-body" style="display:none;padding:0 14px 14px;display:none">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Prénom</div><input id="util-new-prenom" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box" placeholder="Prénom"></div>
-              <div><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Nom</div><input id="util-new-nom" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box" placeholder="Nom"></div>
-            </div>
-            <div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Email</div><input id="util-new-email" type="email" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box" placeholder="adresse@email.fr"></div>
-            <div style="margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Statut</div>
-              <select id="util-new-statut" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 9px;outline:none;width:100%;box-sizing:border-box">
-                <option value="utilisateur" selected>👁 Utilisateur (lecture seule)</option>
-                <option value="utilisateur_modif">✏️ Utilisateur (modif + export)</option>
-                <option value="gestionnaire">👑 Gestionnaire</option>
-                <option value="developpeur">⚙️ Développeur</option>
-              </select>
-            </div>
-            <button onclick="generateInviteCode()" style="width:100%;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔑 Générer le code d'invitation</button>
-            <div id="util-invite-code-result" style="display:none;margin-top:12px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.35);border-radius:10px;padding:14px"></div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.7px">👥 Utilisateurs</div>
-            <div id="util-count" style="font-size:11px;color:var(--txt3);margin-top:2px"></div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="syncAndRefreshUsers()" style="font-size:11px;padding:5px 12px">🔄 Actualiser</button>
-        </div>
-        <div style="margin:0 12px 10px;background:rgba(0,87,255,.08);border:1px solid rgba(0,87,255,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--txt2);line-height:1.6">
-          💡 Un utilisateur apparaît ici après sa première connexion depuis l'application. S'il n'est pas visible, appuyez sur <b>Actualiser</b> ou demandez-lui de se connecter et de synchroniser ses données depuis son appareil.
-        </div>
-        <div style="padding:0 12px 8px;display:flex;flex-direction:column;gap:6px">
-          <!-- Recherche -->
-          <div style="position:relative">
-            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--txt3)">🔍</span>
-            <input id="util-search" type="search" placeholder="Rechercher par nom, email…"
-              style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px 7px 32px;width:100%;outline:none;box-sizing:border-box"
-              oninput="renderUtilisateursTab()">
-          </div>
-          <!-- Filtre profil + tri -->
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="util-statut-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:7px 12px;flex:1;outline:none" onchange="renderUtilisateursTab()">
-              <option value="all">👥 Tous les profils</option>
-              <option value="developpeur">⚙️ Développeurs</option>
-              <option value="gestionnaire">👑 Gestionnaires</option>
-              <option value="utilisateur_modif">✏️ Utilisateurs (modif)</option>
-              <option value="utilisateur">👁 Utilisateurs</option>
-            </select>
-            <button id="util-sort-btn" onclick="_toggleUtilSort()" title="Trier par nom"
-              style="flex-shrink:0;padding:7px 11px;background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt2);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation">
-              A→Z
-            </button>
-          </div>
-        </div>
-        <div id="stab-utilisateurs-list" style="padding:0 12px 24px"></div>
+        <div id="acces-admin-body" style="padding:12px 12px 44px"></div>
       </div>
 
       <!-- TAB À PROPOS -->
@@ -4466,7 +4397,8 @@ var S = {
   budgetDTN: {previsionnel:[], realise:[]},
   aides: [],
   _deletedAides: {},
-  territoires: {}
+  territoires: {},
+  accesUsers: []
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -5132,6 +5064,7 @@ function _flushSaveState() {
     collectif:S.collectif||[], _deletedCollectif:S._deletedCollectif||[],
     shn:S.shn||[], _deletedSHN:S._deletedSHN||[],
     territoires:S.territoires||{},
+    accesUsers:S.accesUsers||[],
     etapes:S.etapes||{}
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
@@ -22929,13 +22862,12 @@ function switchSettingsTab(tab, btn) {
   if (tab === 'compte')       renderSettingsCompte();
   if (tab === 'staff')        renderStaffTab();
   if (tab === 'utilisateurs') {
-    var _us = document.getElementById('util-search'); if (_us) _us.value = '';
-    renderUtilisateursTab();
-    // Pull silencieux pour récupérer les nouveaux utilisateurs depuis le cloud
+    if (typeof renderAccesAdmin === 'function') renderAccesAdmin();
+    // Pull silencieux pour récupérer les nouveaux accès depuis le cloud
     if (getSB() && navigator.onLine && !_syncInProgress) {
       pullFromCloud().then(function() {
         saveState();
-        renderUtilisateursTab();
+        if (typeof renderAccesAdmin === 'function') renderAccesAdmin();
         updateSyncTime();
       }).catch(function(){});
     }
@@ -24862,12 +24794,19 @@ function _sitePrintFiche(){
     +'.rub td.rlbl{font-weight:700;text-transform:uppercase;font-size:11px;color:#334155;width:190px}.rub td.rinf{color:#0f172a}.rub td.rstar{width:120px;white-space:nowrap;text-align:right;font-size:17px;letter-spacing:2px}'
     +'.rub .on{color:#f59e0b}.rub .off{color:#cbd5e1}'
     +'.muted{color:#64748b;font-size:12px;font-style:italic}'
-    +'.foot{margin-top:22px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:10px;color:#94a3b8;text-align:right}';
+    +'.foot{margin-top:22px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:10px;color:#94a3b8;text-align:right}'
+    +'.frmap{flex-shrink:0;text-align:center}.frmap svg{width:120px;height:auto}.frcap{font-size:9px;font-weight:600;color:#64748b;margin-top:2px;max-width:124px}';
   var logoHtml = logo ? '<img src="'+logo+'" alt="FFPLUM">' : '<div style="font-size:22px;font-weight:900;color:#1d4ed8">FFPLUM</div>';
   var titre = lieu || oaci || 'Site aéro';
   var subParts = [oaci, ville, region].filter(Boolean).join(' · ');
+  // Mini-carte de France : région du site + marqueur aux coordonnées
+  var _regionKey = (typeof _collNormRegion==='function') ? _collNormRegion(region || (d&&d.region) || '') : (region||'');
+  var _lat = d ? _basulmCoord(d.latitude) : null, _lng = d ? _basulmCoord(d.longitude) : null;
+  var _miniMap = _frMiniMapSVG(_regionKey, _lat, _lng);
+  var _mapCap = region || (d&&d.region) || '';
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche site — '+esc(titre)+'</title><style>'+css+'</style></head><body>'
-    +'<div class="head">'+logoHtml+'<div><h1>Fiche site aéro — '+esc(titre)+'</h1><div class="sub">'+esc(subParts)+'</div></div></div>'
+    +'<div class="head">'+logoHtml+'<div style="flex:1"><h1>Fiche site aéro — '+esc(titre)+'</h1><div class="sub">'+esc(subParts)+'</div></div>'
+    +(_miniMap?'<div class="frmap">'+_miniMap+(_mapCap?'<div class="frcap">'+esc(_mapCap)+'</div>':'')+'</div>':'')+'</div>'
     +'<div class="sec">Identification</div>'+idHtml
     +'<div class="sec">Fiche BasULM détaillée</div>'+basulmHtml
     +'<div class="sec">Évaluations &amp; informations</div><table class="rub">'+rubRows+'</table>'
@@ -25979,6 +25918,7 @@ async function pushToCloud() {
     aides:                S.aides                || [],
     _deletedAides:        S._deletedAides        || {},
     territoires:          S.territoires          || {},
+    accesUsers:           S.accesUsers           || [],
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26593,6 +26533,11 @@ async function loadFromSupabaseFirst() {
     var savedShn = (S.shn && S.shn.length) ? S.shn.slice() : null;
     // ✅ GARDE TERRITOIRES : comités régionaux + divers (le local ne doit pas être écrasé par un cloud plus ancien)
     var savedTerritoires = (S.territoires && S.territoires.comites && S.territoires.comites.length) ? JSON.parse(JSON.stringify(S.territoires)) : null;
+    // ✅ GARDE ACCÈS : utilisateurs + codes d'accès (fusion par id, local prioritaire)
+    var savedAccesUsers = (S.accesUsers && S.accesUsers.length) ? JSON.parse(JSON.stringify(S.accesUsers)) : null;
+    // ✅ GARDE ÉVÉNEMENTS (accidents/incidents par compétition) — DONNÉES CRITIQUES :
+    // ne jamais laisser un cloud plus ancien effacer une saisie locale.
+    var savedEvenements = (S.evenements && Object.keys(S.evenements).length) ? JSON.parse(JSON.stringify(S.evenements)) : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -26683,6 +26628,35 @@ async function loadFromSupabaseFirst() {
       });
       if (typeof savedTerritoires.divers === 'string' && savedTerritoires.divers) S.territoires.divers = savedTerritoires.divers;
       if (savedTerritoires._seeded) S.territoires._seeded = true;
+    }
+    // ✅ Fusionner les accès locaux avec le cloud : accès par id (local gagne)
+    if (savedAccesUsers) {
+      if (!Array.isArray(S.accesUsers)) S.accesUsers = [];
+      savedAccesUsers.forEach(function(a) {
+        var idx = S.accesUsers.findIndex(function(x){ return x.id === a.id; });
+        if (idx === -1) { S.accesUsers.push(a); } else { S.accesUsers[idx] = a; }
+      });
+    }
+    // ✅ Fusionner les ÉVÉNEMENTS (accidents/incidents) locaux avec le cloud, compétition
+    // par compétition, événement par id : union + dernier _updatedAt gagne (défaut = local).
+    // Garantit qu'une saisie d'accident locale ne disparaît jamais lors d'une synchro.
+    if (savedEvenements) {
+      if (!S.evenements || typeof S.evenements !== 'object') S.evenements = {};
+      Object.keys(savedEvenements).forEach(function(cid) {
+        var localArr = Array.isArray(savedEvenements[cid]) ? savedEvenements[cid] : [];
+        if (!Array.isArray(S.evenements[cid])) S.evenements[cid] = [];
+        var cloudArr = S.evenements[cid];
+        localArr.forEach(function(ev) {
+          if (!ev) return;
+          if (!ev.id) { cloudArr.push(ev); return; }
+          var idx = cloudArr.findIndex(function(x){ return x && x.id === ev.id; });
+          if (idx === -1) { cloudArr.push(ev); }
+          else {
+            var lTs = ev._updatedAt || 0, cTs = (cloudArr[idx] && cloudArr[idx]._updatedAt) || 0;
+            if (lTs >= cTs) cloudArr[idx] = ev; // local prioritaire à égalité
+          }
+        });
+      });
     }
     // Fusionner les événements agenda locaux non présents dans le cloud
     if (localAgendaEvents.length) {
@@ -32780,6 +32754,168 @@ function showWelcomeScreen() {
 function hideWelcomeScreen() {
   var ws = document.getElementById('welcome-screen');
   if (ws) ws.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ACCÈS PAR CODE — système simple : le gestionnaire crée un utilisateur
+//  (prénom, nom, email, statut) → un code est généré, transmis manuellement.
+//  L'utilisateur saisit email + code pour accéder selon les droits de son statut.
+//  Les accès voyagent dans l'état partagé (sync cloud) → validation sur tout appareil.
+// ═══════════════════════════════════════════════════════════════════════
+var _ACCES_STATUTS = [
+  ['gestionnaire',      '👑 Gestionnaire — accès total + gestion des accès'],
+  ['utilisateur_modif', '✏️ Utilisateur (modification)'],
+  ['utilisateur',       '👁 Utilisateur (lecture seule)'],
+  ['commissaire',       '🚩 Commissaire — saisie des résultats'],
+  ['pilote',            '✈️ Pilote — consultation'],
+  ['developpeur',       '⚙️ Développeur — accès technique']
+];
+var _ACCES_STATUT_LBL = {gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏️ Util. modif',utilisateur:'👁 Utilisateur',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',developpeur:'⚙️ Développeur',invite:'👁 Invité'};
+
+function _accesInit(){ if (!Array.isArray(S.accesUsers)) S.accesUsers = []; }
+function _accesNormEmail(e){ return (e||'').toString().trim().toLowerCase(); }
+function _accesGenCode(){
+  _accesInit();
+  var A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sans I,O,0,1,L (ambigus)
+  for (var tries=0; tries<50; tries++){
+    var c=''; for (var i=0;i<6;i++) c += A[Math.floor(Math.random()*A.length)];
+    if (!S.accesUsers.some(function(u){ return u.code===c; })) return c;
+  }
+  return 'X'+Date.now().toString(36).slice(-5).toUpperCase();
+}
+function _accesUid(){ return 'acc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function _accesCreate(prenom, nom, email, statut){
+  _accesInit();
+  email = _accesNormEmail(email);
+  if (!email){ toast('Email requis','err'); return null; }
+  if (S.accesUsers.some(function(u){ return _accesNormEmail(u.email)===email; })){ toast('Un accès existe déjà pour cet email','warn'); return null; }
+  var rec = { id:_accesUid(), prenom:(prenom||'').trim(), nom:(nom||'').trim(), email:email, statut:statut||'utilisateur', code:_accesGenCode(), actif:true, createdAt:Date.now(), lastLoginAt:null };
+  S.accesUsers.push(rec);
+  saveState(); if (typeof silentPush==='function') silentPush();
+  return rec;
+}
+function _accesFind(email, code){
+  _accesInit();
+  var e = _accesNormEmail(email), c = (code||'').toString().trim().toUpperCase();
+  return S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && (u.code||'').toUpperCase()===c; }) || null;
+}
+// Connexion par email + code → applique le statut et entre dans l'application.
+function _accesLogin(email, code){
+  _accesInit();
+  var rec = _accesFind(email, code);
+  if (!rec){ return { ok:false, msg:'Email ou code incorrect.' }; }
+  if (rec.actif === false){ return { ok:false, msg:'Cet accès a été désactivé. Contactez le gestionnaire.' }; }
+  rec.lastLoginAt = Date.now();
+  S.user = { id:rec.id, prenom:rec.prenom, nom:rec.nom, email:rec.email, statut:rec.statut, _acces:true };
+  saveState(); if (typeof silentPush==='function') silentPush();
+  return { ok:true, rec:rec };
+}
+function _accesUpdate(id, field, val){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u[field]=(field==='email')?_accesNormEmail(val):val; u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); }
+function _accesRegen(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.code=_accesGenCode(); u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Nouveau code généré','ok'); }
+function _accesToggle(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.actif=(u.actif===false); u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast(u.actif?'Accès réactivé':'Accès désactivé', u.actif?'ok':'warn'); }
+function _accesDelete(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; if(!confirm('Supprimer définitivement l\'accès de '+((u.prenom||'')+' '+(u.nom||'')).trim()+' ('+u.email+') ?')) return; S.accesUsers=S.accesUsers.filter(function(x){return x.id!==id;}); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Accès supprimé',''); }
+// Copie un message d'invitation prêt à envoyer (lien + email + code)
+function _accesCopyInvite(id){
+  _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return;
+  var lien = (location && location.origin && location.origin.indexOf('http')===0) ? location.origin+location.pathname : 'Gest\'DTN';
+  var msg = 'Bonjour '+((u.prenom||'')+' '+(u.nom||'')).trim()+',\n\n'
+    + 'Voici votre accès à Gest\'DTN :\n'
+    + 'Lien : '+lien+'\n'
+    + 'Email : '+u.email+'\n'
+    + 'Code d\'accès : '+u.code+'\n\n'
+    + 'Sur la page d\'accueil, choisissez « J\'ai un code d\'accès », saisissez votre email et ce code.';
+  var done=function(){ toast('Invitation copiée — collez-la dans un email/SMS','ok'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg).then(done, function(){ window.prompt('Copiez l\'invitation :', msg); });
+  else window.prompt('Copiez l\'invitation :', msg);
+}
+// ── Connexion depuis l'écran d'accueil (email + code) ──
+var _accesLoginRetried = false;
+function _accesEnterApp(rec){
+  hideWelcomeScreen();
+  var app = document.getElementById('app'); if (app) app.style.display='';
+  if (window.innerWidth >= 768 && typeof showDTNPortal==='function') { showDTNPortal(); }
+  else { if (typeof renderHome==='function') renderHome(); if (typeof renderCompetitions==='function') renderCompetitions(); }
+  if (typeof updateHeader==='function') updateHeader();
+  toast('Bienvenue '+(((rec.prenom||'')+' '+(rec.nom||'')).trim()||rec.email)+' · '+(_ACCES_STATUT_LBL[rec.statut]||rec.statut), 'ok');
+}
+function _accesDoWelcomeLogin(){
+  var email = ((document.getElementById('acces-login-email')||{}).value||'');
+  var code  = ((document.getElementById('acces-login-code')||{}).value||'');
+  var errEl = document.getElementById('acces-login-err');
+  var setErr= function(m,ok){ if(errEl){ errEl.textContent=m||''; errEl.style.display=m?'block':'none'; errEl.style.color= ok?'var(--txt3)':'#f87171'; } };
+  setErr('');
+  if (!email.trim() || !code.trim()){ setErr('Saisissez votre email et votre code.'); return; }
+  var r = _accesLogin(email, code);
+  if (r.ok){ _accesEnterApp(r.rec); return; }
+  // Accès introuvable : tenter un rafraîchissement cloud (nouvel appareil) puis réessayer une fois
+  if (!_accesLoginRetried && typeof pullFromCloud==='function'){
+    _accesLoginRetried = true;
+    setErr('Vérification en cours…', true);
+    Promise.resolve(pullFromCloud()).then(function(){
+      var r2 = _accesLogin(email, code);
+      if (r2.ok) _accesEnterApp(r2.rec); else setErr(r2.msg);
+    }).catch(function(){ setErr(r.msg); });
+    return;
+  }
+  setErr(r.msg);
+}
+
+// ── Administration des accès (gestionnaire) : rendu dans l'onglet « Accès » ──
+var _accesBtn = 'display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap';
+function renderAccesModal(){ renderAccesAdmin(); }
+function renderAccesAdmin(){
+  var el = document.getElementById('acces-admin-body'); if (!el) return;
+  _accesInit();
+  var esc = _territEsc;
+  var canManage = (typeof canManageUsers==='function') ? canManageUsers() : true;
+  if (!canManage){
+    el.innerHTML = '<div class="card" style="text-align:center;color:var(--txt3);font-size:13px;padding:26px 16px">🔒 Réservé au gestionnaire.<br><span style="font-size:11px">Statut actuel : '+esc(_ACCES_STATUT_LBL[_userStatut()]||_userStatut()||'invité')+'</span></div>';
+    return;
+  }
+  var statOpts = _ACCES_STATUTS.map(function(s){ return '<option value="'+s[0]+'">'+esc(s[1])+'</option>'; }).join('');
+  var inSt  = 'width:100%;box-sizing:border-box;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none';
+  var lblSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block';
+  var doc = '<div class="card" style="margin:0 0 12px;font-size:12.5px;color:var(--txt2);line-height:1.8"><div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:4px">🔐 Accès simple par code</div>1) Créez l\'utilisateur (nom, email, statut) → un <b>code</b> est généré.<br>2) Cliquez sur <b>Copier l\'invitation</b> et envoyez-la (email / SMS) avec le lien du site.<br>3) L\'utilisateur saisit son <b>email + code</b> sur l\'accueil → accès selon son statut.</div>';
+  var form = '<div class="card" style="margin:0 0 14px;padding:12px 14px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--stol);margin-bottom:10px">➕ Créer un accès</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    +   '<div><label style="'+lblSt+'">Prénom</label><input id="acces-new-prenom" style="'+inSt+'" placeholder="Prénom"></div>'
+    +   '<div><label style="'+lblSt+'">Nom</label><input id="acces-new-nom" style="'+inSt+'" placeholder="Nom"></div>'
+    + '</div>'
+    + '<div style="margin-bottom:8px"><label style="'+lblSt+'">Email</label><input id="acces-new-email" type="email" style="'+inSt+'" placeholder="adresse@email.fr"></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lblSt+'">Statut</label><select id="acces-new-statut" style="'+inSt+'">'+statOpts+'</select></div>'
+    + '<button onclick="_accesAdminCreate()" style="width:100%;padding:10px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--stol),#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Créer l\'accès &amp; générer le code</button>'
+    + '</div>';
+  var list = S.accesUsers.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+  var rows = list.length ? list.map(function(u){
+    var name = ((u.prenom||'')+' '+(u.nom||'')).trim() || '—';
+    var col = {gestionnaire:'#c89600',developpeur:'#ef4444',utilisateur_modif:'var(--stol)',commissaire:'#8b5cf6',pilote:'#0891b2',utilisateur:'var(--txt2)'}[u.statut] || 'var(--txt2)';
+    var inactive = (u.actif===false);
+    return '<div class="card" style="padding:10px 12px;margin-bottom:8px;'+(inactive?'opacity:.55;':'')+'">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +   '<div style="flex:1;min-width:140px"><div style="font-size:13px;font-weight:700;color:var(--txt)">'+esc(name)+(inactive?' <span style="font-size:10px;color:#f87171">(désactivé)</span>':'')+'</div><div style="font-size:11px;color:var(--txt3)">'+esc(u.email)+'</div></div>'
+      +   '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(127,127,127,.12);color:'+col+'">'+(_ACCES_STATUT_LBL[u.statut]||u.statut)+'</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">'
+      +   '<div style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:var(--txt);background:var(--navy3);border:1px dashed var(--bdr);border-radius:8px;padding:4px 12px">'+esc(u.code)+'</div>'
+      +   '<button onclick="_accesCopyInvite(\''+u.id+'\')" style="'+_accesBtn+'">📋 Copier l\'invitation</button>'
+      +   '<button onclick="_accesRegen(\''+u.id+'\')" title="Générer un nouveau code" style="'+_accesBtn+'">🔄</button>'
+      +   '<button onclick="_accesToggle(\''+u.id+'\')" title="'+(inactive?'Réactiver':'Désactiver')+'" style="'+_accesBtn+'">'+(inactive?'✅':'⏸')+'</button>'
+      +   '<button onclick="_accesDelete(\''+u.id+'\')" title="Supprimer" style="'+_accesBtn+';color:#f87171;border-color:rgba(239,68,68,.3)">🗑</button>'
+      + '</div>'
+      + '</div>';
+  }).join('') : '<div class="card" style="text-align:center;color:var(--txt3);font-size:13px;padding:20px">Aucun accès créé. Utilisez le formulaire ci-dessus.</div>';
+  el.innerHTML = doc + form
+    + '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin:4px 2px 8px">'+list.length+' accès enregistré'+(list.length>1?'s':'')+'</div>'
+    + rows;
+}
+function _accesAdminCreate(){
+  var g = function(id){ return ((document.getElementById(id)||{}).value||''); };
+  var rec = _accesCreate(g('acces-new-prenom'), g('acces-new-nom'), g('acces-new-email'), g('acces-new-statut'));
+  if (!rec) return;
+  ['acces-new-prenom','acces-new-nom','acces-new-email'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  renderAccesAdmin();
+  toast('Accès créé — code '+rec.code+'. Cliquez « Copier l\'invitation ».','ok');
 }
 function welcomeConnect() {
   hideWelcomeScreen();
@@ -40000,7 +40136,7 @@ function hdgAddEvenement(compId) {
   var imm  = (document.getElementById('evt-inp-immat')||{}).value||'';
   var circ = (document.getElementById('evt-inp-circ')||{}).value||'';
   if (!nom && !circ && !imm) return;
-  S.evenements[compId].push({ id:'evt-'+Date.now(), typeIncident:type, nom:nom, date:date, horaire:'', immatriculation:imm, circonstance:circ, commentaires:'' });
+  S.evenements[compId].push({ id:'evt-'+Date.now(), typeIncident:type, nom:nom, date:date, horaire:'', immatriculation:imm, circonstance:circ, commentaires:'', _updatedAt:Date.now() });
   ['evt-inp-nom','evt-inp-date','evt-inp-immat','evt-inp-circ'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
 }
@@ -40063,6 +40199,7 @@ function saveEvenementSheet() {
   ev.immatriculation = g('evt-modal-immat');
   ev.circonstance  = g('evt-modal-circ');
   ev.commentaires  = g('evt-modal-comm');
+  ev._updatedAt    = Date.now();
   closeEvenementModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Événement enregistré ✓','ok');
 }
