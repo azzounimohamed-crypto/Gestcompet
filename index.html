@@ -402,6 +402,16 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
 @media (max-width:767px){
   #header-mobile-title{display:block!important}
   #header-mobile-ffplum{display:none!important}
+  /* ── Volets plein écran sur smartphone : annule le décalage de 216px
+        (largeur de la barre latérale bureau) posé en style inline par le JS ── */
+  #ndf-overlay,#ndf-detail-sheet,#collectif-overlay,#budget-overlay,#espaces-overlay,
+  #gantt-overlay,#agenda-overlay,#page-dispositifs-aide,#page-securite,
+  #page-formations,#page-acces,#page-territoires{left:0!important}
+  /* Portail DTN : pas d'espace réservé ni de retrait pour la barre latérale */
+  #dtn-sb-spacer{width:0!important}
+  #dtn-header{padding-left:0!important}
+  /* Carte des étapes : dégager le zoom de la barre de fonds de carte */
+  #etapes-map .leaflet-top.leaflet-left{top:38px}
   /* ── Module Collectifs & SHN : onglets compacts défilables sur mobile ── */
   #collectif-tab-bar{max-width:calc(100% - 24px);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:8px 12px 4px!important}
   #collectif-tab-bar::-webkit-scrollbar{display:none}
@@ -436,6 +446,42 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
   #cfe-ec-photo-col>button{font-size:13px!important;padding:6px 10px!important}
   /* Inputs : 16px pour éviter le zoom automatique iOS */
   #cfe-content-wrap .cf-input,#cfe-content-wrap .cf-select{font-size:16px!important;min-height:44px}
+  /* ══ Modale Compétiteur (Équipage) : plein écran mobile ══
+     Même patron que la modale Collectif ci-dessus : navigation en pilules
+     horizontales, une seule colonne, inputs 16px, cibles 44px. Le pied de page
+     regroupe les actions à portée du pouce. */
+  #pm-panel{width:100vw!important;height:100%!important;max-height:100%!important;border-radius:0!important}
+  #pm-header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px!important}
+  #pm-header>div:first-child{min-width:0}
+  #pm-manual-title,#pilot-manual-title{font-size:17px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pm-header>button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin:0 -8px 0 8px;border-radius:10px}
+  /* Onglets : pilules défilables au-dessus du contenu */
+  #pm-body{flex-direction:column!important}
+  #pm-sidebar{width:100%!important;flex-direction:row!important;overflow-x:auto;-webkit-overflow-scrolling:touch;border-right:none!important;border-bottom:1px solid var(--bdr);padding:10px 12px!important;gap:8px!important;scrollbar-width:none}
+  #pm-sidebar::-webkit-scrollbar{display:none}
+  #pm-sidebar button{width:auto!important;flex:0 0 auto;white-space:nowrap;border:none!important;border-radius:999px;padding:9px 15px!important;font-size:13px!important;font-weight:600!important;line-height:1.2;min-height:40px;background:rgba(255,255,255,.06)!important;color:var(--txt2)!important}
+  #pm-sidebar button.active{background:var(--stol)!important;color:#fff!important;font-weight:700!important}
+  body.theme-light #pm-sidebar button{background:rgba(0,0,0,.06)!important;color:rgba(0,0,0,.6)!important}
+  body.theme-light #pm-sidebar button.active{background:var(--stol)!important;color:#fff!important}
+  /* Contenu : une seule colonne — les grilles 2 et 3 colonnes du bureau
+     donnaient des champs de ~60px de large sur 375px. */
+  #pm-content-wrap{padding:16px 16px 24px!important}
+  #pm-content-wrap div[style*="grid-template-columns"]{grid-template-columns:1fr!important;gap:12px!important}
+  #pm-content-wrap .cf-input,#pm-content-wrap .cf-select{font-size:16px!important;min-height:44px}
+  #pm-content-wrap button{min-height:44px}
+  /* Photo centrée au-dessus des champs plutôt qu'en colonne latérale.
+     `align-items:stretch` est indispensable : en colonne, le `flex-start` du
+     bureau dimensionne les enfants sur leur contenu et les champs n'occupent
+     alors que la moitié de la largeur. */
+  /* Ordre naturel : Prénom/Nom d'abord — ce sont les champs les plus saisis et
+     ils doivent être atteignables sans défiler. La photo, facultative, suit. */
+  #pm-ec-row{flex-direction:column!important;align-items:stretch!important;gap:16px!important}
+  #pm-ec-photo-col{flex:none!important;align-self:center}
+  #pm-ec-photo-col>button{font-size:13px!important;min-height:36px;padding:6px 10px!important}
+  /* Pied de page : 2 lignes, actions principales à droite, cibles 48px */
+  #pm-footer{flex-wrap:wrap;padding-bottom:env(safe-area-inset-bottom)!important}
+  #pm-footer>button{min-height:48px;font-size:13px!important;flex:1 1 50%!important}
+  #pm-footer>#pm-btn-delete{flex:1 1 50%!important;border-right:none!important}
   /* Tableaux d'historique : scroll horizontal contenu dans un wrapper */
   .cfe-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px}
   .cfe-tbl-wrap table{min-width:640px}
@@ -2745,7 +2791,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button onclick="closeCollectifModule()" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
   </div>
   <!-- Onglets -->
-  <div id="collectif-tab-bar" style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;margin:8px 22px 4px;flex-shrink:0">
+  <div id="collectif-tab-bar" style="display:inline-flex;background:var(--navy3);border-radius:var(--rs);padding:3px;gap:2px;margin:8px 12px 4px;flex-shrink:0;max-width:calc(100% - 24px);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
     <button id="collectif-tab-stats" class="class-tab active" onclick="_collectifSetPage('stats')" style="flex:none;min-width:150px;text-align:center">📊 Chiffres &amp; stats</button>
     <button id="collectif-tab-cf" class="class-tab" onclick="_collectifSetPage('collectif-france')" style="flex:none;min-width:160px;text-align:center">🇫🇷 Collectif France</button>
     <button id="collectif-tab-ef" class="class-tab" onclick="_collectifSetPage('equipes-france')" style="flex:none;min-width:160px;text-align:center">🏅 Équipes de France</button>
@@ -3522,6 +3568,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <span style="font-size:13px;font-weight:600;color:var(--txt)">🤝 Partenaires</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
+            <input type="checkbox" id="volet-chk-deroulement" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
+            <span style="font-size:13px;font-weight:600;color:var(--txt)">📅 Déroulement</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-resultats" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
             <span style="font-size:13px;font-weight:600;color:var(--txt)">🏆 Résultats</span>
           </label>
@@ -3535,7 +3585,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-evenements" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
-            <span style="font-size:13px;font-weight:600;color:var(--txt)">📅 Événements</span>
+            <span style="font-size:13px;font-weight:600;color:var(--txt)">⚠️ Événements</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-budget" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
@@ -3792,10 +3842,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
 <!-- SAISIE MANUELLE PILOTE -->
 <div class="overlay" id="sheet-pilot-manual" style="align-items:center;justify-content:center" onclick="closeOnBg(event,'sheet-pilot-manual')">
-<div style="background:var(--navy2);border-radius:14px;width:min(1040px,97vw);height:min(660px,92vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden">
+<div id="pm-panel" style="background:var(--navy2);border-radius:14px;width:min(1040px,97vw);height:min(660px,92vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden">
 
   <!-- En-tête -->
-  <div style="padding:16px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+  <div id="pm-header" style="padding:16px 22px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Compétiteur</div>
       <div id="pilot-manual-title" style="font-size:17px;font-weight:800;color:var(--txt)">—</div>
@@ -3806,10 +3856,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   <input type="hidden" id="pm-edit-id">
 
   <!-- Corps : sidebar + contenu -->
-  <div style="flex:1;display:flex;overflow:hidden;min-height:0">
+  <div id="pm-body" style="flex:1;display:flex;overflow:hidden;min-height:0">
 
     <!-- Sidebar nav -->
-    <div style="width:170px;flex-shrink:0;background:var(--navy3);border-right:1px solid var(--bdr);padding:10px 0;display:flex;flex-direction:column;gap:2px">
+    <div id="pm-sidebar" style="width:170px;flex-shrink:0;background:var(--navy3);border-right:1px solid var(--bdr);padding:10px 0;display:flex;flex-direction:column;gap:2px">
       <button id="pm-nav-etat-civil" onclick="_pmTab('etat-civil')" style="width:100%;text-align:left;padding:10px 14px;border:none;border-left:3px solid var(--stol);background:rgba(255,255,255,.05);color:var(--txt);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">
         👤 État civil
       </button>
@@ -3828,12 +3878,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </div>
 
     <!-- Contenu -->
-    <div style="flex:1;overflow-y:auto;padding:20px 24px">
+    <div id="pm-content-wrap" style="flex:1;overflow-y:auto;padding:20px 24px">
 
       <!-- ── État civil ── -->
       <div id="pm-content-etat-civil">
         <div class="cf-label" style="text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">État civil</div>
-        <div style="display:flex;gap:16px;align-items:flex-start">
+        <div id="pm-ec-row" style="display:flex;gap:16px;align-items:flex-start">
           <div style="flex:1">
             <div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:8px;margin-bottom:10px">
               <div class="cf-row"><label class="cf-label">Genre</label>
@@ -3862,7 +3912,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             </div>
           </div>
           <!-- Photo à droite -->
-          <div style="flex:0 0 100px;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div id="pm-ec-photo-col" style="flex:0 0 100px;display:flex;flex-direction:column;align-items:center;gap:6px">
             <div id="pm-photo-wrap" onclick="document.getElementById('pm-photo-inp').click()"
               style="width:100px;height:130px;border:2px dashed var(--bdr);border-radius:6px;overflow:hidden;cursor:pointer;background:var(--navy3);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px">
               <img id="pm-photo-img" style="display:none;width:100%;height:100%;object-fit:cover">
@@ -3972,7 +4022,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   </div><!-- fin corps -->
 
   <!-- Pied de page -->
-  <div style="display:flex;gap:0;padding:0;border-top:1px solid var(--bdr);flex-shrink:0">
+  <div id="pm-footer" style="display:flex;gap:0;padding:0;border-top:1px solid var(--bdr);flex-shrink:0">
     <button onclick="closeSheet('sheet-pilot-manual')" style="flex:1;padding:14px;border:none;border-right:1px solid var(--bdr);background:none;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>
     <button id="pm-btn-delete" onclick="_pmDeleteStep(this)" style="flex:0 0 110px;padding:14px 10px;border:none;border-right:1px solid var(--bdr);background:none;color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px" title="Supprimer ce compétiteur">
       <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 2h4a1 1 0 0 0-2 0H6a1 1 0 0 0-2 0zm-2 1h8l-.8 9.6A1 1 0 0 1 10.2 14H5.8a1 1 0 0 1-1-.4L4 3zm2 2v6h1V5zm3 0v6h1V5z"/></svg>
@@ -6032,7 +6082,7 @@ function saveComp() {
     saison: (document.getElementById('comp-date-from').value || '').substring(0,4) || '2026',
     voletsConfig: (function(){
       var vc = {};
-      ['infos','staff','gestion','repas','partenaires','resultats','etapes','materiel','evenements','budget'].forEach(function(k){
+      ['infos','staff','gestion','repas','partenaires','deroulement','resultats','etapes','materiel','evenements','budget'].forEach(function(k){
         var el = document.getElementById('volet-chk-' + k);
         vc[k] = el ? el.checked : true;
       });
@@ -6639,17 +6689,39 @@ function openCompDetail(compId) {
 var _mobileCompId  = null;
 var _mobileCompSectionIdx = 0;
 var _mobileInfoViewMode = 'affiche'; // 'affiche' | 'stats' — vue par défaut sur mobile
+// Couleur et libellé d'onglet portés par la section elle-même : la liste étant
+// filtrée par voletsConfig, un index dans un tableau parallèle serait décalé.
 var _MOBILE_COMP_SECTIONS = [
-  {id:'infos',       lbl:'Infos & Stats', ico:'📊'},
-  {id:'staff',       lbl:'Staff',         ico:'👥'},
-  {id:'gestion',     lbl:'Equipage',      ico:'✈️'},
-  {id:'repas',       lbl:'🍽 Repas',       ico:'🍽'},
-  {id:'partenaires', lbl:'Partenaires',   ico:'🤝'},
-  {id:'deroulement', lbl:'Déroulement',   ico:'📅'},
-  {id:'resultats',   lbl:'Résultats',     ico:'🏅'},
-  {id:'materiel',    lbl:'Matériel',      ico:'🔧'},
-  {id:'budget',      lbl:'Budget',        ico:'💰'}
+  {id:'infos',       lbl:'Infos & Stats', ico:'📊', tab:'Accueil',     col:'#2563eb'},
+  {id:'staff',       lbl:'Staff',         ico:'👥', tab:'Staff',       col:'#0369a1'},
+  {id:'gestion',     lbl:'Equipage',      ico:'✈️', tab:'Equipage',    col:'#7c3aed'},
+  {id:'repas',       lbl:'🍽 Repas',       ico:'🍽', tab:'Repas',       col:'#d97706'},
+  {id:'partenaires', lbl:'Partenaires',   ico:'🤝', tab:'Partenaires', col:'#059669'},
+  {id:'deroulement', lbl:'Déroulement',   ico:'📅', tab:'Déroulement', col:'#0891b2'},
+  {id:'resultats',   lbl:'Résultats',     ico:'🏅', tab:'Résultats',   col:'#b45309'},
+  {id:'etapes',      lbl:'🗺 Site & Étapes', ico:'🗺', tab:'Site & Étapes', col:'#be185d'},
+  {id:'materiel',    lbl:'Matériel',      ico:'🔧', tab:'Matériel',    col:'#374151'},
+  {id:'evenements',  lbl:'Événements',    ico:'⚠️', tab:'Événements',  col:'#b91c1c'},
+  {id:'budget',      lbl:'Budget',        ico:'💰', tab:'Budget',      col:'#15803d'}
 ];
+
+// Sections réellement affichées pour une compétition : les volets décochés dans
+// « Modifier la compétition » sont retirés (même règle que la version desktop).
+// Infos reste toujours présent pour éviter un détail vide.
+function _mcdSections(cp) {
+  if (!cp) cp = (S.comps||[]).find(function(c){ return c.id === _mobileCompId; });
+  var vc = (cp && cp.voletsConfig) || {};
+  var list = _MOBILE_COMP_SECTIONS.filter(function(s){ return vc[s.id] !== false; });
+  return list.length ? list : [_MOBILE_COMP_SECTIONS[0]];
+}
+
+// Ramène l'index courant dans les bornes de la liste filtrée.
+function _mcdClampIdx(cp) {
+  var n = _mcdSections(cp).length;
+  if (_mobileCompSectionIdx >= n) _mobileCompSectionIdx = n - 1;
+  if (_mobileCompSectionIdx < 0)  _mobileCompSectionIdx = 0;
+  return _mobileCompSectionIdx;
+}
 
 var _mcdTouchStartX = null;
 
@@ -6684,7 +6756,7 @@ function mcdPrev() {
   if (_mobileCompSectionIdx > 0) { _mobileCompSectionIdx--; renderMobileCompDetail(); }
 }
 function mcdNext() {
-  if (_mobileCompSectionIdx < _MOBILE_COMP_SECTIONS.length - 1) { _mobileCompSectionIdx++; renderMobileCompDetail(); }
+  if (_mobileCompSectionIdx < _mcdSections().length - 1) { _mobileCompSectionIdx++; renderMobileCompDetail(); }
 }
 function toggleMobileInfoView() {
   _mobileInfoViewMode = (_mobileInfoViewMode === 'affiche') ? 'stats' : 'affiche';
@@ -6694,8 +6766,10 @@ function toggleMobileInfoView() {
 function renderMobileCompDetail() {
   var cp = S.comps.find(function(c){ return c.id === _mobileCompId; });
   if (!cp) return;
-  var sec   = _MOBILE_COMP_SECTIONS[_mobileCompSectionIdx];
-  var total = _MOBILE_COMP_SECTIONS.length;
+  var _secs = _mcdSections(cp);
+  _mcdClampIdx(cp);
+  var sec   = _secs[_mobileCompSectionIdx];
+  var total = _secs.length;
 
   // ── En-tête ──
   var titleEl = document.getElementById('mcd-title');
@@ -6717,15 +6791,18 @@ function renderMobileCompDetail() {
   // ── Onglets verticaux ──
   var vtabs = document.getElementById('mcd-vtabs');
   if (vtabs) {
-    var _MCD_TAB_COLORS = ['#2563eb','#0369a1','#7c3aed','#d97706','#059669','#0891b2','#b45309','#374151','#15803d'];
-    var _MCD_TAB_LABELS = ['Accueil','Staff','Equipage','Repas','Partenaires','Déroulement','Résultats','Matériel','Budget'];
     vtabs.innerHTML = '';
-    _MOBILE_COMP_SECTIONS.forEach(function(s, i) {
+    _secs.forEach(function(s, i) {
       var btn = document.createElement('button');
       var isActive = (i === _mobileCompSectionIdx);
-      var color = _MCD_TAB_COLORS[i] || '#374151';
-      var lbl = _MCD_TAB_LABELS[i] || s.lbl;
-      btn.style.cssText = 'flex:1;min-height:44px;background:' + color + ';'
+      var color = s.col || '#374151';
+      var lbl = s.tab || s.lbl;
+      // Libellé vertical : la hauteur doit suivre la longueur du texte, sinon il
+      // déborde sur l'onglet voisin dès qu'il y a beaucoup de volets. `flex:1 0 auto`
+      // laisse les onglets remplir la hauteur quand il reste de la place, sans
+      // jamais passer sous la taille du texte ; le rail défile au-delà.
+      var _minH = Math.max(44, lbl.length * 8 + 24);
+      btn.style.cssText = 'flex:1 0 auto;min-height:' + _minH + 'px;background:' + color + ';'
         + (isActive ? 'opacity:1;box-shadow:inset -4px 0 0 #fff;' : 'opacity:0.55;')
         + 'border:none;border-bottom:1px solid rgba(255,255,255,.12);color:#fff;'
         + 'font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;'
@@ -6759,8 +6836,14 @@ function renderMobileCompDetail() {
   });
   var contentEl = document.getElementById('mcd-content');
   if (contentEl) {
-    contentEl.innerHTML = renderHDPTabContent(cp, sec.id, runs, enrolled, staffList);
+    // « Site & Étapes » a son propre rendu tactile (voir _mcdRenderEtapes) :
+    // le rendu bureau est un tableau de 10 colonnes inexploitable sur mobile.
+    contentEl.innerHTML = (sec.id === 'etapes')
+      ? _mcdRenderEtapes(cp)
+      : renderHDPTabContent(cp, sec.id, runs, enrolled, staffList);
     if (sec.id === 'etapes') {
+      // Carte initialisée seulement si le bandeau carte est déplié.
+      if (_mcdEtMapOn) setTimeout(function(){ try { _etapeMapInit(cp.id); } catch(e){ console.warn('[GestSTOL] _etapeMapInit:', e); } }, 150);
       setTimeout(function(){ try { _etapeAutoOpenFirst(cp.id); } catch(e){} }, 230);
     }
     if (sec.id === 'infos') {
@@ -6778,7 +6861,7 @@ function renderMobileCompDetail() {
       // Bouton toggle Affiche ↔ Stats + bouton Repas
       var _enrolCount = ((S.compEnroll||{})[cp.id]||[]).length;
       var _showStats = (_enrolCount > 0);
-      var _repasSecIdx = _MOBILE_COMP_SECTIONS.findIndex(function(s){ return s.id==='repas'; });
+      var _repasSecIdx = _secs.findIndex(function(s){ return s.id==='repas'; });
       var _hasRepasSection = (_repasSecIdx >= 0);
       if (_showStats) {
         var _isAffView = (_mobileInfoViewMode === 'affiche');
@@ -6974,18 +7057,254 @@ function _etapeFormFillOACI(val) {
   });
 }
 
+// Le volet « Site & Étapes » existe sur deux surfaces (tableau sur ordinateur,
+// cartes empilées sur smartphone). Ces deux fonctions évitent que chaque action
+// (ajout, suppression, réordonnancement, import) ne rafraîchisse que le bureau.
+function _mcdIsOn() {
+  var ov = document.getElementById('overlay-comp-mobile');
+  return !!(ov && ov.style.display !== 'none' && typeof _mobileCompId !== 'undefined' && _mobileCompId);
+}
+function _etapesRerender() {
+  if (_mcdIsOn()) { renderMobileCompDetail(); return; }
+  switchHomeDetailTab('etapes');
+}
+
 function _etapeAdd(compId) {
   if (!S.etapes) S.etapes = {};
   if (!S.etapes[compId]) S.etapes[compId] = [];
   var newEt = { id:'et'+Date.now().toString(36), nom:'', lieu:'', oaci:'', club:'', region:'', responsable:'', gestionnaire:'', contactDSAC:'', notam:false, commentaires:'', dateFrom:'', dateTo:'', date:'', desc:'', lat:'', lng:'' };
   S.etapes[compId].push(newEt);
   saveState();
-  switchHomeDetailTab('etapes');
+  _etapesRerender();
   setTimeout(function(){
-    var row = document.getElementById('etape-row-'+newEt.id);
+    var row = document.getElementById('etape-row-'+newEt.id) || document.getElementById('mcd-et-card-'+newEt.id);
     if (row) { var inp = row.querySelector('input'); if(inp) inp.focus(); }
     _etapeToggleAcc(newEt.id, compId);
+    if (_mcdIsOn()) { var c = document.getElementById('mcd-et-card-'+newEt.id); if (c && c.scrollIntoView) c.scrollIntoView({block:'center'}); }
   }, 80);
+}
+
+// Réordonnancement au doigt : le glisser-déposer du tableau bureau ne se
+// transpose pas sur écran tactile, on monte/descend l'étape d'un cran.
+function _mcdEtapeMove(compId, etId, dir) {
+  var list = (S.etapes && S.etapes[compId]) || [];
+  var movable = list.filter(function(e){ return !e._isSite; });
+  var i = movable.findIndex(function(x){ return x.id === etId; });
+  var j = i + dir;
+  if (i < 0 || j < 0 || j >= movable.length) return;
+  var tmp = movable[i]; movable[i] = movable[j]; movable[j] = tmp;
+  var site = list.filter(function(e){ return e._isSite; });
+  S.etapes[compId] = site.concat(movable);
+  S.etapes[compId].forEach(function(e, k){ e._order = e._isSite ? -1 : k; });
+  _flushSaveState();
+  renderMobileCompDetail();
+}
+
+// ── Volet « Site & Étapes » : rendu smartphone ───────────────────────────────
+// Le rendu bureau est un split 52/48 (tableau de 10 colonnes + carte) avec
+// glisser-déposer et tableaux imbriqués : inutilisable sous 400 px. Ici : une
+// carte dépliable par étape, champs empilés pleine largeur, cibles tactiles de
+// 44 px, carte géographique repliable. Tous les handlers d'enregistrement sont
+// ceux du bureau — seule la présentation change.
+var _MCD_ET_INP     = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:16px;padding:10px 12px;outline:none';
+var _MCD_ET_LBL     = 'display:block;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px';
+var _MCD_ET_SUBCARD = 'border:1px solid var(--bdr);border-radius:10px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,.02)';
+var _MCD_ET_DELBTN  = 'flex-shrink:0;width:44px;height:44px;border:none;border-radius:8px;background:rgba(239,68,68,.12);color:#f87171;font-size:20px;line-height:1;cursor:pointer;font-family:inherit';
+var _MCD_ET_ICOBTN  = 'flex-shrink:0;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);text-decoration:none;font-size:17px';
+function _mcdEtEmpty(txt) {
+  return '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:14px 0">'+txt+'</div>';
+}
+var _mcdEtMapOn = false;
+function _mcdEtMapToggle(compId) {
+  var w = document.getElementById('mcd-et-map-wrap'); if (!w) return;
+  _mcdEtMapOn = (w.style.display === 'none');
+  w.style.display = _mcdEtMapOn ? 'block' : 'none';
+  var b = document.getElementById('mcd-et-map-btn');
+  if (b) { b.style.background = _mcdEtMapOn ? 'var(--stol)' : 'var(--navy3)'; b.style.color = _mcdEtMapOn ? '#fff' : 'var(--txt2)'; }
+  if (_mcdEtMapOn) setTimeout(function(){ try { _etapeMapInit(compId); } catch(e){ console.warn('[GestSTOL] carte étapes:', e); } }, 60);
+}
+// Sous-blocs repliables dans une étape dépliée : sans cela, une seule étape
+// occupe plusieurs écrans de défilement.
+function _mcdEtSub(etId, key) {
+  var b = document.getElementById('mcd-etsub-'+etId+'-'+key); if (!b) return;
+  var open = b.style.display !== 'none';
+  b.style.display = open ? 'none' : 'block';
+  var c = document.getElementById('mcd-etsubchev-'+etId+'-'+key);
+  if (c) c.style.transform = open ? '' : 'rotate(90deg)';
+}
+
+function _mcdRenderEtapes(cp) {
+  var cid = cp.id;
+  if (!S.etapes) S.etapes = {};
+  if (!S.etapes[cid]) S.etapes[cid] = [];
+  // Réutilise la préparation du rendu bureau (étape « site », migration,
+  // tri par _order) en appelant le renderer partagé sur un conteneur jetable.
+  try { var _throw = document.createElement('div'); _throw.innerHTML = renderHDPTabContent(cp, 'etapes', [], [], []); } catch(e){}
+  var etList = (S.etapes[cid] || []).slice().sort(function(a,b){ return (a._order||0) - (b._order||0); });
+  var canEd = canModify();
+  var esc2 = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var fdt = function(d){ if(!d) return ''; var p=(d||'').split('-'); return p.length===3 ? p[2]+'/'+p[1] : d; };
+
+  // Distance cumulée
+  var totalKm = 0, prev = null;
+  etList.forEach(function(et){
+    var la=parseFloat(et.lat), ln=parseFloat(et.lng);
+    if (!isNaN(la)&&!isNaN(ln)) { if(prev) totalKm += _haversineKm(prev[0],prev[1],la,ln); prev=[la,ln]; }
+  });
+
+  var h = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">';
+
+  // ── Barre d'action fixe ──
+  h += '<div style="flex-shrink:0;padding:10px 12px;background:var(--navy2);border-bottom:1px solid var(--bdr)">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">';
+  h += '<div style="font-size:14px;font-weight:800;color:var(--txt)">🗺 '+etList.length+' étape'+(etList.length>1?'s':'')
+     +  (totalKm>0 ? ' <span style="font-size:12px;color:var(--stol);font-weight:600">· '+Math.round(totalKm)+' km</span>' : '')+'</div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px">';
+  h += '<button id="mcd-et-map-btn" onclick="_mcdEtMapToggle(\''+cid+'\')" style="flex:1;min-height:44px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🗺 Carte</button>';
+  h += '<input type="file" id="etapes-import-inp-'+cid+'" accept=".json,.xlsx,.xls" style="display:none" onchange="_etapesImportFile(\''+cid+'\',this)">';
+  h += '<div style="position:relative;flex:1">';
+  h += '<button id="etapes-menu-btn-'+cid+'" onclick="_etapesToggleMenu(\''+cid+'\')" style="width:100%;min-height:44px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Actions ▾</button>';
+  h += '<div id="etapes-menu-'+cid+'" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:210px;z-index:999;overflow:hidden">';
+  var mI = function(icon,label,action){ return '<button onclick="_etapesMenuAction(\''+cid+'\',\''+action+'\')" style="display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px;background:none;border:none;color:var(--txt);font-size:14px;font-family:inherit;cursor:pointer;text-align:left">'+icon+'<span>'+label+'</span></button>'; };
+  h += '<div style="padding:4px 0">'
+     + mI('📋','Exporter JSON','export-json') + mI('📗','Exporter Excel','export-xlsx')
+     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+     + mI('📂','Importer JSON','import-json') + mI('📊','Importer Excel','import-xlsx')
+     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+     + mI('🖨️','Imprimer / PDF','print')
+     + '</div></div></div>';
+  if (canEd) h += '<button onclick="_etapeAdd(\''+cid+'\')" style="flex:1;min-height:44px;border:none;border-radius:10px;background:var(--stol);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">+ Étape</button>';
+  h += '</div></div>';
+
+  // ── Carte repliable ──
+  h += '<div id="mcd-et-map-wrap" style="display:'+(_mcdEtMapOn?'block':'none')+';flex-shrink:0;border-bottom:1px solid var(--bdr)">';
+  h += '<div id="etapes-map" style="height:230px;background:var(--navy3)"></div>';
+  h += '</div>';
+
+  // ── Liste des étapes ──
+  h += '<div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 24px;min-height:0">';
+  if (!etList.length) {
+    h += '<div style="padding:40px 20px;text-align:center;color:var(--txt3);font-size:14px">Aucune étape<br><span style="font-size:13px">Appuyez sur <b>+ Étape</b> pour créer la première</span></div>';
+  }
+  var prevRow = null;
+  var movables = etList.filter(function(e){ return !e._isSite; });
+  etList.forEach(function(et, i) {
+    var eid = et.id;
+    var legKm = null;
+    var la=parseFloat(et.lat), ln=parseFloat(et.lng);
+    if (!isNaN(la)&&!isNaN(ln)) { if(prevRow) legKm=_haversineKm(prevRow[0],prevRow[1],la,ln); prevRow=[la,ln]; }
+    var mIdx = movables.findIndex(function(x){ return x.id===eid; });
+
+    h += '<div id="mcd-et-card-'+eid+'" style="border:1px solid var(--bdr);border-radius:12px;margin-bottom:10px;overflow:hidden;background:var(--navy2)">';
+    // En-tête tapable
+    h += '<div onclick="_etapeToggleAcc(\''+eid+'\',\''+cid+'\')" style="display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer;min-height:44px">';
+    h += '<div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:'+(et._isSite?'var(--stol)':'rgba(255,255,255,.08)')+';color:'+(et._isSite?'#fff':'var(--txt2)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800">'+(et._isSite?'📍':(i+1))+'</div>';
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div style="display:flex;align-items:baseline;gap:8px">';
+    if (et.oaci) h += '<span style="font-family:monospace;font-size:13px;font-weight:800;color:var(--stol);letter-spacing:1px">'+esc2(et.oaci)+'</span>';
+    h += '<span style="font-size:14px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc2(et.lieu||et.nom||'Étape sans nom')+'</span>';
+    h += '</div>';
+    var sub = [];
+    if (et.dateFrom||et.date) sub.push(fdt(et.dateFrom||et.date) + (et.dateTo? ' → '+fdt(et.dateTo) : ''));
+    if (legKm !== null) sub.push(Math.round(legKm)+' km');
+    if (et.club) sub.push(esc2(et.club));
+    if (sub.length) h += '<div style="font-size:12px;color:var(--txt3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sub.join(' · ')+'</div>';
+    h += '</div>';
+    h += '<span id="et-chev-'+eid+'" style="flex-shrink:0;font-size:15px;color:var(--txt3);transition:transform .15s">▶</span>';
+    h += '</div>';
+
+    // Corps déplié
+    h += '<div id="etape-acc-'+eid+'" style="display:none;padding:0 12px 12px;border-top:1px solid var(--bdr)">';
+
+    // ── Fiche BasULM en tête, dépliée d'emblée ──
+    // C'est la source de référence du terrain (piste, radio, altitude, contacts…) :
+    // l'essentiel est déjà là, inutile de faire défiler pour l'atteindre.
+    h += '<div style="padding-top:12px">';
+    h += '<div id="etape-basulm-'+eid+'"><div style="color:var(--txt3);font-size:13px;font-style:italic;padding:6px 0">Chargement…</div></div>';
+    h += '</div>';
+
+    // Sous-blocs repliables — `open` déplie le bloc dès l'ouverture de l'étape.
+    var subHead = function(key, label, btn, open) {
+      var s = '<div style="border-top:1px solid var(--bdr);margin-top:6px">';
+      s += '<div style="display:flex;align-items:center;gap:8px;min-height:46px">';
+      s += '<div onclick="_mcdEtSub(\''+eid+'\',\''+key+'\')" style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer">';
+      s += '<span id="mcd-etsubchev-'+eid+'-'+key+'" style="font-size:13px;color:var(--txt3);transition:transform .15s'+(open?';transform:rotate(90deg)':'')+'">▶</span>';
+      s += '<span style="font-size:13px;font-weight:700;color:var(--txt2)">'+label+'</span></div>';
+      s += (btn||'');
+      s += '</div>';
+      s += '<div id="mcd-etsub-'+eid+'-'+key+'" style="display:'+(open?'block':'none')+';padding-bottom:10px">';
+      return s;
+    };
+    var addBtn = function(fn){ return canEd ? '<button onclick="'+fn+'" style="flex-shrink:0;min-height:44px;padding:0 16px;border:none;border-radius:8px;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter</button>' : ''; };
+
+    // Identité : repliée, car ses champs reprennent ce que la fiche affiche déjà.
+    h += subHead('ident','Identité de l\'étape');
+    h += '<label style="'+_MCD_ET_LBL+'">Code OACI</label>';
+    h += '<input type="text" value="'+esc2(et.oaci||'')+'" placeholder="LFSE" maxlength="8" style="'+_MCD_ET_INP+';text-transform:uppercase;font-family:monospace;color:var(--stol);letter-spacing:1px;font-weight:700;margin-bottom:10px" oninput="this.value=this.value.toUpperCase();_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'oaci\',this.value)" onchange="_etapeInlineOACI(\''+cid+'\',\''+eid+'\',this.value,this)">';
+    h += '<label style="'+_MCD_ET_LBL+'">Lieu / Aérodrome</label>';
+    h += '<input type="text" value="'+esc2(et.lieu||et.nom||'')+'" placeholder="Commune, aérodrome…" style="'+_MCD_ET_INP+';margin-bottom:10px" oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'lieu\',this.value);_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'nom\',this.value)" onchange="_etapeFieldSaveLieu(\''+cid+'\',\''+eid+'\',this.value)">';
+    h += '<div style="display:flex;gap:10px;margin-bottom:10px">';
+    h += '<div style="flex:1;min-width:0"><label style="'+_MCD_ET_LBL+'">Date du</label><input type="date" value="'+esc2(et.dateFrom||et.date||'')+'" style="'+_MCD_ET_INP+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'dateFrom\',this.value);_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'date\',this.value)"></div>';
+    h += '<div style="flex:1;min-width:0"><label style="'+_MCD_ET_LBL+'">Date au</label><input type="date" value="'+esc2(et.dateTo||'')+'" style="'+_MCD_ET_INP+'" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'dateTo\',this.value)"></div>';
+    h += '</div>';
+    h += '<label style="'+_MCD_ET_LBL+'">Club</label>';
+    h += '<input type="text" value="'+esc2(et.club||'')+'" placeholder="Club…" style="'+_MCD_ET_INP+';margin-bottom:10px" oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'club\',this.value)">';
+    h += '<label style="'+_MCD_ET_LBL+'">Région</label>';
+    h += '<input type="text" value="'+esc2(et.region||'')+'" placeholder="Région…" list="et-inline-regions" style="'+_MCD_ET_INP+';margin-bottom:10px" oninput="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'region\',this.value)">';
+    h += '<label style="display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;user-select:none">'
+       + '<input type="checkbox" '+(et.notam?'checked':'')+' onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'notam\',this.checked)" style="width:20px;height:20px;accent-color:var(--stol);flex-shrink:0">'
+       + '<span style="font-size:14px;font-weight:600;color:var(--txt)">NOTAM déposé</span></label>';
+    h += '</div></div>';
+
+
+
+    h += subHead('ct','Contacts', addBtn('_etapeContactAdd(\''+cid+'\',\''+eid+'\')'));
+    h += '<div id="contact-table-'+eid+'">'+_mcdEtEmpty('Aucun contact')+'</div>';
+    h += '</div></div>';
+
+    h += subHead('inst','Installation');
+    var instItems = [['hebergement','Hébergement'],['restauration','Restauration'],['carburant','Carburant'],['sanitaires','Sanitaires WC-Douches'],['briefing','Salle briefing'],['hangar','Hangar'],['wifi','Wifi']];
+    var inst = et.installations || {};
+    instItems.forEach(function(it){
+      var k=it[0], lbl=it[1], v=inst[k]||{};
+      h += '<div style="'+_MCD_ET_SUBCARD+'">';
+      h += '<label style="display:flex;align-items:center;gap:10px;min-height:40px;cursor:pointer;user-select:none">'
+         + '<input type="checkbox" id="inst-'+eid+'-'+k+'"'+(v.ok?' checked':'')+' onchange="_etapeInstallSave(\''+cid+'\',\''+eid+'\',\''+k+'\',\'ok\',this.checked)" style="width:20px;height:20px;accent-color:var(--stol);flex-shrink:0">'
+         + '<span style="font-size:14px;font-weight:600;color:var(--txt)">'+lbl+'</span></label>';
+      h += '<input type="text" value="'+esc2(v.infos||'')+'" placeholder="Infos…" style="'+_MCD_ET_INP+'" oninput="_etapeInstallSave(\''+cid+'\',\''+eid+'\',\''+k+'\',\'infos\',this.value)">';
+      h += '</div>';
+    });
+    h += '</div></div>';
+
+    h += subHead('der','Aérodromes de déroutement', addBtn('_etapeDerAdd(\''+cid+'\',\''+eid+'\')'));
+    h += '<div id="der-table-'+eid+'">'+_mcdEtEmpty('Aucun aérodrome de déroutement')+'</div>';
+    h += '</div></div>';
+
+    h += subHead('com','Commentaires');
+    h += '<textarea rows="4" placeholder="Notes, informations complémentaires…" style="'+_MCD_ET_INP+';resize:vertical" onchange="_etapeFieldSave(\''+cid+'\',\''+eid+'\',\'commentaires\',this.value)">'+esc2(et.commentaires||'')+'</textarea>';
+    h += '</div></div>';
+
+    // Actions de bas de carte : ordre + suppression
+    if (canEd && !et._isSite) {
+      h += '<div style="display:flex;gap:8px;border-top:1px solid var(--bdr);padding-top:10px;margin-top:6px">';
+      h += '<button onclick="_mcdEtapeMove(\''+cid+'\',\''+eid+'\',-1)"'+(mIdx<=0?' disabled':'')+' style="flex:1;min-height:44px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;font-family:inherit;opacity:'+(mIdx<=0?'.35':'1')+'">↑</button>';
+      h += '<button onclick="_mcdEtapeMove(\''+cid+'\',\''+eid+'\',1)"'+(mIdx<0||mIdx>=movables.length-1?' disabled':'')+' style="flex:1;min-height:44px;border:1px solid var(--bdr);border-radius:10px;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;font-family:inherit;opacity:'+(mIdx<0||mIdx>=movables.length-1?'.35':'1')+'">↓</button>';
+      h += '<button id="etdel-'+eid+'" onclick="_etapeDel(\''+cid+'\',\''+eid+'\')" style="flex:1;min-height:44px;border:none;border-radius:10px;background:rgba(239,68,68,.12);color:#f87171;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Supprimer</button>';
+      h += '</div>';
+    } else if (et._isSite) {
+      h += '<div style="border-top:1px solid var(--bdr);padding-top:10px;margin-top:6px;font-size:12px;color:var(--txt3)">📍 Étape « site », liée aux informations de la compétition — non supprimable.</div>';
+    }
+
+    h += '</div></div>'; // fin corps + carte
+  });
+  h += '</div>';
+
+  // Datalist régions (référencée par le champ Région)
+  var rl = ['Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne','Centre-Val de Loire','Corse','Grand Est','Hauts-de-France','Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie','Pays de la Loire','Provence-Alpes-Côte d\'Azur'];
+  h += '<datalist id="et-inline-regions">'+rl.map(function(r){return '<option value="'+r+'">';}).join('')+'</datalist>';
+  h += '</div>';
+  return h;
 }
 
 function _etapeEdit(compId, etId) {
@@ -7048,7 +7367,7 @@ function _etapeSave(compId, etId) {
         }
       }).catch(function(){});
   }
-  switchHomeDetailTab('etapes');
+  _etapesRerender();
   toast('Étape enregistrée ✓', 'ok');
 }
 
@@ -7230,7 +7549,7 @@ function _etapeDel(compId, etId) {
     });
   }
   saveState();
-  switchHomeDetailTab('etapes');
+  _etapesRerender();
   toast('Étape supprimée', 'ok');
 }
 
@@ -7278,7 +7597,7 @@ function _etapeDrop(ev, compId, etId) {
   list.splice(tgtIdx, 0, item);
   list.forEach(function(e, i){ e._order = i; });
   _flushSaveState();
-  switchHomeDetailTab('etapes');
+  _etapesRerender();
 }
 var _derOACITimers = {};
 function _etapeDerOACISchedule(compId, etId, derId, inputEl) {
@@ -7364,6 +7683,32 @@ function _etapeDerRender(compId, etId) {
   var sSt  = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
   var opts = ['Aéroclub','Gestionnaire','Autre'];
   var h = '';
+  // Smartphone : une carte par terrain de déroutement au lieu du tableau 6 colonnes.
+  if (_mcdIsOn()) {
+    if (!ders.length) { el.innerHTML = _mcdEtEmpty('Aucun aérodrome de déroutement'); return; }
+    ders.forEach(function(d) {
+      if (!d.id) d.id = 'der'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      var did = d.id;
+      var sv = function(f){ return '_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\''+f+'\',this.value)'; };
+      h += '<div data-der-id="'+did+'" style="'+_MCD_ET_SUBCARD+'">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      h += '<input type="text" value="'+esc2(d.oaci||'')+'" placeholder="LFSE" maxlength="6" style="'+_MCD_ET_INP+';width:110px;text-transform:uppercase;font-family:monospace;color:var(--stol);letter-spacing:1px;font-weight:700" oninput="this.value=this.value.toUpperCase().trim();_etapeDerSave(\''+compId+'\',\''+etId+'\',\''+did+'\',\'oaci\',this.value);_etapeDerOACISchedule(\''+compId+'\',\''+etId+'\',\''+did+'\',this)">';
+      h += '<input type="text" value="'+esc2(d.lieu||'')+'" placeholder="Commune, terrain…" style="'+_MCD_ET_INP+';flex:1;min-width:0" oninput="'+sv('lieu')+'">';
+      h += '<button onclick="_etapeDerDel(\''+compId+'\',\''+etId+'\',\''+did+'\')" style="'+_MCD_ET_DELBTN+'">×</button>';
+      h += '</div>';
+      h += '<select style="'+_MCD_ET_INP+';margin-bottom:8px" onchange="'+sv('typeContact')+'"><option value="">— Type de contact —</option>';
+      opts.forEach(function(t){ h += '<option value="'+t+'"'+(d.typeContact===t?' selected':'')+'>'+t+'</option>'; });
+      h += '</select>';
+      h += '<input type="text" value="'+esc2(d.nom||'')+'" placeholder="Prénom Nom…" style="'+_MCD_ET_INP+';margin-bottom:8px" oninput="'+sv('nom')+'">';
+      h += '<div style="display:flex;gap:8px">';
+      h += '<input type="tel" value="'+esc2(d.tel||'')+'" placeholder="06 xx xx xx xx" style="'+_MCD_ET_INP+';flex:1" oninput="'+sv('tel')+'">';
+      h += (d.tel ? '<a href="tel:'+esc2(d.tel)+'" style="'+_MCD_ET_ICOBTN+'">📞</a>' : '');
+      h += '</div>';
+      h += '</div>';
+    });
+    el.innerHTML = h;
+    return;
+  }
   if (ders.length) {
     h += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
     h += '<th style="'+thSt+';width:72px">OACI</th><th style="'+thSt+'">Lieu</th><th style="'+thSt+';width:110px">Type de contact</th><th style="'+thSt+'">Nom</th><th style="'+thSt+';width:120px">Téléphone</th><th style="'+thSt+';width:24px"></th>';
@@ -7487,6 +7832,35 @@ function _etapeContactRender(compId, etId) {
   var sSt  = 'background:var(--navy2);border:none;border-bottom:1px solid var(--bdr);color:var(--txt);font-family:inherit;font-size:11px;padding:2px 3px;width:100%;box-sizing:border-box;outline:none;cursor:pointer';
   var foncts = ['Responsable de l\'étape','Président','Aéroclub','Gestionnaire','Autorité','Autre'];
   var h = '';
+  // Smartphone : un tableau de 5 colonnes est illisible → une carte par contact,
+  // champs empilés et pleine largeur.
+  if (_mcdIsOn()) {
+    if (!contacts.length) { el.innerHTML = _mcdEtEmpty('Aucun contact'); return; }
+    contacts.forEach(function(c) {
+      if (!c.id) c.id = 'ct'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      var ctId = c.id;
+      var sv = function(f){ return '_etapeContactSave(\''+compId+'\',\''+etId+'\',\''+ctId+'\',\''+f+'\',this.value)'; };
+      h += '<div data-ct-id="'+ctId+'" style="'+_MCD_ET_SUBCARD+'">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      h += '<input type="text" value="'+esc2(c.nom||'')+'" placeholder="Nom Prénom…" style="'+_MCD_ET_INP+';font-weight:600;flex:1" oninput="'+sv('nom')+'">';
+      h += '<button onclick="_etapeContactDel(\''+compId+'\',\''+etId+'\',\''+ctId+'\')" style="'+_MCD_ET_DELBTN+'">×</button>';
+      h += '</div>';
+      h += '<select style="'+_MCD_ET_INP+';margin-bottom:8px" onchange="'+sv('fonction')+'"><option value="">— Fonction —</option>';
+      foncts.forEach(function(f){ h += '<option value="'+f+'"'+(c.fonction===f?' selected':'')+'>'+f+'</option>'; });
+      h += '</select>';
+      h += '<div style="display:flex;gap:8px">';
+      h += '<input type="tel" value="'+esc2(c.tel||'')+'" placeholder="06…" style="'+_MCD_ET_INP+';flex:1" oninput="'+sv('tel')+'">';
+      h += (c.tel ? '<a href="tel:'+esc2(c.tel)+'" style="'+_MCD_ET_ICOBTN+'">📞</a>' : '');
+      h += '</div>';
+      h += '<div style="display:flex;gap:8px;margin-top:8px">';
+      h += '<input type="email" value="'+esc2(c.email||'')+'" placeholder="adresse@…" style="'+_MCD_ET_INP+';flex:1" oninput="'+sv('email')+'">';
+      h += (c.email ? '<a href="mailto:'+esc2(c.email)+'" style="'+_MCD_ET_ICOBTN+'">✉️</a>' : '');
+      h += '</div>';
+      h += '</div>';
+    });
+    el.innerHTML = h;
+    return;
+  }
   if (contacts.length) {
     h += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
     h += '<th style="'+thSt+'">Nom Prénom</th><th style="'+thSt+';width:160px">Fonction</th><th style="'+thSt+';width:130px">Téléphone</th><th style="'+thSt+'">Email</th><th style="'+thSt+';width:24px"></th>';
@@ -7585,7 +7959,7 @@ function _etapesImportFile(compId, input) {
           var ex = S.etapes[compId].find(function(x){ return x.id===et.id || (et.oaci&&x.oaci===et.oaci) || (et.lieu&&(x.lieu||x.nom||'')===(et.lieu||et.nom||'')); });
           if (ex) { Object.assign(ex, et); updated++; } else { S.etapes[compId].push(et); added++; }
         });
-        _flushSaveState(); switchHomeDetailTab('etapes');
+        _flushSaveState(); _etapesRerender();
         toast(added+' ajoutée(s), '+updated+' mise(s) à jour (JSON)', 'ok');
       } catch(err) { toast('Erreur JSON : '+err.message, 'err'); }
     }; rr.readAsText(file);
@@ -7613,7 +7987,7 @@ function _etapesImportFile(compId, input) {
           var ex = S.etapes[compId].find(function(x){ return (oaci&&x.oaci===oaci)||(lieu&&(x.lieu||x.nom||'').toLowerCase()===lieu.toLowerCase()); });
           if (ex) { Object.assign(ex, rec); updated++; } else { rec.id='et'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); S.etapes[compId].push(rec); added++; }
         });
-        _flushSaveState(); switchHomeDetailTab('etapes');
+        _flushSaveState(); _etapesRerender();
         toast(added+' ajoutée(s), '+updated+' mise(s) à jour (Excel)', 'ok');
       } catch(err) { toast('Erreur Excel : '+err.message, 'err'); }
     }; rr2.readAsArrayBuffer(file);
@@ -8237,7 +8611,7 @@ function editComp(id) {
   if (delBtn) { delBtn.style.display = 'flex'; }
   // Pré-remplir les cases Volets
   var vc = cp.voletsConfig || {};
-  ['infos','staff','gestion','repas','partenaires','resultats','etapes','materiel','evenements','budget'].forEach(function(k) {
+  ['infos','staff','gestion','repas','partenaires','deroulement','resultats','etapes','materiel','evenements','budget'].forEach(function(k) {
     var chk = document.getElementById('volet-chk-' + k);
     if (chk) chk.checked = (vc[k] !== false);
   });
@@ -11361,9 +11735,14 @@ function _renderMobPoleSportButtons() {
 // TABLEAU DE BORD ACCUEIL MOBILE — prochaine compétition + tuiles
 // commandes avec compteurs (miroir du tableau de bord desktop)
 // ═══════════════════════════════════════════════════════════════
-function _mobOpenCompSection(compId, idx) {
+// `sec` est un id de volet ('gestion', 'resultats'…) — un index numérique serait
+// faux dès qu'un volet est décoché dans « Modifier la compétition ».
+function _mobOpenCompSection(compId, sec) {
   openCompMobileDetail(compId);
-  _mobileCompSectionIdx = idx;
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  var list = _mcdSections(cp);
+  var i = (typeof sec === 'number') ? sec : list.findIndex(function(s){ return s.id === sec; });
+  _mobileCompSectionIdx = (i >= 0) ? i : 0;
   renderMobileCompDetail();
 }
 
@@ -11558,9 +11937,9 @@ function _renderMobHomeDashboard() {
       + '</div>'
       + '</div>';
     html += '<div class="mhd-hero-actions">'
-      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',2)">'+_svg(IC.equip,14)+'Équipage</button>'
-      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',5)">'+_svg(IC.result,14)+'Résultats</button>'
-      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',1)">'+_svg(IC.staff,14)+'Staff</button>'
+      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',\'gestion\')">'+_svg(IC.equip,14)+'Équipage</button>'
+      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',\'resultats\')">'+_svg(IC.result,14)+'Résultats</button>'
+      + '<button class="mhd-act" onclick="event.stopPropagation();_mobOpenCompSection(\''+_nid+'\',\'staff\')">'+_svg(IC.staff,14)+'Staff</button>'
       + '</div>';
     html += '</div>';
   } else {
@@ -17121,6 +17500,7 @@ var _staffColWidths = (function(){
   try { var s=localStorage.getItem(_STF_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===7) return a; } } catch(e){}
   return [40, 170, 130, 68, 92, 150, 130];
 })(); // avatar|nom|fonction|licence|tel|email|odm-ndf
+_staffColWidths[0] = 68; // colonne avatar élargie : case à cocher + avatar
 var _staffResizing  = null;
 function _staffGetTpl() { return _staffColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _staffApplyTpl() {
@@ -17155,6 +17535,7 @@ var _equipColWidths = (function(){
   try { var s=localStorage.getItem(_EQP_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===18) return a; } } catch(e){}
   return [40, 44, 145, 65, 72, 52, 80, 68, 70, 62, 58, 68, 85, 85, 80, 60, 70, 30];
 })(); // avatar|genre|nom|lic|niveau|podium|region|immat|pratique|classe|cat|equip|marque|modele|moteur|aile|helice|btn
+_equipColWidths[0] = 68; // colonne avatar élargie : case à cocher + avatar
 var _equipResizing  = null;
 function _equipGetTpl() { return _equipColWidths.map(function(w){ return w+'px'; }).join(' '); }
 function _equipApplyTpl() {
@@ -17898,6 +18279,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html5 += '<button onclick="_eqpActMenu()" style="'+_eqpGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
     html5 += '</div>';
     html5 += '<div id="eqp-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    html5 += _eqpMI('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>','Envoyer un email (coché)','_collEmail(\'equip\')');
+    html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
     html5 += _eqpMI(_eqpPr,'Imprimer',          'hdgPrintEquipage(\''+cid+'\')');
     html5 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
     html5 += _eqpMI(_eqpDl,'Exporter Excel',     'exportEquipageFmt(\'excel\',\''+cid+'\')');
@@ -17925,15 +18308,15 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _eqSort  = ['','nom','','','','','','pratique','','categorie','','','','','',''];
     var _stickyBg = 'var(--navy3)';
     html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 0;border-bottom:2px solid var(--bdr);align-items:center;background:'+_stickyBg+';position:sticky;top:0;z-index:10">';
-    html5 += '<div style="position:sticky;left:0;z-index:12;background:'+_stickyBg+';padding-left:12px"></div>'; // avatar col
+    html5 += '<div style="position:sticky;left:0;z-index:12;background:'+_stickyBg+';padding-left:10px;display:flex;align-items:center"><input type="checkbox" id="collsel-all-equip" onchange="_collSelAll(\'equip\',this.checked)" title="Tout cocher / décocher" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol)"></div>'; // case tout-cocher + avatar col
     var _hiddenHdrIdx = _eqpCompetitif ? [] : [3, 4, 9]; // Niveau, Podium, Catégorie
     _eqHdrs.forEach(function(h, i) {
       if (_hiddenHdrIdx.indexOf(i) !== -1) { html5 += '<div style="overflow:hidden;padding:0"></div>'; return; }
       var sortCol = _eqSort[i];
       var clickable = sortCol ? 'cursor:pointer;user-select:none;' : '';
       var click = sortCol ? ' onclick="_equipToggleSort(\''+sortCol+'\')"' : '';
-      var stickyExtra = i===0 ? 'position:sticky;left:43px;z-index:12;background:'+_stickyBg+';padding-left:12px;'
-                      : i===1 ? 'position:sticky;left:90px;z-index:12;background:'+_stickyBg+';border-right:2px solid rgba(255,255,255,.12);'
+      var stickyExtra = i===0 ? 'position:sticky;left:71px;z-index:12;background:'+_stickyBg+';padding-left:12px;'
+                      : i===1 ? 'position:sticky;left:118px;z-index:12;background:'+_stickyBg+';border-right:2px solid rgba(255,255,255,.12);'
                       : '';
       html5 += '<div style="'+_hSt+';position:relative;'+clickable+stickyExtra+'"'+click+'>'
         + h + (sortCol ? '<span style="color:var(--stol)">'+_eqIco(sortCol)+'</span>' : '')
@@ -17948,8 +18331,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _sBg = 'var(--navy4)';
     html5 += '<div data-eqp-row style="display:grid;grid-template-columns:'+_eqpTpl+';gap:3px;padding:5px 0;align-items:center;'+_rowInpSt+'">';
     html5 += '<div style="position:sticky;left:0;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // avatar placeholder
-    html5 += '<div style="position:sticky;left:43px;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // genre
-    html5 += '<div style="position:sticky;left:90px;z-index:8;background:'+_sBg+';border-right:2px solid rgba(255,255,255,.12)">';
+    html5 += '<div style="position:sticky;left:71px;z-index:8;background:'+_sBg+';padding-left:12px"></div>'; // genre
+    html5 += '<div style="position:sticky;left:118px;z-index:8;background:'+_sBg+';border-right:2px solid rgba(255,255,255,.12)">';
     html5 += '<div style="position:relative">';
     html5 += '<input id="hdg-c-nom" placeholder="Nom, prénom ou N° licence…" autocomplete="off" style="'+_iSt+';border-color:var(--stol)" oninput="hdgShowSuggestC(\''+cid+'\')" onkeydown="if(event.key===\'Enter\')hdgAddComp(\''+cid+'\')" onblur="setTimeout(function(){var d=document.getElementById(\'hdg-sug-c\');if(d)d.style.display=\'none\'},180)">';
     html5 += '<div id="hdg-sug-c" style="display:none;position:absolute;top:100%;left:0;min-width:260px;z-index:1000;background:var(--navy2);border:1.5px solid var(--stol);border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-height:200px;overflow-y:auto"></div>';
@@ -18045,18 +18428,19 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var _avCol2 = 'var(--stol)';
         var _ini2   = ((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase()||'?';
         var _photo2 = p.photo||'';
-        // Avatar — sticky left:0
-        html5 += '<div data-sc style="position:sticky;left:0;z-index:5;background:'+_rowBg+';padding-left:12px;display:flex;align-items:center">';
+        // Avatar — sticky left:0 (case à cocher AVANT l'avatar)
+        html5 += '<div data-sc style="position:sticky;left:0;z-index:5;background:'+_rowBg+';padding-left:12px;display:flex;align-items:center;gap:6px">';
+        html5 += '<input type="checkbox" class="collsel-equip" data-email="'+escG(p.email||'')+'" onclick="event.stopPropagation()" onchange="_collSelSync(\'equip\')" title="Sélectionner" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol);flex-shrink:0">';
         html5 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:'+_avCol2+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid '+_avCol2+'">';
         html5 += _photo2 ? '<img src="'+_photo2+'" style="width:100%;height:100%;object-fit:cover">' : _ini2;
         html5 += '</div></div>';
-        // Genre — sticky left:43px + padding-left pour aérer
-        html5 += '<div data-sc onclick="event.stopPropagation()" style="position:sticky;left:43px;z-index:5;background:'+_rowBg+';padding-left:12px"><select onchange="eqpInlineSave(\''+pidE+'\',\'genre\',this.value,\''+cid+'\')" style="'+_sISt+(p.genre?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
+        // Genre — sticky left:71px + padding-left pour aérer
+        html5 += '<div data-sc onclick="event.stopPropagation()" style="position:sticky;left:71px;z-index:5;background:'+_rowBg+';padding-left:12px"><select onchange="eqpInlineSave(\''+pidE+'\',\'genre\',this.value,\''+cid+'\')" style="'+_sISt+(p.genre?';color:var(--txt2)':';color:#f59e0b;font-weight:600')+'">'
           +'<option value="">—</option>'
           +['M.','Mme.'].map(function(g){ return '<option value="'+g+'"'+(p.genre===g?' selected':'')+'>'+g+'</option>'; }).join('')
           +'</select></div>';
-        // Nom — sticky left:90px + separator
-        html5 += '<div data-sc style="position:sticky;left:90px;z-index:5;background:'+_rowBg+';border-right:2px solid rgba(255,255,255,.12);'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
+        // Nom — sticky left:118px + separator
+        html5 += '<div data-sc style="position:sticky;left:118px;z-index:5;background:'+_rowBg+';border-right:2px solid rgba(255,255,255,.12);'+_dSt+';font-weight:600">'+escG((p.prenom||'')+' '+(p.nom||''))+'</div>';
         // Licence — éditable
         html5 += '<div onclick="event.stopPropagation()"><input value="'+escG(p.licence||'')+'" placeholder="—" title="Licence FFPLUM (4-7 chiffres)" style="'+_iStE+(p.licence?';color:var(--txt)':';color:#f59e0b')+'" onchange="eqpInlineSave(\''+pidE+'\',\'licence\',this.value,\''+cid+'\',this)" onclick="event.stopPropagation()"></div>';
         // Niveau — masqué hors compétition officielle
@@ -19019,6 +19403,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     html3 += '<button onclick="_stfActMenu()" style="'+_stfGlass+'" onmouseover="this.style.background=\'rgba(255,255,255,.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,.1)\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg> Actions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg></button>';
     html3 += '</div>';
     html3 += '<div id="stf-act-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:200px;background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:200;overflow:hidden;padding:6px">';
+    html3 += _stfMI('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>','Envoyer un email (coché)','_collEmail(\'staff\')');
+    html3 += '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>';
     html3 += _stfMI(_stfDl,'Exporter CSV',   'exportStaffFmt(\'csv\',\''+cidS+'\')');
     html3 += _stfMI(_stfDl,'Exporter Excel', 'exportStaffFmt(\'excel\',\''+cidS+'\')');
     html3 += _stfMI(_stfDl,'Exporter JSON',  'exportStaffFmt(\'json\',\''+cidS+'\')');
@@ -19035,7 +19421,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _rl = 'width:2px;height:60%;background:var(--bdr);border-radius:1px';
     var _srtIco = function(col){ return _staffSortCol===col ? (_staffSortDir===1?' ↑':' ↓') : ''; };
     html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:5px 8px 5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    html3 += '<div></div>'; // avatar col
+    html3 += '<div style="display:flex;align-items:center;justify-content:flex-start"><input type="checkbox" id="collsel-all-staff" onchange="_collSelAll(\'staff\',this.checked)" title="Tout cocher / décocher" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol)"></div>'; // case tout-cocher + avatar col
     // Nom — cliquable
     html3 += '<div style="'+_hStS+';position:relative;cursor:pointer;user-select:none" onclick="_staffToggleSort(\'nom\')">'
       + 'Nom<span style="color:var(--stol)">'+_srtIco('nom')+'</span>'
@@ -19127,10 +19513,12 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var photoS = pilot.photo || s.photo || '';
         var iniS2  = ((prenomS[0]||'').toUpperCase()+(nomS[0]||'').toUpperCase()) || '?';
         html3 += '<div data-stf-row style="display:grid;grid-template-columns:'+_stfTpl+';gap:3px;padding:4px 8px 4px 12px;background:'+bg+';border-bottom:1px solid var(--bdr);align-items:center;cursor:pointer" onclick="showStaffDetailModal(\''+cidS+'\','+si+')" onmouseover="this.style.background=\'var(--navy3)\'" onmouseout="this.style.background=\''+bg+'\'">';
-        // Avatar
+        // Avatar (case à cocher AVANT l'avatar)
+        html3 += '<div style="display:flex;align-items:center;gap:6px">';
+        html3 += '<input type="checkbox" class="collsel-staff" data-email="'+escS(email2||'')+'" onclick="event.stopPropagation()" onchange="_collSelSync(\'staff\')" title="Sélectionner" style="width:15px;height:15px;cursor:pointer;accent-color:var(--stol);flex-shrink:0">';
         html3 += '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid var(--stol)">';
         html3 += photoS ? '<img src="'+photoS+'" style="width:100%;height:100%;object-fit:cover">' : iniS2;
-        html3 += '</div>';
+        html3 += '</div></div>';
         html3 += '<div style="'+_dStS+';font-weight:700;text-transform:uppercase;letter-spacing:.3px">'+nom+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--stol);font-weight:600">'+(s.role||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(lic2||'—')+'</div>';
@@ -19317,7 +19705,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (!S.evenements[cp.id]) S.evenements[cp.id] = [];
     var evtList = S.evenements[cp.id];
     var canEditEvt = canModify();
-    var EVCOL = 'grid-template-columns:100px minmax(0,1fr) 90px 80px minmax(0,1.2fr) 28px 28px 28px';
+    var EVCOL = 'grid-template-columns:100px minmax(0,1fr) 90px 80px minmax(0,1.2fr) 40px 40px 40px';
     var hStE = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap';
     var iStE = 'background:var(--navy3);border:1.5px solid var(--stol);border-radius:6px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 7px;outline:none;width:100%;box-sizing:border-box';
     var addBtnE = 'width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--stol),#059669);border:none;color:#fff;font-size:20px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25)';
@@ -19334,7 +19722,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Fixed header (desktop uniquement)
     if (!_isMobEvt) {
     htmlEvt += '<div style="display:grid;'+EVCOL+';gap:3px;padding:5px 12px;border-bottom:2px solid var(--bdr);flex-shrink:0;align-items:center;background:var(--navy3)">';
-    ['Type','Nom / Aéronef','Date','Immat.','Circonstance','','',''].forEach(function(h){
+    ['Type','Nom / Aéronef','Date','Identification','Circonstance','','',''].forEach(function(h){
       htmlEvt += '<div style="'+hStE+'">'+h+'</div>';
     });
     htmlEvt += '</div>';
@@ -19347,7 +19735,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlEvt += '<div><input id="evt-inp-type" list="evt-type-list" placeholder="Type…" value="Sécurité" style="'+iStE+'"><datalist id="evt-type-list"><option value="Sécurité"/><option value="Matériel"/><option value="Médical"/><option value="Météo"/><option value="Administratif"/><option value="Mécanique"/><option value="Autre"/></datalist></div>';
       htmlEvt += '<div><input id="evt-inp-nom" placeholder="Nom concerné…" autocomplete="off" style="'+iStE+'"></div>';
       htmlEvt += '<div><input id="evt-inp-date" type="date" style="'+iStE+'"></div>';
-      htmlEvt += '<div><input id="evt-inp-immat" placeholder="Immat…" style="'+iStE+'"></div>';
+      htmlEvt += '<div><input id="evt-inp-immat" placeholder="Identification…" style="'+iStE+'"></div>';
       htmlEvt += '<div><input id="evt-inp-circ" placeholder="Circonstance…" style="'+iStE+'"></div>';
       htmlEvt += '<div></div>';
       htmlEvt += '<div></div>';
@@ -19377,10 +19765,10 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       htmlEvt += '<div style="font-size:11px;color:var(--txt3);white-space:nowrap">'+(evt.date||'—')+(evt.horaire?' '+evt.horaire:'')+'</div>';
       htmlEvt += '<div style="font-size:11px;color:var(--amber);font-weight:700;white-space:nowrap">'+(evt.immatriculation||'—')+'</div>';
       htmlEvt += '<div style="font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(evt.circonstance||'—')+'</div>';
-      htmlEvt += '<button onclick="printEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Imprimer la fiche A4 (diffusion interne)" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
-      htmlEvt += '<button onclick="exportEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Exporter fiche" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>';
+      htmlEvt += '<button onclick="printEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Imprimer la fiche A4 (diffusion interne)" style="padding:7px 8px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>';
+      htmlEvt += '<button onclick="exportEvenement(\''+cp.id+'\',\''+evt.id+'\')" title="Exporter fiche" style="padding:7px 8px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>';
       if (canEditEvt) {
-        htmlEvt += '<button onclick="openEvenementModal(\''+cp.id+'\',\''+evt.id+'\')" title="Modifier" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+        htmlEvt += '<button onclick="openEvenementModal(\''+cp.id+'\',\''+evt.id+'\')" title="Modifier" style="padding:7px 8px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
       } else {
         htmlEvt += '<div></div>';
       }
@@ -27152,6 +27540,9 @@ async function pullFromCloud() {
   if (S._deletedDocuments && S.documents) {
     S.documents = S.documents.filter(function(d){ return !S._deletedDocuments[d.id]; });
   }
+  // ── Accès (utilisateurs + codes) : fusion par id (la liste synchronisée sert à
+  // la gestion/révocation ; la connexion elle-même ne dépend plus de la synchro). ──
+  if (r.accesUsers) S.accesUsers = _mergeById(S.accesUsers || [], r.accesUsers || []);
   // ── Aides fédérales : fusion + tombstones ──
   S.aides = _mergeById(S.aides || [], r.aides || []);
   // Fusionner les tombstones _deletedAides (union par id : le max des timestamps)
@@ -27696,7 +28087,7 @@ function _isStolLiveView() {
   try {
     var mob = document.getElementById('overlay-comp-mobile');
     if (mob && mob.style.display !== 'none' && typeof _mobileCompId !== 'undefined' && _mobileCompId) {
-      var sec = (typeof _MOBILE_COMP_SECTIONS !== 'undefined') ? _MOBILE_COMP_SECTIONS[_mobileCompSectionIdx] : null;
+      var sec = (typeof _mcdSections === 'function') ? _mcdSections()[_mobileCompSectionIdx] : null;
       if (sec && sec.id === 'resultats') return _isCompStol(_mobileCompId);
       return false;
     }
@@ -28616,19 +29007,129 @@ function editPilotManual(pilotId) {
 // ═══════════════════════════════════
 // SAISIE MANUELLE PILOTE (gestionnaire)
 // ═══════════════════════════════════
+// ── Photos de compétiteurs : compression + hébergement Supabase ──────────────
+// Une photo d'appareil pèse ~550 Ko en base64. À cette taille elle est retirée
+// partout (cloud, localStorage, sauvegardes) et ne survit que dans l'IndexedDB
+// de l'appareil qui l'a prise : invisible ailleurs, perdue au vidage du cache.
+// On la réduit donc au format « trombinoscope » — l'objectif est d'identifier
+// un pilote, pas d'archiver un portrait — puis on l'héberge pour ne stocker
+// qu'une URL légère, synchronisée comme n'importe quel champ texte.
+var PM_PHOTO_MAX_W = 400, PM_PHOTO_MAX_H = 500, PM_PHOTO_Q = 0.75;
+
+function _pmResizePhoto(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onerror = function(){ reject(new Error('lecture du fichier impossible')); };
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onerror = function(){ reject(new Error('image illisible')); };
+      img.onload = function() {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var ratio = Math.min(PM_PHOTO_MAX_W / w, PM_PHOTO_MAX_H / h, 1); // jamais agrandir
+        var cw = Math.max(1, Math.round(w * ratio)), ch = Math.max(1, Math.round(h * ratio));
+        var cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        var ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); // évite le noir sur PNG transparent
+        ctx.drawImage(img, 0, 0, cw, ch);
+        resolve({ dataUrl: cv.toDataURL('image/jpeg', PM_PHOTO_Q), w: cw, h: ch });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// base64 → Supabase Storage → URL. Même bucket et même patron que les affiches.
+// Renvoie null si l'hébergement est indisponible : l'appelant conserve alors le
+// base64 (compressé), donc l'utilisateur ne perd jamais sa photo.
+async function _pmUploadPhoto(dataUrl, pilotId) {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return null;
+  var sb = (typeof _sb !== 'undefined') ? _sb : null;
+  if (!sb) return null;
+  try {
+    var parts = dataUrl.split(',');
+    var mime  = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+    var bin   = atob(parts[1]);
+    var arr   = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var blob  = new Blob([arr], { type: mime });
+    var path  = 'photos/' + pilotId + '.jpg';
+    var up = await sb.storage.from('gestappli-sync').upload(path, blob, { upsert: true, contentType: mime, cacheControl: '31536000' });
+    if (up.error) { console.warn('[photo] upload:', up.error.message); return null; }
+    // URL publique en priorité : contrairement à une URL signée, elle n'expire pas.
+    var pub = sb.storage.from('gestappli-sync').getPublicUrl(path);
+    if (pub && pub.data && pub.data.publicUrl) {
+      var okPub = await new Promise(function(r){
+        var t = new Image(); var done = false;
+        t.onload  = function(){ if(!done){done=true; r(true);} };
+        t.onerror = function(){ if(!done){done=true; r(false);} };
+        setTimeout(function(){ if(!done){done=true; r(false);} }, 8000);
+        t.src = pub.data.publicUrl;
+      });
+      if (okPub) return pub.data.publicUrl;
+    }
+    // Bucket privé : URL signée 1 an (à re-signer avant échéance).
+    var sig = await sb.storage.from('gestappli-sync').createSignedUrl(path, 31536000);
+    if (sig.data && sig.data.signedUrl) return sig.data.signedUrl;
+  } catch(e) { console.warn('[photo]', e.message || e); }
+  return null;
+}
+
+// Remplace le base64 d'un pilote par une URL hébergée. Sans effet si
+// l'hébergement est indisponible (Supabase en pause, hors ligne) : on réessaiera
+// à la prochaine édition ou via migrerPhotosLocales().
+async function _pmPersistPhoto(pilotId) {
+  var p = (S.pilots||[]).find(function(x){ return x.id === pilotId; });
+  if (!p || !p.photo || !p.photo.startsWith('data:')) return false;
+  var url = await _pmUploadPhoto(p.photo, pilotId);
+  if (!url) return false;
+  var cur = (S.pilots||[]).find(function(x){ return x.id === pilotId; });
+  if (!cur) return false;
+  cur.photo = url;
+  cur._updatedAt = Date.now();
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  if (typeof renderPilots === 'function') { try { renderPilots(); } catch(e){} }
+  return true;
+}
+
+// Migration des photos base64 restées locales. À lancer une fois depuis la
+// console (`migrerPhotosLocales()`) une fois Supabase réactivé : elles ne
+// vivent que dans l'IndexedDB de CET appareil, donc la migration doit être
+// faite depuis celui qui les détient.
+async function migrerPhotosLocales() {
+  var locales = (S.pilots||[]).filter(function(p){ return p.photo && p.photo.startsWith('data:'); });
+  if (!locales.length) { console.log('[photos] aucune photo locale à migrer'); return {total:0}; }
+  console.log('[photos] migration de ' + locales.length + ' photo(s)…');
+  var ok = 0, ko = 0;
+  for (var i = 0; i < locales.length; i++) {
+    var p = locales[i];
+    var done = await _pmPersistPhoto(p.id);
+    if (done) { ok++; console.log('  ✓ ' + (p.prenom||'') + ' ' + (p.nom||'')); }
+    else      { ko++; console.warn('  ✗ ' + (p.prenom||'') + ' ' + (p.nom||'') + ' — hébergement indisponible'); }
+  }
+  console.log('[photos] terminé : ' + ok + ' migrée(s), ' + ko + ' en échec');
+  if (ok) toast(ok + ' photo(s) migrée(s) ✓', 'ok');
+  if (ko) toast(ko + ' photo(s) non migrée(s) — hébergement indisponible', 'warn');
+  return {total:locales.length, ok:ok, ko:ko};
+}
+
 function handlePMPhoto(inp) {
   if (!inp.files || !inp.files[0]) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    inp._data = e.target.result;
-    var img  = document.getElementById('pm-photo-img');
-    var icon = document.getElementById('pm-photo-icon');
-    var del  = document.getElementById('pm-photo-del');
-    if (img)  { img.src = e.target.result; img.style.display = ''; }
+  var img  = document.getElementById('pm-photo-img');
+  var icon = document.getElementById('pm-photo-icon');
+  var del  = document.getElementById('pm-photo-del');
+  _pmResizePhoto(inp.files[0]).then(function(res) {
+    inp._data = res.dataUrl;           // remplacé par l'URL à l'enregistrement
+    if (img)  { img.src = res.dataUrl; img.style.display = ''; }
     if (icon) icon.style.display = 'none';
     if (del)  del.style.display = '';
-  };
-  reader.readAsDataURL(inp.files[0]);
+    console.log('[photo] ' + res.w + 'x' + res.h + ' — ' + Math.round(res.dataUrl.length/1024) + ' Ko');
+  }).catch(function(err) {
+    console.warn('[photo]', err.message || err);
+    toast('Photo illisible : ' + (err.message || 'format non pris en charge'), 'err');
+  });
 }
 
 function pmDeletePhoto() {
@@ -28666,15 +29167,21 @@ function openAddPilotManual() {
   if (pmDel)  pmDel.style.display = 'none';
   updatePMClasse();
   pmToggleULM();
-  // Remplir la liste des compétitions
+  // Remplir la liste des compétitions (le select a été retiré de la modale :
+  // sans cette garde, l'exception empêchait l'ouverture de la fiche).
   var sel = document.getElementById('pm-comp-enroll');
-  sel.innerHTML = '<option value="">— Aucune —</option>';
-  S.comps.forEach(function(c){
-    var opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name + ' (' + formatDate(c.dateFrom) + ')';
-    sel.appendChild(opt);
-  });
+  if (sel) {
+    sel.innerHTML = '<option value="">— Aucune —</option>';
+    S.comps.forEach(function(c){
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + ' (' + formatDate(c.dateFrom) + ')';
+      sel.appendChild(opt);
+    });
+  }
+  // Rien à supprimer sur une fiche vierge : le bouton n'a de sens qu'en édition.
+  var _pmDelNew = document.getElementById('pm-btn-delete');
+  if (_pmDelNew) _pmDelNew.style.display = 'none';
   openSheet('sheet-pilot-manual');
 }
 
@@ -28813,6 +29320,9 @@ function savePilotManual() {
   if (editId) S.ulms[pilotId] = [ulm].concat((S.ulms[pilotId]||[]).slice(1)); // MAJ 1re machine, garde les autres
   else S.ulms[pilotId].push(ulm);
   saveState();
+  // Hébergement de la photo en arrière-plan : l'enregistrement n'attend pas, et
+  // si l'hébergement échoue le base64 compressé reste en place (rien n'est perdu).
+  if (pilot.photo && pilot.photo.startsWith('data:')) _pmPersistPhoto(pilotId);
   closeSheet('sheet-pilot-manual');
   renderPilots();
   toast(editId ? 'Compétiteur mis à jour ✓' : 'Compétiteur ajouté ✓', 'ok');
@@ -28882,6 +29392,8 @@ function editPilotManual(pilotId) {
   }
   updatePMClasse();
   pmToggleULM();
+  var _pmDelEdit = document.getElementById('pm-btn-delete');
+  if (_pmDelEdit) _pmDelEdit.style.display = 'flex'; // fiche existante : suppression possible
   openSheet('sheet-pilot-manual');
 }
 
@@ -29098,6 +29610,7 @@ function _pmTab(tab) {
       btn.style.background = active ? 'rgba(255,255,255,.05)' : 'transparent';
       btn.style.color = active ? 'var(--txt)' : 'var(--txt2)';
       btn.style.fontWeight = active ? '600' : '500';
+      btn.classList.toggle('active', active); // ciblé par la mise en forme mobile (pilules)
     }
     if (pnl) pnl.style.display = active ? '' : 'none';
   });
@@ -32294,8 +32807,8 @@ function _autoBackupLocal() {
     var snap = {
       _backupAt: Date.now(),
       _version: 2,
-      comps:          (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
-      pilots:         (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
+      comps:          (S.comps||[]).map(function(c){ if(!c.affiche||!c.affiche.startsWith('data:')) return c; var cc=Object.assign({},c); delete cc.affiche; return cc; }),
+      pilots:         (S.pilots||[]).map(function(p){ if(!p.photo||!p.photo.startsWith('data:')) return p; var pp=Object.assign({},p); delete pp.photo; return pp; }),
       ulms:           S.ulms           || {},
       staff:          S.staff          || {},
       compEnroll:     S.compEnroll     || {},
@@ -32354,8 +32867,8 @@ function exportGlobalBackup() {
     var payload = {
       _exportAt: d.toISOString(),
       _type: 'global_backup_v2',
-      comps:          (S.comps||[]).map(function(c){ var cc=Object.assign({},c); delete cc.affiche; return cc; }),
-      pilots:         (S.pilots||[]).map(function(p){ var pp=Object.assign({},p); delete pp.photo; return pp; }),
+      comps:          (S.comps||[]).map(function(c){ if(!c.affiche||!c.affiche.startsWith('data:')) return c; var cc=Object.assign({},c); delete cc.affiche; return cc; }),
+      pilots:         (S.pilots||[]).map(function(p){ if(!p.photo||!p.photo.startsWith('data:')) return p; var pp=Object.assign({},p); delete pp.photo; return pp; }),
       ulms:           S.ulms           || {},
       staff:          S.staff          || {},
       compEnroll:     S.compEnroll     || {},
@@ -32774,22 +33287,44 @@ var _ACCES_STATUT_LBL = {gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏
 
 function _accesInit(){ if (!Array.isArray(S.accesUsers)) S.accesUsers = []; }
 function _accesNormEmail(e){ return (e||'').toString().trim().toLowerCase(); }
-function _accesGenCode(){
-  _accesInit();
-  var A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sans I,O,0,1,L (ambigus)
-  for (var tries=0; tries<50; tries++){
-    var c=''; for (var i=0;i<6;i++) c += A[Math.floor(Math.random()*A.length)];
-    if (!S.accesUsers.some(function(u){ return u.code===c; })) return c;
-  }
-  return 'X'+Date.now().toString(36).slice(-5).toUpperCase();
-}
 function _accesUid(){ return 'acc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+// ── Code DÉTERMINISTE : dérivé de (email + statut + secret) ──
+// Identique sur tout appareil → vérifiable HORS LIGNE, sans dépendre de la
+// synchronisation cloud. C'est ce qui rend l'accès fiable et immédiat.
+var _ACCES_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sans I,O,0,1,L (ambigus)
+var _ACCES_SECRET   = 'GestDTN-2026-#Ax9Qv';
+function _accesHash(str){
+  var A=_ACCES_ALPHABET, n=A.length; // 30
+  // cyrb53 (deux hachages 32 bits combinés en un entier ~53 bits)
+  var h1=0xdeadbeef, h2=0x41c6ce57;
+  for (var i=0;i<str.length;i++){ var ch=str.charCodeAt(i);
+    h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677);
+  }
+  h1=Math.imul(h1^(h1>>>16),2246822507); h1^=Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507); h2^=Math.imul(h1^(h1>>>13),3266489909);
+  var num = 4294967296*(2097151 & (h2>>>0)) + (h1>>>0); // 0 .. ~2^53
+  var out='';
+  for (var k=0;k<6;k++){ out += A[num % n]; num = Math.floor(num / n); }
+  return out;
+}
+function _accesCodeFor(email, statut){ return _accesHash(_ACCES_SECRET+'|'+_accesNormEmail(email)+'|'+(statut||'')); }
+
 function _accesCreate(prenom, nom, email, statut){
   _accesInit();
   email = _accesNormEmail(email);
   if (!email){ toast('Email requis','err'); return null; }
-  if (S.accesUsers.some(function(u){ return _accesNormEmail(u.email)===email; })){ toast('Un accès existe déjà pour cet email','warn'); return null; }
-  var rec = { id:_accesUid(), prenom:(prenom||'').trim(), nom:(nom||'').trim(), email:email, statut:statut||'utilisateur', code:_accesGenCode(), actif:true, createdAt:Date.now(), lastLoginAt:null };
+  statut = statut || 'utilisateur';
+  var code = _accesCodeFor(email, statut);
+  var existing = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===email; });
+  if (existing){
+    existing.prenom=(prenom||'').trim(); existing.nom=(nom||'').trim(); existing.statut=statut;
+    existing.code=code; existing.actif=true; existing._updatedAt=Date.now();
+    saveState(); if (typeof silentPush==='function') silentPush();
+    toast('Accès mis à jour ('+email+')','ok');
+    return existing;
+  }
+  var rec = { id:_accesUid(), prenom:(prenom||'').trim(), nom:(nom||'').trim(), email:email, statut:statut, code:code, actif:true, createdAt:Date.now(), lastLoginAt:null };
   S.accesUsers.push(rec);
   saveState(); if (typeof silentPush==='function') silentPush();
   return rec;
@@ -32799,19 +33334,37 @@ function _accesFind(email, code){
   var e = _accesNormEmail(email), c = (code||'').toString().trim().toUpperCase();
   return S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && (u.code||'').toUpperCase()===c; }) || null;
 }
-// Connexion par email + code → applique le statut et entre dans l'application.
+// Connexion : vérification DÉTERMINISTE hors-ligne (le code + l'email suffisent,
+// aucune synchro requise) ; la liste synchronisée sert à la révocation/gestion.
 function _accesLogin(email, code){
   _accesInit();
-  var rec = _accesFind(email, code);
-  if (!rec){ return { ok:false, msg:'Email ou code incorrect.' }; }
-  if (rec.actif === false){ return { ok:false, msg:'Cet accès a été désactivé. Contactez le gestionnaire.' }; }
-  rec.lastLoginAt = Date.now();
-  S.user = { id:rec.id, prenom:rec.prenom, nom:rec.nom, email:rec.email, statut:rec.statut, _acces:true };
+  var e = _accesNormEmail(email), c = (code||'').toString().trim().toUpperCase();
+  if (!e || !c) return { ok:false, msg:'Saisissez votre email et votre code.' };
+  var known = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e; });
+  // Révocation (si l'accès désactivé est connu localement)
+  if (known && known.actif === false) return { ok:false, msg:'Cet accès a été désactivé. Contactez le gestionnaire.' };
+  // 1) Correspondance directe dans la liste
+  var rec = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && (u.code||'').toUpperCase()===c; });
+  var statut = rec ? rec.statut : null;
+  // 2) Vérification déterministe (fonctionne même sans synchronisation)
+  if (!statut){
+    for (var i=0;i<_ACCES_STATUTS.length;i++){
+      if (_accesCodeFor(e, _ACCES_STATUTS[i][0]).toUpperCase() === c){ statut=_ACCES_STATUTS[i][0]; break; }
+    }
+  }
+  if (!statut) return { ok:false, msg:'Email ou code incorrect.' };
+  var prenom = rec ? rec.prenom : (known?known.prenom:'');
+  var nom    = rec ? rec.nom    : (known?known.nom:'');
+  var id     = rec ? rec.id     : (known?known.id : ('acc_'+e.replace(/[^a-z0-9]/g,'').slice(0,14)));
+  if (rec) rec.lastLoginAt = Date.now();
+  else if (known){ known.lastLoginAt=Date.now(); known.statut=statut; }
+  else { S.accesUsers.push({ id:id, prenom:prenom, nom:nom, email:e, statut:statut, code:c, actif:true, createdAt:Date.now(), lastLoginAt:Date.now(), _offline:true }); }
+  S.user = { id:id, prenom:prenom, nom:nom, email:e, statut:statut, _acces:true };
   saveState(); if (typeof silentPush==='function') silentPush();
-  return { ok:true, rec:rec };
+  return { ok:true, rec:{ prenom:prenom, nom:nom, email:e, statut:statut } };
 }
-function _accesUpdate(id, field, val){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u[field]=(field==='email')?_accesNormEmail(val):val; u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); }
-function _accesRegen(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.code=_accesGenCode(); u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Nouveau code généré','ok'); }
+function _accesUpdate(id, field, val){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u[field]=(field==='email')?_accesNormEmail(val):val; if(field==='email'||field==='statut'){ u.code=_accesCodeFor(u.email,u.statut); } u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); }
+function _accesRegen(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.code=_accesCodeFor(u.email,u.statut); u._updatedAt=Date.now(); saveState(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Le code est lié à l\'email + statut (déterministe).','ok'); }
 function _accesToggle(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.actif=(u.actif===false); u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast(u.actif?'Accès réactivé':'Accès désactivé', u.actif?'ok':'warn'); }
 function _accesDelete(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; if(!confirm('Supprimer définitivement l\'accès de '+((u.prenom||'')+' '+(u.nom||'')).trim()+' ('+u.email+') ?')) return; S.accesUsers=S.accesUsers.filter(function(x){return x.id!==id;}); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Accès supprimé',''); }
 // Copie un message d'invitation prêt à envoyer (lien + email + code)
@@ -32899,8 +33452,7 @@ function renderAccesAdmin(){
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">'
       +   '<div style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:var(--txt);background:var(--navy3);border:1px dashed var(--bdr);border-radius:8px;padding:4px 12px">'+esc(u.code)+'</div>'
       +   '<button onclick="_accesCopyInvite(\''+u.id+'\')" style="'+_accesBtn+'">📋 Copier l\'invitation</button>'
-      +   '<button onclick="_accesRegen(\''+u.id+'\')" title="Générer un nouveau code" style="'+_accesBtn+'">🔄</button>'
-      +   '<button onclick="_accesToggle(\''+u.id+'\')" title="'+(inactive?'Réactiver':'Désactiver')+'" style="'+_accesBtn+'">'+(inactive?'✅':'⏸')+'</button>'
+      +   '<button onclick="_accesToggle(\''+u.id+'\')" title="'+(inactive?'Réactiver':'Désactiver')+'" style="'+_accesBtn+'">'+(inactive?'✅ Réactiver':'⏸ Désactiver')+'</button>'
       +   '<button onclick="_accesDelete(\''+u.id+'\')" title="Supprimer" style="'+_accesBtn+';color:#f87171;border-color:rgba(239,68,68,.3)">🗑</button>'
       + '</div>'
       + '</div>';
@@ -39129,7 +39681,7 @@ function exportEvenementsExcel(compId) {
   var evtList = ((S.evenements||{})[compId]||[]);
   if (!evtList.length) { toast('Aucun événement à exporter',''); return; }
   if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée','err'); return; }
-  var rows = [['Type','Nom / Aéronef','Date','Heure','Immatriculation','Circonstance','Commentaires']];
+  var rows = [['Type','Nom / Aéronef','Date','Heure','Identification','Circonstance','Commentaires']];
   evtList.forEach(function(ev){ rows.push([ev.typeIncident||'',ev.nom||'',ev.date||'',ev.horaire||'',ev.immatriculation||'',ev.circonstance||'',ev.commentaires||'']); });
   var ws = XLSX.utils.aoa_to_sheet(rows); var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Événements');
@@ -39179,7 +39731,7 @@ function importEvenAuto(inp, compId) {
         var type = (row['Type']||row['type']||'').toString().trim();
         var nom  = (row['Nom / Aéronef']||row['Nom']||row['nom']||'').toString().trim();
         if (!type && !nom) return;
-        S.evenements[compId].push({id:'evt-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),typeIncident:type||'Autre',nom:nom,date:(row['Date']||row['date']||'').toString().trim(),horaire:(row['Heure']||row['horaire']||'').toString().trim(),immatriculation:(row['Immatriculation']||row['immat']||'').toString().trim(),circonstance:(row['Circonstance']||row['circonstance']||'').toString().trim(),commentaires:(row['Commentaires']||row['commentaires']||'').toString().trim(),_updatedAt:Date.now()});
+        S.evenements[compId].push({id:'evt-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),typeIncident:type||'Autre',nom:nom,date:(row['Date']||row['date']||'').toString().trim(),horaire:(row['Heure']||row['horaire']||'').toString().trim(),immatriculation:(row['Identification']||row['Immatriculation']||row['immat']||'').toString().trim(),circonstance:(row['Circonstance']||row['circonstance']||'').toString().trim(),commentaires:(row['Commentaires']||row['commentaires']||'').toString().trim(),_updatedAt:Date.now()});
         added++;
       });
       saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
@@ -40152,6 +40704,13 @@ function openEvenementModal(compId, evtId) {
   if(g('evt-modal-immat'))g('evt-modal-immat').value= e.immatriculation||'';
   if(g('evt-modal-circ')) g('evt-modal-circ').value = e.circonstance||'';
   if(g('evt-modal-comm')) g('evt-modal-comm').value = e.commentaires||'';
+  if(g('evt-modal-conditions'))    g('evt-modal-conditions').value    = e.conditions||'';
+  if(g('evt-modal-description'))    g('evt-modal-description').value    = e.description||'';
+  if(g('evt-modal-consequences'))   g('evt-modal-consequences').value   = e.consequences||'';
+  if(g('evt-modal-analyse'))        g('evt-modal-analyse').value        = e.analyse||'';
+  if(g('evt-modal-enseignements'))  g('evt-modal-enseignements').value  = e.enseignements||'';
+  if(g('evt-modal-suites'))         g('evt-modal-suites').value         = e.suites||'';
+  if(g('evt-modal-date-redaction')) g('evt-modal-date-redaction').value = e.dateRedaction||'';
   var sh = g('sheet-evenement');
   if (sh) {
     var isMobEvtSh = window.innerWidth < 768;
@@ -40166,7 +40725,7 @@ function openEvenementModal(compId, evtId) {
       if (evtHdl) evtHdl.style.display = 'flex';
     } else {
       sh.style.alignItems = 'center';
-      if (evtPan) { evtPan.style.width=''; evtPan.style.maxWidth=''; evtPan.style.borderRadius='16px'; evtPan.style.height=''; evtPan.style.maxHeight='90vh'; evtPan.style.boxShadow='0 20px 60px rgba(0,0,0,.5)'; }
+      if (evtPan) { evtPan.style.width='min(1040px,97vw)'; evtPan.style.maxWidth=''; evtPan.style.borderRadius='16px'; evtPan.style.height=''; evtPan.style.maxHeight='92vh'; evtPan.style.boxShadow='0 20px 60px rgba(0,0,0,.5)'; }
       if (evtHdl) evtHdl.style.display = 'none';
     }
     sh.style.display = 'flex';
@@ -40199,6 +40758,13 @@ function saveEvenementSheet() {
   ev.immatriculation = g('evt-modal-immat');
   ev.circonstance  = g('evt-modal-circ');
   ev.commentaires  = g('evt-modal-comm');
+  ev.conditions    = g('evt-modal-conditions');
+  ev.description   = g('evt-modal-description');
+  ev.consequences  = g('evt-modal-consequences');
+  ev.analyse       = g('evt-modal-analyse');
+  ev.enseignements = g('evt-modal-enseignements');
+  ev.suites        = g('evt-modal-suites');
+  ev.dateRedaction = g('evt-modal-date-redaction');
   ev._updatedAt    = Date.now();
   closeEvenementModal(); saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
   toast('Événement enregistré ✓','ok');
@@ -40246,7 +40812,7 @@ function printAllEvenements(compId) {
     html += '<p style="color:#888;text-align:center;padding:30px">Aucun événement enregistré.</p>';
   } else {
     html += '<table><thead><tr>';
-    ['N°','Type','Nom / Aéronef','Date','Heure','Immatriculation','Circonstances','Commentaires'].forEach(function(h){ html += '<th>'+h+'</th>'; });
+    ['N°','Type','Nom / Aéronef','Date','Heure','Identification','Circonstances','Commentaires'].forEach(function(h){ html += '<th>'+h+'</th>'; });
     html += '</tr></thead><tbody>';
     evtList.forEach(function(ev, i) {
       var tc = typeColors[ev.typeIncident]||'#6b7280';
@@ -40285,6 +40851,7 @@ function printEvenement(compId, evtId) {
   var sig = (S.docSettings||{}).signataire || {};
   var now = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   var fdate = function(d){ if(!d) return '—'; var p=(''+d).split('-'); return (p.length===3 && p[0].length===4) ? p[2]+'/'+p[1]+'/'+p[0] : d; };
+  var redac = ev.dateRedaction ? fdate(ev.dateRedaction) : now; // date de rédaction (par défaut aujourd'hui)
   var dl = cp.dateFrom ? (fdate(cp.dateFrom)+(cp.dateTo&&cp.dateTo!==cp.dateFrom?' → '+fdate(cp.dateTo):'')) : '';
   var ref = 'ÉVT-'+(''+evtId).replace(/[^a-zA-Z0-9]/g,'').slice(-6).toUpperCase();
   var row = function(label, val){ return '<tr><td class="k">'+label+'</td><td class="v">'+val+'</td></tr>'; };
@@ -40321,18 +40888,24 @@ function printEvenement(compId, evtId) {
   html += '</div>';
   html += '<div class="diffuse">Diffusion interne</div>';
   html += '<div class="title">Fiche d\'événement</div>';
-  html += '<div class="ref">Édité le '+now+'</div>';
+  html += '<div class="ref">Rédigé le '+redac+'</div>';
   html += '<div class="ctx"><b>Compétition :</b> '+esc(cp.name||'—')+(dl?' &nbsp;·&nbsp; '+dl:'')+(cp.oaci?' &nbsp;·&nbsp; '+esc(cp.oaci):'')+(cp.lieu?' &nbsp;·&nbsp; '+esc(cp.lieu):'')+'</div>';
   html += '<table class="det">';
   html += row('Type d\'événement','<span class="badge" style="background:'+tc+'">'+esc(ev.typeIncident||'—')+'</span>');
   html += row('Date de l\'événement','<b>'+fdate(ev.date)+'</b>'+(ev.horaire?' &nbsp; à '+esc(ev.horaire):''));
   html += row('Personne / aéronef concerné', esc(ev.nom||'—'));
-  if (ev.immatriculation) html += row('Immatriculation','<b style="color:#b45309">'+esc(ev.immatriculation)+'</b>');
+  if (ev.immatriculation) html += row('Identification','<b style="color:#b45309">'+esc(ev.immatriculation)+'</b>');
   html += '</table>';
   html += '<div class="block"><h3>Circonstances</h3><div class="body">'+(ev.circonstance? nl2br(ev.circonstance) : '—')+'</div></div>';
-  html += '<div class="block"><h3>Commentaires / suites données</h3><div class="body">'+(ev.commentaires? nl2br(ev.commentaires) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Conditions du jour</h3><div class="body">'+(ev.conditions? nl2br(ev.conditions) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Description de l\'événement</h3><div class="body">'+(ev.description? nl2br(ev.description) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Conséquences</h3><div class="body">'+(ev.consequences? nl2br(ev.consequences) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Analyse</h3><div class="body">'+(ev.analyse? nl2br(ev.analyse) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Enseignements et recommandations</h3><div class="body">'+(ev.enseignements? nl2br(ev.enseignements) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Suites données</h3><div class="body">'+(ev.suites? nl2br(ev.suites) : '—')+'</div></div>';
+  html += '<div class="block"><h3>Commentaires</h3><div class="body">'+(ev.commentaires? nl2br(ev.commentaires) : '—')+'</div></div>';
   html += '<div class="sign"><div class="box">';
-  html += '<div class="loc">Fait à '+esc(sig.ville||'—')+', le '+now+'</div>';
+  html += '<div class="loc">Fait à '+esc(sig.ville||'—')+', le '+redac+'</div>';
   html += '<div class="who">'+(esc(((sig.prenom||'')+' '+(sig.nom||'')).trim())||'&nbsp;')+'</div>';
   html += '<div class="role">'+esc(sig.titre||'')+'</div>';
   html += '</div></div>';
@@ -40347,7 +40920,7 @@ function printEvenement(compId, evtId) {
 function exportEvenementsCSV(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
   var evtList = ((S.evenements||{})[compId]||[]);
-  var rows = [['Type','Nom / Aéronef','Date','Heure','Immatriculation','Circonstance','Commentaires']];
+  var rows = [['Type','Nom / Aéronef','Date','Heure','Identification','Circonstance','Commentaires']];
   evtList.forEach(function(ev){
     rows.push([ev.typeIncident||'',ev.nom||'',ev.date||'',ev.horaire||'',ev.immatriculation||'',ev.circonstance||'',ev.commentaires||'']);
   });
@@ -40415,7 +40988,7 @@ function exportEvenement(compId, evtId) {
   html += '<tr><td>Nom / Personne concernée</td><td>'+esc(ev.nom)+'</td></tr>';
   html += '<tr><td>Date</td><td>'+(esc(ev.date)||'—')+'</td></tr>';
   html += '<tr><td>Horaire</td><td>'+(esc(ev.horaire)||'—')+'</td></tr>';
-  html += '<tr><td>Immatriculation aéronef</td><td>'+(esc(ev.immatriculation)||'—')+'</td></tr>';
+  html += '<tr><td>Identification</td><td>'+(esc(ev.immatriculation)||'—')+'</td></tr>';
   html += '<tr><td>Circonstance</td><td>'+esc(ev.circonstance)+'</td></tr>';
   html += '</table>';
   if (ev.commentaires) {
@@ -46055,22 +46628,26 @@ function exportSHNFmt(fmt) {
 function _dtnCfActMenu()  { _makeActMenu('dtn-cf-act-menu','dtn-cf-act-wrap'); }
 function _dtnCfActClose() { var m=document.getElementById('dtn-cf-act-menu'); if(m) m.style.display='none'; }
 function _compActMenu() {
-  var m = document.getElementById('cp-act-menu');
+  // Le détail compétition peut être rendu dans deux surfaces (tableau de bord +
+  // page dédiée) → plusieurs #cp-act-menu. On agit sur celui qui est VISIBLE.
+  var wraps = [].slice.call(document.querySelectorAll('#cp-act-wrap'));
+  var wrap = wraps.filter(function(w){ return w.offsetParent !== null; })[0] || wraps[0];
+  if (!wrap) return;
+  var m = wrap.querySelector('#cp-act-menu');
   if (!m) return;
-  var open = m.style.display !== 'none';
-  m.style.display = open ? 'none' : 'block';
+  var open = m.style.display === 'block';
+  document.querySelectorAll('#cp-act-menu').forEach(function(x){ x.style.display = 'none'; }); // referme toute autre instance
   if (!open) {
+    m.style.display = 'block';
     setTimeout(function() {
       document.addEventListener('click', function _cl(e) {
-        var wrap = document.getElementById('cp-act-wrap');
-        if (!wrap || !wrap.contains(e.target)) { _compActClose(); document.removeEventListener('click', _cl); }
+        if (!wrap.contains(e.target)) { _compActClose(); document.removeEventListener('click', _cl); }
       });
     }, 0);
   }
 }
 function _compActClose() {
-  var m = document.getElementById('cp-act-menu');
-  if (m) m.style.display = 'none';
+  document.querySelectorAll('#cp-act-menu').forEach(function(m){ m.style.display = 'none'; });
 }
 function _bgtActMenu(cpId) {
   var m = document.getElementById('bgt-act-menu');
@@ -46530,7 +47107,7 @@ function printCompDossier(compId, opts) {
   var evtHtml = '<div class="page-sec">'+SH('Événements',evtList.length);
   if(!evtList.length){ evtHtml += emptyRow('Aucun événement enregistré.'); }
   else {
-    evtHtml += '<table><thead><tr><th>Type</th><th>Nom / Aéronef</th><th>Date</th><th>Immatriculation</th><th>Circonstance</th></tr></thead><tbody>';
+    evtHtml += '<table><thead><tr><th>Type</th><th>Nom / Aéronef</th><th>Date</th><th>Identification</th><th>Circonstance</th></tr></thead><tbody>';
     evtList.forEach(function(e){
       var tc=tcMap[e.typeIncident]||'#6b7280';
       evtHtml += '<tr><td><span style="font-size:7.5px;font-weight:700;color:'+tc+';background:'+tc+'20;padding:1px 5px;border-radius:8px">'+esc(e.typeIncident||'—')+'</span></td>'
@@ -47515,7 +48092,7 @@ function openEvtAddSheet(compId) {
   body += '<div><label style="'+lSt+'">Date</label><input id="eas-date" type="date" value="'+today+'" style="'+iSt+'"></div>';
   body += '<div><label style="'+lSt+'">Heure</label><input id="eas-heure" type="time" style="'+iSt+'"></div>';
   body += '</div>';
-  body += '<label style="'+lSt+'">Immatriculation</label><input id="eas-immat" placeholder="F-XXXX…" style="'+iSt+'">';
+  body += '<label style="'+lSt+'">Identification</label><input id="eas-immat" placeholder="Identification…" style="'+iSt+'">';
   body += '<label style="'+lSt+'">Circonstance</label><textarea id="eas-circ" placeholder="Décrivez les circonstances…" rows="3" style="'+iSt+';resize:none;line-height:1.5"></textarea>';
   body += '<label style="'+lSt+'">Commentaires</label><textarea id="eas-comm" placeholder="Commentaires complémentaires…" rows="2" style="'+iSt+';resize:none;line-height:1.5"></textarea>';
   _mobileSheet('evt-add', 'Nouvel événement', '📋 Événements', '#f59e0b', body,
@@ -50048,19 +50625,21 @@ function showDTNPortal() {
   // Marquer que le portail DTN est visible (pour cacher le rail desktop)
   document.body.classList.add('dtn-portal-visible');
   _dtnShowSidebar();
-  // Réinitialiser l'état sidebar (toujours visible à l'ouverture)
-  _dtnSidebarVisible = true;
-  document.body.classList.remove('dtn-sb-hidden');
+  // État sidebar à l'ouverture : visible sur bureau, repliée (hors écran) sur
+  // smartphone pour laisser toute la largeur aux volets (Territoires, Sécurité…).
+  var _isMobDtn = window.innerWidth < 768;
+  _dtnSidebarVisible = !_isMobDtn;
+  document.body.classList.toggle('dtn-sb-hidden', _isMobDtn);
   var _sbEl = document.getElementById('dtn-sidebar');
-  if (_sbEl) _sbEl.style.transform = 'translateX(0)';
+  if (_sbEl) _sbEl.style.transform = _isMobDtn ? 'translateX(-216px)' : 'translateX(0)';
   var _hdrEl = document.getElementById('dtn-header');
-  if (_hdrEl) _hdrEl.style.paddingLeft = '216px';
+  if (_hdrEl) _hdrEl.style.paddingLeft = _isMobDtn ? '0' : '216px';
   var _spEl = document.getElementById('dtn-sb-spacer');
-  if (_spEl) _spEl.style.width = '216px';
+  if (_spEl) _spEl.style.width = _isMobDtn ? '0' : '216px';
   var _showBtn = document.getElementById('dtn-sb-show-btn');
-  if (_showBtn) _showBtn.style.display = 'none';
+  if (_showBtn) _showBtn.style.display = _isMobDtn ? 'flex' : 'none';
   var _showBtn2 = document.getElementById('dtn-sb-show-btn2');
-  if (_showBtn2) _showBtn2.style.display = 'none';
+  if (_showBtn2) _showBtn2.style.display = _isMobDtn ? 'flex' : 'none';
   var _brand = document.getElementById('dtn-header-brand');
   if (_brand) _brand.style.display = 'none';
   var _floatBrand = document.getElementById('floating-brand');
@@ -50339,7 +50918,8 @@ function openCollectifModule() {
   var ov = document.getElementById('collectif-overlay');
   if (!ov) return;
   var sbHidden = document.body.classList.contains('dtn-sb-hidden');
-  ov.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;left:'+(sbHidden?'0':'216px')+';z-index:2600;background:#ffffff;overflow:hidden';
+  var _left = (window.innerWidth < 768 || sbHidden) ? '0' : '216px'; // plein écran sur smartphone
+  ov.style.cssText = 'display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;left:'+_left+';z-index:2600;background:#ffffff;overflow:hidden';
   // Ouverture prioritaire sur le volet « Chiffres & stats »
   _collectifSetPage('stats');
 }
@@ -50596,8 +51176,9 @@ function _collStatsRegionSVG(regions){
   var esc=function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var SHORT={'Auvergne-Rhône-Alpes':'ARA','Bourgogne-Franche-Comté':'BFC','Bretagne':'BRE','Centre-Val de Loire':'CVL','Corse':'COR','Grand Est':'GES','Hauts-de-France':'HDF','Île-de-France':'IDF','Normandie':'NOR','Nouvelle-Aquitaine':'NAQ','Occitanie':'OCC','Pays de la Loire':'PDL',"Provence-Alpes-Côte d'Azur":'PACA'};
   var G=(typeof _FR_REGION_GEO!=='undefined')?_FR_REGION_GEO:null;
+  var _gcol = (window.innerWidth<768) ? 'auto' : 'span 2'; // pas de span sur smartphone (grille 1 colonne)
   var keys=Object.keys(regions);
-  if(!keys.length || !G) return '<div style="'+_cSt+';grid-column:span 2"><div style="'+_tSt+'">Régions d\'origine</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune région renseignée</div></div>';
+  if(!keys.length || !G) return '<div style="'+_cSt+';grid-column:'+_gcol+'"><div style="'+_tSt+'">Régions d\'origine</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune région renseignée</div></div>';
   // Répartir les effectifs : métropole (présente dans la géométrie) vs hors métropole
   var metro={}; Object.keys(G.regions).forEach(function(n){ metro[n]=0; });
   var others=[];
@@ -50628,7 +51209,7 @@ function _collStatsRegionSVG(regions){
   // Cadre (trait fin) autour de la carte — maintenu même en présence de non-résidents
   var mapFramed='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'
     +'<div style="border:1px solid var(--bdr);border-radius:10px;padding:10px;background:rgba(127,127,127,.03)">'+svg+'</div>'+footer+'</div>';
-  return '<div style="'+_cSt+';grid-column:span 2"><div style="'+_tSt+'">Régions d\'origine</div>'+mapFramed+'</div>';
+  return '<div style="'+_cSt+';grid-column:'+_gcol+'"><div style="'+_tSt+'">Régions d\'origine</div>'+mapFramed+'</div>';
 }
 
 // Impression A4 (paysage) — reprend à l'identique les KPI, graphiques et carte
@@ -51832,6 +52413,17 @@ function _csbNavOut(key) {
 function _dtnShowSidebar() {
   var sb = document.getElementById('dtn-sidebar');
   if (sb) sb.style.display = 'flex';
+  // Smartphone : barre latérale hors écran et espace réservé annulé, sinon le
+  // volet (Territoires, Sécurité, Formations…) est écrasé à ~159 px de large.
+  if (window.innerWidth < 768) {
+    _dtnSidebarVisible = false;
+    document.body.classList.add('dtn-sb-hidden');
+    if (sb) sb.style.transform = 'translateX(-216px)';
+    var _hd = document.getElementById('dtn-header');     if (_hd) _hd.style.paddingLeft = '0';
+    var _sp = document.getElementById('dtn-sb-spacer');   if (_sp) _sp.style.width = '0';
+    var _b1 = document.getElementById('dtn-sb-show-btn');  if (_b1) _b1.style.display = 'flex';
+    var _b2 = document.getElementById('dtn-sb-show-btn2'); if (_b2) _b2.style.display = 'flex';
+  }
 }
 function _dtnHideSidebar() {
   var sb = document.getElementById('dtn-sidebar');
@@ -58261,27 +58853,60 @@ document.addEventListener('DOMContentLoaded', async function() {
 </div>
 
 <!-- ══ MODAL ÉVÉNEMENT ══ -->
+<style>
+  #evt-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  #evt-cols .evt-sec{font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  #evt-cols .evt-sec > div{flex:1;height:1px;background:var(--bdr)}
+  #evt-cols label.evt-l{font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px}
+  #evt-cols .evt-f{width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s}
+  #evt-cols textarea.evt-f{resize:vertical}
+  #evt-cols .evt-f:focus{border-color:var(--stol)}
+  #evt-cols .evt-field{margin-bottom:12px}
+  @media(max-width:760px){#evt-cols{grid-template-columns:1fr;gap:14px}}
+</style>
 <div id="sheet-evenement" style="display:none;opacity:0;transition:opacity .2s,transform .2s;position:fixed;inset:0;z-index:3000;align-items:center;justify-content:center;background:rgba(0,0,0,.55)">
-  <div id="evt-panel" style="background:var(--navy2);border-radius:16px;padding:24px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);transition:height .3s ease">
-    <div id="evt-handle" style="display:none;width:100%;padding-bottom:12px;justify-content:center;cursor:grab;touch-action:none"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto"></div></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <h3 style="margin:0;font-size:16px;font-weight:800;color:var(--txt)">Événement / Incident</h3>
+  <div id="evt-panel" style="background:var(--navy2);border-radius:16px;width:min(1040px,97vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);transition:height .3s ease">
+    <div id="evt-handle" style="display:none;width:100%;padding:10px 0 6px;justify-content:center;cursor:grab;touch-action:none;flex-shrink:0"><div style="width:40px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+      <h3 style="margin:0;font-size:16px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:8px"><span style="font-size:18px">⚠️</span>Événement / Incident</h3>
       <button onclick="closeEvenementModal()" style="background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;line-height:1;padding:4px">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Type d'incident</label><input id="evt-modal-type" list="evt-modal-type-list" placeholder="Saisir ou choisir…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"><datalist id="evt-modal-type-list"><option value="Sécurité"/><option value="Matériel"/><option value="Médical"/><option value="Météo"/><option value="Administratif"/><option value="Mécanique"/><option value="Autre"/></datalist></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Nom / Personne concernée</label><input id="evt-modal-nom" placeholder="Nom…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Date</label><input id="evt-modal-date" type="date" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Horaire</label><input id="evt-modal-heure" type="time" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Immatriculation aéronef</label><input id="evt-modal-immat" placeholder="F-XXXX" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s;text-transform:uppercase" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Circonstance</label><input id="evt-modal-circ" placeholder="Résumé…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></div>
+    <!-- Corps scrollable : deux colonnes -->
+    <div style="flex:1;overflow-y:auto;min-height:0;padding:18px 24px">
+      <div id="evt-cols">
+        <!-- Colonne gauche : Informations -->
+        <div>
+          <div class="evt-sec"><span>Informations</span><div></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div><label class="evt-l">Type d'incident</label><input id="evt-modal-type" list="evt-modal-type-list" placeholder="Saisir ou choisir…" class="evt-f"><datalist id="evt-modal-type-list"><option value="Sécurité"/><option value="Matériel"/><option value="Médical"/><option value="Météo"/><option value="Administratif"/><option value="Mécanique"/><option value="Autre"/></datalist></div>
+            <div><label class="evt-l">Nom / Personne concernée</label><input id="evt-modal-nom" placeholder="Nom…" class="evt-f"></div>
+            <div><label class="evt-l">Date</label><input id="evt-modal-date" type="date" class="evt-f"></div>
+            <div><label class="evt-l">Horaire</label><input id="evt-modal-heure" type="time" class="evt-f"></div>
+            <div><label class="evt-l">Identification</label><input id="evt-modal-immat" placeholder="Identification…" class="evt-f" style="text-transform:uppercase"></div>
+            <div><label class="evt-l">Circonstance</label><input id="evt-modal-circ" placeholder="Résumé…" class="evt-f"></div>
+            <div><label class="evt-l">Date de rédaction</label><input id="evt-modal-date-redaction" type="date" class="evt-f" title="Date de rédaction de la fiche (par défaut aujourd'hui)"></div>
+          </div>
+          <div class="evt-field" style="margin-top:12px"><label class="evt-l">Commentaires détaillés</label><textarea id="evt-modal-comm" rows="4" placeholder="Détails supplémentaires, actions prises…" class="evt-f"></textarea></div>
+        </div>
+        <!-- Colonne droite : Analyse & suivi -->
+        <div>
+          <div class="evt-sec"><span>Analyse &amp; suivi</span><div></div></div>
+          <div class="evt-field"><label class="evt-l">Conditions du jour</label><textarea id="evt-modal-conditions" rows="2" placeholder="Météo, vent, visibilité, état du terrain…" class="evt-f"></textarea></div>
+          <div class="evt-field"><label class="evt-l">Description de l'événement</label><textarea id="evt-modal-description" rows="3" placeholder="Déroulé factuel et chronologique…" class="evt-f"></textarea></div>
+          <div class="evt-field"><label class="evt-l">Conséquences</label><textarea id="evt-modal-consequences" rows="2" placeholder="Blessures, dégâts matériels, impacts…" class="evt-f"></textarea></div>
+          <div class="evt-field"><label class="evt-l">Analyse</label><textarea id="evt-modal-analyse" rows="2" placeholder="Causes, facteurs contributifs…" class="evt-f"></textarea></div>
+          <div class="evt-field"><label class="evt-l">Enseignements et recommandations</label><textarea id="evt-modal-enseignements" rows="2" placeholder="Leçons tirées, actions préventives…" class="evt-f"></textarea></div>
+          <div class="evt-field" style="margin-bottom:0"><label class="evt-l">Suites données</label><textarea id="evt-modal-suites" rows="2" placeholder="Décisions, mesures appliquées, suivi, clôture…" class="evt-f"></textarea></div>
+        </div>
+      </div>
     </div>
-    <div style="margin-top:12px"><label style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:4px">Commentaires détaillés</label><textarea id="evt-modal-comm" rows="4" placeholder="Détails supplémentaires, actions prises…" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;resize:vertical;transition:border-color .15s" onfocus="this.style.borderColor='var(--stol)'" onblur="this.style.borderColor='var(--bdr)'"></textarea></div>
-    <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
-      <button onclick="deleteEvenementFromModal()" style="padding:9px 16px;border:1px solid #ef4444;border-radius:8px;background:none;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:auto">Supprimer</button>
+    <!-- Pied de page fixe : tous les boutons toujours visibles -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 24px;border-top:1px solid var(--bdr);background:var(--navy3);flex-shrink:0;align-items:center">
+      <button onclick="deleteEvenementFromModal()" style="padding:9px 16px;border:1px solid #ef4444;border-radius:8px;background:none;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🗑 Supprimer</button>
+      <div style="flex:1"></div>
       <button onclick="saveEvenementSheet();printEvenement(_evtModalCompId,_evtModalId)" title="Enregistrer puis imprimer la fiche A4 (diffusion interne)" style="padding:9px 16px;border:1px solid var(--stol);border-radius:8px;background:none;color:var(--stol);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖨 Imprimer</button>
       <button onclick="closeEvenementModal()" style="padding:9px 18px;border:1px solid var(--bdr);border-radius:8px;background:none;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>
-      <button onclick="saveEvenementSheet()" style="padding:9px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--stol),#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.2)">Enregistrer</button>
+      <button onclick="saveEvenementSheet()" style="padding:9px 24px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--stol),#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.2)">Enregistrer</button>
     </div>
   </div>
 </div>
