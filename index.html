@@ -828,7 +828,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <button class="btn btn-primary btn-full" style="font-size:16px;padding:14px;border-radius:12px" onclick="_accesDoWelcomeLogin()">🔑 Accéder</button>
     <button class="btn btn-full" style="font-size:14px;padding:13px;border-radius:12px;background:transparent;border:1px solid var(--bdr);color:var(--txt2)" onclick="welcomeWithoutAccount()">👁 Accéder sans compte</button>
   </div>
-  <div style="font-size:11px;color:var(--txt3);margin-top:36px">v1.0.8 · 2026</div>
+  <div style="font-size:11px;color:var(--txt3);margin-top:36px">v1.0.9 · 2026</div>
 </div>
 
 <!-- ═══════════════ MODALE AGENDA SAISONNIER ═══════════════ -->
@@ -8910,7 +8910,7 @@ function openUserAccountPopup() {
     html += '<div style="padding:10px 16px 16px;display:flex;gap:8px;border-top:1px solid var(--bdr)">';
     html += '<button onclick="openUserAccountPopup(true)" style="flex:1;padding:9px;border-radius:10px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Modifier</button>';
     html += '<button onclick="sbSync().catch(function(){})" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">☁️ Synchro</button>';
-    html += '<button onclick="sbLogout()" style="flex:1;padding:9px;border-radius:10px;border:1px solid rgba(220,38,38,.3);background:rgba(220,38,38,.08);color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🚪 Quitter</button>';
+    html += '<button onclick="sbLogout()" style="flex:1;padding:9px;border-radius:10px;border:1px solid rgba(220,38,38,.3);background:rgba(220,38,38,.08);color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🚪 Déconnexion</button>';
     html += '</div>';
   }
 
@@ -26006,10 +26006,30 @@ async function sbReset() {
   else toast('Email envoyé à ' + email, 'ok');
 }
 
-async function sbLogout() {
-  var sb = getSB(); if (!sb) return;
-  await sb.auth.signOut();
-  S.user = null; saveState(); renderSettings(); updateHeader(); toast('Déconnecté', '');
+// Déconnexion. Trois défauts corrigés ici :
+//  1. `if (!sb) return` sortait avant tout : sans client Supabase, le bouton ne
+//     faisait strictement rien.
+//  2. `await signOut()` bloquait l'interface le temps d'un aller-retour réseau.
+//  3. La session était vidée mais l'écran d'accueil n'était jamais affiché :
+//     on restait dans l'application sans pouvoir se reconnecter.
+// La session locale est donc fermée IMMÉDIATEMENT et l'écran de connexion
+// s'affiche sans attendre ; la déconnexion Supabase part en arrière-plan.
+function sbLogout() {
+  S.user = null;
+  saveState();
+  try { if (typeof renderSettings==='function') renderSettings(); } catch(e){}
+  try { if (typeof updateHeader==='function')  updateHeader();  } catch(e){}
+  // Ferme les volets ouverts et ramène à l'écran de connexion, sans attendre.
+  if (typeof quitterApp === 'function') quitterApp();
+  else if (typeof showWelcomeScreen === 'function') showWelcomeScreen();
+  toast('Déconnecté', '');
+  // Sans effet sur l'affichage : purement pour libérer la session côté Supabase.
+  try {
+    var sb = (typeof getSB==='function') ? getSB() : null;
+    if (sb && sb.auth && sb.auth.signOut) {
+      Promise.resolve(sb.auth.signOut()).catch(function(e){ console.warn('[logout] signOut:', e && e.message); });
+    }
+  } catch(e){ console.warn('[logout]', e && e.message); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -26763,6 +26783,30 @@ function _cleanupAllDuplicates() {
 // Appelé au démarrage AVANT tout rendu. Remplace l'état local entièrement.
 // Le localStorage n'est qu'un cache hors-ligne, jamais source principale.
 // ══════════════════════════════════════════════════════════════════════════════
+// Fusion d'une liste locale dans la liste issue du cloud, élément par élément.
+// L'ancienne version faisait « le local gagne toujours » : la copie locale d'un
+// poste, même vieille de plusieurs jours, écrasait à chaque démarrage les
+// modifications faites ailleurs. Un utilisateur ne voyait donc jamais les
+// changements des autres — et pire, sa version périmée repartait vers le cloud
+// à la première modification, effaçant le travail de tout le monde.
+// On compare désormais `_updatedAt` : le plus récent gagne. À défaut
+// d'horodatage des deux côtés, le local est conservé (comportement d'origine).
+function _fusionPlusRecent(cloudArr, localArr, libelle) {
+  if (!Array.isArray(localArr) || !localArr.length) return Array.isArray(cloudArr) ? cloudArr : [];
+  if (!Array.isArray(cloudArr) || !cloudArr.length) return localArr.slice();
+  var out = cloudArr.slice(), remplaces = 0, ignores = 0;
+  localArr.forEach(function(loc) {
+    if (!loc || loc.id === undefined) return;
+    var idx = out.findIndex(function(x){ return x && x.id === loc.id; });
+    if (idx === -1) { out.push(loc); return; }
+    var tLoc = loc._updatedAt || 0, tCld = out[idx]._updatedAt || 0;
+    if (tLoc >= tCld) { out[idx] = loc; remplaces++; }
+    else { ignores++; } // le cloud est plus récent : on garde sa version
+  });
+  if (ignores && libelle) console.warn('[Sync] '+libelle+' : '+ignores+' élément(s) plus récents côté cloud conservés, '+remplaces+' locaux retenus');
+  return out;
+}
+
 async function loadFromSupabaseFirst() {
   if (!navigator.onLine) return false;
   var sb = getSB();
@@ -26984,46 +27028,23 @@ async function loadFromSupabaseFirst() {
     })();
     // ✅ Fusionner collectif local avec cloud : local gagne membre par membre (plus récent)
     if (savedCollectif) {
-      if (!S.collectif || !S.collectif.length) {
-        S.collectif = savedCollectif;
-      } else {
-        savedCollectif.forEach(function(m) {
-          var idx = S.collectif.findIndex(function(x){ return x.id === m.id; });
-          if (idx === -1) { S.collectif.push(m); }
-          else { S.collectif[idx] = m; } // local toujours plus récent que cloud
-        });
-      }
+      S.collectif = _fusionPlusRecent(S.collectif, savedCollectif, 'Collectif France');
     }
     if (savedShn) {
-      if (!S.shn || !S.shn.length) {
-        S.shn = savedShn;
-      } else {
-        savedShn.forEach(function(m) {
-          var idx = S.shn.findIndex(function(x){ return x.id === m.id; });
-          if (idx === -1) { S.shn.push(m); }
-          else { S.shn[idx] = m; }
-        });
-      }
+      S.shn = _fusionPlusRecent(S.shn, savedShn, 'SHN');
     }
     // ✅ Fusionner territoires local avec cloud : comité par comité (local gagne), divers local conservé
     if (savedTerritoires) {
       if (!S.territoires || typeof S.territoires !== 'object') S.territoires = {};
       if (!Array.isArray(S.territoires.comites)) S.territoires.comites = [];
-      savedTerritoires.comites.forEach(function(c) {
-        var idx = S.territoires.comites.findIndex(function(x){ return x.id === c.id; });
-        if (idx === -1) { S.territoires.comites.push(c); }
-        else { S.territoires.comites[idx] = c; }
-      });
+      S.territoires.comites = _fusionPlusRecent(S.territoires.comites, savedTerritoires.comites, 'Comités régionaux');
       if (typeof savedTerritoires.divers === 'string' && savedTerritoires.divers) S.territoires.divers = savedTerritoires.divers;
       if (savedTerritoires._seeded) S.territoires._seeded = true;
     }
     // ✅ Fusionner les accès locaux avec le cloud : accès par id (local gagne)
     if (savedAccesUsers) {
       if (!Array.isArray(S.accesUsers)) S.accesUsers = [];
-      savedAccesUsers.forEach(function(a) {
-        var idx = S.accesUsers.findIndex(function(x){ return x.id === a.id; });
-        if (idx === -1) { S.accesUsers.push(a); } else { S.accesUsers[idx] = a; }
-      });
+      S.accesUsers = _fusionPlusRecent(S.accesUsers, savedAccesUsers, 'Accès');
     }
     // ✅ Fusionner les ÉVÉNEMENTS (accidents/incidents) locaux avec le cloud, compétition
     // par compétition, événement par id : union + dernier _updatedAt gagne (défaut = local).
@@ -30043,8 +30064,10 @@ function cfSetEfr(id, field, val) {
   var m = (S.collectif||[]).find(function(x){ return x.id === id; });
   if (!m) return;
   m[field] = val;
+  m._updatedAt = Date.now(); // sans horodatage, la fusion cloud arbitre à l'aveugle
   saveState();
   try { var _cfLS=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } catch(e) {}
+  if (typeof silentPush === 'function') silentPush();
   if (document.getElementById('ef-tbody')) _efRenderList();
 }
 
@@ -30065,14 +30088,17 @@ function cfClearEFR(id) {
   m.equipe_france = false;
   m.efr1 = '';
   m.efr2 = '';
+  m._updatedAt = Date.now();
   saveState();
   try { var _cfLS=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } catch(e) {}
+  if (typeof silentPush === 'function') silentPush();
   if (document.getElementById('ef-tbody')) _efRenderList();
 }
 
 function cfClearAllEFR() {
   if (!confirm('Réinitialiser toutes les désignations Équipes de France et EFR ?\nCette action est irréversible.')) return;
-  (S.collectif||[]).forEach(function(m){ m.equipe_france = false; m.efr1 = ''; m.efr2 = ''; });
+  var _tsRaz = Date.now();
+  (S.collectif||[]).forEach(function(m){ m.equipe_france = false; m.efr1 = ''; m.efr2 = ''; m._updatedAt = _tsRaz; });
   saveState();
   try { var _cfLS=S.collectif.map(function(m){if(!m.photo||!m.photo.startsWith('data:'))return m;var c=Object.assign({},m);delete c.photo;return c;}); localStorage.setItem(LS_COLLECTIF, JSON.stringify(_cfLS)); } catch(e) {}
   if (document.getElementById('ef-tbody')) _efRenderList();
@@ -42189,7 +42215,26 @@ function _ndfSetSeason(val) {
   renderNDFList();
 }
 
-function _ndfUserId() { return S.user && S.user.id; }
+// Identifiant sous lequel sont rangées les données de l'utilisateur courant.
+// Il ne suffit pas de renvoyer S.user.id : un compte créé avant le passage au
+// code d'accès porte un identifiant différent de celui de sa fiche pilote, et
+// c'est la fiche pilote qui détient l'historique. On résout donc À CHAQUE APPEL
+// plutôt qu'une fois à la connexion — au moment où l'on se connecte, la liste
+// des pilotes n'est pas forcément encore chargée depuis le cloud.
+function _ndfUserId() {
+  var u = S.user;
+  if (!u || !u.id) return null;
+  if ((S.notesfrais||{})[u.id] && S.notesfrais[u.id].length) return u.id; // déjà au bon endroit
+  var e = (u.email||'').trim().toLowerCase();
+  if (!e) return u.id;
+  // 1) Rattachement explicite posé sur la fiche d'accès
+  var acc = (S.accesUsers||[]).find(function(x){ return (x.email||'').trim().toLowerCase()===e; });
+  if (acc && acc.legacyId && (S.notesfrais||{})[acc.legacyId]) return acc.legacyId;
+  // 2) Fiche pilote de même email
+  var p = (S.pilots||[]).find(function(x){ return x && (x.email||'').trim().toLowerCase()===e; });
+  if (p && p.id && (S.notesfrais||{})[p.id]) return p.id;
+  return u.id;
+}
 
 function _ndfUserNDFs() {
   var uid = _ndfUserId();
