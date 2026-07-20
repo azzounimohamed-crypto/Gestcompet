@@ -33285,7 +33285,38 @@ var _ACCES_STATUTS = [
 ];
 var _ACCES_STATUT_LBL = {gestionnaire:'👑 Gestionnaire',utilisateur_modif:'✏️ Util. modif',utilisateur:'👁 Utilisateur',commissaire:'🚩 Commissaire',pilote:'✈️ Pilote',developpeur:'⚙️ Développeur',invite:'👁 Invité'};
 
-function _accesInit(){ if (!Array.isArray(S.accesUsers)) S.accesUsers = []; }
+// Le code est DÉRIVÉ de (email + statut) — jamais une valeur libre. Un code
+// stocké qui diverge de ce calcul est la panne historique de ce système :
+// l'administrateur envoyait le code stocké, mais sur un autre appareil (liste
+// absente ou périmée) seule la vérification déterministe s'applique et attendait
+// une autre valeur. On répare donc tout écart au chargement, une fois pour
+// toutes, et l'affichage comme la vérification passent par _accesCodeOf().
+function _accesCodeOf(u){ return (u && u.email) ? _accesCodeFor(u.email, u.statut) : ''; }
+
+function _accesInit(){
+  if (!Array.isArray(S.accesUsers)) S.accesUsers = [];
+  var fixed = 0;
+  S.accesUsers.forEach(function(u){
+    if (!u || !u.email) return;
+    var want = _accesCodeFor(u.email, u.statut);
+    if ((u.code||'').toUpperCase() !== want){
+      console.warn('[Accès] code réparé pour ' + u.email + ' : ' + (u.code||'(vide)') + ' → ' + want);
+      u.code = want; u._updatedAt = Date.now();
+      u.codeChangedAt = Date.now(); u.inviteStale = true; // invitation déjà envoyée caduque
+      fixed++;
+    }
+    // Rattachement automatique à la fiche pilote de même email : c'est elle qui
+    // porte l'historique (notes de frais, ULM) sous son propre identifiant.
+    if (_accesAppairerPilote(u)){
+      console.warn('[Accès] ' + u.email + ' rattaché à la fiche pilote ' + u.legacyId);
+      fixed++;
+    }
+  });
+  if (fixed){
+    saveState();
+    if (typeof silentPush === 'function') silentPush();
+  }
+}
 function _accesNormEmail(e){ return (e||'').toString().trim().toLowerCase(); }
 function _accesUid(){ return 'acc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 
@@ -33332,7 +33363,7 @@ function _accesCreate(prenom, nom, email, statut){
 function _accesFind(email, code){
   _accesInit();
   var e = _accesNormEmail(email), c = (code||'').toString().trim().toUpperCase();
-  return S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && (u.code||'').toUpperCase()===c; }) || null;
+  return S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && _accesCodeOf(u).toUpperCase()===c; }) || null;
 }
 // Connexion : vérification DÉTERMINISTE hors-ligne (le code + l'email suffisent,
 // aucune synchro requise) ; la liste synchronisée sert à la révocation/gestion.
@@ -33343,28 +33374,170 @@ function _accesLogin(email, code){
   var known = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e; });
   // Révocation (si l'accès désactivé est connu localement)
   if (known && known.actif === false) return { ok:false, msg:'Cet accès a été désactivé. Contactez le gestionnaire.' };
-  // 1) Correspondance directe dans la liste
-  var rec = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && (u.code||'').toUpperCase()===c; });
-  var statut = rec ? rec.statut : null;
-  // 2) Vérification déterministe (fonctionne même sans synchronisation)
-  if (!statut){
-    for (var i=0;i<_ACCES_STATUTS.length;i++){
-      if (_accesCodeFor(e, _ACCES_STATUTS[i][0]).toUpperCase() === c){ statut=_ACCES_STATUTS[i][0]; break; }
-    }
+  // 1) Vérification déterministe D'ABORD : elle ne dépend ni de la liste ni du
+  //    réseau, donc elle donne le même résultat sur tout appareil, hors ligne.
+  var statut = null;
+  for (var i=0;i<_ACCES_STATUTS.length;i++){
+    if (_accesCodeFor(e, _ACCES_STATUTS[i][0]).toUpperCase() === c){ statut=_ACCES_STATUTS[i][0]; break; }
   }
+  // 2) Repli sur la liste — en comparant au code DÉRIVÉ, jamais au code stocké
+  //    (un code stocké périmé ne doit ni ouvrir ni bloquer l'accès).
+  var rec = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && _accesCodeOf(u).toUpperCase()===c; });
+  if (!statut && rec) statut = rec.statut;
+  if (!rec && statut) rec = S.accesUsers.find(function(u){ return _accesNormEmail(u.email)===e && u.statut===statut; });
   if (!statut) return { ok:false, msg:'Email ou code incorrect.' };
   var prenom = rec ? rec.prenom : (known?known.prenom:'');
   var nom    = rec ? rec.nom    : (known?known.nom:'');
-  var id     = rec ? rec.id     : (known?known.id : ('acc_'+e.replace(/[^a-z0-9]/g,'').slice(0,14)));
+  // Les notes de frais et les ULM sont rangés par identifiant d'utilisateur.
+  // Un compte créé sous l'ancien système d'authentification porte un identifiant
+  // différent : sans `legacyId`, ses données existent toujours mais deviennent
+  // invisibles. Voir « Lier des données existantes » dans la page Accès.
+  var id     = rec ? (rec.legacyId || rec.id)
+                   : (known ? (known.legacyId || known.id)
+                            : ('acc_'+e.replace(/[^a-z0-9]/g,'').slice(0,14)));
   if (rec) rec.lastLoginAt = Date.now();
   else if (known){ known.lastLoginAt=Date.now(); known.statut=statut; }
-  else { S.accesUsers.push({ id:id, prenom:prenom, nom:nom, email:e, statut:statut, code:c, actif:true, createdAt:Date.now(), lastLoginAt:Date.now(), _offline:true }); }
+  else {
+    var nouveau = { id:id, prenom:prenom, nom:nom, email:e, statut:statut, code:c, actif:true, createdAt:Date.now(), lastLoginAt:Date.now(), _offline:true };
+    // Fiche créée à la volée : la rattacher tout de suite au pilote de même
+    // email, sinon l'utilisateur arrive sur des notes de frais vides.
+    _accesAppairerPilote(nouveau);
+    S.accesUsers.push(nouveau);
+    if (nouveau.legacyId){ id = nouveau.legacyId; prenom = nouveau.prenom; nom = nouveau.nom; }
+  }
   S.user = { id:id, prenom:prenom, nom:nom, email:e, statut:statut, _acces:true };
   saveState(); if (typeof silentPush==='function') silentPush();
   return { ok:true, rec:{ prenom:prenom, nom:nom, email:e, statut:statut } };
 }
-function _accesUpdate(id, field, val){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u[field]=(field==='email')?_accesNormEmail(val):val; if(field==='email'||field==='statut'){ u.code=_accesCodeFor(u.email,u.statut); } u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); }
-function _accesRegen(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.code=_accesCodeFor(u.email,u.statut); u._updatedAt=Date.now(); saveState(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Le code est lié à l\'email + statut (déterministe).','ok'); }
+
+// ── Rattacher les données d'un compte antérieur ──────────────────────────────
+// Les notes de frais (S.notesfrais) et les ULM (S.ulms) sont indexés par
+// identifiant d'utilisateur. Les comptes de l'ancien système d'authentification
+// portaient un UUID ; la connexion par code attribue un identifiant « acc_… ».
+// Les données restent donc en base mais deviennent invisibles. Ces deux
+// fonctions listent ce qui n'est rattaché à personne, et permettent de le lier.
+// Un compte correspond très souvent à une fiche pilote portant le même email.
+// C'est cette fiche qui détient l'historique (notes de frais, ULM), sous son
+// propre identifiant. On fait le rapprochement automatiquement : plus besoin de
+// passer par « 🔗 Données », et le nom est repris de la fiche pilote plutôt que
+// ressaisi à la main (source des doublons de prénom).
+function _accesAppairerPilote(u){
+  if (!u || !u.email || u.legacyId) return false;
+  var e = _accesNormEmail(u.email);
+  var p = (S.pilots||[]).find(function(x){ return x && _accesNormEmail(x.email) === e; });
+  if (!p) return false;
+  u.legacyId = p.id;
+  // Le nom du pilote fait référence : il évite les saisies approximatives.
+  if (p.prenom) u.prenom = p.prenom;
+  if (p.nom)    u.nom    = p.nom;
+  u._updatedAt = Date.now();
+  return true;
+}
+
+// Corriger le nom d'un accès (les fiches créées à la main comportaient parfois
+// le prénom répété dans le champ Nom).
+function _accesRenommer(id){
+  _accesInit();
+  var u = (S.accesUsers||[]).find(function(x){ return x.id===id; });
+  if (!u) return;
+  var pr = window.prompt('Prénom de '+u.email+' :', u.prenom||'');
+  if (pr === null) return;
+  var no = window.prompt('Nom de '+u.email+' :', u.nom||'');
+  if (no === null) return;
+  u.prenom = (pr||'').trim(); u.nom = (no||'').trim(); u._updatedAt = Date.now();
+  saveState(); if (typeof silentPush==='function') silentPush();
+  toast('Nom mis à jour','ok');
+  renderAccesAdmin();
+}
+
+function _accesDonneesOrphelines(){
+  var pris = {};
+  (S.accesUsers||[]).forEach(function(u){ pris[u.id]=1; if(u.legacyId) pris[u.legacyId]=1; });
+  // S.ulms est aussi indexé par identifiant de PILOTE : ces entrées sont
+  // normales et n'ont rien à voir avec un compte. Sans ce filtre, la liste
+  // proposée dépassait 200 lignes et devenait inexploitable.
+  var pilotes = {};
+  (S.pilots||[]).forEach(function(p){ if(p && p.id) pilotes[p.id]=1; });
+  var cles = {};
+  Object.keys(S.notesfrais||{}).forEach(function(k){ cles[k]=1; });
+  Object.keys(S.ulms||{}).forEach(function(k){ if(!pilotes[k]) cles[k]=1; });
+  return Object.keys(cles).map(function(k){
+    var ndf = ((S.notesfrais||{})[k]||[]).length;
+    var ulm = ((S.ulms||{})[k]||[]).length;
+    return { id:k, notesfrais:ndf, ulms:ulm, orphelin:!pris[k], total:ndf+ulm };
+  }).filter(function(x){ return x.total > 0; })
+    .sort(function(a,b){ return (b.notesfrais - a.notesfrais) || (b.total - a.total); });
+}
+
+function _accesLierDonnees(id){
+  _accesInit();
+  var u = (S.accesUsers||[]).find(function(x){ return x.id===id; });
+  if (!u) return;
+  var cands = _accesDonneesOrphelines();
+  if (!cands.length){ toast('Aucune donnée à rattacher.','warn'); return; }
+  var lignes = cands.map(function(c,i){
+    return (i+1)+') '+c.id+'  —  '+c.notesfrais+' note(s) de frais, '+c.ulms+' ULM'+(c.orphelin?'':'  [déjà rattaché]');
+  }).join('\n');
+  var rep = window.prompt(
+    'Rattacher des données existantes à '+u.email+'\n\n'
+    + 'Ces données ont été créées sous un autre identifiant (ancien compte).\n'
+    + 'Saisissez le numéro de la ligne à rattacher, ou 0 pour détacher :\n\n'
+    + lignes + '\n', '');
+  if (rep === null) return;
+  var n = parseInt(rep, 10);
+  if (n === 0){
+    delete u.legacyId; u._updatedAt = Date.now();
+    saveState(); if (typeof silentPush==='function') silentPush();
+    toast('Données détachées de '+u.email,'');
+    renderAccesAdmin(); return;
+  }
+  var c = cands[n-1];
+  if (!c){ toast('Numéro invalide.','err'); return; }
+  u.legacyId = c.id; u._updatedAt = Date.now();
+  saveState(); if (typeof silentPush==='function') silentPush();
+  toast('✓ '+c.notesfrais+' note(s) de frais et '+c.ulms+' ULM rattachées à '+u.email+' — reconnectez-vous pour les voir.','ok');
+  renderAccesAdmin();
+}
+// Changer l'email ou le statut change MÉCANIQUEMENT le code (il en est dérivé).
+// C'est la dernière façon dont une invitation déjà envoyée pouvait devenir
+// caduque sans que personne ne le voie : on le signale donc explicitement et on
+// marque la fiche « invitation à renvoyer » jusqu'à ce qu'elle soit recopiée.
+function _accesUpdate(id, field, val){
+  _accesInit();
+  var u = S.accesUsers.find(function(x){ return x.id===id; });
+  if (!u) return;
+  var avant = _accesCodeOf(u);
+  u[field] = (field==='email') ? _accesNormEmail(val) : val;
+  if (field==='email' || field==='statut') u.code = _accesCodeFor(u.email, u.statut);
+  var apres = _accesCodeOf(u);
+  u._updatedAt = Date.now();
+  if (apres !== avant){
+    u.codeChangedAt = Date.now(); u.inviteStale = true;
+    toast('⚠️ Le code de '+u.email+' devient '+apres+' — l\'ancienne invitation ne fonctionne plus, renvoyez-la.', 'warn');
+  }
+  saveState();
+  if (typeof silentPush==='function') silentPush();
+  if (typeof renderAccesModal==='function') renderAccesModal();
+}
+
+// Le code étant dérivé, il ne peut pas être « régénéré » : on le recalcule et on
+// dit clairement s'il a changé ou non, plutôt que de laisser croire à un nouveau code.
+function _accesRegen(id){
+  _accesInit();
+  var u = S.accesUsers.find(function(x){ return x.id===id; });
+  if (!u) return;
+  var avant = u.code, apres = _accesCodeFor(u.email, u.statut);
+  u.code = apres; u._updatedAt = Date.now();
+  if (avant !== apres){
+    u.codeChangedAt = Date.now(); u.inviteStale = true;
+    saveState();
+    if (typeof silentPush==='function') silentPush();
+    toast('Code corrigé : '+apres+' — invitation à renvoyer.', 'warn');
+  } else {
+    toast('Code inchangé ('+apres+') : il est dérivé de l\'email + statut et reste stable.', 'ok');
+  }
+  if (typeof renderAccesModal==='function') renderAccesModal();
+}
 function _accesToggle(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; u.actif=(u.actif===false); u._updatedAt=Date.now(); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast(u.actif?'Accès réactivé':'Accès désactivé', u.actif?'ok':'warn'); }
 function _accesDelete(id){ _accesInit(); var u=S.accesUsers.find(function(x){return x.id===id;}); if(!u) return; if(!confirm('Supprimer définitivement l\'accès de '+((u.prenom||'')+' '+(u.nom||'')).trim()+' ('+u.email+') ?')) return; S.accesUsers=S.accesUsers.filter(function(x){return x.id!==id;}); saveState(); if(typeof silentPush==='function') silentPush(); if(typeof renderAccesModal==='function') renderAccesModal(); toast('Accès supprimé',''); }
 // Copie un message d'invitation prêt à envoyer (lien + email + code)
@@ -33375,9 +33548,15 @@ function _accesCopyInvite(id){
     + 'Voici votre accès à Gest\'DTN :\n'
     + 'Lien : '+lien+'\n'
     + 'Email : '+u.email+'\n'
-    + 'Code d\'accès : '+u.code+'\n\n'
+    + 'Code d\'accès : '+_accesCodeOf(u)+'\n\n'
     + 'Sur la page d\'accueil, choisissez « J\'ai un code d\'accès », saisissez votre email et ce code.';
-  var done=function(){ toast('Invitation copiée — collez-la dans un email/SMS','ok'); };
+  // Copier l'invitation vaut « envoyée » : c'est ce qui éteint l'alerte de renvoi.
+  var done=function(){
+    u.inviteSentAt = Date.now(); u.inviteStale = false; u._updatedAt = Date.now();
+    saveState(); if (typeof silentPush==='function') silentPush();
+    if (typeof renderAccesModal==='function') renderAccesModal();
+    toast('Invitation copiée — collez-la dans un email/SMS','ok');
+  };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg).then(done, function(){ window.prompt('Copiez l\'invitation :', msg); });
   else window.prompt('Copiez l\'invitation :', msg);
 }
@@ -33387,7 +33566,13 @@ function _accesEnterApp(rec){
   hideWelcomeScreen();
   var app = document.getElementById('app'); if (app) app.style.display='';
   if (window.innerWidth >= 768 && typeof showDTNPortal==='function') { showDTNPortal(); }
-  else { if (typeof renderHome==='function') renderHome(); if (typeof renderCompetitions==='function') renderCompetitions(); }
+  else {
+    if (typeof renderHome==='function') renderHome();
+    if (typeof renderCompetitions==='function') renderCompetitions();
+    // Sans cela on arrivait sur un écran blanc : les rendus étaient faits mais
+    // aucune page n'était affichée.
+    if (typeof showPage==='function') showPage('page-home');
+  }
   if (typeof updateHeader==='function') updateHeader();
   toast('Bienvenue '+(((rec.prenom||'')+' '+(rec.nom||'')).trim()||rec.email)+' · '+(_ACCES_STATUT_LBL[rec.statut]||rec.statut), 'ok');
 }
@@ -33400,14 +33585,21 @@ function _accesDoWelcomeLogin(){
   if (!email.trim() || !code.trim()){ setErr('Saisissez votre email et votre code.'); return; }
   var r = _accesLogin(email, code);
   if (r.ok){ _accesEnterApp(r.rec); return; }
-  // Accès introuvable : tenter un rafraîchissement cloud (nouvel appareil) puis réessayer une fois
+  // Le code est vérifiable hors ligne : si la vérification échoue, le cloud n'y
+  // changera rien. On tente quand même un rafraîchissement (liste de révocation,
+  // nom/prénom), mais SOUS DÉLAI MAXIMAL : sans cela, un Supabase en pause laisse
+  // « Vérification en cours… » indéfiniment — c'était la panne constatée.
   if (!_accesLoginRetried && typeof pullFromCloud==='function'){
     _accesLoginRetried = true;
     setErr('Vérification en cours…', true);
-    Promise.resolve(pullFromCloud()).then(function(){
+    var fini = false;
+    var conclure = function(){
+      if (fini) return; fini = true;
       var r2 = _accesLogin(email, code);
       if (r2.ok) _accesEnterApp(r2.rec); else setErr(r2.msg);
-    }).catch(function(){ setErr(r.msg); });
+    };
+    setTimeout(conclure, 6000); // filet de sécurité : jamais d'attente sans fin
+    Promise.resolve(pullFromCloud()).then(conclure).catch(conclure);
     return;
   }
   setErr(r.msg);
@@ -33444,17 +33636,30 @@ function renderAccesAdmin(){
     var name = ((u.prenom||'')+' '+(u.nom||'')).trim() || '—';
     var col = {gestionnaire:'#c89600',developpeur:'#ef4444',utilisateur_modif:'var(--stol)',commissaire:'#8b5cf6',pilote:'#0891b2',utilisateur:'var(--txt2)'}[u.statut] || 'var(--txt2)';
     var inactive = (u.actif===false);
-    return '<div class="card" style="padding:10px 12px;margin-bottom:8px;'+(inactive?'opacity:.55;':'')+'">'
+    // Le code a changé depuis le dernier envoi (ou n'a jamais été envoyé) :
+    // l'invitation en circulation ne fonctionne plus, il faut la renvoyer.
+    var aRenvoyer = !u.inviteSentAt || u.inviteStale === true;
+    var bandeau = aRenvoyer
+      ? '<div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);font-size:11.5px;color:#f59e0b;font-weight:600">⚠️ '
+        + (u.codeChangedAt ? 'Le code a changé — l\'invitation précédente ne fonctionne plus.' : 'Invitation jamais envoyée.')
+        + ' Cliquez sur « Copier l\'invitation » et renvoyez-la.</div>'
+      : '';
+    return '<div class="card" style="padding:10px 12px;margin-bottom:8px;'+(inactive?'opacity:.55;':'')+(aRenvoyer?'border-color:rgba(245,158,11,.4);':'')+'">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
       +   '<div style="flex:1;min-width:140px"><div style="font-size:13px;font-weight:700;color:var(--txt)">'+esc(name)+(inactive?' <span style="font-size:10px;color:#f87171">(désactivé)</span>':'')+'</div><div style="font-size:11px;color:var(--txt3)">'+esc(u.email)+'</div></div>'
       +   '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(127,127,127,.12);color:'+col+'">'+(_ACCES_STATUT_LBL[u.statut]||u.statut)+'</span>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">'
-      +   '<div style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:var(--txt);background:var(--navy3);border:1px dashed var(--bdr);border-radius:8px;padding:4px 12px">'+esc(u.code)+'</div>'
+      +   '<div style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:var(--txt);background:var(--navy3);border:1px dashed var(--bdr);border-radius:8px;padding:4px 12px">'+esc(_accesCodeOf(u))+'</div>'
       +   '<button onclick="_accesCopyInvite(\''+u.id+'\')" style="'+_accesBtn+'">📋 Copier l\'invitation</button>'
       +   '<button onclick="_accesToggle(\''+u.id+'\')" title="'+(inactive?'Réactiver':'Désactiver')+'" style="'+_accesBtn+'">'+(inactive?'✅ Réactiver':'⏸ Désactiver')+'</button>'
+      +   '<button onclick="_accesRenommer(\''+u.id+'\')" title="Corriger le prénom / nom" style="'+_accesBtn+'">✏️ Nom</button>'
+      +   '<button onclick="_accesLierDonnees(\''+u.id+'\')" title="Rattacher les notes de frais / ULM d\'un ancien compte" style="'+_accesBtn+'">🔗 Données</button>'
       +   '<button onclick="_accesDelete(\''+u.id+'\')" title="Supprimer" style="'+_accesBtn+';color:#f87171;border-color:rgba(239,68,68,.3)">🗑</button>'
       + '</div>'
+      + (u.legacyId ? '<div style="margin-top:6px;font-size:11px;color:var(--txt3)">🔗 Données rattachées : <span style="font-family:monospace">'+esc(u.legacyId)+'</span> — '
+          + ((S.notesfrais||{})[u.legacyId]||[]).length+' note(s) de frais, '+((S.ulms||{})[u.legacyId]||[]).length+' ULM</div>' : '')
+      + bandeau
       + '</div>';
   }).join('') : '<div class="card" style="text-align:center;color:var(--txt3);font-size:13px;padding:20px">Aucun accès créé. Utilisez le formulaire ci-dessus.</div>';
   el.innerHTML = doc + form
