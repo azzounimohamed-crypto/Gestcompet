@@ -29203,6 +29203,34 @@ async function _offloadHeavyBlobs(onProgress){
   return {total:total, ok:ok, ko:ko, MoLibere: Math.round(octetsLibres/1024/1024*10)/10};
 }
 
+// Détecteur RAPIDE de fichiers base64 encore présents (s'arrête au premier
+// trouvé, ne sérialise rien). Sert à ne déclencher l'hébergement automatique
+// que lorsqu'il y a réellement un nouveau fichier à traiter.
+function _hasHeavyB64(){
+  var isB64=function(v){ return typeof v==='string' && v.slice(0,5)==='data:'; };
+  var docs=S.documents||[]; for(var i=0;i<docs.length;i++){ if(docs[i]&&isB64(docs[i].data)) return true; }
+  var cps=S.comps||[]; for(var j=0;j<cps.length;j++){ if(cps[j]&&isB64(cps[j].candidatureDoc)) return true; }
+  var pk=S.partenaires;
+  var scanPart=function(p){ var fs=(p&&p.fichiers)||[]; for(var k=0;k<fs.length;k++){ if(fs[k]&&isB64(fs[k].data)) return true; } return false; };
+  if(Array.isArray(pk)){ for(var a=0;a<pk.length;a++){ if(scanPart(pk[a])) return true; } }
+  else if(pk){ var keys=Object.keys(pk); for(var b=0;b<keys.length;b++){ var v=pk[keys[b]]; if(Array.isArray(v)){ for(var c=0;c<v.length;c++){ if(scanPart(v[c])) return true; } } else if(scanPart(v)) return true; } }
+  return false;
+}
+
+// Hébergement AUTOMATIQUE en arrière-plan : appelé avant chaque envoi cloud, il
+// héberge tout fichier ajouté depuis la dernière fois pour que le data.json
+// reste léger sans intervention. Ne retraite jamais ce qui est déjà une URL.
+var _autoOffloadRunning=false;
+async function _autoOffloadBlobs(){
+  if(_autoOffloadRunning) return false;
+  if(!(typeof _sb!=='undefined'&&_sb) || !navigator.onLine) return false;
+  if(!_hasHeavyB64()) return false;
+  _autoOffloadRunning=true;
+  try{ var st=await _offloadHeavyBlobs(function(){}); if(st.ok) console.log('[auto-offload] '+st.ok+' fichier(s) hébergé(s), ~'+st.MoLibere+' Mo allégés'); return st.ok>0; }
+  catch(e){ console.warn('[auto-offload]', e&&e.message); return false; }
+  finally{ _autoOffloadRunning=false; }
+}
+
 // Bouton « Alléger la synchronisation » : héberge les fichiers puis resynchronise.
 async function allegerSynchro(){
   if(!(typeof _sb!=='undefined'&&_sb)){ if(typeof toast==='function')toast('Supabase indisponible','err'); return; }
@@ -32934,6 +32962,9 @@ function silentPush(fast) {
   if (_silentPushTimer) clearTimeout(_silentPushTimer);
   _silentPushTimer = setTimeout(function(){
     _silentPushTimer = null;
+    // Héberger d'abord tout fichier ajouté (base64) pour que l'envoi reste léger,
+    // puis pousser. Si rien à héberger ou hébergement indisponible : push direct.
+    Promise.resolve(_autoOffloadBlobs()).catch(function(){}).then(function(){
     pushToCloud().then(function(){
       _lastSyncAt     = Date.now();
       _lastPushOkAt   = Date.now();
@@ -32949,6 +32980,7 @@ function silentPush(fast) {
       updateSyncHealthPill();
       console.warn('[silentPush] échec:', e);
     });
+    }); // fin _autoOffloadBlobs().then
   }, _pushDelay); // debounce : 10s normal, 2,5s en mode saisie live STOL
 }
 
