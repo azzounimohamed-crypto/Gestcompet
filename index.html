@@ -55422,49 +55422,118 @@ function _formDeleteInscription(id){
   S.formInscriptions=(S.formInscriptions||[]).filter(function(e){ return e.id!==id; });
   _formSave(); renderFormationsModule('inscriptions');
 }
-function _formInscPilotPreview(){
-  var id=(document.getElementById('fi-pilot')||{}).value||'';
-  var info=_formPilotInfo(id);
-  var el=document.getElementById('fi-preview'); if(!el) return;
-  el.innerHTML = info ? ('N° licence : <b style="color:var(--stol)">'+(_formEsc(info.licence)||'—')+'</b> &nbsp;·&nbsp; Région : <b>'+(_formEsc(info.region)||'—')+'</b>') : '<span style="color:var(--txt3)">Sélectionnez un licencié</span>';
+// ── Recherche d'un licencié : par numéro OU par prénom+nom ───────────────────
+// Remplace le menu déroulant de 682 licenciés (fastidieux à parcourir, et lent
+// à ouvrir). L'utilisateur saisit une licence ou un nom ; la base complète le
+// reste automatiquement, mais une personne hors base reste saisissable.
+function _formNorm(s){ return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function _formPilotByLicence(lic){
+  var l=(lic||'').toString().trim(); if(!l) return null;
+  return (S.pilots||[]).find(function(p){ return (p.licence||'').toString().trim()===l; }) || null;
+}
+function _formPilotsByName(prenom, nom){
+  var pn=_formNorm(prenom), nn=_formNorm(nom);
+  if(!pn && !nn) return [];
+  return (S.pilots||[]).filter(function(p){
+    var ppn=_formNorm(p.prenom), pnn=_formNorm(p.nom);
+    if(pn && nn) return ppn===pn && pnn===nn;
+    if(nn) return pnn===nn;
+    return ppn===pn;
+  });
+}
+function _formInscSetMatch(msg, color){
+  var el=document.getElementById('fi-match'); if(!el) return;
+  el.innerHTML=msg; el.style.color=color||'var(--txt2)';
+}
+function _formInscApply(p){
+  // Remplit les champs depuis une fiche pilote trouvée
+  var setv=function(id,v){ var e=document.getElementById(id); if(e && (v!=null)) e.value=v; };
+  setv('fi-prenom', p.prenom||''); setv('fi-nom', p.nom||'');
+  setv('fi-licence', p.licence||''); setv('fi-region', p.region||'');
+  var hid=document.getElementById('fi-pilot'); if(hid) hid.value=p.id||'';
+  _formInscSetMatch('✓ Licencié trouvé dans la base : <b>'+_formEsc(((p.prenom||'')+' '+(p.nom||'')).trim())+'</b>', '#22c55e');
+}
+// Saisie du numéro de licence → complète prénom/nom/région
+function _formInscFromLicence(){
+  var lic=(document.getElementById('fi-licence')||{}).value||'';
+  var hid=document.getElementById('fi-pilot');
+  if(!lic.trim()){ if(hid)hid.value=''; _formInscSetMatch('',''); return; }
+  var p=_formPilotByLicence(lic);
+  if(p){ _formInscApply(p); }
+  else { if(hid)hid.value=''; _formInscSetMatch('Licence non trouvée — saisie libre (prénom + nom).', 'var(--txt3)'); }
+}
+// Saisie prénom + nom → retrouve la licence si le nom est unique dans la base
+function _formInscFromName(){
+  var pr=(document.getElementById('fi-prenom')||{}).value||'';
+  var no=(document.getElementById('fi-nom')||{}).value||'';
+  var hid=document.getElementById('fi-pilot');
+  if(!pr.trim() && !no.trim()){ _formInscSetMatch('',''); return; }
+  // Ne pas écraser une licence déjà saisie et valide
+  var licCur=(document.getElementById('fi-licence')||{}).value||'';
+  if(licCur.trim() && _formPilotByLicence(licCur)) return;
+  var matches=_formPilotsByName(pr, no);
+  if(matches.length===1){ _formInscApply(matches[0]); }
+  else if(matches.length>1){ if(hid)hid.value=''; _formInscSetMatch(matches.length+' licenciés portent ce nom — précisez le numéro de licence.', '#f59e0b'); }
+  else { if(hid)hid.value=''; _formInscSetMatch('Hors base — saisie libre acceptée.', 'var(--txt3)'); }
 }
 function _formEditInscription(id){
   var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
   var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
-  var pilots=(S.pilots||[]).slice().sort(function(a,b){ return ((a.nom||'')+(a.prenom||'')).toLowerCase().localeCompare(((b.nom||'')+(b.prenom||'')).toLowerCase()); });
   var ov=document.getElementById('form-modal'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.id='form-modal';
   ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:16px;padding:9px 11px;outline:none';
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
   var sessOpts='<option value="">— Choisir une session —</option>'+sessions.map(function(s){ return '<option value="'+s.id+'"'+(x&&x.sessionId===s.id?' selected':(_formInscFilter===s.id&&!x?' selected':''))+'>'+_formEsc(_formSessionLabel(s))+'</option>'; }).join('');
-  var pilotOpts='<option value="">— Choisir un licencié —</option>'+pilots.map(function(p){ var nm=((p.nom||'')+' '+(p.prenom||'')).trim(); var lic=p.licence?' ('+p.licence+')':''; return '<option value="'+p.id+'"'+(x&&x.pilotId===p.id?' selected':'')+'>'+_formEsc(nm+lic)+'</option>'; }).join('');
   var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+((x?x.statut:'inscrit')===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+  // Datalists : auto-complétion native (filtre à la frappe, pas de menu géant)
+  var licList=(S.pilots||[]).map(function(p){ return p.licence?('<option value="'+_formEsc(p.licence)+'">'+_formEsc(((p.prenom||'')+' '+(p.nom||'')).trim())+'</option>'):''; }).join('');
+  var nomSet={}; (S.pilots||[]).forEach(function(p){ if(p.nom) nomSet[p.nom]=1; });
+  var nomList=Object.keys(nomSet).map(function(n){ return '<option value="'+_formEsc(n)+'"></option>'; }).join('');
+  var curLic=x?(x.licence||''):'', curPr='', curNo='';
+  if(x){ // reconstituer prénom/nom depuis l'inscription (champ nom = "Prénom Nom")
+    if(x.pilotId){ var pp=(S.pilots||[]).find(function(z){return z.id===x.pilotId;}); if(pp){ curPr=pp.prenom||''; curNo=pp.nom||''; } }
+    if(!curPr && !curNo && x.nom){ var parts=x.nom.trim().split(/\s+/); curPr=parts.shift()||''; curNo=parts.join(' '); }
+  }
   ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(520px,100%);max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(x?'Modifier l\'inscription':'Nouvelle inscription')+'</div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Session *</label><select id="fi-session" style="'+fSt+';cursor:pointer">'+sessOpts+'</select></div>'
-    + '<div style="margin-bottom:8px"><label style="'+lSt+'">Licencié * (base des licenciés)</label><select id="fi-pilot" onchange="_formInscPilotPreview()" style="'+fSt+';cursor:pointer">'+pilotOpts+'</select></div>'
-    + '<div id="fi-preview" style="font-size:12px;color:var(--txt2);background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:8px 11px;margin-bottom:14px"></div>'
+    + '<datalist id="fi-dl-lic">'+licList+'</datalist>'
+    + '<datalist id="fi-dl-nom">'+nomList+'</datalist>'
+    + '<div style="margin-bottom:14px"><label style="'+lSt+'">Session *</label><select id="fi-session" style="'+fSt+';cursor:pointer">'+sessOpts+'</select></div>'
+    + '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Licencié — saisir la licence <span style="text-transform:none;font-weight:400">ou</span> le prénom + nom</div>'
+    + '<input type="hidden" id="fi-pilot" value="'+(x&&x.pilotId?_formEsc(x.pilotId):'')+'">'
+    + '<div style="margin-bottom:10px"><label style="'+lSt+'">N° de licence</label><input id="fi-licence" list="fi-dl-lic" value="'+_formEsc(curLic)+'" placeholder="Tapez le numéro…" oninput="_formInscFromLicence()" style="'+fSt+'"></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div><label style="'+lSt+'">Prénom</label><input id="fi-prenom" value="'+_formEsc(curPr)+'" placeholder="Prénom" oninput="_formInscFromName()" style="'+fSt+'"></div><div><label style="'+lSt+'">Nom</label><input id="fi-nom" list="fi-dl-nom" value="'+_formEsc(curNo)+'" placeholder="Nom" oninput="_formInscFromName()" style="'+fSt+'"></div></div>'
+    + '<div style="margin-bottom:10px"><label style="'+lSt+'">Région</label><input id="fi-region" value="'+_formEsc(x?(x.region||''):'')+'" placeholder="(auto si trouvé)" style="'+fSt+'"></div>'
+    + '<div id="fi-match" style="font-size:12px;color:var(--txt2);min-height:16px;margin-bottom:14px"></div>'
     + '<div style="margin-bottom:18px"><label style="'+lSt+'">Statut</label><select id="fi-statut" style="'+fSt+';cursor:pointer">'+stOpts+'</select></div>'
     + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
     + '<button onclick="_formSaveInscription(\''+(x?x.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
     + '</div>';
   document.body.appendChild(ov);
-  _formInscPilotPreview();
+  if(curLic) _formInscFromLicence(); else if(curPr||curNo) _formInscFromName();
 }
 function _formSaveInscription(id){
   var sessionId=(document.getElementById('fi-session')||{}).value||'';
-  var pilotId=(document.getElementById('fi-pilot')||{}).value||'';
+  var licence=((document.getElementById('fi-licence')||{}).value||'').trim();
+  var prenom=((document.getElementById('fi-prenom')||{}).value||'').trim();
+  var nom=((document.getElementById('fi-nom')||{}).value||'').trim();
+  var region=((document.getElementById('fi-region')||{}).value||'').trim();
+  var pilotId=((document.getElementById('fi-pilot')||{}).value||'').trim();
   var statut=(document.getElementById('fi-statut')||{}).value||'inscrit';
   if(!sessionId){ if(typeof toast==='function')toast('Choisissez une session','err'); return; }
-  if(!pilotId){ if(typeof toast==='function')toast('Choisissez un licencié','err'); return; }
-  var info=_formPilotInfo(pilotId)||{};
+  if(!licence && !prenom && !nom){ if(typeof toast==='function')toast('Saisissez une licence, ou un prénom et un nom','err'); return; }
+  var nomComplet=((prenom+' '+nom).trim())||nom||prenom;
   var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
-  // Anti-doublon : même licencié déjà inscrit à cette session
-  var dup=(S.formInscriptions||[]).some(function(e){ return e!==x && e.sessionId===sessionId && e.pilotId===pilotId; });
-  if(dup){ if(typeof toast==='function')toast('Ce licencié est déjà inscrit à cette session','warn'); return; }
-  var data={ sessionId:sessionId, pilotId:pilotId, nom:info.nom||'', licence:info.licence||'', region:info.region||'', statut:statut, _updatedAt:Date.now() };
+  // Anti-doublon dans la même session : par licence si fournie, sinon par nom
+  var dup=(S.formInscriptions||[]).some(function(e){
+    if(e===x || e.sessionId!==sessionId) return false;
+    if(licence && e.licence) return e.licence.trim()===licence;
+    return _formNorm(e.nom)===_formNorm(nomComplet);
+  });
+  if(dup){ if(typeof toast==='function')toast('Déjà inscrit à cette session','warn'); return; }
+  var data={ sessionId:sessionId, pilotId:pilotId, nom:nomComplet, licence:licence, region:region, statut:statut, _updatedAt:Date.now() };
   if(x){ Object.assign(x,data); }
   else { data.id=_formUid('fi'); S.formInscriptions.push(data); }
   _formSave();
