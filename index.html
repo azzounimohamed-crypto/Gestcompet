@@ -3184,6 +3184,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
           <button class="btn btn-full btn-sm" onclick="testSupabase()" style="margin-bottom:6px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981">🔍 Tester la connexion</button>
+          <button class="btn btn-full btn-sm" onclick="allegerSynchro()" style="margin-bottom:6px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);color:#8b5cf6">🪶 Alléger la synchronisation</button>
+          <div id="alleger-progress" style="font-size:11px;color:#8b5cf6;text-align:center;min-height:14px"></div>
+          <div style="font-size:10px;color:var(--txt3);text-align:center;margin-bottom:6px">Héberge les documents et pièces jointes hors du fichier de synchro (les rend plus rapides).</div>
           <div id="sync-diag-result" style="font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
           <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
@@ -13542,10 +13545,15 @@ function docPreview(id) {
   } else if (isVideo) {
     body.innerHTML = '<video src="'+doc.data+'" controls style="width:100%;max-height:74vh;border-radius:8px"></video>';
   } else if (isText) {
-    try {
-      var raw = atob(doc.data.split(',')[1]);
-      body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:74vh;overflow-y:auto;padding:8px">'+raw.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>';
-    } catch(e) { body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; }
+    var _showText = function(raw){ body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:74vh;overflow-y:auto;padding:8px">'+String(raw).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>'; };
+    if (doc.data && doc.data.slice(0,5)==='data:') {
+      try { _showText(atob(doc.data.split(',')[1])); }
+      catch(e) { body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; }
+    } else if (doc.data) {
+      // Fichier hébergé (URL) : récupérer le texte
+      body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Chargement…</div>';
+      fetch(doc.data).then(function(r){ return r.text(); }).then(_showText).catch(function(){ body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; });
+    }
   } else {
     body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--txt3)">'
       + '<div style="font-size:48px;margin-bottom:12px">'+docTypeIcon(doc.type)+'</div>'
@@ -29090,6 +29098,130 @@ function _pmResizePhoto(file) {
 // base64 → Supabase Storage → URL. Même bucket et même patron que les affiches.
 // Renvoie null si l'hébergement est indisponible : l'appelant conserve alors le
 // base64 (compressé), donc l'utilisateur ne perd jamais sa photo.
+// ── Allègement de la synchronisation ─────────────────────────────────────────
+// Le fichier de synchro (data.json) contenait ~17 Mo, dont 97 % de fichiers
+// encodés en base64 (documents, pièces jointes partenaires, dossiers de
+// candidature). Ils étaient donc renvoyés en entier à CHAQUE sauvegarde, ce qui
+// gelait brièvement le navigateur. Solution : héberger ces fichiers dans le
+// Storage Supabase (comme les affiches et les photos) et ne garder qu'une URL
+// dans les données synchronisées. Aucune modification du cœur de la synchro :
+// une fois la valeur remplacée par une URL courte, l'envoi existant est
+// naturellement 15 Mo plus léger.
+function _guessExt(mime, name){
+  var m=(mime||'').toLowerCase();
+  if(/pdf/.test(m)) return 'pdf';
+  if(/png/.test(m)) return 'png';
+  if(/jpe?g/.test(m)) return 'jpg';
+  if(/webp/.test(m)) return 'webp';
+  if(/gif/.test(m)) return 'gif';
+  if(/mp4/.test(m)) return 'mp4';
+  if(/(msword|wordprocessingml)/.test(m)) return 'docx';
+  if(/(excel|spreadsheetml)/.test(m)) return 'xlsx';
+  var ext=(name||'').split('.').pop(); if(ext && ext.length<=5) return ext.toLowerCase();
+  return 'bin';
+}
+// base64 → Storage → URL. Renvoie null si indisponible (le base64 est alors
+// conservé : aucune perte). Chemin déterministe pour ne pas dupliquer.
+async function _offloadDataUrl(dataUrl, path){
+  if(!dataUrl || dataUrl.slice(0,5)!=='data:') return null;
+  var sb=(typeof _sb!=='undefined')?_sb:null; if(!sb) return null;
+  try{
+    var parts=dataUrl.split(',');
+    var mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';
+    var bin=atob(parts[1]); var arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    var blob=new Blob([arr],{type:mime});
+    var up=await sb.storage.from('gestappli-sync').upload(path, blob, {upsert:true, contentType:mime, cacheControl:'31536000'});
+    if(up.error){ console.warn('[offload]', up.error.message); return null; }
+    var pub=sb.storage.from('gestappli-sync').getPublicUrl(path);
+    if(pub&&pub.data&&pub.data.publicUrl) return pub.data.publicUrl;
+    var sig=await sb.storage.from('gestappli-sync').createSignedUrl(path, 31536000);
+    if(sig.data&&sig.data.signedUrl) return sig.data.signedUrl;
+  }catch(e){ console.warn('[offload]', e.message||e); }
+  return null;
+}
+
+// Parcourt les fichiers lourds de S, les héberge et remplace par une URL.
+// `onProgress(fait, total)` est appelé au fil de l'eau. Retourne des stats.
+async function _offloadHeavyBlobs(onProgress){
+  var jobs=[]; // {get:fn->dataUrl, set:fn(url), path}
+  var _uid=function(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); };
+  var isB64=function(v){ return typeof v==='string' && v.slice(0,5)==='data:'; };
+
+  // 1) Documents partagés : S.documents[].data
+  (S.documents||[]).forEach(function(doc){
+    if(doc && isB64(doc.data)){
+      if(!doc.id) doc.id='doc_'+_uid();
+      jobs.push({path:'files/documents/'+doc.id+'.'+_guessExt(doc.type,doc.name),
+                 get:function(){return doc.data;}, set:function(u){ doc.data=u; doc._updatedAt=Date.now(); }});
+    }
+  });
+  // 2) Pièces jointes des partenaires : S.partenaires[cle][].fichiers[].data
+  var _partEach=function(p, cle){
+    (p&&p.fichiers||[]).forEach(function(f,i){
+      if(f && isB64(f.data)){
+        jobs.push({path:'files/partenaires/'+cle+'_'+i+'_'+_uid()+'.'+_guessExt(f.type,f.name),
+                   get:function(){return f.data;}, set:function(u){ f.data=u; }});
+      }
+    });
+  };
+  if(Array.isArray(S.partenaires)) S.partenaires.forEach(function(p,i){ _partEach(p,'p'+i); });
+  else Object.keys(S.partenaires||{}).forEach(function(cle){
+    var v=S.partenaires[cle];
+    if(Array.isArray(v)) v.forEach(function(p,i){ _partEach(p,cle+'_'+i); });
+    else _partEach(v,cle);
+  });
+  // 3) Dossiers de candidature : S.comps[].candidatureDoc
+  (S.comps||[]).forEach(function(cp){
+    if(cp && isB64(cp.candidatureDoc)){
+      jobs.push({path:'files/candidatures/'+cp.id+'.'+_guessExt('',cp.candidatureDocName),
+                 get:function(){return cp.candidatureDoc;}, set:function(u){ cp.candidatureDoc=u; cp._updatedAt=Date.now(); }});
+    }
+  });
+  // 4) Justificatifs de budget : achats[].photo et ndf.reelle[].photo
+  Object.keys(S.budgets||{}).forEach(function(cid){
+    var bc=S.budgets[cid]; if(!bc) return;
+    Object.keys(bc).forEach(function(sec){
+      (Array.isArray(bc[sec])?bc[sec]:[]).forEach(function(l){
+        (l&&l.achats||[]).forEach(function(a,i){ if(a&&isB64(a.photo)){ jobs.push({path:'files/budget/'+cid+'_'+sec+'_a'+i+'_'+_uid()+'.jpg', get:function(){return a.photo;}, set:function(u){ a.photo=u; }}); } });
+        var rl=(l&&l.ndf&&l.ndf.reelle)||[];
+        rl.forEach(function(a,i){ if(a&&isB64(a.photo)){ jobs.push({path:'files/budget/'+cid+'_'+sec+'_n'+i+'_'+_uid()+'.jpg', get:function(){return a.photo;}, set:function(u){ a.photo=u; }}); } });
+      });
+    });
+  });
+
+  var total=jobs.length, ok=0, ko=0, octetsLibres=0;
+  if(onProgress) onProgress(0, total);
+  for(var j=0;j<jobs.length;j++){
+    var job=jobs[j]; var dataUrl=job.get();
+    var url=await _offloadDataUrl(dataUrl, job.path);
+    if(url){ octetsLibres += (dataUrl.length - url.length); job.set(url); ok++; }
+    else { ko++; }
+    if(onProgress) onProgress(j+1, total);
+  }
+  if(ok){ if(typeof saveState==='function') saveState(); }
+  return {total:total, ok:ok, ko:ko, MoLibere: Math.round(octetsLibres/1024/1024*10)/10};
+}
+
+// Bouton « Alléger la synchronisation » : héberge les fichiers puis resynchronise.
+async function allegerSynchro(){
+  if(!(typeof _sb!=='undefined'&&_sb)){ if(typeof toast==='function')toast('Supabase indisponible','err'); return; }
+  var restants=0;
+  var isB64=function(v){ return typeof v==='string'&&v.slice(0,5)==='data:'; };
+  (S.documents||[]).forEach(function(d){ if(isB64(d&&d.data)) restants++; });
+  (S.comps||[]).forEach(function(c){ if(isB64(c&&c.candidatureDoc)) restants++; });
+  if(!restants){ /* on lance quand même : partenaires/budgets peuvent en contenir */ }
+  if(typeof toast==='function') toast('Allègement en cours… ne fermez pas l\'application.','');
+  try{
+    var stats=await _offloadHeavyBlobs(function(fait,tot){
+      var el=document.getElementById('alleger-progress'); if(el) el.textContent=fait+' / '+tot+' fichier(s) hébergé(s)…';
+    });
+    if(stats.ok && typeof silentPush==='function') silentPush();
+    if(typeof toast==='function') toast('✓ '+stats.ok+' fichier(s) hébergé(s), ~'+stats.MoLibere+' Mo retirés de la synchro'+(stats.ko?(' · '+stats.ko+' échec(s)'):''), 'ok');
+    var el=document.getElementById('alleger-progress'); if(el) el.textContent='✓ Terminé : '+stats.ok+' hébergé(s), ~'+stats.MoLibere+' Mo allégés.';
+  }catch(e){ if(typeof toast==='function') toast('Erreur : '+(e.message||e),'err'); }
+}
+
 async function _pmUploadPhoto(dataUrl, pilotId) {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
   var sb = (typeof _sb !== 'undefined') ? _sb : null;
