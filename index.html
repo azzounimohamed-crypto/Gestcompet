@@ -29692,30 +29692,84 @@ function _pmFillHistorique() {
     });
     compList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
   }
-  if (cnt) cnt.textContent = compList.length ? compList.length + ' compétition' + (compList.length>1?'s':'') : '';
-  if (!compList.length) {
-    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition enregistrée</div>';
+  // ── Sessions de formation suivies par ce compétiteur ──
+  // Rattachées par pilotId, ou à défaut par numéro de licence (saisie libre).
+  var formList = [];
+  if (pilotId) {
+    var _pil = (S.pilots||[]).find(function(z){ return z.id===pilotId; }) || {};
+    var _lic = (_pil.licence||'').toString().trim();
+    var _STL = {inscrit:'Inscrit',confirme:'Confirmé',present:'Présent',absent:'Absent',annule:'Annulé'};
+    (S.formInscriptions||[]).forEach(function(insc){
+      var match = (insc.pilotId && insc.pilotId===pilotId) || (_lic && insc.licence && insc.licence.toString().trim()===_lic);
+      if (!match) return;
+      var sess = (typeof _formSessionById==='function') ? _formSessionById(insc.sessionId) : null;
+      var tn = sess ? ((sess.typeName)|| ((typeof _formTypeById==='function'&&_formTypeById(sess.typeId)||{}).nom) || 'Formation') : 'Formation';
+      var df = sess ? (sess.dateFrom||'') : '';
+      formList.push({
+        saison: (df && df.slice(0,4)) || '—',
+        nom: tn,
+        ref: sess ? (sess.ref||'') : '',
+        lieu: sess ? (sess.mode==='distance' ? 'À distance' : (sess.lieu||'')) : '',
+        dateFrom: df, dateTo: sess ? (sess.dateTo||'') : '',
+        statut: _STL[insc.statut] || insc.statut || 'Inscrit'
+      });
+    });
+    formList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
+  }
+  if (cnt) {
+    var parts=[];
+    if (compList.length) parts.push(compList.length+' compétition'+(compList.length>1?'s':''));
+    if (formList.length) parts.push(formList.length+' formation'+(formList.length>1?'s':''));
+    cnt.textContent = parts.join(' · ');
+  }
+  if (!compList.length && !formList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition ni formation enregistrée</div>';
     return;
   }
   var pratL = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi',paramotor:'Paramoteur'};
+  var _sousTitre = function(t){ return '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);margin:4px 2px 2px">'+t+'</div>'; };
   var html = '<div style="display:flex;flex-direction:column;gap:8px">';
-  compList.forEach(function(c) {
-    var podStr = podL[String(c.podium)] || '';
-    var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
-    html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
-      + '<div style="flex-shrink:0;width:44px;text-align:center">'
-      +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
-      +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
-      + '</div>'
-      + '<div style="flex:1;min-width:0">'
-      +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
-      +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
-      +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
-      +   '</div>'
-      + '</div>'
-      + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
-      + '</div>';
-  });
+  if (compList.length) {
+    if (formList.length) html += _sousTitre('🏆 Compétitions');
+    compList.forEach(function(c) {
+      var podStr = podL[String(c.podium)] || '';
+      var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
+      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+        + '<div style="flex-shrink:0;width:44px;text-align:center">'
+        +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
+        +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
+        + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
+        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
+        +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
+        +   '</div>'
+        + '</div>'
+        + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
+        + '</div>';
+    });
+  }
+  if (formList.length) {
+    var _stColor = {'Présent':'#22c55e','Confirmé':'#10b981','Inscrit':'#3b82f6','Absent':'#f59e0b','Annulé':'#ef4444'};
+    if (compList.length) html += _sousTitre('🎓 Formations');
+    formList.forEach(function(f) {
+      var dates = f.dateFrom ? (fmtDate(f.dateFrom) + (f.dateTo && f.dateTo!==f.dateFrom ? ' → '+fmtDate(f.dateTo) : '')) : '';
+      var col = _stColor[f.statut] || 'var(--txt3)';
+      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+        + '<div style="flex-shrink:0;width:44px;text-align:center">'
+        +   '<div style="font-size:16px;font-weight:800;color:#8b5cf6;line-height:1">' + esc(f.saison) + '</div>'
+        +   '<div style="font-size:9px;color:var(--txt3);margin-top:2px">🎓</div>'
+        + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.nom) + (f.ref?' <span style="font-weight:400;color:var(--txt3);font-size:11px">'+esc(f.ref)+'</span>':'') + '</div>'
+        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
+        +     (f.lieu ? '📍 '+esc(f.lieu) : '') + (f.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
+        +   '</div>'
+        + '</div>'
+        + '<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+col+'">'+esc(f.statut)+'</div>'
+        + '</div>';
+    });
+  }
   html += '</div>';
   body.innerHTML = html;
 }
@@ -55401,15 +55455,29 @@ function _formRenderInscriptions(){
     var info=_formPilotInfo(x.pilotId)||{ nom:x.nom, licence:x.licence, region:x.region };
     var sess=_formSessionById(x.sessionId);
     var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+(x.statut===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
-    h+='<tr><td style="'+td+';font-weight:700;color:var(--txt)">'+_formEsc(info.nom||'—')+'</td>'
+    h+='<tr><td style="'+td+';font-weight:700"><span onclick="_formOpenPilot(\''+x.id+'\')" title="Ouvrir la fiche compétiteur" style="color:var(--stol);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">'+_formEsc(info.nom||'—')+'</span></td>'
       + '<td style="'+td+';color:var(--stol);font-weight:700">'+_formEsc(info.licence||'—')+'</td>'
       + '<td style="'+td+';color:var(--txt2)">'+_formEsc(info.region||'—')+'</td>'
       + '<td style="'+td+';color:var(--txt2);font-size:12px">'+_formEsc(sess?_formSessionLabel(sess):'—')+'</td>'
       + '<td style="'+td+'"><select onchange="_formSetInscStatut(\''+x.id+'\',this.value)" style="'+_selSt+';color:'+_formStatutColor(x.statut)+'">'+stOpts+'</select></td>'
-      + '<td style="'+td+';text-align:right"><button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button></td></tr>';
+      + '<td style="'+td+';text-align:right;white-space:nowrap">'
+      +   '<button onclick="_formEditInscription(\''+x.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit;margin-right:5px">✏️</button>'
+      +   '<button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button>'
+      + '</td></tr>';
   });
   h+='</tbody></table></div></div>';
   return h;
+}
+// Ouvre la fiche Compétiteur depuis une inscription. L'inscription garde un
+// pilotId quand le licencié vient de la base ; sinon on tente de le retrouver
+// par le numéro de licence.
+function _formOpenPilot(inscId){
+  var x=(S.formInscriptions||[]).find(function(e){ return e.id===inscId; }); if(!x) return;
+  var pid=x.pilotId||'';
+  if(!pid && x.licence){ var p=_formPilotByLicence(x.licence); if(p) pid=p.id; }
+  if(!pid){ if(typeof toast==='function')toast('Ce licencié n\'est pas dans la base des compétiteurs (saisie libre).','warn'); return; }
+  if(typeof editPilotManual==='function') editPilotManual(pid);
+  else if(typeof toast==='function') toast('Fiche compétiteur indisponible','err');
 }
 function _formSetInscStatut(id, val){
   var x=(S.formInscriptions||[]).find(function(e){ return e.id===id; }); if(!x)return;
