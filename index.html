@@ -26786,24 +26786,50 @@ function _cleanupAllDuplicates() {
 // Fusion d'une liste locale dans la liste issue du cloud, élément par élément.
 // L'ancienne version faisait « le local gagne toujours » : la copie locale d'un
 // poste, même vieille de plusieurs jours, écrasait à chaque démarrage les
-// modifications faites ailleurs. Un utilisateur ne voyait donc jamais les
-// changements des autres — et pire, sa version périmée repartait vers le cloud
-// à la première modification, effaçant le travail de tout le monde.
-// On compare désormais `_updatedAt` : le plus récent gagne. À défaut
-// d'horodatage des deux côtés, le local est conservé (comportement d'origine).
+// modifications faites ailleurs, puis repartait vers le cloud à la première
+// modification, effaçant le travail de tout le monde.
+//
+// La comparaison par `_updatedAt` seule ne suffit pas : les données historiques
+// (statuts SHN, désignations…) n'ont AUCUN horodatage. Deux copies sans date
+// donnaient une égalité, et le local vide l'emportait — c'est exactement le cas
+// où Mathieu ne voyait pas les SHN. On procède donc en deux temps :
+//   1. si les deux versions sont horodatées, la plus récente gagne en entier
+//      (on fait confiance à la date, y compris pour un champ effacé volontairement) ;
+//   2. sinon (au moins une sans date, cas des données héritées), on fusionne
+//      CHAMP PAR CHAMP : une valeur vide ne remplace jamais une valeur remplie.
+//      Ainsi un SHN présent d'un côté et absent de l'autre est toujours conservé.
+function _estVide(v){ return v === undefined || v === null || v === ''; }
+function _fusionMembre(cloud, local) {
+  var out = {}, keys = {};
+  Object.keys(cloud||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(local||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(keys).forEach(function(k){
+    var cv = cloud ? cloud[k] : undefined, lv = local ? local[k] : undefined;
+    if (_estVide(lv) && !_estVide(cv))      out[k] = cv;   // le local n'a rien → prendre le cloud
+    else if (_estVide(cv) && !_estVide(lv)) out[k] = lv;   // le cloud n'a rien → garder le local
+    else                                    out[k] = lv !== undefined ? lv : cv; // conflit → local
+  });
+  return out;
+}
 function _fusionPlusRecent(cloudArr, localArr, libelle) {
   if (!Array.isArray(localArr) || !localArr.length) return Array.isArray(cloudArr) ? cloudArr : [];
   if (!Array.isArray(cloudArr) || !cloudArr.length) return localArr.slice();
-  var out = cloudArr.slice(), remplaces = 0, ignores = 0;
+  var out = cloudArr.slice(), remplaces = 0, fusionnes = 0, ignores = 0;
   localArr.forEach(function(loc) {
     if (!loc || loc.id === undefined) return;
     var idx = out.findIndex(function(x){ return x && x.id === loc.id; });
     if (idx === -1) { out.push(loc); return; }
     var tLoc = loc._updatedAt || 0, tCld = out[idx]._updatedAt || 0;
-    if (tLoc >= tCld) { out[idx] = loc; remplaces++; }
-    else { ignores++; } // le cloud est plus récent : on garde sa version
+    if (tLoc && tCld) {
+      // Les deux sont datés : on tranche par la date, sans rien perdre à l'aveugle.
+      if (tLoc >= tCld) { out[idx] = loc; remplaces++; } else { ignores++; }
+    } else {
+      // Au moins une version non datée (données héritées) : fusion par champ,
+      // une valeur vide n'écrase jamais une valeur renseignée.
+      out[idx] = _fusionMembre(out[idx], loc); fusionnes++;
+    }
   });
-  if (ignores && libelle) console.warn('[Sync] '+libelle+' : '+ignores+' élément(s) plus récents côté cloud conservés, '+remplaces+' locaux retenus');
+  if (libelle && (ignores || fusionnes)) console.warn('[Sync] '+libelle+' : '+remplaces+' remplacé(s) local, '+ignores+' gardé(s) cloud, '+fusionnes+' fusionné(s) champ par champ');
   return out;
 }
 
