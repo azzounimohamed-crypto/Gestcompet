@@ -2177,6 +2177,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </span>
       <span class="nav-lbl">Réglages</span>
+      <span id="nav-version" style="font-size:8px;color:var(--txt3);line-height:1;margin-top:1px;font-weight:600">v1.0.9</span>
     </button>
 
   </nav>
@@ -5103,7 +5104,7 @@ function _flushSaveState() {
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
     stolNatExcluded:S.stolNatExcluded||{},
-    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false,
+    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -26335,6 +26336,16 @@ async function pushToCloud() {
     _deletedAides:        S._deletedAides        || {},
     territoires:          S.territoires          || {},
     accesUsers:           S.accesUsers           || [],
+    // Module Formations : absent du payload jusqu'ici → chaque envoi effaçait
+    // ces données du cloud, et le rechargement re-semait les types par défaut
+    // (d'où les types supprimés qui « revenaient »). Désormais persistés et
+    // partagés, avec la pierre tombale des types supprimés.
+    formTypes:            S.formTypes            || [],
+    formSessions:         S.formSessions         || [],
+    formInscriptions:     S.formInscriptions     || [],
+    formQualifs:          S.formQualifs          || [],
+    _formSeeded:          S._formSeeded          || false,
+    _deletedFormTypes:    S._deletedFormTypes    || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26879,7 +26890,7 @@ async function loadFromSupabaseFirst() {
     // pour ne jamais perdre un N° de licence (ni l'identité) saisi localement.
     var _localPilotsSnapshot = (S.pilots || []).slice();
     // Module Formations : snapshot pour fusion (union par id) après application cloud.
-    var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded };
+    var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded, delTypes:Object.assign({}, S._deletedFormTypes||{}) };
     // Tombstones d'événements sécurité supprimés (pour ne pas les réajouter).
     var _delSecuSnap = Object.assign({}, S._deletedSecurite||{});
 
@@ -27141,6 +27152,32 @@ async function loadFromSupabaseFirst() {
         });
       });
       if (_formSnap.seeded) S._formSeeded = true;
+      // Fusion des pierres tombales de types (nom → date de suppression, la plus
+      // récente gagne), puis on retire du cloud tout type supprimé plus
+      // récemment qu'il n'a été modifié. C'est ce qui empêche un type supprimé
+      // de revenir via la synchro d'un autre appareil.
+      if (!S._deletedFormTypes || typeof S._deletedFormTypes!=='object' || Array.isArray(S._deletedFormTypes)) S._deletedFormTypes={};
+      var _dt=_formSnap.delTypes||{};
+      Object.keys(_dt).forEach(function(key){ if((_dt[key]||0) > (S._deletedFormTypes[key]||0)) S._deletedFormTypes[key]=_dt[key]; });
+      var _tomb=S._deletedFormTypes;
+      S.formTypes=(S.formTypes||[]).filter(function(t){
+        if(!t) return false;
+        var d=_tomb[_formTypeKey(t.nom)];
+        return !(d && d >= (t._updatedAt||0)); // supprimé après sa dernière modif → retiré
+      });
+      // Dédoublonnage par nom (hérité du semis à id aléatoire d'anciennes versions) :
+      // on garde une seule entrée par nom, la plus récemment modifiée.
+      var _vus={};
+      S.formTypes=(S.formTypes||[]).filter(function(t){
+        var k=_formTypeKey(t.nom);
+        if(_vus[k]!==undefined){
+          if((t._updatedAt||0) > (_vus[k]._updatedAt||0)){ // celui-ci est plus récent : remplace
+            var idx=S.formTypes.indexOf(_vus[k]); if(idx>=0) S.formTypes[idx]=null; _vus[k]=t; return true;
+          }
+          return false;
+        }
+        _vus[k]=t; return true;
+      }).filter(function(t){ return !!t; });
     })();
     // ✅ Fusionner securiteEvents locaux avec cloud — champ par champ, sans perte.
     // Un événement présent des deux côtés : la version la plus récente (_updatedAt)
@@ -55373,14 +55410,19 @@ function openDTNModule(module) {
 // localStorage (payload) et fusion cloud (union par id).
 // ═══════════════════════════════════════════════════════════════════
 var _formTab = 'types';
+// Nom normalisé, clé des pierres tombales de types (insensible casse/accents).
+function _formTypeKey(nom){ return (nom||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 function _formInit(){
   if (!S.formTypes)        S.formTypes = [];
   if (!S.formSessions)     S.formSessions = [];
   if (!S.formInscriptions) S.formInscriptions = [];
   if (!S.formQualifs)      S.formQualifs = [];
+  if (!S._deletedFormTypes || typeof S._deletedFormTypes!=='object' || Array.isArray(S._deletedFormTypes)) S._deletedFormTypes = {};
   if (!S.formTypes.length && !S._formSeeded){
     S._formSeeded = true;
+    // Ne jamais re-semer un type que l'utilisateur a supprimé (sinon il revient).
     ['Directeur de vol','Pilote de démo','Qualif Sport','Commissaire','Instructeur','Examinateur'].forEach(function(n){
+      if (S._deletedFormTypes[_formTypeKey(n)]) return;
       S.formTypes.push({ id:_formUid('ft'), nom:n, description:'', dureeValidite:null, actif:true, _updatedAt:Date.now() });
     });
   }
@@ -55444,7 +55486,13 @@ function _formDeleteType(id){
   var t=_formTypeById(id); if(!t)return;
   var used=(S.formSessions||[]).some(function(s){ return s.typeId===id; });
   if(!confirm('Supprimer le type « '+t.nom+' » ?'+(used?'\n\n⚠️ Des sessions utilisent ce type — elles conserveront le nom mais ne seront plus reliées.':''))) return;
-  S.formTypes=(S.formTypes||[]).filter(function(x){ return x.id!==id; });
+  // Pierre tombale PAR NOM : sans elle, le type revenait au rechargement (fusion
+  // union) ou était re-semé avec un nouvel id sur un autre appareil. On supprime
+  // aussi tous les homonymes (doublons hérités du semis à id aléatoire).
+  if (!S._deletedFormTypes || typeof S._deletedFormTypes!=='object') S._deletedFormTypes={};
+  var key=_formTypeKey(t.nom);
+  S._deletedFormTypes[key]=Date.now();
+  S.formTypes=(S.formTypes||[]).filter(function(x){ return _formTypeKey(x.nom)!==key; });
   _formSave(); renderFormationsModule();
 }
 function _formEditType(id){
@@ -55474,6 +55522,8 @@ function _formSaveType(id){
   var valRaw=((document.getElementById('ft-val')||{}).value||'').trim();
   var val = valRaw==='' ? null : (parseInt(valRaw,10)||0);
   var actif=!!(document.getElementById('ft-actif')||{}).checked;
+  // Recréer/renommer un type sur un nom supprimé lève sa pierre tombale.
+  if (S._deletedFormTypes) { delete S._deletedFormTypes[_formTypeKey(nom)]; }
   var t=id?_formTypeById(id):null;
   if(t){ t.nom=nom; t.description=desc; t.dureeValidite=val; t.actif=actif; t._updatedAt=Date.now(); }
   else { S.formTypes.push({ id:_formUid('ft'), nom:nom, description:desc, dureeValidite:val, actif:actif, _updatedAt:Date.now() }); }
