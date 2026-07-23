@@ -3184,6 +3184,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           <button class="btn btn-primary btn-full btn-sm" onclick="sbSync()" style="margin-bottom:6px">☁️ Synchroniser maintenant</button>
           <button class="btn btn-full btn-sm" onclick="forcePushCloud()" style="margin-bottom:6px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444">⬆️ Forcer l'envoi (écraser le cloud)</button>
           <button class="btn btn-full btn-sm" onclick="testSupabase()" style="margin-bottom:6px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981">🔍 Tester la connexion</button>
+          <button class="btn btn-full btn-sm" onclick="allegerSynchro()" style="margin-bottom:6px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);color:#8b5cf6">🪶 Alléger la synchronisation</button>
+          <div id="alleger-progress" style="font-size:11px;color:#8b5cf6;text-align:center;min-height:14px"></div>
+          <div style="font-size:10px;color:var(--txt3);text-align:center;margin-bottom:6px">Héberge les documents et pièces jointes hors du fichier de synchro (les rend plus rapides).</div>
           <div id="sync-diag-result" style="font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
           <div style="font-size:11px;color:var(--txt3);text-align:center">Sync auto toutes les 15 secondes</div>
         </div>
@@ -13542,10 +13545,15 @@ function docPreview(id) {
   } else if (isVideo) {
     body.innerHTML = '<video src="'+doc.data+'" controls style="width:100%;max-height:74vh;border-radius:8px"></video>';
   } else if (isText) {
-    try {
-      var raw = atob(doc.data.split(',')[1]);
-      body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:74vh;overflow-y:auto;padding:8px">'+raw.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>';
-    } catch(e) { body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; }
+    var _showText = function(raw){ body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:74vh;overflow-y:auto;padding:8px">'+String(raw).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>'; };
+    if (doc.data && doc.data.slice(0,5)==='data:') {
+      try { _showText(atob(doc.data.split(',')[1])); }
+      catch(e) { body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; }
+    } else if (doc.data) {
+      // Fichier hébergé (URL) : récupérer le texte
+      body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Chargement…</div>';
+      fetch(doc.data).then(function(r){ return r.text(); }).then(_showText).catch(function(){ body.innerHTML = '<div style="color:var(--txt3);padding:24px;text-align:center">Impossible d\'afficher ce fichier</div>'; });
+    }
   } else {
     body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--txt3)">'
       + '<div style="font-size:48px;margin-bottom:12px">'+docTypeIcon(doc.type)+'</div>'
@@ -26786,24 +26794,50 @@ function _cleanupAllDuplicates() {
 // Fusion d'une liste locale dans la liste issue du cloud, élément par élément.
 // L'ancienne version faisait « le local gagne toujours » : la copie locale d'un
 // poste, même vieille de plusieurs jours, écrasait à chaque démarrage les
-// modifications faites ailleurs. Un utilisateur ne voyait donc jamais les
-// changements des autres — et pire, sa version périmée repartait vers le cloud
-// à la première modification, effaçant le travail de tout le monde.
-// On compare désormais `_updatedAt` : le plus récent gagne. À défaut
-// d'horodatage des deux côtés, le local est conservé (comportement d'origine).
+// modifications faites ailleurs, puis repartait vers le cloud à la première
+// modification, effaçant le travail de tout le monde.
+//
+// La comparaison par `_updatedAt` seule ne suffit pas : les données historiques
+// (statuts SHN, désignations…) n'ont AUCUN horodatage. Deux copies sans date
+// donnaient une égalité, et le local vide l'emportait — c'est exactement le cas
+// où Mathieu ne voyait pas les SHN. On procède donc en deux temps :
+//   1. si les deux versions sont horodatées, la plus récente gagne en entier
+//      (on fait confiance à la date, y compris pour un champ effacé volontairement) ;
+//   2. sinon (au moins une sans date, cas des données héritées), on fusionne
+//      CHAMP PAR CHAMP : une valeur vide ne remplace jamais une valeur remplie.
+//      Ainsi un SHN présent d'un côté et absent de l'autre est toujours conservé.
+function _estVide(v){ return v === undefined || v === null || v === ''; }
+function _fusionMembre(cloud, local) {
+  var out = {}, keys = {};
+  Object.keys(cloud||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(local||{}).forEach(function(k){ keys[k]=1; });
+  Object.keys(keys).forEach(function(k){
+    var cv = cloud ? cloud[k] : undefined, lv = local ? local[k] : undefined;
+    if (_estVide(lv) && !_estVide(cv))      out[k] = cv;   // le local n'a rien → prendre le cloud
+    else if (_estVide(cv) && !_estVide(lv)) out[k] = lv;   // le cloud n'a rien → garder le local
+    else                                    out[k] = lv !== undefined ? lv : cv; // conflit → local
+  });
+  return out;
+}
 function _fusionPlusRecent(cloudArr, localArr, libelle) {
   if (!Array.isArray(localArr) || !localArr.length) return Array.isArray(cloudArr) ? cloudArr : [];
   if (!Array.isArray(cloudArr) || !cloudArr.length) return localArr.slice();
-  var out = cloudArr.slice(), remplaces = 0, ignores = 0;
+  var out = cloudArr.slice(), remplaces = 0, fusionnes = 0, ignores = 0;
   localArr.forEach(function(loc) {
     if (!loc || loc.id === undefined) return;
     var idx = out.findIndex(function(x){ return x && x.id === loc.id; });
     if (idx === -1) { out.push(loc); return; }
     var tLoc = loc._updatedAt || 0, tCld = out[idx]._updatedAt || 0;
-    if (tLoc >= tCld) { out[idx] = loc; remplaces++; }
-    else { ignores++; } // le cloud est plus récent : on garde sa version
+    if (tLoc && tCld) {
+      // Les deux sont datés : on tranche par la date, sans rien perdre à l'aveugle.
+      if (tLoc >= tCld) { out[idx] = loc; remplaces++; } else { ignores++; }
+    } else {
+      // Au moins une version non datée (données héritées) : fusion par champ,
+      // une valeur vide n'écrase jamais une valeur renseignée.
+      out[idx] = _fusionMembre(out[idx], loc); fusionnes++;
+    }
   });
-  if (ignores && libelle) console.warn('[Sync] '+libelle+' : '+ignores+' élément(s) plus récents côté cloud conservés, '+remplaces+' locaux retenus');
+  if (libelle && (ignores || fusionnes)) console.warn('[Sync] '+libelle+' : '+remplaces+' remplacé(s) local, '+ignores+' gardé(s) cloud, '+fusionnes+' fusionné(s) champ par champ');
   return out;
 }
 
@@ -29064,6 +29098,158 @@ function _pmResizePhoto(file) {
 // base64 → Supabase Storage → URL. Même bucket et même patron que les affiches.
 // Renvoie null si l'hébergement est indisponible : l'appelant conserve alors le
 // base64 (compressé), donc l'utilisateur ne perd jamais sa photo.
+// ── Allègement de la synchronisation ─────────────────────────────────────────
+// Le fichier de synchro (data.json) contenait ~17 Mo, dont 97 % de fichiers
+// encodés en base64 (documents, pièces jointes partenaires, dossiers de
+// candidature). Ils étaient donc renvoyés en entier à CHAQUE sauvegarde, ce qui
+// gelait brièvement le navigateur. Solution : héberger ces fichiers dans le
+// Storage Supabase (comme les affiches et les photos) et ne garder qu'une URL
+// dans les données synchronisées. Aucune modification du cœur de la synchro :
+// une fois la valeur remplacée par une URL courte, l'envoi existant est
+// naturellement 15 Mo plus léger.
+function _guessExt(mime, name){
+  var m=(mime||'').toLowerCase();
+  if(/pdf/.test(m)) return 'pdf';
+  if(/png/.test(m)) return 'png';
+  if(/jpe?g/.test(m)) return 'jpg';
+  if(/webp/.test(m)) return 'webp';
+  if(/gif/.test(m)) return 'gif';
+  if(/mp4/.test(m)) return 'mp4';
+  if(/(msword|wordprocessingml)/.test(m)) return 'docx';
+  if(/(excel|spreadsheetml)/.test(m)) return 'xlsx';
+  var ext=(name||'').split('.').pop(); if(ext && ext.length<=5) return ext.toLowerCase();
+  return 'bin';
+}
+// base64 → Storage → URL. Renvoie null si indisponible (le base64 est alors
+// conservé : aucune perte). Chemin déterministe pour ne pas dupliquer.
+async function _offloadDataUrl(dataUrl, path){
+  if(!dataUrl || dataUrl.slice(0,5)!=='data:') return null;
+  var sb=(typeof _sb!=='undefined')?_sb:null; if(!sb) return null;
+  try{
+    var parts=dataUrl.split(',');
+    var mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';
+    var bin=atob(parts[1]); var arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    var blob=new Blob([arr],{type:mime});
+    var up=await sb.storage.from('gestappli-sync').upload(path, blob, {upsert:true, contentType:mime, cacheControl:'31536000'});
+    if(up.error){ console.warn('[offload]', up.error.message); return null; }
+    var pub=sb.storage.from('gestappli-sync').getPublicUrl(path);
+    if(pub&&pub.data&&pub.data.publicUrl) return pub.data.publicUrl;
+    var sig=await sb.storage.from('gestappli-sync').createSignedUrl(path, 31536000);
+    if(sig.data&&sig.data.signedUrl) return sig.data.signedUrl;
+  }catch(e){ console.warn('[offload]', e.message||e); }
+  return null;
+}
+
+// Parcourt les fichiers lourds de S, les héberge et remplace par une URL.
+// `onProgress(fait, total)` est appelé au fil de l'eau. Retourne des stats.
+async function _offloadHeavyBlobs(onProgress){
+  var jobs=[]; // {get:fn->dataUrl, set:fn(url), path}
+  var _uid=function(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); };
+  var isB64=function(v){ return typeof v==='string' && v.slice(0,5)==='data:'; };
+
+  // 1) Documents partagés : S.documents[].data
+  (S.documents||[]).forEach(function(doc){
+    if(doc && isB64(doc.data)){
+      if(!doc.id) doc.id='doc_'+_uid();
+      jobs.push({path:'files/documents/'+doc.id+'.'+_guessExt(doc.type,doc.name),
+                 get:function(){return doc.data;}, set:function(u){ doc.data=u; doc._updatedAt=Date.now(); }});
+    }
+  });
+  // 2) Pièces jointes des partenaires : S.partenaires[cle][].fichiers[].data
+  var _partEach=function(p, cle){
+    (p&&p.fichiers||[]).forEach(function(f,i){
+      if(f && isB64(f.data)){
+        jobs.push({path:'files/partenaires/'+cle+'_'+i+'_'+_uid()+'.'+_guessExt(f.type,f.name),
+                   get:function(){return f.data;}, set:function(u){ f.data=u; }});
+      }
+    });
+  };
+  if(Array.isArray(S.partenaires)) S.partenaires.forEach(function(p,i){ _partEach(p,'p'+i); });
+  else Object.keys(S.partenaires||{}).forEach(function(cle){
+    var v=S.partenaires[cle];
+    if(Array.isArray(v)) v.forEach(function(p,i){ _partEach(p,cle+'_'+i); });
+    else _partEach(v,cle);
+  });
+  // 3) Dossiers de candidature : S.comps[].candidatureDoc
+  (S.comps||[]).forEach(function(cp){
+    if(cp && isB64(cp.candidatureDoc)){
+      jobs.push({path:'files/candidatures/'+cp.id+'.'+_guessExt('',cp.candidatureDocName),
+                 get:function(){return cp.candidatureDoc;}, set:function(u){ cp.candidatureDoc=u; cp._updatedAt=Date.now(); }});
+    }
+  });
+  // 4) Justificatifs de budget : achats[].photo et ndf.reelle[].photo
+  Object.keys(S.budgets||{}).forEach(function(cid){
+    var bc=S.budgets[cid]; if(!bc) return;
+    Object.keys(bc).forEach(function(sec){
+      (Array.isArray(bc[sec])?bc[sec]:[]).forEach(function(l){
+        (l&&l.achats||[]).forEach(function(a,i){ if(a&&isB64(a.photo)){ jobs.push({path:'files/budget/'+cid+'_'+sec+'_a'+i+'_'+_uid()+'.jpg', get:function(){return a.photo;}, set:function(u){ a.photo=u; }}); } });
+        var rl=(l&&l.ndf&&l.ndf.reelle)||[];
+        rl.forEach(function(a,i){ if(a&&isB64(a.photo)){ jobs.push({path:'files/budget/'+cid+'_'+sec+'_n'+i+'_'+_uid()+'.jpg', get:function(){return a.photo;}, set:function(u){ a.photo=u; }}); } });
+      });
+    });
+  });
+
+  var total=jobs.length, ok=0, ko=0, octetsLibres=0;
+  if(onProgress) onProgress(0, total);
+  for(var j=0;j<jobs.length;j++){
+    var job=jobs[j]; var dataUrl=job.get();
+    var url=await _offloadDataUrl(dataUrl, job.path);
+    if(url){ octetsLibres += (dataUrl.length - url.length); job.set(url); ok++; }
+    else { ko++; }
+    if(onProgress) onProgress(j+1, total);
+  }
+  if(ok){ if(typeof saveState==='function') saveState(); }
+  return {total:total, ok:ok, ko:ko, MoLibere: Math.round(octetsLibres/1024/1024*10)/10};
+}
+
+// Détecteur RAPIDE de fichiers base64 encore présents (s'arrête au premier
+// trouvé, ne sérialise rien). Sert à ne déclencher l'hébergement automatique
+// que lorsqu'il y a réellement un nouveau fichier à traiter.
+function _hasHeavyB64(){
+  var isB64=function(v){ return typeof v==='string' && v.slice(0,5)==='data:'; };
+  var docs=S.documents||[]; for(var i=0;i<docs.length;i++){ if(docs[i]&&isB64(docs[i].data)) return true; }
+  var cps=S.comps||[]; for(var j=0;j<cps.length;j++){ if(cps[j]&&isB64(cps[j].candidatureDoc)) return true; }
+  var pk=S.partenaires;
+  var scanPart=function(p){ var fs=(p&&p.fichiers)||[]; for(var k=0;k<fs.length;k++){ if(fs[k]&&isB64(fs[k].data)) return true; } return false; };
+  if(Array.isArray(pk)){ for(var a=0;a<pk.length;a++){ if(scanPart(pk[a])) return true; } }
+  else if(pk){ var keys=Object.keys(pk); for(var b=0;b<keys.length;b++){ var v=pk[keys[b]]; if(Array.isArray(v)){ for(var c=0;c<v.length;c++){ if(scanPart(v[c])) return true; } } else if(scanPart(v)) return true; } }
+  return false;
+}
+
+// Hébergement AUTOMATIQUE en arrière-plan : appelé avant chaque envoi cloud, il
+// héberge tout fichier ajouté depuis la dernière fois pour que le data.json
+// reste léger sans intervention. Ne retraite jamais ce qui est déjà une URL.
+var _autoOffloadRunning=false;
+async function _autoOffloadBlobs(){
+  if(_autoOffloadRunning) return false;
+  if(!(typeof _sb!=='undefined'&&_sb) || !navigator.onLine) return false;
+  if(!_hasHeavyB64()) return false;
+  _autoOffloadRunning=true;
+  try{ var st=await _offloadHeavyBlobs(function(){}); if(st.ok) console.log('[auto-offload] '+st.ok+' fichier(s) hébergé(s), ~'+st.MoLibere+' Mo allégés'); return st.ok>0; }
+  catch(e){ console.warn('[auto-offload]', e&&e.message); return false; }
+  finally{ _autoOffloadRunning=false; }
+}
+
+// Bouton « Alléger la synchronisation » : héberge les fichiers puis resynchronise.
+async function allegerSynchro(){
+  if(!(typeof _sb!=='undefined'&&_sb)){ if(typeof toast==='function')toast('Supabase indisponible','err'); return; }
+  var restants=0;
+  var isB64=function(v){ return typeof v==='string'&&v.slice(0,5)==='data:'; };
+  (S.documents||[]).forEach(function(d){ if(isB64(d&&d.data)) restants++; });
+  (S.comps||[]).forEach(function(c){ if(isB64(c&&c.candidatureDoc)) restants++; });
+  if(!restants){ /* on lance quand même : partenaires/budgets peuvent en contenir */ }
+  if(typeof toast==='function') toast('Allègement en cours… ne fermez pas l\'application.','');
+  try{
+    var stats=await _offloadHeavyBlobs(function(fait,tot){
+      var el=document.getElementById('alleger-progress'); if(el) el.textContent=fait+' / '+tot+' fichier(s) hébergé(s)…';
+    });
+    if(stats.ok && typeof silentPush==='function') silentPush();
+    if(typeof toast==='function') toast('✓ '+stats.ok+' fichier(s) hébergé(s), ~'+stats.MoLibere+' Mo retirés de la synchro'+(stats.ko?(' · '+stats.ko+' échec(s)'):''), 'ok');
+    var el=document.getElementById('alleger-progress'); if(el) el.textContent='✓ Terminé : '+stats.ok+' hébergé(s), ~'+stats.MoLibere+' Mo allégés.';
+  }catch(e){ if(typeof toast==='function') toast('Erreur : '+(e.message||e),'err'); }
+}
+
 async function _pmUploadPhoto(dataUrl, pilotId) {
   if (!dataUrl || !dataUrl.startsWith('data:')) return null;
   var sb = (typeof _sb !== 'undefined') ? _sb : null;
@@ -29666,30 +29852,84 @@ function _pmFillHistorique() {
     });
     compList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
   }
-  if (cnt) cnt.textContent = compList.length ? compList.length + ' compétition' + (compList.length>1?'s':'') : '';
-  if (!compList.length) {
-    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition enregistrée</div>';
+  // ── Sessions de formation suivies par ce compétiteur ──
+  // Rattachées par pilotId, ou à défaut par numéro de licence (saisie libre).
+  var formList = [];
+  if (pilotId) {
+    var _pil = (S.pilots||[]).find(function(z){ return z.id===pilotId; }) || {};
+    var _lic = (_pil.licence||'').toString().trim();
+    var _STL = {inscrit:'Inscrit',confirme:'Confirmé',present:'Présent',absent:'Absent',annule:'Annulé'};
+    (S.formInscriptions||[]).forEach(function(insc){
+      var match = (insc.pilotId && insc.pilotId===pilotId) || (_lic && insc.licence && insc.licence.toString().trim()===_lic);
+      if (!match) return;
+      var sess = (typeof _formSessionById==='function') ? _formSessionById(insc.sessionId) : null;
+      var tn = sess ? ((sess.typeName)|| ((typeof _formTypeById==='function'&&_formTypeById(sess.typeId)||{}).nom) || 'Formation') : 'Formation';
+      var df = sess ? (sess.dateFrom||'') : '';
+      formList.push({
+        saison: (df && df.slice(0,4)) || '—',
+        nom: tn,
+        ref: sess ? (sess.ref||'') : '',
+        lieu: sess ? (sess.mode==='distance' ? 'À distance' : (sess.lieu||'')) : '',
+        dateFrom: df, dateTo: sess ? (sess.dateTo||'') : '',
+        statut: _STL[insc.statut] || insc.statut || 'Inscrit'
+      });
+    });
+    formList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
+  }
+  if (cnt) {
+    var parts=[];
+    if (compList.length) parts.push(compList.length+' compétition'+(compList.length>1?'s':''));
+    if (formList.length) parts.push(formList.length+' formation'+(formList.length>1?'s':''));
+    cnt.textContent = parts.join(' · ');
+  }
+  if (!compList.length && !formList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition ni formation enregistrée</div>';
     return;
   }
   var pratL = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi',paramotor:'Paramoteur'};
+  var _sousTitre = function(t){ return '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);margin:4px 2px 2px">'+t+'</div>'; };
   var html = '<div style="display:flex;flex-direction:column;gap:8px">';
-  compList.forEach(function(c) {
-    var podStr = podL[String(c.podium)] || '';
-    var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
-    html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
-      + '<div style="flex-shrink:0;width:44px;text-align:center">'
-      +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
-      +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
-      + '</div>'
-      + '<div style="flex:1;min-width:0">'
-      +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
-      +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
-      +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
-      +   '</div>'
-      + '</div>'
-      + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
-      + '</div>';
-  });
+  if (compList.length) {
+    if (formList.length) html += _sousTitre('🏆 Compétitions');
+    compList.forEach(function(c) {
+      var podStr = podL[String(c.podium)] || '';
+      var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
+      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+        + '<div style="flex-shrink:0;width:44px;text-align:center">'
+        +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
+        +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
+        + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
+        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
+        +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
+        +   '</div>'
+        + '</div>'
+        + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
+        + '</div>';
+    });
+  }
+  if (formList.length) {
+    var _stColor = {'Présent':'#22c55e','Confirmé':'#10b981','Inscrit':'#3b82f6','Absent':'#f59e0b','Annulé':'#ef4444'};
+    if (compList.length) html += _sousTitre('🎓 Formations');
+    formList.forEach(function(f) {
+      var dates = f.dateFrom ? (fmtDate(f.dateFrom) + (f.dateTo && f.dateTo!==f.dateFrom ? ' → '+fmtDate(f.dateTo) : '')) : '';
+      var col = _stColor[f.statut] || 'var(--txt3)';
+      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+        + '<div style="flex-shrink:0;width:44px;text-align:center">'
+        +   '<div style="font-size:16px;font-weight:800;color:#8b5cf6;line-height:1">' + esc(f.saison) + '</div>'
+        +   '<div style="font-size:9px;color:var(--txt3);margin-top:2px">🎓</div>'
+        + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.nom) + (f.ref?' <span style="font-weight:400;color:var(--txt3);font-size:11px">'+esc(f.ref)+'</span>':'') + '</div>'
+        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
+        +     (f.lieu ? '📍 '+esc(f.lieu) : '') + (f.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
+        +   '</div>'
+        + '</div>'
+        + '<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+col+'">'+esc(f.statut)+'</div>'
+        + '</div>';
+    });
+  }
   html += '</div>';
   body.innerHTML = html;
 }
@@ -32722,6 +32962,9 @@ function silentPush(fast) {
   if (_silentPushTimer) clearTimeout(_silentPushTimer);
   _silentPushTimer = setTimeout(function(){
     _silentPushTimer = null;
+    // Héberger d'abord tout fichier ajouté (base64) pour que l'envoi reste léger,
+    // puis pousser. Si rien à héberger ou hébergement indisponible : push direct.
+    Promise.resolve(_autoOffloadBlobs()).catch(function(){}).then(function(){
     pushToCloud().then(function(){
       _lastSyncAt     = Date.now();
       _lastPushOkAt   = Date.now();
@@ -32737,6 +32980,7 @@ function silentPush(fast) {
       updateSyncHealthPill();
       console.warn('[silentPush] échec:', e);
     });
+    }); // fin _autoOffloadBlobs().then
   }, _pushDelay); // debounce : 10s normal, 2,5s en mode saisie live STOL
 }
 
@@ -55375,15 +55619,29 @@ function _formRenderInscriptions(){
     var info=_formPilotInfo(x.pilotId)||{ nom:x.nom, licence:x.licence, region:x.region };
     var sess=_formSessionById(x.sessionId);
     var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+(x.statut===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
-    h+='<tr><td style="'+td+';font-weight:700;color:var(--txt)">'+_formEsc(info.nom||'—')+'</td>'
+    h+='<tr><td style="'+td+';font-weight:700"><span onclick="_formOpenPilot(\''+x.id+'\')" title="Ouvrir la fiche compétiteur" style="color:var(--stol);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">'+_formEsc(info.nom||'—')+'</span></td>'
       + '<td style="'+td+';color:var(--stol);font-weight:700">'+_formEsc(info.licence||'—')+'</td>'
       + '<td style="'+td+';color:var(--txt2)">'+_formEsc(info.region||'—')+'</td>'
       + '<td style="'+td+';color:var(--txt2);font-size:12px">'+_formEsc(sess?_formSessionLabel(sess):'—')+'</td>'
       + '<td style="'+td+'"><select onchange="_formSetInscStatut(\''+x.id+'\',this.value)" style="'+_selSt+';color:'+_formStatutColor(x.statut)+'">'+stOpts+'</select></td>'
-      + '<td style="'+td+';text-align:right"><button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button></td></tr>';
+      + '<td style="'+td+';text-align:right;white-space:nowrap">'
+      +   '<button onclick="_formEditInscription(\''+x.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit;margin-right:5px">✏️</button>'
+      +   '<button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button>'
+      + '</td></tr>';
   });
   h+='</tbody></table></div></div>';
   return h;
+}
+// Ouvre la fiche Compétiteur depuis une inscription. L'inscription garde un
+// pilotId quand le licencié vient de la base ; sinon on tente de le retrouver
+// par le numéro de licence.
+function _formOpenPilot(inscId){
+  var x=(S.formInscriptions||[]).find(function(e){ return e.id===inscId; }); if(!x) return;
+  var pid=x.pilotId||'';
+  if(!pid && x.licence){ var p=_formPilotByLicence(x.licence); if(p) pid=p.id; }
+  if(!pid){ if(typeof toast==='function')toast('Ce licencié n\'est pas dans la base des compétiteurs (saisie libre).','warn'); return; }
+  if(typeof editPilotManual==='function') editPilotManual(pid);
+  else if(typeof toast==='function') toast('Fiche compétiteur indisponible','err');
 }
 function _formSetInscStatut(id, val){
   var x=(S.formInscriptions||[]).find(function(e){ return e.id===id; }); if(!x)return;
@@ -55396,49 +55654,118 @@ function _formDeleteInscription(id){
   S.formInscriptions=(S.formInscriptions||[]).filter(function(e){ return e.id!==id; });
   _formSave(); renderFormationsModule('inscriptions');
 }
-function _formInscPilotPreview(){
-  var id=(document.getElementById('fi-pilot')||{}).value||'';
-  var info=_formPilotInfo(id);
-  var el=document.getElementById('fi-preview'); if(!el) return;
-  el.innerHTML = info ? ('N° licence : <b style="color:var(--stol)">'+(_formEsc(info.licence)||'—')+'</b> &nbsp;·&nbsp; Région : <b>'+(_formEsc(info.region)||'—')+'</b>') : '<span style="color:var(--txt3)">Sélectionnez un licencié</span>';
+// ── Recherche d'un licencié : par numéro OU par prénom+nom ───────────────────
+// Remplace le menu déroulant de 682 licenciés (fastidieux à parcourir, et lent
+// à ouvrir). L'utilisateur saisit une licence ou un nom ; la base complète le
+// reste automatiquement, mais une personne hors base reste saisissable.
+function _formNorm(s){ return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function _formPilotByLicence(lic){
+  var l=(lic||'').toString().trim(); if(!l) return null;
+  return (S.pilots||[]).find(function(p){ return (p.licence||'').toString().trim()===l; }) || null;
+}
+function _formPilotsByName(prenom, nom){
+  var pn=_formNorm(prenom), nn=_formNorm(nom);
+  if(!pn && !nn) return [];
+  return (S.pilots||[]).filter(function(p){
+    var ppn=_formNorm(p.prenom), pnn=_formNorm(p.nom);
+    if(pn && nn) return ppn===pn && pnn===nn;
+    if(nn) return pnn===nn;
+    return ppn===pn;
+  });
+}
+function _formInscSetMatch(msg, color){
+  var el=document.getElementById('fi-match'); if(!el) return;
+  el.innerHTML=msg; el.style.color=color||'var(--txt2)';
+}
+function _formInscApply(p){
+  // Remplit les champs depuis une fiche pilote trouvée
+  var setv=function(id,v){ var e=document.getElementById(id); if(e && (v!=null)) e.value=v; };
+  setv('fi-prenom', p.prenom||''); setv('fi-nom', p.nom||'');
+  setv('fi-licence', p.licence||''); setv('fi-region', p.region||'');
+  var hid=document.getElementById('fi-pilot'); if(hid) hid.value=p.id||'';
+  _formInscSetMatch('✓ Licencié trouvé dans la base : <b>'+_formEsc(((p.prenom||'')+' '+(p.nom||'')).trim())+'</b>', '#22c55e');
+}
+// Saisie du numéro de licence → complète prénom/nom/région
+function _formInscFromLicence(){
+  var lic=(document.getElementById('fi-licence')||{}).value||'';
+  var hid=document.getElementById('fi-pilot');
+  if(!lic.trim()){ if(hid)hid.value=''; _formInscSetMatch('',''); return; }
+  var p=_formPilotByLicence(lic);
+  if(p){ _formInscApply(p); }
+  else { if(hid)hid.value=''; _formInscSetMatch('Licence non trouvée — saisie libre (prénom + nom).', 'var(--txt3)'); }
+}
+// Saisie prénom + nom → retrouve la licence si le nom est unique dans la base
+function _formInscFromName(){
+  var pr=(document.getElementById('fi-prenom')||{}).value||'';
+  var no=(document.getElementById('fi-nom')||{}).value||'';
+  var hid=document.getElementById('fi-pilot');
+  if(!pr.trim() && !no.trim()){ _formInscSetMatch('',''); return; }
+  // Ne pas écraser une licence déjà saisie et valide
+  var licCur=(document.getElementById('fi-licence')||{}).value||'';
+  if(licCur.trim() && _formPilotByLicence(licCur)) return;
+  var matches=_formPilotsByName(pr, no);
+  if(matches.length===1){ _formInscApply(matches[0]); }
+  else if(matches.length>1){ if(hid)hid.value=''; _formInscSetMatch(matches.length+' licenciés portent ce nom — précisez le numéro de licence.', '#f59e0b'); }
+  else { if(hid)hid.value=''; _formInscSetMatch('Hors base — saisie libre acceptée.', 'var(--txt3)'); }
 }
 function _formEditInscription(id){
   var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
   var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
-  var pilots=(S.pilots||[]).slice().sort(function(a,b){ return ((a.nom||'')+(a.prenom||'')).toLowerCase().localeCompare(((b.nom||'')+(b.prenom||'')).toLowerCase()); });
   var ov=document.getElementById('form-modal'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.id='form-modal';
   ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:16px;padding:9px 11px;outline:none';
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
   var sessOpts='<option value="">— Choisir une session —</option>'+sessions.map(function(s){ return '<option value="'+s.id+'"'+(x&&x.sessionId===s.id?' selected':(_formInscFilter===s.id&&!x?' selected':''))+'>'+_formEsc(_formSessionLabel(s))+'</option>'; }).join('');
-  var pilotOpts='<option value="">— Choisir un licencié —</option>'+pilots.map(function(p){ var nm=((p.nom||'')+' '+(p.prenom||'')).trim(); var lic=p.licence?' ('+p.licence+')':''; return '<option value="'+p.id+'"'+(x&&x.pilotId===p.id?' selected':'')+'>'+_formEsc(nm+lic)+'</option>'; }).join('');
   var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+((x?x.statut:'inscrit')===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
+  // Datalists : auto-complétion native (filtre à la frappe, pas de menu géant)
+  var licList=(S.pilots||[]).map(function(p){ return p.licence?('<option value="'+_formEsc(p.licence)+'">'+_formEsc(((p.prenom||'')+' '+(p.nom||'')).trim())+'</option>'):''; }).join('');
+  var nomSet={}; (S.pilots||[]).forEach(function(p){ if(p.nom) nomSet[p.nom]=1; });
+  var nomList=Object.keys(nomSet).map(function(n){ return '<option value="'+_formEsc(n)+'"></option>'; }).join('');
+  var curLic=x?(x.licence||''):'', curPr='', curNo='';
+  if(x){ // reconstituer prénom/nom depuis l'inscription (champ nom = "Prénom Nom")
+    if(x.pilotId){ var pp=(S.pilots||[]).find(function(z){return z.id===x.pilotId;}); if(pp){ curPr=pp.prenom||''; curNo=pp.nom||''; } }
+    if(!curPr && !curNo && x.nom){ var parts=x.nom.trim().split(/\s+/); curPr=parts.shift()||''; curNo=parts.join(' '); }
+  }
   ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(520px,100%);max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(x?'Modifier l\'inscription':'Nouvelle inscription')+'</div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Session *</label><select id="fi-session" style="'+fSt+';cursor:pointer">'+sessOpts+'</select></div>'
-    + '<div style="margin-bottom:8px"><label style="'+lSt+'">Licencié * (base des licenciés)</label><select id="fi-pilot" onchange="_formInscPilotPreview()" style="'+fSt+';cursor:pointer">'+pilotOpts+'</select></div>'
-    + '<div id="fi-preview" style="font-size:12px;color:var(--txt2);background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:8px 11px;margin-bottom:14px"></div>'
+    + '<datalist id="fi-dl-lic">'+licList+'</datalist>'
+    + '<datalist id="fi-dl-nom">'+nomList+'</datalist>'
+    + '<div style="margin-bottom:14px"><label style="'+lSt+'">Session *</label><select id="fi-session" style="'+fSt+';cursor:pointer">'+sessOpts+'</select></div>'
+    + '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Licencié — saisir la licence <span style="text-transform:none;font-weight:400">ou</span> le prénom + nom</div>'
+    + '<input type="hidden" id="fi-pilot" value="'+(x&&x.pilotId?_formEsc(x.pilotId):'')+'">'
+    + '<div style="margin-bottom:10px"><label style="'+lSt+'">N° de licence</label><input id="fi-licence" list="fi-dl-lic" value="'+_formEsc(curLic)+'" placeholder="Tapez le numéro…" oninput="_formInscFromLicence()" style="'+fSt+'"></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div><label style="'+lSt+'">Prénom</label><input id="fi-prenom" value="'+_formEsc(curPr)+'" placeholder="Prénom" oninput="_formInscFromName()" style="'+fSt+'"></div><div><label style="'+lSt+'">Nom</label><input id="fi-nom" list="fi-dl-nom" value="'+_formEsc(curNo)+'" placeholder="Nom" oninput="_formInscFromName()" style="'+fSt+'"></div></div>'
+    + '<div style="margin-bottom:10px"><label style="'+lSt+'">Région</label><input id="fi-region" value="'+_formEsc(x?(x.region||''):'')+'" placeholder="(auto si trouvé)" style="'+fSt+'"></div>'
+    + '<div id="fi-match" style="font-size:12px;color:var(--txt2);min-height:16px;margin-bottom:14px"></div>'
     + '<div style="margin-bottom:18px"><label style="'+lSt+'">Statut</label><select id="fi-statut" style="'+fSt+';cursor:pointer">'+stOpts+'</select></div>'
     + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
     + '<button onclick="_formSaveInscription(\''+(x?x.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
     + '</div>';
   document.body.appendChild(ov);
-  _formInscPilotPreview();
+  if(curLic) _formInscFromLicence(); else if(curPr||curNo) _formInscFromName();
 }
 function _formSaveInscription(id){
   var sessionId=(document.getElementById('fi-session')||{}).value||'';
-  var pilotId=(document.getElementById('fi-pilot')||{}).value||'';
+  var licence=((document.getElementById('fi-licence')||{}).value||'').trim();
+  var prenom=((document.getElementById('fi-prenom')||{}).value||'').trim();
+  var nom=((document.getElementById('fi-nom')||{}).value||'').trim();
+  var region=((document.getElementById('fi-region')||{}).value||'').trim();
+  var pilotId=((document.getElementById('fi-pilot')||{}).value||'').trim();
   var statut=(document.getElementById('fi-statut')||{}).value||'inscrit';
   if(!sessionId){ if(typeof toast==='function')toast('Choisissez une session','err'); return; }
-  if(!pilotId){ if(typeof toast==='function')toast('Choisissez un licencié','err'); return; }
-  var info=_formPilotInfo(pilotId)||{};
+  if(!licence && !prenom && !nom){ if(typeof toast==='function')toast('Saisissez une licence, ou un prénom et un nom','err'); return; }
+  var nomComplet=((prenom+' '+nom).trim())||nom||prenom;
   var x=id?(S.formInscriptions||[]).find(function(e){ return e.id===id; }):null;
-  // Anti-doublon : même licencié déjà inscrit à cette session
-  var dup=(S.formInscriptions||[]).some(function(e){ return e!==x && e.sessionId===sessionId && e.pilotId===pilotId; });
-  if(dup){ if(typeof toast==='function')toast('Ce licencié est déjà inscrit à cette session','warn'); return; }
-  var data={ sessionId:sessionId, pilotId:pilotId, nom:info.nom||'', licence:info.licence||'', region:info.region||'', statut:statut, _updatedAt:Date.now() };
+  // Anti-doublon dans la même session : par licence si fournie, sinon par nom
+  var dup=(S.formInscriptions||[]).some(function(e){
+    if(e===x || e.sessionId!==sessionId) return false;
+    if(licence && e.licence) return e.licence.trim()===licence;
+    return _formNorm(e.nom)===_formNorm(nomComplet);
+  });
+  if(dup){ if(typeof toast==='function')toast('Déjà inscrit à cette session','warn'); return; }
+  var data={ sessionId:sessionId, pilotId:pilotId, nom:nomComplet, licence:licence, region:region, statut:statut, _updatedAt:Date.now() };
   if(x){ Object.assign(x,data); }
   else { data.id=_formUid('fi'); S.formInscriptions.push(data); }
   _formSave();
