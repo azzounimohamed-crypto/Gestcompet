@@ -43145,22 +43145,18 @@ function _printNDFLines(list, titre, commentaires) {
 // ═══════════════════════════════════════════════
 // FAQ DTN — questions/réponses modifiables et synchronisées
 // ═══════════════════════════════════════════════
+// FAQ DTN : base de traitement des questions récurrentes des licenciés.
+// Chaque entrée = une demande (date, email), classée par thématique/sous-thématique,
+// avec une proposition de réponse assistée par IA, la réponse retenue, les
+// ressources juridiques/autres et l'auteur. Synchronisée + pierre tombale.
 function _faqInit() {
   if (!Array.isArray(S.faq)) S.faq = [];
   if (!S._deletedFaq || typeof S._deletedFaq!=='object' || Array.isArray(S._deletedFaq)) S._deletedFaq = {};
-  if (!S.faq.length && !S._faqSeeded) {
-    S._faqSeeded = true;
-    var _seed = [
-      ['Comment obtenir un code d\'accès à Gest\'DTN ?', 'Le gestionnaire crée votre accès dans Réglages → onglet Accès (nom, email, statut). Un code vous est communiqué : saisissez votre email et ce code sur l\'écran d\'accueil.'],
-      ['Je ne retrouve pas mes notes de frais après connexion.', 'Vos données sont rattachées à votre fiche de licencié. Ouvrez la page Accès, bouton « 🔗 Données » sur votre fiche, et reliez l\'historique. Reconnectez-vous ensuite.'],
-      ['Comment inscrire un licencié à une session de formation ?', 'Onglet Formations → Inscriptions → Nouvelle inscription. Saisissez le numéro de licence (le nom se complète), ou directement le prénom et le nom.']
-    ];
-    _seed.forEach(function(qr, i){ S.faq.push({ id:_faqUid(), question:qr[0], reponse:qr[1], ordre:i, _updatedAt:Date.now() }); });
-  }
 }
 function _faqUid(){ return 'faq_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _faqEsc(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-var _faqOpenId = null;
+function _faqFrDate(d){ var m=(''+(d||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(d||''); }
+var _faqOpenId = null, _faqSearch = '', _faqFiltre = '';
 
 function _dtnOpenFaqPage() {
   _dtnCloseOverlays();
@@ -43169,58 +43165,90 @@ function _dtnOpenFaqPage() {
   _dtnSetActiveNav('faq');
   renderFaq();
 }
+// Valeurs distinctes d'un champ (pour les filtres et l'auto-complétion).
+function _faqValues(champ){
+  var set={}; (S.faq||[]).forEach(function(f){ var v=(f[champ]||'').trim(); if(v) set[v]=1; });
+  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+}
 function renderFaq() {
   _faqInit();
   var cont = document.getElementById('faq-content');
   if (!cont) return;
   var canEd = (typeof canModify==='function') ? canModify() : true;
-  var list = (S.faq||[]).slice().sort(function(a,b){ return (a.ordre||0)-(b.ordre||0) || (a._updatedAt||0)-(b._updatedAt||0); });
+  var esc = _faqEsc;
 
-  var html = '<div style="max-width:760px;margin:0 auto;padding:16px 14px 40px">';
-  // Barre d'entête
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
-  html += '<div style="font-size:13px;font-weight:700;color:var(--txt2)">'+(list.length?list.length+' question'+(list.length>1?'s':''):'Aucune question')+'</div>';
-  if (canEd) html += '<button onclick="_faqFormOpen(null)" style="padding:8px 14px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter une question</button>';
+  // Filtrage : recherche plein texte + thématique
+  var q = _faqSearch.trim().toLowerCase();
+  var list = (S.faq||[]).filter(function(f){
+    if (_faqFiltre && (f.thematique||'') !== _faqFiltre) return false;
+    if (!q) return true;
+    return [(f.question||''),(f.reponse||''),(f.reponseIA||''),(f.sousThematique||''),(f.email||''),(f.auteur||'')]
+      .join(' ').toLowerCase().indexOf(q) >= 0;
+  }).sort(function(a,b){ return (''+(b.date||'')+(b._updatedAt||0)).localeCompare(''+(a.date||'')+(a._updatedAt||0)); });
+
+  var themes = _faqValues('thematique');
+  var filtreOpts = '<option value="">Toutes les thématiques</option>'+themes.map(function(t){ return '<option value="'+esc(t)+'"'+(_faqFiltre===t?' selected':'')+'>'+esc(t)+'</option>'; }).join('');
+
+  var html = '<div style="max-width:920px;margin:0 auto;padding:16px 14px 48px">';
+  // Barre outils
+  html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
+  html += '<input id="faq-search" value="'+esc(_faqSearch)+'" placeholder="🔎 Rechercher une question…" oninput="_faqSearch=this.value;_faqRenderDebounce()" style="flex:1;min-width:180px;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 12px;outline:none">';
+  html += '<select onchange="_faqFiltre=this.value;renderFaq()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;cursor:pointer;max-width:220px">'+filtreOpts+'</select>';
+  if (canEd) html += '<button onclick="_faqFormOpen(null)" style="padding:9px 15px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ Nouvelle question</button>';
   html += '</div>';
+  html += '<div style="font-size:12px;color:var(--txt3);margin-bottom:12px">'+(list.length?list.length+' question'+(list.length>1?'s':''):'Aucune question')+(_faqFiltre?' · '+esc(_faqFiltre):'')+'</div>';
 
   if (!list.length) {
-    html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 24px;border:1px dashed var(--bdr);border-radius:14px">Aucune question pour l\'instant.'+(canEd?'<br><span style="font-size:12px">Cliquez sur <b>+ Ajouter une question</b>.</span>':'')+'</div>';
+    html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 24px;border:1px dashed var(--bdr);border-radius:14px">Aucune question'+(q||_faqFiltre?' ne correspond au filtre.':' enregistrée.')+(canEd&&!q&&!_faqFiltre?'<br><span style="font-size:12px">Cliquez sur <b>+ Nouvelle question</b> pour traiter une demande de licencié.</span>':'')+'</div>';
   } else {
-    list.forEach(function(f, i){
+    list.forEach(function(f){
       var open = (_faqOpenId===f.id);
+      var repondu = !!(f.reponse||'').trim();
       html += '<div style="border:1px solid var(--bdr);border-radius:12px;margin-bottom:10px;overflow:hidden;background:var(--navy2)">';
-      // En-tête cliquable
-      html += '<div onclick="_faqToggle(\''+f.id+'\')" style="display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;min-height:44px">';
-      html += '<span style="flex-shrink:0;color:var(--stol);font-size:15px;transition:transform .15s;'+(open?'transform:rotate(90deg)':'')+'">▶</span>';
-      html += '<span style="flex:1;font-size:14px;font-weight:700;color:var(--txt)">'+_faqEsc(f.question)+'</span>';
+      // En-tête
+      html += '<div onclick="_faqToggle(\''+f.id+'\')" style="display:flex;align-items:flex-start;gap:10px;padding:13px 15px;cursor:pointer">';
+      html += '<span style="flex-shrink:0;color:var(--stol);font-size:14px;margin-top:3px;transition:transform .15s;'+(open?'transform:rotate(90deg)':'')+'">▶</span>';
+      html += '<div style="flex:1;min-width:0">';
+      // badges thématique
+      var badges='';
+      if(f.thematique) badges+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8">'+esc(f.thematique)+'</span> ';
+      if(f.sousThematique) badges+='<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--txt3)">'+esc(f.sousThematique)+'</span> ';
+      if(badges) html += '<div style="margin-bottom:4px">'+badges+'</div>';
+      html += '<div style="font-size:14px;font-weight:700;color:var(--txt);line-height:1.35">'+esc(f.question||'(sans intitulé)')+'</div>';
+      var meta=[]; if(f.date) meta.push('📅 '+_faqFrDate(f.date)); if(f.email) meta.push('✉️ '+esc(f.email)); if(f.auteur) meta.push('✍️ '+esc(f.auteur));
+      if(meta.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:3px">'+meta.join(' · ')+'</div>';
       html += '</div>';
-      // Réponse
-      html += '<div style="display:'+(open?'block':'none')+';padding:0 16px 14px 42px">';
-      html += '<div style="font-size:13px;line-height:1.65;color:var(--txt2);white-space:pre-wrap">'+_faqEsc(f.reponse)+'</div>';
-      if (canEd) {
-        html += '<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">';
-        html += '<button onclick="event.stopPropagation();_faqMove(\''+f.id+'\',-1)"'+(i===0?' disabled':'')+' style="min-height:34px;padding:0 10px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit;opacity:'+(i===0?'.4':'1')+'">↑</button>';
-        html += '<button onclick="event.stopPropagation();_faqMove(\''+f.id+'\',1)"'+(i===list.length-1?' disabled':'')+' style="min-height:34px;padding:0 10px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:13px;cursor:pointer;font-family:inherit;opacity:'+(i===list.length-1?'.4':'1')+'">↓</button>';
-        html += '<button onclick="event.stopPropagation();_faqFormOpen(\''+f.id+'\')" style="min-height:34px;padding:0 12px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Modifier</button>';
-        html += '<button onclick="event.stopPropagation();_faqDelete(\''+f.id+'\')" style="min-height:34px;padding:0 12px;border:1px solid rgba(239,68,68,.3);border-radius:8px;background:rgba(239,68,68,.08);color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑 Supprimer</button>';
+      html += '<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+(repondu?'rgba(34,197,94,.14);color:#22c55e':'rgba(245,158,11,.14);color:#f59e0b')+'">'+(repondu?'Répondu':'À traiter')+'</span>';
+      html += '</div>';
+      // Détail déplié
+      if (open) {
+        html += '<div style="padding:0 15px 15px 39px">';
+        var bloc=function(titre, val, couleur){
+          if(!(val||'').trim()) return '';
+          return '<div style="margin-top:12px"><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:'+(couleur||'var(--txt3)')+';margin-bottom:4px">'+titre+'</div><div style="font-size:13px;line-height:1.6;color:var(--txt2);white-space:pre-wrap">'+esc(val)+'</div></div>';
+        };
+        html += bloc('🤖 Réponse proposée par l\'IA', f.reponseIA, '#818cf8');
+        html += bloc('✅ Réponse retenue', f.reponse, '#22c55e');
+        html += bloc('⚖️ Ressources juridiques', f.ressourcesJuridiques, '#f59e0b');
+        html += bloc('📎 Autres ressources', f.autresRessources, 'var(--txt3)');
+        if (canEd) {
+          html += '<div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">';
+          html += '<button onclick="event.stopPropagation();_faqFormOpen(\''+f.id+'\')" style="min-height:36px;padding:0 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Modifier</button>';
+          html += '<button onclick="event.stopPropagation();_faqDelete(\''+f.id+'\')" style="min-height:36px;padding:0 14px;border:1px solid rgba(239,68,68,.3);border-radius:8px;background:rgba(239,68,68,.08);color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑 Supprimer</button>';
+          html += '</div>';
+        }
         html += '</div>';
       }
-      html += '</div></div>';
+      html += '</div>';
     });
   }
   html += '</div>';
   cont.innerHTML = html;
 }
+var _faqRenderTimer=null;
+function _faqRenderDebounce(){ clearTimeout(_faqRenderTimer); _faqRenderTimer=setTimeout(function(){ var el=document.getElementById('faq-search'); var pos=el?el.selectionStart:null; renderFaq(); var el2=document.getElementById('faq-search'); if(el2){ el2.focus(); if(pos!=null) try{el2.setSelectionRange(pos,pos);}catch(e){} } }, 220); }
 function _faqToggle(id){ _faqOpenId = (_faqOpenId===id) ? null : id; renderFaq(); }
 function _faqSaveState(){ if(typeof saveState==='function') saveState(); if(typeof silentPush==='function') silentPush(); }
-function _faqMove(id, dir){
-  var list=(S.faq||[]).slice().sort(function(a,b){ return (a.ordre||0)-(b.ordre||0); });
-  var i=list.findIndex(function(x){return x.id===id;}); var j=i+dir;
-  if(i<0||j<0||j>=list.length) return;
-  var tmp=list[i]; list[i]=list[j]; list[j]=tmp;
-  list.forEach(function(f,k){ f.ordre=k; f._updatedAt=Date.now(); });
-  _faqSaveState(); renderFaq();
-}
 function _faqDelete(id){
   var f=(S.faq||[]).find(function(x){return x.id===id;}); if(!f) return;
   if(!confirm('Supprimer la question « '+(f.question||'').slice(0,60)+' » ?')) return;
@@ -43230,18 +43258,58 @@ function _faqDelete(id){
   if(_faqOpenId===id) _faqOpenId=null;
   _faqSaveState(); renderFaq();
 }
+// Compose un prompt à partir des 3 rubriques + ressources, et le copie. L'auteur
+// le colle dans Claude/ChatGPT puis colle la réponse dans le champ « IA ».
+// (Une réponse 100 % automatique nécessiterait un serveur — voir avec l'équipe.)
+function _faqGenPrompt(){
+  var g=function(id){ return ((document.getElementById(id)||{}).value||'').trim(); };
+  var th=g('faq-them'), sth=g('faq-sous'), qu=g('faq-q'), rj=g('faq-juri');
+  if(!qu){ if(typeof toast==='function')toast('Saisissez d\'abord la question','err'); return; }
+  var p='Tu es juriste-conseil de la Fédération Française d\'ULM (FFPLUM). '
+    + 'Réponds à la question d\'un licencié de façon claire, exacte et sourcée, en français.\n\n'
+    + (th?'Thématique : '+th+'\n':'')
+    + (sth?'Sous-thématique : '+sth+'\n':'')
+    + 'Question : '+qu+'\n'
+    + (rj?'\nRessources juridiques à prendre en compte :\n'+rj+'\n':'')
+    + '\nDonne une réponse concise et actionnable, puis liste les références (textes, articles) qui la fondent.';
+  var done=function(){
+    if(typeof toast==='function')toast('Prompt copié — collez-le dans Claude, puis collez la réponse dans « Réponse proposée par l\'IA ».','ok');
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(p).then(done,function(){ window.prompt('Copiez ce prompt :', p); });
+  else window.prompt('Copiez ce prompt :', p);
+}
 function _faqFormOpen(id){
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
+  var today=new Date().toISOString().slice(0,10);
+  var moi=''; try{ moi=((S.user&&(S.user.prenom||'')+' '+(S.user&&S.user.nom||''))||'').trim(); }catch(e){}
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.id='faq-modal';
   ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:16px;padding:10px 12px;outline:none';
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
-  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(560px,100%);max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
-    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(f?'Modifier la question':'Nouvelle question')+'</div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><input id="faq-q" value="'+_faqEsc(f?f.question:'')+'" placeholder="Ex : Comment… ?" style="'+fSt+'"></div>'
-    + '<div style="margin-bottom:18px"><label style="'+lSt+'">Réponse *</label><textarea id="faq-r" rows="6" placeholder="Réponse détaillée…" style="'+fSt+';resize:vertical">'+_faqEsc(f?f.reponse:'')+'</textarea></div>'
+  var e=_faqEsc;
+  var dlThemes='<datalist id="faq-dl-them">'+_faqValues('thematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
+  var dlSous='<datalist id="faq-dl-sous">'+_faqValues('sousThematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(680px,100%);max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + dlThemes + dlSous
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +   '<div><label style="'+lSt+'">Date de la demande</label><input id="faq-date" type="date" value="'+e(f?(f.date||today):today)+'" style="'+fSt+'"></div>'
+    +   '<div><label style="'+lSt+'">Email du demandeur</label><input id="faq-email" type="email" value="'+e(f?f.email:'')+'" placeholder="licencie@…" style="'+fSt+'"></div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +   '<div><label style="'+lSt+'">Thématique</label><input id="faq-them" list="faq-dl-them" value="'+e(f?f.thematique:'')+'" placeholder="Ex : Assurance, Licence…" style="'+fSt+'"></div>'
+    +   '<div><label style="'+lSt+'">Sous-thématique</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
+    + '</div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="3" placeholder="La question telle que posée par le licencié…" style="'+fSt+';resize:vertical">'+e(f?f.question:'')+'</textarea></div>'
+    + '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="4" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+fSt+';resize:vertical">'+e(f?f.reponseIA:'')+'</textarea></div>'
+    + '<div style="margin-bottom:12px"><label style="'+lSt+';color:#22c55e">✅ Ma réponse (celle utilisée)</label><textarea id="faq-r" rows="4" placeholder="La réponse validée, envoyée au licencié…" style="'+fSt+';resize:vertical">'+e(f?f.reponse:'')+'</textarea></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +   '<div><label style="'+lSt+'">⚖️ Ressources juridiques</label><textarea id="faq-juri" rows="3" placeholder="Textes, articles, règlements…" style="'+fSt+';resize:vertical">'+e(f?f.ressourcesJuridiques:'')+'</textarea></div>'
+    +   '<div><label style="'+lSt+'">📎 Autres ressources</label><textarea id="faq-autres" rows="3" placeholder="Liens, documents, contacts…" style="'+fSt+';resize:vertical">'+e(f?f.autresRessources:'')+'</textarea></div>'
+    + '</div>'
+    + '<div style="margin-bottom:18px"><label style="'+lSt+'">✍️ Auteur</label><input id="faq-auteur" value="'+e(f?(f.auteur||''):moi)+'" placeholder="Qui a traité la question" style="'+fSt+'"></div>'
     + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'faq-modal\').remove()" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
     + '<button onclick="_faqSave(\''+(f?f.id:'')+'\')" style="flex:1;padding:11px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
     + '</div>';
@@ -43249,21 +43317,23 @@ function _faqFormOpen(id){
   setTimeout(function(){ var el=document.getElementById('faq-q'); if(el)el.focus(); },60);
 }
 function _faqSave(id){
-  var q=((document.getElementById('faq-q')||{}).value||'').trim();
-  var r=((document.getElementById('faq-r')||{}).value||'').trim();
+  var g=function(idf){ return ((document.getElementById(idf)||{}).value||'').trim(); };
+  var q=g('faq-q');
   if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return; }
-  if(!r){ if(typeof toast==='function')toast('La réponse est requise','err'); return; }
+  var data={
+    date:g('faq-date'), email:g('faq-email'),
+    thematique:g('faq-them'), sousThematique:g('faq-sous'),
+    question:q, reponseIA:g('faq-ia'), reponse:g('faq-r'),
+    ressourcesJuridiques:g('faq-juri'), autresRessources:g('faq-autres'),
+    auteur:g('faq-auteur'), _updatedAt:Date.now()
+  };
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
-  if(f){ f.question=q; f.reponse=r; f._updatedAt=Date.now(); }
-  else {
-    var maxO=(S.faq||[]).reduce(function(m,x){return Math.max(m,x.ordre||0);},-1);
-    var nf={ id:_faqUid(), question:q, reponse:r, ordre:maxO+1, _updatedAt:Date.now() };
-    S.faq.push(nf); _faqOpenId=nf.id;
-  }
+  if(f){ Object.assign(f, data); }
+  else { data.id=_faqUid(); S.faq.push(data); _faqOpenId=data.id; }
   _faqSaveState();
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   renderFaq();
-  if(typeof toast==='function')toast(f?'Question mise à jour ✓':'Question ajoutée ✓','ok');
+  if(typeof toast==='function')toast(f?'Question mise à jour ✓':'Question enregistrée ✓','ok');
 }
 
 function _dtnOpenAidesPage() {
