@@ -43269,12 +43269,13 @@ function renderFaq() {
         html += bloc('✅ Réponse retenue', f.reponse, '#22c55e');
         html += bloc('⚖️ Ressources juridiques', f.ressourcesJuridiques, '#f59e0b');
         html += bloc('📎 Autres ressources', f.autresRessources, 'var(--txt3)');
+        html += '<div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">';
+        html += '<button onclick="event.stopPropagation();_faqEmail(\''+f.id+'\')" style="min-height:36px;padding:0 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✉️ Email</button>';
         if (canEd) {
-          html += '<div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">';
           html += '<button onclick="event.stopPropagation();_faqFormOpen(\''+f.id+'\')" style="min-height:36px;padding:0 14px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Modifier</button>';
           html += '<button onclick="event.stopPropagation();_faqDelete(\''+f.id+'\')" style="min-height:36px;padding:0 14px;border:1px solid rgba(239,68,68,.3);border-radius:8px;background:rgba(239,68,68,.08);color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑 Supprimer</button>';
-          html += '</div>';
         }
+        html += '</div>';
         html += '</div>';
       }
       html += '</div>';
@@ -43286,6 +43287,27 @@ function renderFaq() {
 var _faqRenderTimer=null;
 function _faqRenderDebounce(){ clearTimeout(_faqRenderTimer); _faqRenderTimer=setTimeout(function(){ var el=document.getElementById('faq-search'); var pos=el?el.selectionStart:null; renderFaq(); var el2=document.getElementById('faq-search'); if(el2){ el2.focus(); if(pos!=null) try{el2.setSelectionRange(pos,pos);}catch(e){} } }, 220); }
 function _faqToggle(id){ _faqOpenId = (_faqOpenId===id) ? null : id; renderFaq(); }
+// Compose un courriel avec la question et UNIQUEMENT les rubriques renseignées
+// (le titre d'une rubrique n'apparaît que si elle a du contenu). Destinataire
+// pré-rempli avec l'email du demandeur s'il est connu.
+function _faqMailtoUrl(f){
+  var lignes=[];
+  var add=function(titre, val){ var v=(val||'').toString().trim(); if(v){ lignes.push(titre); lignes.push(v); lignes.push(''); } };
+  var ctx=[]; if((f.thematique||'').trim()) ctx.push(f.thematique.trim()); if((f.sousThematique||'').trim()) ctx.push(f.sousThematique.trim());
+  if(ctx.length){ lignes.push('Thématique : '+ctx.join(' / ')); lignes.push(''); }
+  add('QUESTION', f.question);
+  add('RÉPONSE', f.reponse);
+  add('RESSOURCES JURIDIQUES', f.ressourcesJuridiques);
+  add('AUTRES RESSOURCES', f.autresRessources);
+  if((f.auteur||'').trim()){ lignes.push('— '+f.auteur.trim()+' (DTN FFPLUM)'); }
+  var corps=lignes.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+  var sujet='FAQ DTN'+((f.thematique||'').trim()?' — '+f.thematique.trim():'')+' : '+(f.question||'').trim().replace(/\s+/g,' ').slice(0,80);
+  return 'mailto:'+encodeURIComponent((f.email||'').trim())+'?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(corps);
+}
+function _faqEmail(id){
+  var f=(S.faq||[]).find(function(x){return x.id===id;}); if(!f) return;
+  window.location.href=_faqMailtoUrl(f);
+}
 function _faqSaveState(){ if(typeof saveState==='function') saveState(); if(typeof silentPush==='function') silentPush(); }
 function _faqDelete(id){
   var f=(S.faq||[]).find(function(x){return x.id===id;}); if(!f) return;
