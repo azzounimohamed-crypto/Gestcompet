@@ -43122,6 +43122,28 @@ function _aideTab(tab, btn) {
     cont.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Contenu à venir.</div>';
   }
 }
+// Ouvre/ferme le menu Actions des aides. Le menu est en position:fixed pour
+// échapper au débordement (overflow:auto) de #aides-content qui le rognait
+// quand la liste était courte — d'où le bouton qui paraissait inactif.
+function _aidesToggleActions(btn){
+  var m=document.getElementById('aides-act-menu'); if(!m) return;
+  var open = m.style.display==='block';
+  if(open){ m.style.display='none'; return; }
+  var r=btn.getBoundingClientRect();
+  m.style.display='block';
+  // Aligner le bord droit du menu sur le bord droit du bouton, juste dessous.
+  var w=m.offsetWidth||180;
+  var left=Math.max(8, Math.min(r.right-w, window.innerWidth-w-8));
+  m.style.left=left+'px';
+  m.style.top=(r.bottom+4)+'px';
+  setTimeout(function(){
+    document.addEventListener('click', function _cl(e){
+      if(e.target.closest && e.target.closest('#aides-act-menu')) return;
+      if(e.target===btn || (btn.contains&&btn.contains(e.target))) return;
+      m.style.display='none'; document.removeEventListener('click', _cl);
+    });
+  },0);
+}
 function renderAides(containerEl) {
   var cont = containerEl || document.getElementById('pilots-list');
   if (!cont) return;
@@ -43137,8 +43159,8 @@ function renderAides(containerEl) {
   html += '<div style="font-size:13px;font-weight:700;color:var(--txt)">'+(S.aides.length ? S.aides.length+' aide'+(S.aides.length>1?'s':'') : 'Aucune aide enregistrée')+'</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
   html += '<div style="position:relative;display:inline-block">'
-    +'<button onclick="var m=document.getElementById(\'aides-act-menu\');m.style.display=m.style.display===\'block\'?\'none\':\'block\';event.stopPropagation()" style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">Actions ▾</button>'
-    +'<div id="aides-act-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:500;min-width:160px;padding:6px;white-space:nowrap">'
+    +'<button onclick="_aidesToggleActions(this)" style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">Actions ▾</button>'
+    +'<div id="aides-act-menu" style="display:none;position:fixed;background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9600;min-width:160px;padding:6px;white-space:nowrap">'
       +'<button onclick="exportAides();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter JSON</button>'
       +'<button onclick="exportAidesXlsx();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬇ Exporter Excel</button>'
       +'<button onclick="document.getElementById(\'aides-import-inp\').click();document.getElementById(\'aides-act-menu\').style.display=\'none\'" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--txt);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:7px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'">⬆ Importer</button>'
@@ -43147,7 +43169,6 @@ function renderAides(containerEl) {
   +'</div>';
   html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter un dispositif</button>';
   html += '</div></div></div>';
-  html += '<script>document.addEventListener("click",function(){var m=document.getElementById("aides-act-menu");if(m)m.style.display="none";});<\/script>';
 
   if (!S.aides.length) {
     html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Aucune aide enregistrée.<br><span style="font-size:12px">Cliquez sur <b>+ Ajouter une aide</b> pour commencer.</span></div>';
