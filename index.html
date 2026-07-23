@@ -412,6 +412,8 @@ body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-l
   #dtn-header{padding-left:0!important}
   /* Carte des étapes : dégager le zoom de la barre de fonds de carte */
   #etapes-map .leaflet-top.leaflet-left{top:38px}
+  /* Modale FAQ : une seule colonne sur smartphone */
+  #faq-cols{grid-template-columns:1fr!important}
   /* ── Module Collectifs & SHN : onglets compacts défilables sur mobile ── */
   #collectif-tab-bar{max-width:calc(100% - 24px);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:8px 12px 4px!important}
   #collectif-tab-bar::-webkit-scrollbar{display:none}
@@ -43327,27 +43329,41 @@ function _faqFormOpen(id){
   var e=_faqEsc;
   var dlThemes='<datalist id="faq-dl-them">'+_faqValues('thematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
   var dlSous='<datalist id="faq-dl-sous">'+_faqValues('sousThematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
-  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(680px,100%);max-height:90vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+  // Boîte large, deux colonnes, corps défilant + pied de page FIXE (boutons
+  // toujours visibles quelle que soit la hauteur du contenu).
+  var taSt=fSt+';resize:vertical;line-height:1.5';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(1040px,97vw);height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + dlThemes + dlSous
-    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
-    +   '<div><label style="'+lSt+'">Date de la demande</label><input id="faq-date" type="date" value="'+e(f?(f.date||today):today)+'" style="'+fSt+'"></div>'
-    +   '<div><label style="'+lSt+'">Email du demandeur</label><input id="faq-email" type="email" value="'+e(f?f.email:'')+'" placeholder="licencie@…" style="'+fSt+'"></div>'
+    // En-tête
+    + '<div style="flex-shrink:0;padding:18px 22px 14px;border-bottom:1px solid var(--bdr);font-size:15px;font-weight:800;color:var(--txt)">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    // Corps : 2 colonnes, défilant
+    + '<div style="flex:1;overflow-y:auto;padding:18px 22px" id="faq-modal-body"><div id="faq-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:18px 22px;align-items:start">'
+    // ── Colonne gauche : demande + question ──
+    + '<div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +     '<div><label style="'+lSt+'">Date de la demande</label><input id="faq-date" type="date" value="'+e(f?(f.date||today):today)+'" style="'+fSt+'"></div>'
+    +     '<div><label style="'+lSt+'">Email du demandeur</label><input id="faq-email" type="email" value="'+e(f?f.email:'')+'" placeholder="licencie@…" style="'+fSt+'"></div>'
+    +   '</div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +     '<div><label style="'+lSt+'">Thématique</label><input id="faq-them" list="faq-dl-them" value="'+e(f?f.thematique:'')+'" placeholder="Ex : Assurance, Licence…" style="'+fSt+'"></div>'
+    +     '<div><label style="'+lSt+'">Sous-thématique</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
+    +   '</div>'
+    +   '<div><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="9" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea></div>'
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
-    +   '<div><label style="'+lSt+'">Thématique</label><input id="faq-them" list="faq-dl-them" value="'+e(f?f.thematique:'')+'" placeholder="Ex : Assurance, Licence…" style="'+fSt+'"></div>'
-    +   '<div><label style="'+lSt+'">Sous-thématique</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
+    // ── Colonne droite : réponses, ressources, auteur ──
+    + '<div>'
+    +   '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="4" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+taSt+'">'+e(f?f.reponseIA:'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+';color:#22c55e">✅ Ma réponse (celle utilisée)</label><textarea id="faq-r" rows="5" placeholder="La réponse validée, envoyée au licencié…" style="'+taSt+'">'+e(f?f.reponse:'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">⚖️ Ressources juridiques</label><textarea id="faq-juri" rows="3" placeholder="Textes, articles, règlements…" style="'+taSt+'">'+e(f?f.ressourcesJuridiques:'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📎 Autres ressources</label><textarea id="faq-autres" rows="2" placeholder="Liens, documents, contacts…" style="'+taSt+'">'+e(f?f.autresRessources:'')+'</textarea></div>'
+    +   '<div><label style="'+lSt+'">✍️ Auteur</label><input id="faq-auteur" value="'+e(f?(f.auteur||''):moi)+'" placeholder="Qui a traité la question" style="'+fSt+'"></div>'
     + '</div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="3" placeholder="La question telle que posée par le licencié…" style="'+fSt+';resize:vertical">'+e(f?f.question:'')+'</textarea></div>'
-    + '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="4" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+fSt+';resize:vertical">'+e(f?f.reponseIA:'')+'</textarea></div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+';color:#22c55e">✅ Ma réponse (celle utilisée)</label><textarea id="faq-r" rows="4" placeholder="La réponse validée, envoyée au licencié…" style="'+fSt+';resize:vertical">'+e(f?f.reponse:'')+'</textarea></div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
-    +   '<div><label style="'+lSt+'">⚖️ Ressources juridiques</label><textarea id="faq-juri" rows="3" placeholder="Textes, articles, règlements…" style="'+fSt+';resize:vertical">'+e(f?f.ressourcesJuridiques:'')+'</textarea></div>'
-    +   '<div><label style="'+lSt+'">📎 Autres ressources</label><textarea id="faq-autres" rows="3" placeholder="Liens, documents, contacts…" style="'+fSt+';resize:vertical">'+e(f?f.autresRessources:'')+'</textarea></div>'
+    + '</div></div>'
+    // Pied de page fixe
+    + '<div style="flex-shrink:0;display:flex;gap:10px;padding:14px 22px;border-top:1px solid var(--bdr);background:var(--navy2)">'
+    +   '<button onclick="document.getElementById(\'faq-modal\').remove()" style="flex:1;padding:12px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    +   '<button onclick="_faqSave(\''+(f?f.id:'')+'\')" style="flex:2;padding:12px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>'
     + '</div>'
-    + '<div style="margin-bottom:18px"><label style="'+lSt+'">✍️ Auteur</label><input id="faq-auteur" value="'+e(f?(f.auteur||''):moi)+'" placeholder="Qui a traité la question" style="'+fSt+'"></div>'
-    + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'faq-modal\').remove()" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
-    + '<button onclick="_faqSave(\''+(f?f.id:'')+'\')" style="flex:1;padding:11px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
     + '</div>';
   document.body.appendChild(ov);
   setTimeout(function(){ var el=document.getElementById('faq-q'); if(el)el.focus(); },60);
