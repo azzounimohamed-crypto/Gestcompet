@@ -5123,7 +5123,7 @@ function _flushSaveState() {
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
     stolNatExcluded:S.stolNatExcluded||{},
-    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{},
+    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{}, _faqSeedImported:S._faqSeedImported||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -26368,6 +26368,7 @@ async function pushToCloud() {
     faq:                  S.faq                  || [],
     _faqSeeded:           S._faqSeeded           || false,
     _deletedFaq:          S._deletedFaq          || {},
+    _faqSeedImported:     S._faqSeedImported     || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26914,7 +26915,7 @@ async function loadFromSupabaseFirst() {
     // Module Formations : snapshot pour fusion (union par id) après application cloud.
     var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded, delTypes:Object.assign({}, S._deletedFormTypes||{}) };
     // FAQ DTN : snapshot pour fusion (union par id + pierre tombale) après cloud.
-    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}) };
+    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}), seedImp:Object.assign({}, S._faqSeedImported||{}) };
     // Tombstones d'événements sécurité supprimés (pour ne pas les réajouter).
     var _delSecuSnap = Object.assign({}, S._deletedSecurite||{});
 
@@ -27220,6 +27221,11 @@ async function loadFromSupabaseFirst() {
       Object.keys(_df).forEach(function(id){ if((_df[id]||0) > (S._deletedFaq[id]||0)) S._deletedFaq[id]=_df[id]; });
       var _tomb=S._deletedFaq;
       S.faq=(S.faq||[]).filter(function(f){ if(!f) return false; var d=_tomb[f.id]; return !(d && d >= (f._updatedAt||0)); });
+      // Marqueurs d'import (union) : une question importée sur un appareil n'est
+      // jamais re-proposée à l'import sur un autre.
+      if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported={};
+      var _si=_faqSnap.seedImp||{};
+      Object.keys(_si).forEach(function(k){ if(!S._faqSeedImported[k]) S._faqSeedImported[k]=_si[k]; });
     })();
     // ✅ Fusionner securiteEvents locaux avec cloud — champ par champ, sans perte.
     // Un événement présent des deux côtés : la version la plus récente (_updatedAt)
@@ -43156,6 +43162,7 @@ function _printNDFLines(list, titre, commentaires) {
 function _faqInit() {
   if (!Array.isArray(S.faq)) S.faq = [];
   if (!S._deletedFaq || typeof S._deletedFaq!=='object' || Array.isArray(S._deletedFaq)) S._deletedFaq = {};
+  if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported = {};
 }
 function _faqUid(){ return 'faq_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _faqEsc(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -43165,31 +43172,40 @@ function _faqSeedData(){
   var el=document.getElementById('faq-seed-data'); if(!el) return [];
   try{ return JSON.parse(el.textContent||'[]'); }catch(e){ console.warn('[faq] seed illisible', e); return []; }
 }
-// Combien de questions du document ne sont pas encore dans la FAQ ?
+// Chaque question du document a une CLÉ STABLE (son intitulé normalisé). Une fois
+// importée, cette clé est mémorisée dans S._faqSeedImported (map, synchronisée) :
+// la question ne sera JAMAIS ré-importée, même si on la modifie ou la supprime
+// ensuite. C'est ce qui garantit la durabilité malgré les évolutions.
 function _faqSeedPending(){
   _faqInit();
+  var imp=S._faqSeedImported||{};
   var have={}; (S.faq||[]).forEach(function(f){ have[_faqNormQ(f.question)]=1; });
-  return _faqSeedData().filter(function(s){ return !have[_faqNormQ(s.question)]; }).length;
+  // « à importer » = jamais importée ET pas déjà présente par son intitulé
+  return _faqSeedData().filter(function(s){ var k=_faqNormQ(s.question); return k && !imp[k] && !have[k]; }).length;
 }
-// Importe (une fois) les questions du document, auteur = Mathieu Farcy. Idempotent :
-// une question déjà présente (même intitulé) n'est jamais dupliquée.
+// Importe UNE SEULE FOIS chaque question du document (auteur : Mathieu Farcy).
+// Ne duplique jamais, ne ressuscite jamais une question supprimée.
 function _faqImportSeed(){
   _faqInit();
+  if(!S._faqSeedImported||typeof S._faqSeedImported!=='object'||Array.isArray(S._faqSeedImported)) S._faqSeedImported={};
+  var imp=S._faqSeedImported;
   var have={}; (S.faq||[]).forEach(function(f){ have[_faqNormQ(f.question)]=1; });
-  var added=0;
+  var now=Date.now(), nowIso=new Date().toISOString(), added=0;
   _faqSeedData().forEach(function(s){
-    var k=_faqNormQ(s.question); if(!k || have[k]) return;
-    have[k]=1;
-    S.faq.push({ id:_faqUid(), date:'', email:'',
-      thematique:s.thematique||'', sousThematique:'',
+    var k=_faqNormQ(s.question); if(!k) return;
+    if(imp[k]) return;                        // déjà importée une fois → on n'y touche plus
+    if(have[k]){ imp[k]=now; return; }        // déjà présente (import antérieur) → on marque, sans dupliquer
+    S.faq.push({ id:_faqUid(), date:'',
+      thematique:s.thematique||'', sousThematique:'', sousThematique2:'',
       question:s.question||'', reponseIA:'', reponse:s.reponse||'',
       ressourcesJuridiques:s.ressourcesJuridiques||'', autresRessources:'',
-      auteur:'Mathieu Farcy', _updatedAt:Date.now() });
-    added++;
+      auteur:'Mathieu Farcy', coAuteurs:[], dateCreation:nowIso, dateModification:nowIso,
+      _seedKey:k, _updatedAt:now });
+    imp[k]=now; have[k]=1; added++;
   });
-  if(added){ _faqSaveState(); }
+  _faqSaveState();
   renderFaq();
-  if(typeof toast==='function') toast(added? (added+' question(s) importée(s) ✓') : 'Aucune nouvelle question à importer', added?'ok':'');
+  if(typeof toast==='function') toast(added? (added+' question(s) importée(s) ✓') : 'Tout est déjà importé', added?'ok':'');
 }
 function _faqFrDate(d){ var m=(''+(d||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(d||''); }
 var _faqOpenId = null, _faqSearch = '', _faqFiltre = '', _faqTab = 'questions';
