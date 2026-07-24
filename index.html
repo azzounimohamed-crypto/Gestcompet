@@ -5123,7 +5123,7 @@ function _flushSaveState() {
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
     stolNatExcluded:S.stolNatExcluded||{},
-    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{}, _faqSeedImported:S._faqSeedImported||{},
+    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{}, _faqSeedImported:S._faqSeedImported||{}, faqRefResumes:S.faqRefResumes||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -26369,6 +26369,7 @@ async function pushToCloud() {
     _faqSeeded:           S._faqSeeded           || false,
     _deletedFaq:          S._deletedFaq          || {},
     _faqSeedImported:     S._faqSeedImported     || {},
+    faqRefResumes:        S.faqRefResumes        || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26915,7 +26916,7 @@ async function loadFromSupabaseFirst() {
     // Module Formations : snapshot pour fusion (union par id) après application cloud.
     var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded, delTypes:Object.assign({}, S._deletedFormTypes||{}) };
     // FAQ DTN : snapshot pour fusion (union par id + pierre tombale) après cloud.
-    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}), seedImp:Object.assign({}, S._faqSeedImported||{}) };
+    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}), seedImp:Object.assign({}, S._faqSeedImported||{}), refRes:Object.assign({}, S.faqRefResumes||{}) };
     // Tombstones d'événements sécurité supprimés (pour ne pas les réajouter).
     var _delSecuSnap = Object.assign({}, S._deletedSecurite||{});
 
@@ -27226,6 +27227,10 @@ async function loadFromSupabaseFirst() {
       if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported={};
       var _si=_faqSnap.seedImp||{};
       Object.keys(_si).forEach(function(k){ if(!S._faqSeedImported[k]) S._faqSeedImported[k]=_si[k]; });
+      // Résumés des références réglementaires : fusion par clé, le plus récent gagne.
+      if (!S.faqRefResumes || typeof S.faqRefResumes!=='object' || Array.isArray(S.faqRefResumes)) S.faqRefResumes={};
+      var _rr=_faqSnap.refRes||{};
+      Object.keys(_rr).forEach(function(k){ var loc=_rr[k], ex=S.faqRefResumes[k]; if(!ex || (loc&&(loc._updatedAt||0)>=(ex._updatedAt||0))) S.faqRefResumes[k]=loc; });
     })();
     // ✅ Fusionner securiteEvents locaux avec cloud — champ par champ, sans perte.
     // Un événement présent des deux côtés : la version la plus récente (_updatedAt)
@@ -43163,6 +43168,7 @@ function _faqInit() {
   if (!Array.isArray(S.faq)) S.faq = [];
   if (!S._deletedFaq || typeof S._deletedFaq!=='object' || Array.isArray(S._deletedFaq)) S._deletedFaq = {};
   if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported = {};
+  if (!S.faqRefResumes || typeof S.faqRefResumes!=='object' || Array.isArray(S.faqRefResumes)) S.faqRefResumes = {};
 }
 function _faqUid(){ return 'faq_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _faqEsc(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -43212,7 +43218,7 @@ var _faqOpenId = null, _faqSearch = '', _faqFiltre = '', _faqTab = 'questions';
 function _faqSetTab(t){ _faqTab=t; renderFaq(); }
 // Barre des deux volets : Chiffres & stats · Questions
 function _faqTabBar(){
-  var tabs=[['stats','📊 Chiffres & stats'],['questions','❓ Questions']];
+  var tabs=[['stats','📊 Chiffres & stats'],['questions','❓ Questions'],['refs','⚖️ Références réglementaires']];
   var h='<div style="max-width:920px;margin:0 auto;padding:14px 14px 0"><div style="display:inline-flex;background:var(--navy3);border-radius:10px;padding:3px;gap:2px">';
   tabs.forEach(function(t){ var a=_faqTab===t[0];
     h+='<button onclick="_faqSetTab(\''+t[0]+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt3)')+';font-size:13px;font-weight:'+(a?'800':'600')+';cursor:pointer;font-family:inherit;transition:all .15s">'+t[1]+'</button>';
@@ -43285,12 +43291,70 @@ function _faqValues(champ){
   var set={}; (S.faq||[]).forEach(function(f){ var v=(f[champ]||'').trim(); if(v) set[v]=1; });
   return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
 }
+// ── Volet Références réglementaires ──────────────────────────────────────────
+// Agrège tous les textes cités dans le champ « Ressources juridiques » des
+// questions (une référence par ligne), dédoublonne, compte les questions qui
+// l'utilisent, et associe un résumé éditable (le sens du texte), synchronisé.
+var _faqRefsCache = [];
+function _faqRefsCollect(){
+  var map={};
+  (S.faq||[]).forEach(function(f){
+    var seen={};
+    (f.ressourcesJuridiques||'').split(/\n+/).forEach(function(line){
+      var t=line.trim(); if(!t) return;
+      var k=_faqNormQ(t); if(!k || k.length<4) return;
+      if(!map[k]) map[k]={key:k, texte:t, count:0, questions:[]};
+      if(!seen[k]){ map[k].count++; if(f.question) map[k].questions.push(f.question); seen[k]=1; }
+    });
+  });
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .sort(function(a,b){ return b.count-a.count || a.texte.localeCompare(b.texte); });
+}
+function _faqRefSaveResume(idx, val){
+  var r=_faqRefsCache[idx]; if(!r) return;
+  _faqInit();
+  S.faqRefResumes[r.key]={ texte:r.texte, resume:(val||'').trim(), _updatedAt:Date.now() };
+  _faqSaveState();
+}
+function _faqRefsHtml(){
+  _faqInit();
+  var esc=_faqEsc, canEd=(typeof canModify==='function')?canModify():true;
+  var refs=_faqRefsCollect(); _faqRefsCache=refs;
+  var res=S.faqRefResumes||{};
+  var h='<div style="max-width:920px;margin:0 auto;padding:16px 14px 48px">';
+  h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:14px">'+(refs.length?refs.length+' texte'+(refs.length>1?'s':'')+' de référence cité'+(refs.length>1?'s':'')+' dans les questions':'Aucune référence')+'</div>';
+  if(!refs.length){
+    h+='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 24px;border:1px dashed var(--bdr);border-radius:12px">Aucun texte réglementaire n\'est encore cité.<br><span style="font-size:12px">Renseignez « Ressources juridiques » dans les questions : les textes remonteront ici automatiquement.</span></div>';
+  } else {
+    refs.forEach(function(r, i){
+      var resume=(res[r.key]&&res[r.key].resume)||'';
+      h+='<div style="border:1px solid var(--bdr);border-radius:12px;margin-bottom:10px;background:var(--navy2);padding:13px 15px">';
+      h+='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">';
+      h+='<span style="flex-shrink:0;font-size:16px;margin-top:1px">⚖️</span>';
+      h+='<div style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--txt);line-height:1.4">'+esc(r.texte)+'</div>';
+      h+='<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8" title="Nombre de questions citant ce texte">'+r.count+' question'+(r.count>1?'s':'')+'</span>';
+      h+='</div>';
+      // Résumé / sens du texte
+      h+='<div style="padding-left:26px">';
+      h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);margin-bottom:4px">📝 Sens du texte</div>';
+      if(canEd){
+        h+='<textarea onchange="_faqRefSaveResume('+i+',this.value)" placeholder="Résumez en quelques lignes ce que dit ce texte…" style="width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 11px;outline:none;resize:vertical;line-height:1.5" rows="2">'+esc(resume)+'</textarea>';
+      } else {
+        h+= resume ? '<div style="font-size:13px;line-height:1.6;color:var(--txt2);white-space:pre-wrap">'+esc(resume)+'</div>' : '<div style="font-size:12px;color:var(--txt3);font-style:italic">Pas encore de résumé.</div>';
+      }
+      h+='</div></div>';
+    });
+  }
+  h+='</div>';
+  return h;
+}
 function renderFaq() {
   _faqInit();
   var cont = document.getElementById('faq-content');
   if (!cont) return;
   var _tabBar = _faqTabBar();
   if (_faqTab === 'stats') { cont.innerHTML = _tabBar + _faqStatsHtml(); return; }
+  if (_faqTab === 'refs')  { cont.innerHTML = _tabBar + _faqRefsHtml();  return; }
   var canEd = (typeof canModify==='function') ? canModify() : true;
   var esc = _faqEsc;
 
