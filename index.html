@@ -43251,7 +43251,18 @@ function _dtnOpenFaqPage() {
   var pg = document.getElementById('page-faq');
   if (pg) pg.style.display = 'flex';
   _dtnSetActiveNav('faq');
+  _faqTab = 'stats'; // ouverture sur le volet Chiffres & stats
   renderFaq();
+}
+// Nom du rédacteur courant (pour l'auteur automatique).
+function _faqUserName(){
+  try{ var u=S.user||{}; var n=((u.prenom||'')+' '+(u.nom||'')).trim(); return n||u.email||''; }catch(e){ return ''; }
+}
+function _faqFrDateTime(iso){
+  if(!iso) return '';
+  var d=new Date(iso); if(isNaN(d)) return '';
+  var p=function(n){return n<10?'0'+n:''+n;};
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+'h'+p(d.getMinutes());
 }
 // Valeurs distinctes d'un champ (pour les filtres et l'auto-complétion).
 function _faqValues(champ){
@@ -43307,7 +43318,9 @@ function renderFaq() {
       if(f.sousThematique) badges+='<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--txt3)">'+esc(f.sousThematique)+'</span> ';
       if(badges) html += '<div style="margin-bottom:4px">'+badges+'</div>';
       html += '<div style="font-size:14px;font-weight:700;color:var(--txt);line-height:1.35">'+esc(f.question||'(sans intitulé)')+'</div>';
-      var meta=[]; if(f.date) meta.push('📅 '+_faqFrDate(f.date)); if(f.email) meta.push('✉️ '+esc(f.email)); if(f.auteur) meta.push('✍️ '+esc(f.auteur));
+      var meta=[]; if(f.date) meta.push('📅 '+_faqFrDate(f.date));
+      var _aut=(f.auteur||''); var _co=(Array.isArray(f.coAuteurs)&&f.coAuteurs.length)?f.coAuteurs:[];
+      if(_aut) meta.push('✍️ '+esc(_aut)+(_co.length?' +'+_co.length:''));
       if(meta.length) html += '<div style="font-size:11px;color:var(--txt3);margin-top:3px">'+meta.join(' · ')+'</div>';
       html += '</div>';
       html += '<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+(repondu?'rgba(34,197,94,.14);color:#22c55e':'rgba(245,158,11,.14);color:#f59e0b')+'">'+(repondu?'Répondu':'À traiter')+'</span>';
@@ -43395,7 +43408,12 @@ function _faqGenPrompt(){
 function _faqFormOpen(id){
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
   var today=new Date().toISOString().slice(0,10);
-  var moi=''; try{ moi=((S.user&&(S.user.prenom||'')+' '+(S.user&&S.user.nom||''))||'').trim(); }catch(e){}
+  var moi=_faqUserName();
+  // Auteur/dates automatiques
+  var redac = f ? (f.auteur||moi||'') : moi;
+  var coaut = (f && Array.isArray(f.coAuteurs)) ? f.coAuteurs.join(', ') : '';
+  var creLe = f ? (_faqFrDateTime(f.dateCreation)||'—') : 'à l\'enregistrement';
+  var modLe = f ? (_faqFrDateTime(f.dateModification)||'—') : '—';
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.id='faq-modal';
   ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
@@ -43404,7 +43422,8 @@ function _faqFormOpen(id){
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
   var e=_faqEsc;
   var dlThemes='<datalist id="faq-dl-them">'+_faqValues('thematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
-  var dlSous='<datalist id="faq-dl-sous">'+_faqValues('sousThematique').map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
+  var _sv=_faqValues('sousThematique').concat(_faqValues('sousThematique2')); var _svSeen={}; _sv=_sv.filter(function(v){var k=v.toLowerCase();if(_svSeen[k])return false;_svSeen[k]=1;return true;});
+  var dlSous='<datalist id="faq-dl-sous">'+_sv.map(function(t){return '<option value="'+e(t)+'">';}).join('')+'</datalist>';
   // Boîte large, deux colonnes, corps défilant + pied de page FIXE (boutons
   // toujours visibles quelle que soit la hauteur du contenu).
   var taSt=fSt+';resize:vertical;line-height:1.5';
@@ -43418,11 +43437,11 @@ function _faqFormOpen(id){
     + '<div>'
     +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
     +     '<div><label style="'+lSt+'">Date de la demande</label><input id="faq-date" type="date" value="'+e(f?(f.date||today):today)+'" style="'+fSt+'"></div>'
-    +     '<div><label style="'+lSt+'">Email du demandeur</label><input id="faq-email" type="email" value="'+e(f?f.email:'')+'" placeholder="licencie@…" style="'+fSt+'"></div>'
+    +     '<div><label style="'+lSt+'">Thématique</label><input id="faq-them" list="faq-dl-them" value="'+e(f?f.thematique:'')+'" placeholder="Ex : Assurance, Licence…" style="'+fSt+'"></div>'
     +   '</div>'
     +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
-    +     '<div><label style="'+lSt+'">Thématique</label><input id="faq-them" list="faq-dl-them" value="'+e(f?f.thematique:'')+'" placeholder="Ex : Assurance, Licence…" style="'+fSt+'"></div>'
-    +     '<div><label style="'+lSt+'">Sous-thématique</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
+    +     '<div><label style="'+lSt+'">Sous-thématique 1</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
+    +     '<div><label style="'+lSt+'">Sous-thématique 2</label><input id="faq-sous2" list="faq-dl-sous" value="'+e(f?(f.sousThematique2||''):'')+'" placeholder="(facultatif)" style="'+fSt+'"></div>'
     +   '</div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="4" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea></div>'
     +   '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="7" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+taSt+'">'+e(f?f.reponseIA:'')+'</textarea></div>'
@@ -43432,7 +43451,12 @@ function _faqFormOpen(id){
     +   '<div style="margin-bottom:12px"><label style="'+lSt+';color:#22c55e">✅ Ma réponse (celle utilisée)</label><textarea id="faq-r" rows="7" placeholder="La réponse validée, envoyée au licencié…" style="'+taSt+'">'+e(f?f.reponse:'')+'</textarea></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">⚖️ Ressources juridiques</label><textarea id="faq-juri" rows="3" placeholder="Textes, articles, règlements…" style="'+taSt+'">'+e(f?f.ressourcesJuridiques:'')+'</textarea></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📎 Autres ressources</label><textarea id="faq-autres" rows="2" placeholder="Liens, documents, contacts…" style="'+taSt+'">'+e(f?f.autresRessources:'')+'</textarea></div>'
-    +   '<div><label style="'+lSt+'">✍️ Auteur</label><input id="faq-auteur" value="'+e(f?(f.auteur||''):moi)+'" placeholder="Qui a traité la question" style="'+fSt+'"></div>'
+    +   '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--txt2);line-height:1.9">'
+    +     '<div><span style="color:var(--txt3)">✍️ Rédacteur :</span> <b style="color:var(--txt)">'+(e(redac)||'—')+'</b></div>'
+    +     (coaut ? '<div><span style="color:var(--txt3)">🤝 Co-auteur(s) :</span> '+e(coaut)+'</div>' : '')
+    +     '<div><span style="color:var(--txt3)">🕓 Créé le :</span> '+e(creLe)+' &nbsp;·&nbsp; <span style="color:var(--txt3)">Modifié le :</span> '+e(modLe)+'</div>'
+    +     '<div style="font-size:10px;color:var(--txt3);margin-top:4px">Rédacteur, co-auteurs et dates sont renseignés automatiquement.</div>'
+    +   '</div>'
     + '</div>'
     + '</div></div>'
     // Pied de page fixe
@@ -43448,16 +43472,30 @@ function _faqSave(id){
   var g=function(idf){ return ((document.getElementById(idf)||{}).value||'').trim(); };
   var q=g('faq-q');
   if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return; }
+  var nowIso=new Date().toISOString();
+  var me=_faqUserName();
+  // Champs saisis (email retiré du formulaire : on préserve l'existant, on ne l'écrase pas)
   var data={
-    date:g('faq-date'), email:g('faq-email'),
-    thematique:g('faq-them'), sousThematique:g('faq-sous'),
+    date:g('faq-date'),
+    thematique:g('faq-them'), sousThematique:g('faq-sous'), sousThematique2:g('faq-sous2'),
     question:q, reponseIA:g('faq-ia'), reponse:g('faq-r'),
     ressourcesJuridiques:g('faq-juri'), autresRessources:g('faq-autres'),
-    auteur:g('faq-auteur'), _updatedAt:Date.now()
+    dateModification:nowIso, _updatedAt:Date.now()
   };
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
-  if(f){ Object.assign(f, data); }
-  else { data.id=_faqUid(); S.faq.push(data); _faqOpenId=data.id; }
+  if(f){
+    // Modification : co-auteur automatique (si un autre que le rédacteur intervient)
+    if(me && me!==(f.auteur||'')){
+      if(!Array.isArray(f.coAuteurs)) f.coAuteurs=[];
+      if(f.coAuteurs.indexOf(me)===-1) f.coAuteurs.push(me);
+    }
+    Object.assign(f, data);
+  } else {
+    // Création : rédacteur = utilisateur courant, dates auto
+    data.id=_faqUid(); data.auteur=me||''; data.coAuteurs=[];
+    data.dateCreation=nowIso;
+    S.faq.push(data); _faqOpenId=data.id;
+  }
   _faqSaveState();
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   renderFaq();
