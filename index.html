@@ -43325,6 +43325,16 @@ function _faqRefGuessNiveau(t){
 
 }
 function _faqRefRec(key){ return (S.faqRefResumes||{})[key] || {}; }
+// Ouvre une recherche pré-remplie du texte sur la bonne source officielle.
+function _faqRefSearchOpen(idx){
+  var r=_faqRefsCache[idx]; if(!r) return;
+  var niv=((document.getElementById('faqref-niveau')||{}).value)||_faqRefGuessNiveau(r.texte);
+  var site=(niv==='Traités internationaux') ? ' site:eur-lex.europa.eu' : ' site:legifrance.gouv.fr';
+  var q=(((document.getElementById('faqref-titre')||{}).value)||'').trim() || r.texte;
+  window.open('https://www.google.com/search?q='+encodeURIComponent(q+site),'_blank','noopener');
+}
+// Normalise une URL saisie (ajoute https:// si absent).
+function _faqNormUrl(u){ u=(u||'').trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u='https://'+u; return u; }
 function _faqRefEdit(idx){
   var r=_faqRefsCache[idx]; if(!r) return;
   _faqInit();
@@ -43345,6 +43355,7 @@ function _faqRefEdit(idx){
     +     '<div><label style="'+lSt+'">Niveau</label><select id="faqref-niveau" style="'+fSt+';cursor:pointer">'+nivOpts+'</select></div>'
     +     '<div><label style="'+lSt+'">Titre</label><input id="faqref-titre" value="'+e(rec.titre||'')+'" placeholder="Titre court du texte" style="'+fSt+'"></div>'
     +   '</div>'
+    +   '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔎 Chercher le texte</button></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez ici l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📝 Sens du texte (résumé)</label><textarea id="faqref-resume" rows="3" placeholder="Ce que dit le texte, en quelques lignes…" style="'+taSt+'">'+e(rec.resume||'')+'</textarea></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Motifs</label><textarea id="faqref-motifs" rows="4" placeholder="Pourquoi ce texte, ce qu\'il vise…" style="'+taSt+'">'+e(rec.motifs||'')+'</textarea></div>'
     +   '<div><label style="'+lSt+'">Dispositif</label><textarea id="faqref-dispositif" rows="5" placeholder="Ce que le texte prescrit concrètement (articles clés)…" style="'+taSt+'">'+e(rec.dispositif||'')+'</textarea></div>'
@@ -43362,7 +43373,7 @@ function _faqRefSave(idx){
   var g=function(id){ return ((document.getElementById(id)||{}).value||'').trim(); };
   S.faqRefResumes[r.key]={
     texte:r.texte,
-    niveau:g('faqref-niveau'), titre:g('faqref-titre'),
+    niveau:g('faqref-niveau'), titre:g('faqref-titre'), lien:_faqNormUrl(g('faqref-lien')),
     resume:g('faqref-resume'), motifs:g('faqref-motifs'), dispositif:g('faqref-dispositif'),
     _updatedAt:Date.now()
   };
@@ -43394,6 +43405,7 @@ function _faqRefsHtml(){
       h+='</div>';
       h+='<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
       h+='<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8;white-space:nowrap" title="Questions citant ce texte">'+r.count+' question'+(r.count>1?'s':'')+'</span>';
+      if((rec.lien||'').trim()) h+='<a href="'+esc(rec.lien)+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid rgba(34,197,94,.35);border-radius:7px;background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none;white-space:nowrap">🔗 Ouvrir le texte</a>';
       if(canEd) h+='<button onclick="_faqRefEdit('+i+')" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit;white-space:nowrap">✏️ Modifier</button>';
       h+='</div>';
       h+='</div>';
