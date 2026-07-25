@@ -25000,6 +25000,8 @@ function renderSitesSportifs() {
   var COLS = 'grid-template-columns:80px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 90px 36px';
 
   var html = '';
+  // Import des terrains de compétition (dédoublonné par OACI) — visible s'il en reste
+  if (canEdit) { var _sp=_sitesImportPending(); if(_sp>0) html += '<div style="padding:8px 8px 4px"><button onclick="_sitesImportComps()" title="Ajouter les terrains des compétitions et remplir via BasULM" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🏟 Importer '+_sp+' site(s) des compétitions</button></div>'; }
   // En-tête colonnes
   html += '<div style="display:grid;'+COLS+';gap:4px;padding:6px 8px;border-bottom:2px solid var(--bdr);align-items:center;background:var(--navy3)">';
   ['OACI','Lieu','Ville','Région','Gestionnaire','Pratique',''].forEach(function(h){ html += '<div style="'+hSt+'">'+h+'</div>'; });
@@ -25041,6 +25043,56 @@ function renderSitesSportifs() {
     html += '</div>';
   });
   cont.innerHTML = html;
+}
+// ── Import des terrains de compétition dans « Sites aéros » ──────────────────
+// Reprend le site d'accueil de chaque compétition (OACI/lieu/région/pratique),
+// dédoublonné par OACI (à défaut par lieu), et remplit les fiches via BasULM.
+function _sitesCompVenues(){
+  var have={};
+  (S.sitesSportifs||[]).forEach(function(s){
+    var k=(s.oaci||'').trim().toUpperCase(); if(k) have[k]=1;
+    var kl=(s.lieu||'').trim().toLowerCase(); if(kl) have['L:'+kl]=1;
+  });
+  var out=[], seen={};
+  (S.comps||[]).forEach(function(c){
+    var oaci=(c.oaci||'').trim().toUpperCase(), lieu=(c.lieu||'').trim();
+    if(!oaci && !lieu) return;
+    var key = oaci || ('L:'+lieu.toLowerCase());
+    if(seen[key]) return;
+    if(oaci && have[oaci]) return;
+    if(!oaci && have['L:'+lieu.toLowerCase()]) return;
+    seen[key]=1;
+    out.push({ oaci:oaci, lieu:lieu, region:(c.region||''), pratique:(c.pratique||'microlight') });
+  });
+  return out;
+}
+function _sitesImportPending(){ return _sitesCompVenues().length; }
+function _sitesImportComps(){
+  if(!S.sitesSportifs) S.sitesSportifs=[];
+  var venues=_sitesCompVenues();
+  if(!venues.length){ if(typeof toast==='function')toast('Aucun nouveau site de compétition à importer','warn'); return; }
+  var added=[];
+  venues.forEach(function(v){
+    var site={ id:'site-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      oaci:v.oaci, lieu:v.lieu, ville:'', region:v.region, gestionnaire:'',
+      pratique:(v.pratique==='paramoteur'?'paramoteur':(v.pratique==='microlight'?'microlight':'all')),
+      _fromComp:true, _updatedAt:Date.now() };
+    S.sitesSportifs.push(site); added.push(site);
+  });
+  saveState(); if(typeof silentPush==='function') silentPush(); renderSitesSportifs();
+  if(typeof toast==='function') toast(added.length+' site(s) importé(s) — complément BasULM en cours…','ok');
+  // Remplissage automatique via BasULM (lieu, ville, région + fiche complète)
+  added.forEach(function(site){
+    if(!site.oaci || typeof basulmLookup!=='function') return;
+    basulmLookup(site.oaci).then(function(d){
+      if(!d) return; var o=(S.sitesSportifs||[]).find(function(x){return x.id===site.id;}); if(!o) return;
+      if(!o.lieu && d.toponyme) o.lieu=d.toponyme;
+      if(!o.ville && d.ville)   o.ville=d.ville;
+      if(!o.region && d.region) o.region=d.region;
+      o.basulm=d; o._updatedAt=Date.now();
+      saveState(); renderSitesSportifs();
+    }).catch(function(){});
+  });
 }
 function addSiteInline() {
   if (!S.sitesSportifs) S.sitesSportifs = [];
