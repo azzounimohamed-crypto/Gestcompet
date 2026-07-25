@@ -43450,6 +43450,7 @@ function renderFaq() {
   html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
   html += '<input id="faq-search" value="'+esc(_faqSearch)+'" placeholder="🔎 Rechercher une question…" oninput="_faqSearch=this.value;_faqRenderDebounce()" style="flex:1;min-width:180px;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 12px;outline:none">';
   html += '<select onchange="_faqFiltre=this.value;renderFaq()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;cursor:pointer;max-width:220px">'+filtreOpts+'</select>';
+  html += '<button onclick="_faqPrint()" title="Exporter / imprimer les questions répondues" style="padding:9px 13px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🖨️ Exporter</button>';
   if (canEd) html += '<button onclick="_faqFormOpen(null)" style="padding:9px 15px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ Nouvelle question</button>';
   html += '</div>';
   // Import des questions déjà traitées (Mathieu Farcy) — visible tant qu'il en reste.
@@ -43509,6 +43510,91 @@ function renderFaq() {
 var _faqRenderTimer=null;
 function _faqRenderDebounce(){ clearTimeout(_faqRenderTimer); _faqRenderTimer=setTimeout(function(){ var el=document.getElementById('faq-search'); var pos=el?el.selectionStart:null; renderFaq(); var el2=document.getElementById('faq-search'); if(el2){ el2.focus(); if(pos!=null) try{el2.setSelectionRange(pos,pos);}catch(e){} } }, 220); }
 function _faqToggle(id){ _faqOpenId = (_faqOpenId===id) ? null : id; renderFaq(); }
+
+// ── Détection de questions similaires déjà traitées (réutilisation) ──────────
+var _FAQ_STOP={ 'pour':1,'avec':1,'dans':1,'une':1,'des':1,'les':1,'que':1,'qui':1,'est':1,'sont':1,'peut':1,'puis':1,'faire':1,'être':1,'etre':1,'mon':1,'mes':1,'son':1,'ses':1,'quel':1,'quelle':1,'comment':1,'quelles':1,'quels':1,'sur':1,'aux':1,'par':1,'plus':1,'cette':1,'ce':1,'la':1,'le':1,'un':1,'du':1,'au':1,'ou':1,'et':1,'en':1,'de':1,'je':1,'il':1,'elle':1,'nous':1,'vous':1,'dois':1,'doit':1,'suis':1,'ai':1 };
+function _faqTokens(s){ return _faqNormQ(s).split(/[^a-z0-9]+/).filter(function(w){ return w.length>=4 && !_FAQ_STOP[w]; }); }
+var _faqEditingId=null, _faqSimCache=[];
+function _faqSimilar(qText, excludeId){
+  var qt=_faqTokens(qText); if(qt.length<2) return [];
+  var qset={}; qt.forEach(function(w){ qset[w]=1; });
+  return (S.faq||[]).filter(function(f){ return f && f.id!==excludeId && (f.reponse||'').trim(); })
+    .map(function(f){ var seen={}, c=0; _faqTokens(f.question).forEach(function(w){ if(qset[w]&&!seen[w]){ c++; seen[w]=1; } }); return {f:f, score:c}; })
+    .filter(function(x){ return x.score>=2; })
+    .sort(function(a,b){ return b.score-a.score; })
+    .slice(0,4);
+}
+function _faqUpdateSimilar(){
+  var el=document.getElementById('faq-similar'); if(!el) return;
+  var q=((document.getElementById('faq-q')||{}).value)||'';
+  var sims=_faqSimilar(q, _faqEditingId);
+  _faqSimCache=sims.map(function(x){ return x.f; });
+  if(!sims.length){ el.innerHTML=''; return; }
+  var esc=_faqEsc;
+  var h='<div style="border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.06);border-radius:10px;padding:10px 12px">';
+  h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#22c55e;margin-bottom:6px">♻️ Questions déjà traitées similaires</div>';
+  sims.forEach(function(x,i){
+    var f=x.f;
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:'+(i?'1px solid var(--bdr)':'none')+'">';
+    h+='<div style="flex:1;min-width:0"><div style="font-size:12.5px;color:var(--txt);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.question||'')+'</div>'+((f.thematique)?'<div style="font-size:10px;color:var(--txt3)">'+esc(f.thematique)+(f.auteur?' · '+esc(f.auteur):'')+'</div>':'')+'</div>';
+    h+='<button type="button" onclick="_faqReuse('+i+')" style="flex-shrink:0;min-height:32px;padding:0 12px;border:1px solid rgba(34,197,94,.4);border-radius:7px;background:rgba(34,197,94,.12);color:#22c55e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">↩ Réutiliser</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  el.innerHTML=h;
+}
+function _faqReuse(i){
+  var m=_faqSimCache[i]; if(!m) return;
+  var rEl=document.getElementById('faq-r');
+  if(rEl){
+    if(rEl.value.trim() && !window.confirm('Remplacer la réponse en cours par celle de la question similaire ?')) return;
+    rEl.value=m.reponse||'';
+  }
+  var fill=function(id,val){ var e=document.getElementById(id); if(e && !e.value.trim() && (val||'').trim()) e.value=val; };
+  fill('faq-juri', m.ressourcesJuridiques);
+  fill('faq-them', m.thematique);
+  fill('faq-sous', m.sousThematique);
+  if(typeof toast==='function') toast('Réponse réutilisée — vérifiez et adaptez.','ok');
+}
+
+// ── Export / impression de la FAQ (questions répondues, par thématique) ──────
+function _faqPrint(){
+  _faqInit();
+  var esc=function(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  // Respecte le filtre thématique actif ; n'exporte que les questions répondues.
+  var list=(S.faq||[]).filter(function(f){ return (f.reponse||'').trim() && (!_faqFiltre || (f.thematique||'')===_faqFiltre); });
+  if(!list.length){ if(typeof toast==='function')toast('Aucune question répondue à exporter','warn'); return; }
+  // Regrouper par thématique
+  var groups={}; list.forEach(function(f){ var t=(f.thematique||'').trim()||'Divers'; (groups[t]=groups[t]||[]).push(f); });
+  var themes=Object.keys(groups).sort(function(a,b){ return a.localeCompare(b); });
+  var d=new Date(); var dstr=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+  var h='<!doctype html><html><head><meta charset="utf-8"><title>FAQ DTN — FFPLUM</title><style>'
+    +'*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;margin:0;padding:24px 30px;font-size:12px;line-height:1.5}'
+    +'h1{font-size:20px;color:#003399;margin:0 0 2px}.sub{color:#666;font-size:11px;margin-bottom:18px}'
+    +'h2{font-size:14px;color:#003399;border-bottom:2px solid #003399;padding-bottom:3px;margin:22px 0 10px}'
+    +'.q{font-weight:700;color:#111;margin:12px 0 3px}.r{white-space:pre-wrap;margin:0 0 4px}'
+    +'.ref{font-size:10.5px;color:#555;white-space:pre-wrap;border-left:3px solid #ccc;padding-left:8px;margin:4px 0 10px}'
+    +'.item{page-break-inside:avoid;margin-bottom:8px}'
+    +'.print-btn{position:fixed;top:10px;right:12px;padding:8px 16px;background:#003399;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}'
+    +'@media print{.print-btn{display:none}}'
+    +'</style></head><body>';
+  h+='<button class="print-btn" onclick="window.print()">🖨 Imprimer</button>';
+  h+='<h1>FAQ — Direction Technique Nationale · FFPLUM</h1>';
+  h+='<div class="sub">'+list.length+' question'+(list.length>1?'s':'')+(_faqFiltre?' · '+esc(_faqFiltre):'')+' · édité le '+dstr+'</div>';
+  themes.forEach(function(t){
+    h+='<h2>'+esc(t)+' ('+groups[t].length+')</h2>';
+    groups[t].forEach(function(f){
+      h+='<div class="item"><div class="q">'+esc(f.question||'')+'</div>';
+      h+='<div class="r">'+esc(f.reponse||'')+'</div>';
+      if((f.ressourcesJuridiques||'').trim()) h+='<div class="ref">⚖️ '+esc(f.ressourcesJuridiques)+'</div>';
+      h+='</div>';
+    });
+  });
+  h+='</body></html>';
+  var w=window.open('','_blank'); if(!w){ if(typeof toast==='function')toast('Autorisez les fenêtres pop-up pour exporter','err'); return; }
+  w.document.write(h); w.document.close(); w.focus();
+  setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+}
 // Compose un courriel avec la question et UNIQUEMENT les rubriques renseignées
 // (le titre d'une rubrique n'apparaît que si elle a du contenu). Destinataire
 // pré-rempli avec l'email du demandeur s'il est connu.
@@ -43562,6 +43648,7 @@ function _faqGenPrompt(){
 }
 function _faqFormOpen(id){
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
+  _faqEditingId = f ? f.id : null;
   var today=new Date().toISOString().slice(0,10);
   var moi=_faqUserName();
   // Auteur/dates automatiques
@@ -43606,7 +43693,7 @@ function _faqFormOpen(id){
     +     '<div><label style="'+lSt+'">Sous-thématique 1</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
     +     '<div><label style="'+lSt+'">Sous-thématique 2</label><input id="faq-sous2" list="faq-dl-sous" value="'+e(f?(f.sousThematique2||''):'')+'" placeholder="(facultatif)" style="'+fSt+'"></div>'
     +   '</div>'
-    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="4" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="4" oninput="_faqUpdateSimilar()" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea><div id="faq-similar" style="margin-top:8px"></div></div>'
     +   '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="7" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+taSt+'">'+e(f?f.reponseIA:'')+'</textarea></div>'
     + '</div>'
     // ── Colonne droite : ma réponse, ressources, auteur ──
@@ -43629,6 +43716,7 @@ function _faqFormOpen(id){
     + '</div>'
     + '</div>';
   document.body.appendChild(ov);
+  _faqUpdateSimilar();
   setTimeout(function(){ var el=document.getElementById('faq-q'); if(el)el.focus(); },60);
 }
 // Liste ordonnée des id de questions telle qu'affichée (filtre + recherche + tri),
