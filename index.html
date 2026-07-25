@@ -5123,7 +5123,7 @@ function _flushSaveState() {
     espacesPartages:S.espacesPartages||[],
     stolResults:S.stolResults||{},
     stolNatExcluded:S.stolNatExcluded||{},
-    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{}, _faqSeedImported:S._faqSeedImported||{},
+    formTypes:S.formTypes||[], formSessions:S.formSessions||[], formInscriptions:S.formInscriptions||[], formQualifs:S.formQualifs||[], _formSeeded:S._formSeeded||false, _deletedFormTypes:S._deletedFormTypes||{}, faq:S.faq||[], _faqSeeded:S._faqSeeded||false, _deletedFaq:S._deletedFaq||{}, _faqSeedImported:S._faqSeedImported||{}, faqRefResumes:S.faqRefResumes||{},
     settings:S.settings||{}, sitesSportifs:S.sitesSportifs||[],
     officialDocs:S.officialDocs||{}, messages:S.messages||[],
     _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
@@ -25000,6 +25000,8 @@ function renderSitesSportifs() {
   var COLS = 'grid-template-columns:80px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 90px 36px';
 
   var html = '';
+  // Import des terrains de compétition (dédoublonné par OACI) — visible s'il en reste
+  if (canEdit) { var _sp=_sitesImportPending(); if(_sp>0) html += '<div style="padding:8px 8px 4px"><button onclick="_sitesImportComps()" title="Ajouter les terrains des compétitions et remplir via BasULM" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🏟 Importer '+_sp+' site(s) des compétitions</button></div>'; }
   // En-tête colonnes
   html += '<div style="display:grid;'+COLS+';gap:4px;padding:6px 8px;border-bottom:2px solid var(--bdr);align-items:center;background:var(--navy3)">';
   ['OACI','Lieu','Ville','Région','Gestionnaire','Pratique',''].forEach(function(h){ html += '<div style="'+hSt+'">'+h+'</div>'; });
@@ -25041,6 +25043,56 @@ function renderSitesSportifs() {
     html += '</div>';
   });
   cont.innerHTML = html;
+}
+// ── Import des terrains de compétition dans « Sites aéros » ──────────────────
+// Reprend le site d'accueil de chaque compétition (OACI/lieu/région/pratique),
+// dédoublonné par OACI (à défaut par lieu), et remplit les fiches via BasULM.
+function _sitesCompVenues(){
+  var have={};
+  (S.sitesSportifs||[]).forEach(function(s){
+    var k=(s.oaci||'').trim().toUpperCase(); if(k) have[k]=1;
+    var kl=(s.lieu||'').trim().toLowerCase(); if(kl) have['L:'+kl]=1;
+  });
+  var out=[], seen={};
+  (S.comps||[]).forEach(function(c){
+    var oaci=(c.oaci||'').trim().toUpperCase(), lieu=(c.lieu||'').trim();
+    if(!oaci && !lieu) return;
+    var key = oaci || ('L:'+lieu.toLowerCase());
+    if(seen[key]) return;
+    if(oaci && have[oaci]) return;
+    if(!oaci && have['L:'+lieu.toLowerCase()]) return;
+    seen[key]=1;
+    out.push({ oaci:oaci, lieu:lieu, region:(c.region||''), pratique:(c.pratique||'microlight') });
+  });
+  return out;
+}
+function _sitesImportPending(){ return _sitesCompVenues().length; }
+function _sitesImportComps(){
+  if(!S.sitesSportifs) S.sitesSportifs=[];
+  var venues=_sitesCompVenues();
+  if(!venues.length){ if(typeof toast==='function')toast('Aucun nouveau site de compétition à importer','warn'); return; }
+  var added=[];
+  venues.forEach(function(v){
+    var site={ id:'site-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      oaci:v.oaci, lieu:v.lieu, ville:'', region:v.region, gestionnaire:'',
+      pratique:(v.pratique==='paramoteur'?'paramoteur':(v.pratique==='microlight'?'microlight':'all')),
+      _fromComp:true, _updatedAt:Date.now() };
+    S.sitesSportifs.push(site); added.push(site);
+  });
+  saveState(); if(typeof silentPush==='function') silentPush(); renderSitesSportifs();
+  if(typeof toast==='function') toast(added.length+' site(s) importé(s) — complément BasULM en cours…','ok');
+  // Remplissage automatique via BasULM (lieu, ville, région + fiche complète)
+  added.forEach(function(site){
+    if(!site.oaci || typeof basulmLookup!=='function') return;
+    basulmLookup(site.oaci).then(function(d){
+      if(!d) return; var o=(S.sitesSportifs||[]).find(function(x){return x.id===site.id;}); if(!o) return;
+      if(!o.lieu && d.toponyme) o.lieu=d.toponyme;
+      if(!o.ville && d.ville)   o.ville=d.ville;
+      if(!o.region && d.region) o.region=d.region;
+      o.basulm=d; o._updatedAt=Date.now();
+      saveState(); renderSitesSportifs();
+    }).catch(function(){});
+  });
 }
 function addSiteInline() {
   if (!S.sitesSportifs) S.sitesSportifs = [];
@@ -26369,6 +26421,7 @@ async function pushToCloud() {
     _faqSeeded:           S._faqSeeded           || false,
     _deletedFaq:          S._deletedFaq          || {},
     _faqSeedImported:     S._faqSeedImported     || {},
+    faqRefResumes:        S.faqRefResumes        || {},
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -26915,7 +26968,7 @@ async function loadFromSupabaseFirst() {
     // Module Formations : snapshot pour fusion (union par id) après application cloud.
     var _formSnap = { formTypes:(S.formTypes||[]).slice(), formSessions:(S.formSessions||[]).slice(), formInscriptions:(S.formInscriptions||[]).slice(), formQualifs:(S.formQualifs||[]).slice(), seeded:!!S._formSeeded, delTypes:Object.assign({}, S._deletedFormTypes||{}) };
     // FAQ DTN : snapshot pour fusion (union par id + pierre tombale) après cloud.
-    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}), seedImp:Object.assign({}, S._faqSeedImported||{}) };
+    var _faqSnap = { faq:(S.faq||[]).slice(), seeded:!!S._faqSeeded, delFaq:Object.assign({}, S._deletedFaq||{}), seedImp:Object.assign({}, S._faqSeedImported||{}), refRes:Object.assign({}, S.faqRefResumes||{}) };
     // Tombstones d'événements sécurité supprimés (pour ne pas les réajouter).
     var _delSecuSnap = Object.assign({}, S._deletedSecurite||{});
 
@@ -27226,6 +27279,10 @@ async function loadFromSupabaseFirst() {
       if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported={};
       var _si=_faqSnap.seedImp||{};
       Object.keys(_si).forEach(function(k){ if(!S._faqSeedImported[k]) S._faqSeedImported[k]=_si[k]; });
+      // Résumés des références réglementaires : fusion par clé, le plus récent gagne.
+      if (!S.faqRefResumes || typeof S.faqRefResumes!=='object' || Array.isArray(S.faqRefResumes)) S.faqRefResumes={};
+      var _rr=_faqSnap.refRes||{};
+      Object.keys(_rr).forEach(function(k){ var loc=_rr[k], ex=S.faqRefResumes[k]; if(!ex || (loc&&(loc._updatedAt||0)>=(ex._updatedAt||0))) S.faqRefResumes[k]=loc; });
     })();
     // ✅ Fusionner securiteEvents locaux avec cloud — champ par champ, sans perte.
     // Un événement présent des deux côtés : la version la plus récente (_updatedAt)
@@ -43163,6 +43220,7 @@ function _faqInit() {
   if (!Array.isArray(S.faq)) S.faq = [];
   if (!S._deletedFaq || typeof S._deletedFaq!=='object' || Array.isArray(S._deletedFaq)) S._deletedFaq = {};
   if (!S._faqSeedImported || typeof S._faqSeedImported!=='object' || Array.isArray(S._faqSeedImported)) S._faqSeedImported = {};
+  if (!S.faqRefResumes || typeof S.faqRefResumes!=='object' || Array.isArray(S.faqRefResumes)) S.faqRefResumes = {};
 }
 function _faqUid(){ return 'faq_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _faqEsc(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -43212,7 +43270,7 @@ var _faqOpenId = null, _faqSearch = '', _faqFiltre = '', _faqTab = 'questions';
 function _faqSetTab(t){ _faqTab=t; renderFaq(); }
 // Barre des deux volets : Chiffres & stats · Questions
 function _faqTabBar(){
-  var tabs=[['stats','📊 Chiffres & stats'],['questions','❓ Questions']];
+  var tabs=[['stats','📊 Chiffres & stats'],['questions','❓ Questions'],['refs','⚖️ Références réglementaires']];
   var h='<div style="max-width:920px;margin:0 auto;padding:14px 14px 0"><div style="display:inline-flex;background:var(--navy3);border-radius:10px;padding:3px;gap:2px">';
   tabs.forEach(function(t){ var a=_faqTab===t[0];
     h+='<button onclick="_faqSetTab(\''+t[0]+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt3)')+';font-size:13px;font-weight:'+(a?'800':'600')+';cursor:pointer;font-family:inherit;transition:all .15s">'+t[1]+'</button>';
@@ -43285,12 +43343,145 @@ function _faqValues(champ){
   var set={}; (S.faq||[]).forEach(function(f){ var v=(f[champ]||'').trim(); if(v) set[v]=1; });
   return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
 }
+// ── Volet Références réglementaires ──────────────────────────────────────────
+// Agrège tous les textes cités dans le champ « Ressources juridiques » des
+// questions (une référence par ligne), dédoublonne, compte les questions qui
+// l'utilisent, et associe un résumé éditable (le sens du texte), synchronisé.
+var _faqRefsCache = [];
+function _faqRefsCollect(){
+  var map={};
+  (S.faq||[]).forEach(function(f){
+    var seen={};
+    (f.ressourcesJuridiques||'').split(/\n+/).forEach(function(line){
+      var t=line.trim(); if(!t) return;
+      var k=_faqNormQ(t); if(!k || k.length<4) return;
+      if(!map[k]) map[k]={key:k, texte:t, count:0, questions:[]};
+      if(!seen[k]){ map[k].count++; if(f.question) map[k].questions.push(f.question); seen[k]=1; }
+    });
+  });
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .sort(function(a,b){ return b.count-a.count || a.texte.localeCompare(b.texte); });
+}
+// Hiérarchie des normes (du plus élevé au plus bas).
+var _FAQ_NIVEAUX = ['Constitution','Traités internationaux','Lois','Décrets','Arrêtés'];
+var _FAQ_NIV_COL = {'Constitution':'#ef4444','Traités internationaux':'#8b5cf6','Lois':'#0891b2','Décrets':'#d97706','Arrêtés':'#6366f1'};
+// Devine le niveau depuis l'intitulé (première fois seulement).
+function _faqRefGuessNiveau(t){
+  var s=(t||'').toLowerCase();
+  if(/\bconstitution\b/.test(s)) return 'Constitution';
+  if(/trait[eé]|convention|r[èe]glement\s*\(ue\)|directive\s*\(ue\)|directive\s*\d/.test(s)) return 'Traités internationaux';
+  if(/\bloi\b|\bcode\b/.test(s)) return 'Lois';
+  if(/d[eé]cret/.test(s)) return 'Décrets';
+  if(/arr[êe]t[eé]/.test(s)) return 'Arrêtés';
+  return ''; // instruction, guide, etc. : laissé au choix du gestionnaire
+
+}
+function _faqRefRec(key){ return (S.faqRefResumes||{})[key] || {}; }
+// Ouvre une recherche pré-remplie du texte sur la bonne source officielle.
+function _faqRefSearchOpen(idx){
+  var r=_faqRefsCache[idx]; if(!r) return;
+  var niv=((document.getElementById('faqref-niveau')||{}).value)||_faqRefGuessNiveau(r.texte);
+  var site=(niv==='Traités internationaux') ? ' site:eur-lex.europa.eu' : ' site:legifrance.gouv.fr';
+  var q=(((document.getElementById('faqref-titre')||{}).value)||'').trim() || r.texte;
+  window.open('https://www.google.com/search?q='+encodeURIComponent(q+site),'_blank','noopener');
+}
+// Normalise une URL saisie (ajoute https:// si absent).
+function _faqNormUrl(u){ u=(u||'').trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u='https://'+u; return u; }
+function _faqRefEdit(idx){
+  var r=_faqRefsCache[idx]; if(!r) return;
+  _faqInit();
+  var rec=_faqRefRec(r.key), e=_faqEsc;
+  var niveau=rec.niveau||_faqRefGuessNiveau(r.texte);
+  var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:16px;padding:10px 12px;outline:none';
+  var taSt=fSt+';resize:vertical;line-height:1.5';
+  var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
+  var nivOpts='<option value="">— Choisir —</option>'+_FAQ_NIVEAUX.map(function(n){return '<option value="'+e(n)+'"'+(niveau===n?' selected':'')+'>'+e(n)+'</option>';}).join('');
+  var ov=document.getElementById('faqref-modal'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='faqref-modal';
+  ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
+  ov.onclick=function(ev){ if(ev.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(680px,97vw);height:min(88vh,820px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + '<div style="flex-shrink:0;padding:18px 22px 14px;border-bottom:1px solid var(--bdr)"><div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:6px">Référence réglementaire</div><div style="font-size:12px;color:var(--txt2);line-height:1.4">⚖️ '+e(r.texte)+'</div></div>'
+    + '<div style="flex:1;overflow-y:auto;padding:18px 22px">'
+    +   '<div style="display:grid;grid-template-columns:190px 1fr;gap:12px;margin-bottom:12px;align-items:start">'
+    +     '<div><label style="'+lSt+'">Niveau</label><select id="faqref-niveau" style="'+fSt+';cursor:pointer">'+nivOpts+'</select></div>'
+    +     '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔎 Chercher le texte</button></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
+    +   '</div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Titre</label><textarea id="faqref-titre" rows="2" placeholder="Titre / intitulé du texte" style="'+taSt+'">'+e(rec.titre||r.texte||'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📝 Sens du texte (résumé)</label><textarea id="faqref-resume" rows="3" placeholder="Ce que dit le texte, en quelques lignes…" style="'+taSt+'">'+e(rec.resume||'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Motifs</label><textarea id="faqref-motifs" rows="4" placeholder="Pourquoi ce texte, ce qu\'il vise…" style="'+taSt+'">'+e(rec.motifs||'')+'</textarea></div>'
+    +   '<div><label style="'+lSt+'">Dispositif</label><textarea id="faqref-dispositif" rows="5" placeholder="Ce que le texte prescrit concrètement (articles clés)…" style="'+taSt+'">'+e(rec.dispositif||'')+'</textarea></div>'
+    + '</div>'
+    + '<div style="flex-shrink:0;display:flex;gap:10px;padding:14px 22px;border-top:1px solid var(--bdr);background:var(--navy2)">'
+    +   '<button onclick="document.getElementById(\'faqref-modal\').remove()" style="flex:1;padding:12px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    +   '<button onclick="_faqRefSave('+idx+')" style="flex:2;padding:12px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+function _faqRefSave(idx){
+  var r=_faqRefsCache[idx]; if(!r) return;
+  _faqInit();
+  var g=function(id){ return ((document.getElementById(id)||{}).value||'').trim(); };
+  S.faqRefResumes[r.key]={
+    texte:r.texte,
+    niveau:g('faqref-niveau'), titre:g('faqref-titre'), lien:_faqNormUrl(g('faqref-lien')),
+    resume:g('faqref-resume'), motifs:g('faqref-motifs'), dispositif:g('faqref-dispositif'),
+    _updatedAt:Date.now()
+  };
+  _faqSaveState();
+  var ov=document.getElementById('faqref-modal'); if(ov)ov.remove();
+  renderFaq();
+  if(typeof toast==='function') toast('Référence enregistrée ✓','ok');
+}
+function _faqRefsHtml(){
+  _faqInit();
+  var esc=_faqEsc, canEd=(typeof canModify==='function')?canModify():true;
+  var refs=_faqRefsCollect(); _faqRefsCache=refs;
+  var h='<div style="max-width:920px;margin:0 auto;padding:16px 14px 48px">';
+  h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:14px">'+(refs.length?refs.length+' texte'+(refs.length>1?'s':'')+' de référence cité'+(refs.length>1?'s':'')+' dans les questions':'Aucune référence')+'</div>';
+  if(!refs.length){
+    h+='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:40px 24px;border:1px dashed var(--bdr);border-radius:12px">Aucun texte réglementaire n\'est encore cité.<br><span style="font-size:12px">Renseignez « Ressources juridiques » dans les questions : les textes remonteront ici automatiquement.</span></div>';
+  } else {
+    var bloc=function(titre,val){ if(!(val||'').trim()) return ''; return '<div style="margin-top:10px"><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);margin-bottom:3px">'+titre+'</div><div style="font-size:13px;line-height:1.6;color:var(--txt2);white-space:pre-wrap">'+esc(val)+'</div></div>'; };
+    refs.forEach(function(r, i){
+      var rec=_faqRefRec(r.key);
+      var niv=rec.niveau||'';
+      h+='<div style="border:1px solid var(--bdr);border-radius:12px;margin-bottom:10px;background:var(--navy2);padding:13px 15px">';
+      h+='<div style="display:flex;align-items:flex-start;gap:10px">';
+      h+='<span style="flex-shrink:0;font-size:16px;margin-top:1px">⚖️</span>';
+      h+='<div style="flex:1;min-width:0">';
+      if(niv) h+='<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+((_FAQ_NIV_COL[niv]||'#6366f1'))+'22;color:'+((_FAQ_NIV_COL[niv]||'#818cf8'))+';margin-bottom:4px">'+esc(niv)+'</span>';
+      if(rec.titre) h+='<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;line-height:1.4">'+esc(rec.titre)+'</div>';
+      // citation d'origine en sous-titre, sauf si le titre la reprend déjà à l'identique
+      if(!rec.titre || _faqNormQ(rec.titre)!==_faqNormQ(r.texte)) h+='<div style="font-size:'+(rec.titre?'12px':'13px')+';font-weight:'+(rec.titre?'400':'700')+';color:'+(rec.titre?'var(--txt3)':'var(--txt)')+';line-height:1.4">'+esc(r.texte)+'</div>';
+      h+='</div>';
+      h+='<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+      h+='<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8;white-space:nowrap" title="Questions citant ce texte">'+r.count+' question'+(r.count>1?'s':'')+'</span>';
+      if((rec.lien||'').trim()) h+='<a href="'+esc(rec.lien)+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid rgba(34,197,94,.35);border-radius:7px;background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none;white-space:nowrap">🔗 Ouvrir le texte</a>';
+      if(canEd) h+='<button onclick="_faqRefEdit('+i+')" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit;white-space:nowrap">✏️ Modifier</button>';
+      h+='</div>';
+      h+='</div>';
+      // Détails renseignés
+      var det='';
+      det+=bloc('📝 Sens du texte', rec.resume);
+      det+=bloc('Motifs', rec.motifs);
+      det+=bloc('Dispositif', rec.dispositif);
+      if(det) h+='<div style="padding-left:26px">'+det+'</div>';
+      else if(canEd) h+='<div style="padding-left:26px;margin-top:8px;font-size:12px;color:var(--txt3);font-style:italic">Cliquez sur « Modifier » pour renseigner niveau, titre, motifs et dispositif.</div>';
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+  return h;
+}
 function renderFaq() {
   _faqInit();
   var cont = document.getElementById('faq-content');
   if (!cont) return;
   var _tabBar = _faqTabBar();
   if (_faqTab === 'stats') { cont.innerHTML = _tabBar + _faqStatsHtml(); return; }
+  if (_faqTab === 'refs')  { cont.innerHTML = _tabBar + _faqRefsHtml();  return; }
   var canEd = (typeof canModify==='function') ? canModify() : true;
   var esc = _faqEsc;
 
@@ -43311,6 +43502,7 @@ function renderFaq() {
   html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
   html += '<input id="faq-search" value="'+esc(_faqSearch)+'" placeholder="🔎 Rechercher une question…" oninput="_faqSearch=this.value;_faqRenderDebounce()" style="flex:1;min-width:180px;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:14px;padding:9px 12px;outline:none">';
   html += '<select onchange="_faqFiltre=this.value;renderFaq()" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:9px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 10px;cursor:pointer;max-width:220px">'+filtreOpts+'</select>';
+  html += '<button onclick="_faqPrint()" title="Exporter / imprimer les questions répondues" style="padding:9px 13px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🖨️ Exporter</button>';
   if (canEd) html += '<button onclick="_faqFormOpen(null)" style="padding:9px 15px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ Nouvelle question</button>';
   html += '</div>';
   // Import des questions déjà traitées (Mathieu Farcy) — visible tant qu'il en reste.
@@ -43370,6 +43562,91 @@ function renderFaq() {
 var _faqRenderTimer=null;
 function _faqRenderDebounce(){ clearTimeout(_faqRenderTimer); _faqRenderTimer=setTimeout(function(){ var el=document.getElementById('faq-search'); var pos=el?el.selectionStart:null; renderFaq(); var el2=document.getElementById('faq-search'); if(el2){ el2.focus(); if(pos!=null) try{el2.setSelectionRange(pos,pos);}catch(e){} } }, 220); }
 function _faqToggle(id){ _faqOpenId = (_faqOpenId===id) ? null : id; renderFaq(); }
+
+// ── Détection de questions similaires déjà traitées (réutilisation) ──────────
+var _FAQ_STOP={ 'pour':1,'avec':1,'dans':1,'une':1,'des':1,'les':1,'que':1,'qui':1,'est':1,'sont':1,'peut':1,'puis':1,'faire':1,'être':1,'etre':1,'mon':1,'mes':1,'son':1,'ses':1,'quel':1,'quelle':1,'comment':1,'quelles':1,'quels':1,'sur':1,'aux':1,'par':1,'plus':1,'cette':1,'ce':1,'la':1,'le':1,'un':1,'du':1,'au':1,'ou':1,'et':1,'en':1,'de':1,'je':1,'il':1,'elle':1,'nous':1,'vous':1,'dois':1,'doit':1,'suis':1,'ai':1 };
+function _faqTokens(s){ return _faqNormQ(s).split(/[^a-z0-9]+/).filter(function(w){ return w.length>=4 && !_FAQ_STOP[w]; }); }
+var _faqEditingId=null, _faqSimCache=[];
+function _faqSimilar(qText, excludeId){
+  var qt=_faqTokens(qText); if(qt.length<2) return [];
+  var qset={}; qt.forEach(function(w){ qset[w]=1; });
+  return (S.faq||[]).filter(function(f){ return f && f.id!==excludeId && (f.reponse||'').trim(); })
+    .map(function(f){ var seen={}, c=0; _faqTokens(f.question).forEach(function(w){ if(qset[w]&&!seen[w]){ c++; seen[w]=1; } }); return {f:f, score:c}; })
+    .filter(function(x){ return x.score>=2; })
+    .sort(function(a,b){ return b.score-a.score; })
+    .slice(0,4);
+}
+function _faqUpdateSimilar(){
+  var el=document.getElementById('faq-similar'); if(!el) return;
+  var q=((document.getElementById('faq-q')||{}).value)||'';
+  var sims=_faqSimilar(q, _faqEditingId);
+  _faqSimCache=sims.map(function(x){ return x.f; });
+  if(!sims.length){ el.innerHTML=''; return; }
+  var esc=_faqEsc;
+  var h='<div style="border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.06);border-radius:10px;padding:10px 12px">';
+  h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#22c55e;margin-bottom:6px">♻️ Questions déjà traitées similaires</div>';
+  sims.forEach(function(x,i){
+    var f=x.f;
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:'+(i?'1px solid var(--bdr)':'none')+'">';
+    h+='<div style="flex:1;min-width:0"><div style="font-size:12.5px;color:var(--txt);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.question||'')+'</div>'+((f.thematique)?'<div style="font-size:10px;color:var(--txt3)">'+esc(f.thematique)+(f.auteur?' · '+esc(f.auteur):'')+'</div>':'')+'</div>';
+    h+='<button type="button" onclick="_faqReuse('+i+')" style="flex-shrink:0;min-height:32px;padding:0 12px;border:1px solid rgba(34,197,94,.4);border-radius:7px;background:rgba(34,197,94,.12);color:#22c55e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">↩ Réutiliser</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  el.innerHTML=h;
+}
+function _faqReuse(i){
+  var m=_faqSimCache[i]; if(!m) return;
+  var rEl=document.getElementById('faq-r');
+  if(rEl){
+    if(rEl.value.trim() && !window.confirm('Remplacer la réponse en cours par celle de la question similaire ?')) return;
+    rEl.value=m.reponse||'';
+  }
+  var fill=function(id,val){ var e=document.getElementById(id); if(e && !e.value.trim() && (val||'').trim()) e.value=val; };
+  fill('faq-juri', m.ressourcesJuridiques);
+  fill('faq-them', m.thematique);
+  fill('faq-sous', m.sousThematique);
+  if(typeof toast==='function') toast('Réponse réutilisée — vérifiez et adaptez.','ok');
+}
+
+// ── Export / impression de la FAQ (questions répondues, par thématique) ──────
+function _faqPrint(){
+  _faqInit();
+  var esc=function(s){ return (''+(s==null?'':s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  // Respecte le filtre thématique actif ; n'exporte que les questions répondues.
+  var list=(S.faq||[]).filter(function(f){ return (f.reponse||'').trim() && (!_faqFiltre || (f.thematique||'')===_faqFiltre); });
+  if(!list.length){ if(typeof toast==='function')toast('Aucune question répondue à exporter','warn'); return; }
+  // Regrouper par thématique
+  var groups={}; list.forEach(function(f){ var t=(f.thematique||'').trim()||'Divers'; (groups[t]=groups[t]||[]).push(f); });
+  var themes=Object.keys(groups).sort(function(a,b){ return a.localeCompare(b); });
+  var d=new Date(); var dstr=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+  var h='<!doctype html><html><head><meta charset="utf-8"><title>FAQ DTN — FFPLUM</title><style>'
+    +'*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;margin:0;padding:24px 30px;font-size:12px;line-height:1.5}'
+    +'h1{font-size:20px;color:#003399;margin:0 0 2px}.sub{color:#666;font-size:11px;margin-bottom:18px}'
+    +'h2{font-size:14px;color:#003399;border-bottom:2px solid #003399;padding-bottom:3px;margin:22px 0 10px}'
+    +'.q{font-weight:700;color:#111;margin:12px 0 3px}.r{white-space:pre-wrap;margin:0 0 4px}'
+    +'.ref{font-size:10.5px;color:#555;white-space:pre-wrap;border-left:3px solid #ccc;padding-left:8px;margin:4px 0 10px}'
+    +'.item{page-break-inside:avoid;margin-bottom:8px}'
+    +'.print-btn{position:fixed;top:10px;right:12px;padding:8px 16px;background:#003399;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}'
+    +'@media print{.print-btn{display:none}}'
+    +'</style></head><body>';
+  h+='<button class="print-btn" onclick="window.print()">🖨 Imprimer</button>';
+  h+='<h1>FAQ — Direction Technique Nationale · FFPLUM</h1>';
+  h+='<div class="sub">'+list.length+' question'+(list.length>1?'s':'')+(_faqFiltre?' · '+esc(_faqFiltre):'')+' · édité le '+dstr+'</div>';
+  themes.forEach(function(t){
+    h+='<h2>'+esc(t)+' ('+groups[t].length+')</h2>';
+    groups[t].forEach(function(f){
+      h+='<div class="item"><div class="q">'+esc(f.question||'')+'</div>';
+      h+='<div class="r">'+esc(f.reponse||'')+'</div>';
+      if((f.ressourcesJuridiques||'').trim()) h+='<div class="ref">⚖️ '+esc(f.ressourcesJuridiques)+'</div>';
+      h+='</div>';
+    });
+  });
+  h+='</body></html>';
+  var w=window.open('','_blank'); if(!w){ if(typeof toast==='function')toast('Autorisez les fenêtres pop-up pour exporter','err'); return; }
+  w.document.write(h); w.document.close(); w.focus();
+  setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+}
 // Compose un courriel avec la question et UNIQUEMENT les rubriques renseignées
 // (le titre d'une rubrique n'apparaît que si elle a du contenu). Destinataire
 // pré-rempli avec l'email du demandeur s'il est connu.
@@ -43423,6 +43700,7 @@ function _faqGenPrompt(){
 }
 function _faqFormOpen(id){
   var f=id?(S.faq||[]).find(function(x){return x.id===id;}):null;
+  _faqEditingId = f ? f.id : null;
   var today=new Date().toISOString().slice(0,10);
   var moi=_faqUserName();
   // Auteur/dates automatiques
@@ -43443,10 +43721,18 @@ function _faqFormOpen(id){
   // Boîte large, deux colonnes, corps défilant + pied de page FIXE (boutons
   // toujours visibles quelle que soit la hauteur du contenu).
   var taSt=fSt+';resize:vertical;line-height:1.5';
+  // Navigation précédent/suivant (questions existantes uniquement)
+  var _ord = f ? _faqOrderedIds() : [];
+  var _pos = f ? _ord.indexOf(f.id) : -1;
+  var _navBtn=function(dir,ok,lbl){ return '<button onclick="_faqNavQuestion(\''+(f?f.id:'')+'\','+dir+')" '+(ok?'':'disabled')+' title="'+(dir<0?'Question précédente':'Question suivante')+' (enregistre)" style="width:38px;height:38px;border:1px solid var(--bdr);border-radius:9px;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:'+(ok?'pointer':'default')+';font-family:inherit;opacity:'+(ok?'1':'.35')+'">'+lbl+'</button>'; };
+  var _navHtml = (f && _pos>=0) ? ('<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:11px;color:var(--txt3);white-space:nowrap">'+(_pos+1)+' / '+_ord.length+'</span>'+_navBtn(-1,_pos>0,'◀')+_navBtn(1,_pos<_ord.length-1,'▶')+'</div>') : '';
   ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(1040px,97vw);height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + dlThemes + dlSous
-    // En-tête
-    + '<div style="flex-shrink:0;padding:18px 22px 14px;border-bottom:1px solid var(--bdr);font-size:15px;font-weight:800;color:var(--txt)">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    // En-tête : titre à gauche, navigation précédent/suivant à droite
+    + '<div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--bdr)">'
+    +   '<div style="flex:1;font-size:15px;font-weight:800;color:var(--txt)">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    +   _navHtml
+    + '</div>'
     // Corps : 2 colonnes, défilant
     + '<div style="flex:1;overflow-y:auto;padding:18px 22px" id="faq-modal-body"><div id="faq-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:18px 22px;align-items:start">'
     // ── Colonne gauche : demande + question ──
@@ -43459,7 +43745,7 @@ function _faqFormOpen(id){
     +     '<div><label style="'+lSt+'">Sous-thématique 1</label><input id="faq-sous" list="faq-dl-sous" value="'+e(f?f.sousThematique:'')+'" placeholder="Ex : RC, renouvellement…" style="'+fSt+'"></div>'
     +     '<div><label style="'+lSt+'">Sous-thématique 2</label><input id="faq-sous2" list="faq-dl-sous" value="'+e(f?(f.sousThematique2||''):'')+'" placeholder="(facultatif)" style="'+fSt+'"></div>'
     +   '</div>'
-    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="4" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea></div>'
+    +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Question *</label><textarea id="faq-q" rows="4" oninput="_faqUpdateSimilar()" placeholder="La question telle que posée par le licencié…" style="'+taSt+'">'+e(f?f.question:'')+'</textarea><div id="faq-similar" style="margin-top:8px"></div></div>'
     +   '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🤖 Réponse proposée par l\'IA</label><button type="button" onclick="_faqGenPrompt()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📋 Générer le prompt IA</button></div><textarea id="faq-ia" rows="7" placeholder="Collez ici la proposition de l\'IA (bouton ci-dessus)…" style="'+taSt+'">'+e(f?f.reponseIA:'')+'</textarea></div>'
     + '</div>'
     // ── Colonne droite : ma réponse, ressources, auteur ──
@@ -43482,12 +43768,36 @@ function _faqFormOpen(id){
     + '</div>'
     + '</div>';
   document.body.appendChild(ov);
+  _faqUpdateSimilar();
   setTimeout(function(){ var el=document.getElementById('faq-q'); if(el)el.focus(); },60);
+}
+// Liste ordonnée des id de questions telle qu'affichée (filtre + recherche + tri),
+// pour naviguer précédent/suivant dans la boîte d'édition.
+function _faqOrderedIds(){
+  _faqInit();
+  var q=(_faqSearch||'').trim().toLowerCase();
+  return (S.faq||[]).filter(function(f){
+    if(_faqFiltre && (f.thematique||'')!==_faqFiltre) return false;
+    if(!q) return true;
+    return [(f.question||''),(f.reponse||''),(f.reponseIA||''),(f.sousThematique||''),(f.auteur||'')].join(' ').toLowerCase().indexOf(q)>=0;
+  }).sort(function(a,b){ return (''+(b.date||'')+(b._updatedAt||0)).localeCompare(''+(a.date||'')+(a._updatedAt||0)); })
+   .map(function(f){ return f.id; });
+}
+// Enregistre la question courante puis ouvre la précédente/suivante.
+function _faqNavQuestion(id, dir){
+  var list=_faqOrderedIds();
+  var i=list.indexOf(id);
+  if(i<0) return;
+  var j=i+dir; if(j<0||j>=list.length) return;
+  if(!_faqSave(id)) return;   // n'avance pas si la question est vide
+  var nextId=list[j];
+  _faqOpenId=nextId;
+  _faqFormOpen(nextId);
 }
 function _faqSave(id){
   var g=function(idf){ return ((document.getElementById(idf)||{}).value||'').trim(); };
   var q=g('faq-q');
-  if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return; }
+  if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return false; }
   var nowIso=new Date().toISOString();
   var me=_faqUserName();
   // Champs saisis (email retiré du formulaire : on préserve l'existant, on ne l'écrase pas)
@@ -43516,6 +43826,7 @@ function _faqSave(id){
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   renderFaq();
   if(typeof toast==='function')toast(f?'Question mise à jour ✓':'Question enregistrée ✓','ok');
+  return true;
 }
 
 function _dtnOpenAidesPage() {
