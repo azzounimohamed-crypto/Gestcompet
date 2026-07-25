@@ -43582,10 +43582,18 @@ function _faqFormOpen(id){
   // Boîte large, deux colonnes, corps défilant + pied de page FIXE (boutons
   // toujours visibles quelle que soit la hauteur du contenu).
   var taSt=fSt+';resize:vertical;line-height:1.5';
+  // Navigation précédent/suivant (questions existantes uniquement)
+  var _ord = f ? _faqOrderedIds() : [];
+  var _pos = f ? _ord.indexOf(f.id) : -1;
+  var _navBtn=function(dir,ok,lbl){ return '<button onclick="_faqNavQuestion(\''+(f?f.id:'')+'\','+dir+')" '+(ok?'':'disabled')+' title="'+(dir<0?'Question précédente':'Question suivante')+' (enregistre)" style="width:38px;height:38px;border:1px solid var(--bdr);border-radius:9px;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:'+(ok?'pointer':'default')+';font-family:inherit;opacity:'+(ok?'1':'.35')+'">'+lbl+'</button>'; };
+  var _navHtml = (f && _pos>=0) ? ('<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:11px;color:var(--txt3);white-space:nowrap">'+(_pos+1)+' / '+_ord.length+'</span>'+_navBtn(-1,_pos>0,'◀')+_navBtn(1,_pos<_ord.length-1,'▶')+'</div>') : '';
   ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(1040px,97vw);height:min(88vh,860px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + dlThemes + dlSous
-    // En-tête
-    + '<div style="flex-shrink:0;padding:18px 22px 14px;border-bottom:1px solid var(--bdr);font-size:15px;font-weight:800;color:var(--txt)">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    // En-tête : titre à gauche, navigation précédent/suivant à droite
+    + '<div style="flex-shrink:0;display:flex;align-items:center;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--bdr)">'
+    +   '<div style="flex:1;font-size:15px;font-weight:800;color:var(--txt)">'+(f?'Modifier la question':'Nouvelle question de licencié')+'</div>'
+    +   _navHtml
+    + '</div>'
     // Corps : 2 colonnes, défilant
     + '<div style="flex:1;overflow-y:auto;padding:18px 22px" id="faq-modal-body"><div id="faq-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:18px 22px;align-items:start">'
     // ── Colonne gauche : demande + question ──
@@ -43623,10 +43631,33 @@ function _faqFormOpen(id){
   document.body.appendChild(ov);
   setTimeout(function(){ var el=document.getElementById('faq-q'); if(el)el.focus(); },60);
 }
+// Liste ordonnée des id de questions telle qu'affichée (filtre + recherche + tri),
+// pour naviguer précédent/suivant dans la boîte d'édition.
+function _faqOrderedIds(){
+  _faqInit();
+  var q=(_faqSearch||'').trim().toLowerCase();
+  return (S.faq||[]).filter(function(f){
+    if(_faqFiltre && (f.thematique||'')!==_faqFiltre) return false;
+    if(!q) return true;
+    return [(f.question||''),(f.reponse||''),(f.reponseIA||''),(f.sousThematique||''),(f.auteur||'')].join(' ').toLowerCase().indexOf(q)>=0;
+  }).sort(function(a,b){ return (''+(b.date||'')+(b._updatedAt||0)).localeCompare(''+(a.date||'')+(a._updatedAt||0)); })
+   .map(function(f){ return f.id; });
+}
+// Enregistre la question courante puis ouvre la précédente/suivante.
+function _faqNavQuestion(id, dir){
+  var list=_faqOrderedIds();
+  var i=list.indexOf(id);
+  if(i<0) return;
+  var j=i+dir; if(j<0||j>=list.length) return;
+  if(!_faqSave(id)) return;   // n'avance pas si la question est vide
+  var nextId=list[j];
+  _faqOpenId=nextId;
+  _faqFormOpen(nextId);
+}
 function _faqSave(id){
   var g=function(idf){ return ((document.getElementById(idf)||{}).value||'').trim(); };
   var q=g('faq-q');
-  if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return; }
+  if(!q){ if(typeof toast==='function')toast('La question est requise','err'); return false; }
   var nowIso=new Date().toISOString();
   var me=_faqUserName();
   // Champs saisis (email retiré du formulaire : on préserve l'existant, on ne l'écrase pas)
@@ -43655,6 +43686,7 @@ function _faqSave(id){
   var ov=document.getElementById('faq-modal'); if(ov)ov.remove();
   renderFaq();
   if(typeof toast==='function')toast(f?'Question mise à jour ✓':'Question enregistrée ✓','ok');
+  return true;
 }
 
 function _dtnOpenAidesPage() {
