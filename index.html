@@ -2183,6 +2183,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </button>
 
   </nav>
+  <!-- Retour flottant (mobile) pour sortir d'un module plein écran ouvert depuis l'accueil -->
+  <button id="mob-dtn-back" onclick="_mobDtnBack()" style="display:none;position:fixed;top:calc(8px + env(safe-area-inset-top));left:10px;z-index:600;align-items:center;gap:5px;padding:8px 13px;border:none;border-radius:20px;background:var(--stol);color:#fff;font-size:13px;font-weight:800;font-family:inherit;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer">‹ Accueil</button>
 
   <!-- ══ RAIL NAV DESKTOP – volets verticaux gauche ══ -->
   <div id="desktop-nav-rail">
@@ -5389,7 +5391,7 @@ function _renderPageById(id) {
   else if (id === 'page-staff') renderStaffList();
   else if (id === 'page-moyens') renderMoyensPage();
   else if (id === 'page-acteurs') renderActeursPage();
-  else if (id === 'page-sites') renderSitesSportifs();
+  else if (id === 'page-sites') { if(typeof _sitesAutoSync==='function') _sitesAutoSync(); else renderSitesSportifs(); }
   else if (id === 'page-settings') renderSettings();
   _pageRendered[id] = true;
 }
@@ -12017,7 +12019,14 @@ function _renderMobHomeDashboard() {
     { ic:IC.moyens,  lbl:'Moyens',       sub:'Matériel & logistique',   cnt:nbMoyens,  on:"showPage('page-moyens')" },
     { ic:IC.acteurs, lbl:'Acteurs',      sub:'Partenaires & contacts',  cnt:nbActeurs, on:"showPage('page-acteurs')" },
     { ic:IC.sites,   lbl:'Sites aéro',   sub:'Terrains & plateformes',  cnt:nbSites,   on:"showPage('page-sites')" },
-    { ic:IC.stats,   lbl:'Stats saison', sub:'Indicateurs & bilans',    cnt:null,      on:"showPage('page-base');if(typeof renderBase==='function')renderBase()" }
+    { ic:IC.stats,   lbl:'Stats saison', sub:'Indicateurs & bilans',    cnt:null,      on:"showPage('page-base');if(typeof renderBase==='function')renderBase()" },
+    // Modules « Développement » (barre latérale bureau) — rendus accessibles sur mobile
+    { emoji:'🎓', lbl:'Formations',         sub:'Sessions & inscriptions',   cnt:((S.formSessions||[]).length||null), on:"_mobOpenModule('formations')" },
+    { emoji:'❓', lbl:'FAQ',                sub:'Questions des licenciés',   cnt:((S.faq||[]).length||null),          on:"_mobOpenModule('faq')" },
+    { emoji:'🛡️', lbl:'Sécurité',           sub:'RASU & événements',         cnt:null,                                on:"_mobOpenModule('securite')" },
+    { emoji:'📍', lbl:'Territoires',        sub:'Comités régionaux',         cnt:null,                                on:"_mobOpenModule('territoires')" },
+    { emoji:'💶', lbl:'Dispositifs d\'aide', sub:'Aides fédérales',          cnt:((S.aides||[]).length||null),        on:"_mobOpenModule('aides')" },
+    { emoji:'🔑', lbl:'Accès',              sub:'Comptes & codes',           cnt:null,                                on:"_mobOpenModule('acces')" }
   ];
   var _expOpen = !!_mhdExpOpen;
   html += '<div class="mhd-sec">'
@@ -12029,7 +12038,7 @@ function _renderMobHomeDashboard() {
   html += '<div class="mhd-grid" id="mhd-exp-grid" style="display:'+(_expOpen?'grid':'none')+'">';
   mods.forEach(function(m){
     html += '<div class="mhd-mod mhd-press" onclick="'+m.on+'">'
-      + '<div class="mhd-mod-ic">'+_svg(m.ic,17)+'</div>'
+      + '<div class="mhd-mod-ic">'+(m.emoji ? '<span style="font-size:17px;line-height:1">'+m.emoji+'</span>' : _svg(m.ic,17))+'</div>'
       + (m.cnt !== null ? '<div class="mhd-mod-cnt">'+m.cnt+'</div>' : '')
       + '<div class="mhd-mod-lbl">'+m.lbl+'</div>'
       + '<div class="mhd-mod-sub">'+m.sub+'</div>'
@@ -25000,8 +25009,18 @@ function renderSitesSportifs() {
   var COLS = 'grid-template-columns:80px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 90px 36px';
 
   var html = '';
+  // ── Récap : total + nombre par statut ──
+  var byStatut={}; (S.sitesSportifs||[]).forEach(function(s){ var st=_siteStatut(s)||'Non renseigné'; byStatut[st]=(byStatut[st]||0)+1; });
+  var stKeys=Object.keys(byStatut).sort(function(a,b){ if(a==='Non renseigné') return 1; if(b==='Non renseigné') return -1; return byStatut[b]-byStatut[a]||a.localeCompare(b); });
+  html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 8px 4px">';
+  html += '<span style="font-size:12px;font-weight:800;color:var(--txt)">'+(S.sitesSportifs||[]).length+' site'+((S.sitesSportifs||[]).length>1?'s':'')+'</span>';
+  stKeys.forEach(function(st){ var ns=(st==='Non renseigné'); html += '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+(ns?'rgba(148,163,184,.15)':'rgba(99,102,241,.15)')+';color:'+(ns?'var(--txt3)':'#818cf8')+'">'+escH(st)+' : '+byStatut[st]+'</span>'; });
+  html += '<button onclick="_sitesMapToggle()" style="margin-left:auto;padding:6px 12px;border-radius:8px;border:1px solid var(--bdr);background:'+(_sitesMapOn?'var(--stol)':'var(--navy3)')+';color:'+(_sitesMapOn?'#fff':'var(--txt2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗺 Carte</button>';
+  html += '</div>';
+  // Carte de tous les sites (repliable)
+  html += '<div id="sites-map-wrap" style="display:'+(_sitesMapOn?'block':'none')+';padding:0 8px 8px"><div id="sites-map" style="height:340px;border-radius:10px;overflow:hidden;background:var(--navy3);border:1px solid var(--bdr)"></div></div>';
   // Import des terrains de compétition (dédoublonné par OACI) — visible s'il en reste
-  if (canEdit) { var _sp=_sitesImportPending(); if(_sp>0) html += '<div style="padding:8px 8px 4px"><button onclick="_sitesImportComps()" title="Ajouter les terrains des compétitions et remplir via BasULM" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🏟 Importer '+_sp+' site(s) des compétitions</button></div>'; }
+  if (canEdit) { var _sp=_sitesImportPending(); if(_sp>0) html += '<div style="padding:0 8px 4px"><button onclick="_sitesImportComps()" title="Ajouter les terrains des compétitions et remplir via BasULM" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🏟 Importer '+_sp+' site(s) des compétitions</button></div>'; }
   // En-tête colonnes
   html += '<div style="display:grid;'+COLS+';gap:4px;padding:6px 8px;border-bottom:2px solid var(--bdr);align-items:center;background:var(--navy3)">';
   ['OACI','Lieu','Ville','Région','Gestionnaire','Pratique',''].forEach(function(h){ html += '<div style="'+hSt+'">'+h+'</div>'; });
@@ -25024,6 +25043,7 @@ function renderSitesSportifs() {
   if (!list.length) {
     html += '<div style="text-align:center;color:var(--txt3);padding:24px;font-size:13px">Aucun site enregistré — saisissez les informations ci-dessus puis cliquez +</div>';
     cont.innerHTML = html;
+    if(_sitesMapOn) setTimeout(_sitesMapInit,30);
     return;
   }
 
@@ -25043,6 +25063,7 @@ function renderSitesSportifs() {
     html += '</div>';
   });
   cont.innerHTML = html;
+  if(_sitesMapOn) setTimeout(_sitesMapInit,30);
 }
 // ── Import des terrains de compétition dans « Sites aéros » ──────────────────
 // Reprend le site d'accueil de chaque compétition (OACI/lieu/région/pratique),
@@ -25093,6 +25114,104 @@ function _sitesImportComps(){
       saveState(); renderSitesSportifs();
     }).catch(function(){});
   });
+}
+// Complétude d'une fiche site (pour choisir la plus riche lors du dédoublonnage).
+function _siteScore(s){
+  var n=0;
+  ['oaci','lieu','ville','region','gestionnaire'].forEach(function(f){ if((s[f]||'').toString().trim()) n++; });
+  if(s.pratique && s.pratique!=='all') n++;
+  if(s.basulm) n+=2;
+  var rub=s.rubriques||{};
+  Object.keys(rub).forEach(function(k){ var v=rub[k]||{}; if((v.infos||'').trim()) n++; if(v.note>0) n++; });
+  return n;
+}
+// Complète la fiche conservée avec les champs manquants d'un doublon (sans perte).
+function _sitesMergeInto(keep, loser){
+  ['oaci','lieu','ville','region','gestionnaire'].forEach(function(f){ if(!(keep[f]||'').toString().trim() && (loser[f]||'').toString().trim()) keep[f]=loser[f]; });
+  if((keep.pratique==='all'||!keep.pratique) && loser.pratique && loser.pratique!=='all') keep.pratique=loser.pratique;
+  if(!keep.basulm && loser.basulm) keep.basulm=loser.basulm;
+  var kr=keep.rubriques=keep.rubriques||{}, lr=loser.rubriques||{};
+  Object.keys(lr).forEach(function(k){ var kv=kr[k]||{}, lv=lr[k]||{}; if(!(kv.infos||'').trim() && (lv.infos||'').trim()) kv.infos=lv.infos; if(!(kv.note>0) && lv.note>0) kv.note=lv.note; kr[k]=kv; });
+}
+// Supprime les doublons (même OACI, à défaut même lieu) en gardant la fiche la
+// plus complète, après y avoir reversé les infos des doublons.
+function _sitesDedup(){
+  var sites=S.sitesSportifs||[]; if(sites.length<2) return 0;
+  var groups=[], byOaci={}, byLieu={};
+  sites.forEach(function(s){
+    var o=(s.oaci||'').trim().toUpperCase(), l=(s.lieu||'').trim().toLowerCase();
+    var g = o ? byOaci[o] : (l ? byLieu[l] : null);
+    if(!g){ g={members:[]}; groups.push(g); }
+    g.members.push(s);
+    if(o && !byOaci[o]) byOaci[o]=g;
+    if(l && !byLieu[l]) byLieu[l]=g;
+  });
+  var kept=[], removed=0;
+  groups.forEach(function(g){
+    if(g.members.length===1){ kept.push(g.members[0]); return; }
+    g.members.sort(function(a,b){ var d=_siteScore(b)-_siteScore(a); if(d) return d; return (b.basulm?1:0)-(a.basulm?1:0); });
+    var keep=g.members[0];
+    g.members.slice(1).forEach(function(l){ _sitesMergeInto(keep, l); });
+    keep._updatedAt=Date.now();
+    kept.push(keep); removed+=g.members.length-1;
+  });
+  if(removed) S.sitesSportifs=kept;
+  return removed;
+}
+// Synchro automatique (à l'ouverture) : intègre les terrains de compétition
+// manquants, dédoublonne, complète via BasULM. Idempotent.
+var _sitesSyncing=false;
+function _sitesAutoSync(){
+  if(_sitesSyncing) return; _sitesSyncing=true;
+  try{
+    if(!S.sitesSportifs) S.sitesSportifs=[];
+    var added=[];
+    _sitesCompVenues().forEach(function(v){
+      var site={ id:'site-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+        oaci:v.oaci, lieu:v.lieu, ville:'', region:v.region, gestionnaire:'',
+        pratique:(v.pratique==='paramoteur'?'paramoteur':(v.pratique==='microlight'?'microlight':'all')),
+        _fromComp:true, _updatedAt:Date.now() };
+      S.sitesSportifs.push(site); added.push(site);
+    });
+    var removed=_sitesDedup();
+    if(added.length||removed){ saveState(); if(typeof silentPush==='function') silentPush(); }
+    renderSitesSportifs();
+    if(added.length && typeof toast==='function') toast(added.length+' terrain(s) de compétition intégré(s) automatiquement','ok');
+    if(removed && typeof toast==='function') toast(removed+' doublon(s) fusionné(s)','');
+    added.forEach(function(site){
+      if(!site.oaci || typeof basulmLookup!=='function') return;
+      basulmLookup(site.oaci).then(function(d){
+        if(!d) return; var o=(S.sitesSportifs||[]).find(function(x){return x.id===site.id;}); if(!o) return;
+        if(!o.lieu && d.toponyme) o.lieu=d.toponyme;
+        if(!o.ville && d.ville) o.ville=d.ville;
+        if(!o.region && d.region) o.region=d.region;
+        o.basulm=d; o._updatedAt=Date.now();
+        saveState(); renderSitesSportifs();
+      }).catch(function(){});
+    });
+  } finally { _sitesSyncing=false; }
+}
+// Statut d'un site (rubrique « Statut »).
+function _siteStatut(s){ var r=(s.rubriques&&s.rubriques.statut)||{}; return (r.infos||'').trim(); }
+// ── Carte de tous les sites (coordonnées BasULM) ──
+var _sitesMap=null, _sitesMapOn=false;
+function _sitesMapToggle(){ _sitesMapOn=!_sitesMapOn; renderSitesSportifs(); }
+function _sitesMapInit(){
+  if(typeof L==='undefined') return;
+  var el=document.getElementById('sites-map'); if(!el) return;
+  if(_sitesMap){ try{_sitesMap.remove();}catch(e){} _sitesMap=null; }
+  _sitesMap=L.map(el,{zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(_sitesMap);
+  var pts=[];
+  (S.sitesSportifs||[]).forEach(function(s){
+    var d=s.basulm; if(!d) return;
+    var la=_basulmCoord(d.latitude), ln=_basulmCoord(d.longitude);
+    if(la==null||ln==null) return;
+    L.marker([la,ln]).addTo(_sitesMap).bindPopup('<b>'+((s.oaci||'')||'')+'</b> '+((s.lieu||s.ville||'')));
+    pts.push([la,ln]);
+  });
+  if(pts.length) _sitesMap.fitBounds(pts,{padding:[30,30],maxZoom:11}); else _sitesMap.setView([46.6,2.5],5);
+  setTimeout(function(){ if(_sitesMap)_sitesMap.invalidateSize(); },160);
 }
 function addSiteInline() {
   if (!S.sitesSportifs) S.sitesSportifs = [];
@@ -56089,6 +56208,26 @@ function _securiteEventDelete(evId) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Ouverture d'un module « Développement » depuis l'accueil MOBILE (où la barre
+// latérale du portail n'existe pas). Ouvre la page plein écran + un bouton de
+// retour flottant, seul moyen de revenir à l'accueil sur smartphone.
+function _mobOpenModule(kind){
+  try{
+    if(kind==='faq' && typeof _dtnOpenFaqPage==='function') _dtnOpenFaqPage();
+    else if(kind==='aides' && typeof _dtnOpenAidesPage==='function') _dtnOpenAidesPage();
+    else if(typeof openDTNModule==='function') openDTNModule(kind);
+  }catch(e){ if(typeof toast==='function') toast('Ouverture impossible : '+(e.message||e),'err'); return; }
+  var b=document.getElementById('mob-dtn-back'); if(b) b.style.display='flex';
+}
+function _mobDtnBack(){
+  ['page-faq','page-formations','page-securite','page-acces','page-territoires','page-dispositifs-aide'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  if(typeof _dtnCloseOverlays==='function') _dtnCloseOverlays();
+  var dtn=document.getElementById('page-dtn'); if(dtn) dtn.style.display='none';
+  document.body.classList.remove('dtn-portal-visible');
+  var app=document.getElementById('app'); if(app) app.style.display='';
+  var b=document.getElementById('mob-dtn-back'); if(b) b.style.display='none';
+  if(typeof showPage==='function') showPage('page-home');
+}
 function openDTNModule(module) {
   closeNDF();
   _fromDTN = true;
