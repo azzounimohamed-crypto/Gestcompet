@@ -2183,6 +2183,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     </button>
 
   </nav>
+  <!-- Retour flottant (mobile) pour sortir d'un module plein écran ouvert depuis l'accueil -->
+  <button id="mob-dtn-back" onclick="_mobDtnBack()" style="display:none;position:fixed;top:calc(8px + env(safe-area-inset-top));left:10px;z-index:600;align-items:center;gap:5px;padding:8px 13px;border:none;border-radius:20px;background:var(--stol);color:#fff;font-size:13px;font-weight:800;font-family:inherit;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer">‹ Accueil</button>
 
   <!-- ══ RAIL NAV DESKTOP – volets verticaux gauche ══ -->
   <div id="desktop-nav-rail">
@@ -12017,7 +12019,14 @@ function _renderMobHomeDashboard() {
     { ic:IC.moyens,  lbl:'Moyens',       sub:'Matériel & logistique',   cnt:nbMoyens,  on:"showPage('page-moyens')" },
     { ic:IC.acteurs, lbl:'Acteurs',      sub:'Partenaires & contacts',  cnt:nbActeurs, on:"showPage('page-acteurs')" },
     { ic:IC.sites,   lbl:'Sites aéro',   sub:'Terrains & plateformes',  cnt:nbSites,   on:"showPage('page-sites')" },
-    { ic:IC.stats,   lbl:'Stats saison', sub:'Indicateurs & bilans',    cnt:null,      on:"showPage('page-base');if(typeof renderBase==='function')renderBase()" }
+    { ic:IC.stats,   lbl:'Stats saison', sub:'Indicateurs & bilans',    cnt:null,      on:"showPage('page-base');if(typeof renderBase==='function')renderBase()" },
+    // Modules « Développement » (barre latérale bureau) — rendus accessibles sur mobile
+    { emoji:'🎓', lbl:'Formations',         sub:'Sessions & inscriptions',   cnt:((S.formSessions||[]).length||null), on:"_mobOpenModule('formations')" },
+    { emoji:'❓', lbl:'FAQ',                sub:'Questions des licenciés',   cnt:((S.faq||[]).length||null),          on:"_mobOpenModule('faq')" },
+    { emoji:'🛡️', lbl:'Sécurité',           sub:'RASU & événements',         cnt:null,                                on:"_mobOpenModule('securite')" },
+    { emoji:'📍', lbl:'Territoires',        sub:'Comités régionaux',         cnt:null,                                on:"_mobOpenModule('territoires')" },
+    { emoji:'💶', lbl:'Dispositifs d\'aide', sub:'Aides fédérales',          cnt:((S.aides||[]).length||null),        on:"_mobOpenModule('aides')" },
+    { emoji:'🔑', lbl:'Accès',              sub:'Comptes & codes',           cnt:null,                                on:"_mobOpenModule('acces')" }
   ];
   var _expOpen = !!_mhdExpOpen;
   html += '<div class="mhd-sec">'
@@ -12029,7 +12038,7 @@ function _renderMobHomeDashboard() {
   html += '<div class="mhd-grid" id="mhd-exp-grid" style="display:'+(_expOpen?'grid':'none')+'">';
   mods.forEach(function(m){
     html += '<div class="mhd-mod mhd-press" onclick="'+m.on+'">'
-      + '<div class="mhd-mod-ic">'+_svg(m.ic,17)+'</div>'
+      + '<div class="mhd-mod-ic">'+(m.emoji ? '<span style="font-size:17px;line-height:1">'+m.emoji+'</span>' : _svg(m.ic,17))+'</div>'
       + (m.cnt !== null ? '<div class="mhd-mod-cnt">'+m.cnt+'</div>' : '')
       + '<div class="mhd-mod-lbl">'+m.lbl+'</div>'
       + '<div class="mhd-mod-sub">'+m.sub+'</div>'
@@ -56199,6 +56208,26 @@ function _securiteEventDelete(evId) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Ouverture d'un module « Développement » depuis l'accueil MOBILE (où la barre
+// latérale du portail n'existe pas). Ouvre la page plein écran + un bouton de
+// retour flottant, seul moyen de revenir à l'accueil sur smartphone.
+function _mobOpenModule(kind){
+  try{
+    if(kind==='faq' && typeof _dtnOpenFaqPage==='function') _dtnOpenFaqPage();
+    else if(kind==='aides' && typeof _dtnOpenAidesPage==='function') _dtnOpenAidesPage();
+    else if(typeof openDTNModule==='function') openDTNModule(kind);
+  }catch(e){ if(typeof toast==='function') toast('Ouverture impossible : '+(e.message||e),'err'); return; }
+  var b=document.getElementById('mob-dtn-back'); if(b) b.style.display='flex';
+}
+function _mobDtnBack(){
+  ['page-faq','page-formations','page-securite','page-acces','page-territoires','page-dispositifs-aide'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  if(typeof _dtnCloseOverlays==='function') _dtnCloseOverlays();
+  var dtn=document.getElementById('page-dtn'); if(dtn) dtn.style.display='none';
+  document.body.classList.remove('dtn-portal-visible');
+  var app=document.getElementById('app'); if(app) app.style.display='';
+  var b=document.getElementById('mob-dtn-back'); if(b) b.style.display='none';
+  if(typeof showPage==='function') showPage('page-home');
+}
 function openDTNModule(module) {
   closeNDF();
   _fromDTN = true;
