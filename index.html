@@ -54840,7 +54840,7 @@ function _renderSecuriteStats() {
   var _card = function(title, content, span) {
     return '<div style="'+_cSt+';padding:14px;display:flex;flex-direction:column'+(span?';grid-column:span '+span:'')+'">'
       +'<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:11px;flex-shrink:0">'+title+'</div>'
-      +'<div style="flex:1;display:flex;flex-direction:column">'+content+'</div>'
+      +'<div style="flex:1;display:flex;flex-direction:column;min-height:0">'+content+'</div>'
       +'</div>';
   };
 
@@ -55060,76 +55060,45 @@ function _renderSecuriteStats() {
       +'</div>';
   })();
 
-  // ── Card 6 : Origines — Treemap SVG (réf. BEA uniquement) ──
+  // ── Card 6 : Origines (réf. BEA) — barres horizontales classées, remplissant la cellule ──
   (function(){
     var PAL_O=['#ef4444','#f97316','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#10b981','#64748b','#ec4899','#0891b2'];
-    var counts={};
+    var counts={}, morts={}, tues={};
     evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
       counts[e.refBEA]=(counts[e.refBEA]||0)+1;
+      if(_isMort(e)) morts[e.refBEA]=(morts[e.refBEA]||0)+1;       // nb d'accidents mortels
+      tues[e.refBEA]=(tues[e.refBEA]||0)+(parseInt(e.nbTues||0)||0); // nb de tués (si renseigné)
     });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
     var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
-    var footer='<div style="font-size:9px;color:#6366f1;margin-top:6px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
+    var footer='<div style="flex-shrink:0;font-size:9px;color:#6366f1;margin-top:8px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
     if(!items.length){
-      html+=_card('Origines','<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer,2);
+      html+=_card('Origines','<div style="flex:1;display:flex;flex-direction:column;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer,2);
       return;
     }
-    // Treemap slice-and-dice — cellule doublée : viewBox élargi pour garder une hauteur correcte
-    var W=490,H=155,sum=items.reduce(function(a,k){return a+counts[k];},0);
-    var rects=[],rem=items.slice(),x=0,y=0,rw=W,rh=H,horiz=true;
-    while(rem.length){
-      var batch=rem.splice(0,Math.max(1,Math.ceil(rem.length/2)));
-      var bSum=batch.reduce(function(a,k){return a+counts[k];},0);
-      var cx=x,cy=y;
-      if(horiz){
-        var bh=Math.round(bSum/sum*rh);
-        var bx=cx;
-        batch.forEach(function(k,i){
-          var bw=Math.round(counts[k]/bSum*rw);
-          if(i===batch.length-1) bw=cx+rw-bx;
-          rects.push({x:bx,y:cy,w:bw,h:bh,k:k,v:counts[k]});
-          bx+=bw;
-        });
-        y+=bh; rh-=bh;
-      } else {
-        var bw2=Math.round(bSum/sum*rw);
-        var by=cy;
-        batch.forEach(function(k,i){
-          var bh2=Math.round(counts[k]/bSum*rh);
-          if(i===batch.length-1) bh2=cy+rh-by;
-          rects.push({x:cx,y:by,w:bw2,h:bh2,k:k,v:counts[k]});
-          by+=bh2;
-        });
-        x+=bw2; rw-=bw2;
-      }
-      horiz=!horiz;
-    }
-    var BLUES=['#1e3a8a','#1e40af','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#dbeafe','#eff6ff'];
-    var TXTS =['#fff','#fff','#fff','#fff','#fff','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a'];
-    var defs='<defs>'+rects.map(function(r,i){return '<clipPath id="cp'+i+'"><rect x="'+(r.x+1)+'" y="'+(r.y+1)+'" width="'+Math.max(r.w-3,0)+'" height="'+Math.max(r.h-3,0)+'"/></clipPath>';}).join('')+'</defs>';
-    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;overflow:hidden">'+defs;
-    rects.forEach(function(r,i){
-      var col=BLUES[i%BLUES.length], tc=TXTS[i%TXTS.length];
-      s+='<rect x="'+r.x+'" y="'+r.y+'" width="'+Math.max(r.w-1,0)+'" height="'+Math.max(r.h-1,0)+'" fill="'+col+'" rx="2"/>';
-      if(r.w<12||r.h<10) return;
-      var fs=Math.max(5,Math.min(7,Math.floor(r.w/10),Math.floor(r.h/4.5)));
-      var charsPerLine=Math.floor((r.w-4)/(fs*0.58));
-      var lbl=r.k.length>charsPerLine?r.k.slice(0,Math.max(2,charsPerLine-1))+'…':r.k;
-      var showVal=r.h>fs*3.5&&r.w>14;
-      var showLbl=r.w>12&&r.h>fs*1.8;
-      s+='<g clip-path="url(#cp'+i+')">';
-      if(showLbl){
-        var ty=r.y+r.h/2+(showVal?-fs*0.8:0);
-        s+='<text x="'+(r.x+r.w/2)+'" y="'+ty+'" text-anchor="middle" font-family="inherit" font-size="'+fs+'" fill="'+tc+'" dominant-baseline="middle">'+lbl+'</text>';
-      }
-      if(showVal){
-        var vy=r.y+r.h/2+(showLbl?fs*1.2:0);
-        s+='<text x="'+(r.x+r.w/2)+'" y="'+vy+'" text-anchor="middle" font-family="inherit" font-size="'+(fs+1)+'" font-weight="700" fill="'+tc+'" dominant-baseline="middle">'+r.v+'</text>';
-      }
-      s+='</g>';
-    });
-    s+='</svg>';
-    html+=_card('Origines',s+footer,2);
+    var maxV=counts[items[0]]||1;
+    var rows=items.map(function(k,i){
+      var n=counts[k], col=PAL_O[i%PAL_O.length], dc=morts[k]||0, nt=tues[k]||0;
+      var w=Math.round(n/maxV*100), pct=nBEA>0?Math.round(n/nBEA*100):0;
+      var lblCol=dc>0?'#ef4444':'var(--txt)';
+      var dcTitleTxt=dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+(nt>0?' · '+nt+' tué'+(nt>1?'s':''):'');
+      var dcTag=dc>0?'<span style="flex-shrink:0;font-size:9px;font-weight:800;color:#ef4444" title="'+dcTitleTxt+'">† '+(nt>0?nt:dc)+'</span>':'';
+      return '<div style="flex:1 1 0;min-height:20px;max-height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
+          +'<div style="display:flex;align-items:center;gap:7px;min-width:0">'
+            +'<div style="width:3px;height:12px;border-radius:2px;background:'+col+';flex-shrink:0"></div>'
+            +'<span style="font-size:11px;font-weight:'+(dc>0?'700':'600')+';color:'+lblCol+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(k)+(dc>0?' — '+dcTitleTxt:'')+'">'+_esc(k)+'</span>'
+            +dcTag
+          +'</div>'
+          +'<span style="flex-shrink:0;font-size:12px;font-weight:800;color:'+col+'">'+n
+            +'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:4px">'+pct+'%</span></span>'
+        +'</div>'
+        +'<div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">'
+          +'<div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div>'
+      +'</div>';
+    }).join('');
+    var body='<div style="flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:6px;min-height:0;overflow:auto">'+rows+'</div>'+footer;
+    html+=_card('Origines',body,2);
   })();
 
   // ── Card 7 : Instructeur à bord (donut) ──
