@@ -2466,22 +2466,23 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <div style="height:1px;background:var(--bdr);margin:10px 4px"></div>
     <div style="font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--txt3);padding:4px 12px 5px;opacity:.65">Développement</div>
 
+    <button id="dtn-nav-agenda-fed" onclick="_openAgendaFederal()"
+      style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
+      onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnNavOut('agenda-fed')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0057FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+      Agenda fédéral
+    </button>
+
     <button id="dtn-nav-comp" onclick="_toggleDtnCompSub()"
       style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;text-align:left;transition:background .12s,color .12s"
       onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnNavOut('comp')">
       <svg viewBox="0 0 24 24" fill="none" stroke="#0057FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" style="flex-shrink:0"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      <span style="flex:1">Evénements</span>
+      <span style="flex:1">Détails</span>
       <svg id="dtn-comp-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="flex-shrink:0;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
 
     <!-- ── Sous-volets compétition (affichés sur les pages comp) ── -->
     <div id="dtn-comp-sub" style="display:none;flex-direction:column;gap:1px">
-      <button id="dtn-sub-competitions" onclick="openDTNModule('competitions')"
-        style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
-        onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="this.style.background='';this.style.color=''">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#0057FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
-        Agenda fédéral
-      </button>
       <button id="dtn-sub-base" onclick="_compSbNav('page-base')"
         style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px 7px 30px;border:none;border-radius:9px;background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;text-align:left;transition:background .12s,color .12s"
         onmouseover="this.style.background='var(--navy3)';this.style.color='var(--txt)'" onmouseout="_dtnSubNavOut('base')">
@@ -4473,7 +4474,8 @@ var S = {
   aides: [],
   _deletedAides: {},
   territoires: {},
-  accesUsers: []
+  accesUsers: [],
+  factRepasReg: { map: {}, seq: {} }
 };
 
 var BASE44_APP_ID  = '69c6badf4d7980c1f222e978';
@@ -5140,6 +5142,7 @@ function _flushSaveState() {
     shn:S.shn||[], _deletedSHN:S._deletedSHN||[],
     territoires:S.territoires||{},
     accesUsers:S.accesUsers||[],
+    factRepasReg:S.factRepasReg||{map:{},seq:{}},
     etapes:S.etapes||{}
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
@@ -20381,16 +20384,7 @@ function renderRepasTab(cp) {
   });
   h += '<button onclick="saveRepasTarifs(\''+escH(compId)+'\')" style="height:28px;padding:0 10px;border-radius:6px;background:rgba(99,102,241,.15);color:#a78bfa;border:1px solid rgba(99,102,241,.3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ Enregistrer</button>';
   h += '</div>';
-  var _repasHasData = data && ((data.rows && data.rows.length) || (data.participants && data.participants.length));
-  if (!_repasHasData) {
-    h += '<div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:var(--txt3)">';
-    h += '<div style="font-size:48px">🍽️</div>';
-    h += '<div style="font-size:15px;font-weight:700;color:var(--txt2)">Aucune donnée repas</div>';
-    h += '<div style="font-size:12px">Importez un fichier Excel (format export billeterie)</div>';
-    h += '</div>';
-  } else {
-    h += _buildRepasTable(compId);
-  }
+  h += _buildRepasGrid(compId);
   h += '</div>';
   return h;
 }
@@ -20750,6 +20744,153 @@ function _buildRepasTable(compId) {
   return h;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// NOUVELLE GRILLE REPAS (saisie rapide par participant)
+//  - Colonne fixe « Nom » = encadrants (Staff) + équipages (pilotes enrôlés)
+//  - Un groupe de 3 colonnes (Petit déj / Déjeuner / Dîner) par jour de l'événement
+//    (dates générées de dateFrom → dateTo)
+//  - Chaque case cochée → stockée dans data.checks (même format que la facture pilote)
+//    → total facturé recalculé automatiquement à partir des tarifs.
+// ══════════════════════════════════════════════════════════════════════════
+var _REPAS_MEALS = [
+  { type:'Petit déjeuner', short:'Petit déj', tk:'pDej', col:'#f59e0b' },
+  { type:'Déjeuner',       short:'Déjeuner',  tk:'dej',  col:'#10b981' },
+  { type:'Dîner',          short:'Dîner',     tk:'din',  col:'#6366f1' }
+];
+// Participants = encadrants (staff, hors NDF) + équipages (pilotes enrôlés), dédoublonnés et triés.
+function _repasParticipants(compId) {
+  var parts = [], seen = {};
+  function add(nom, prenom, role) {
+    nom = (nom||'').toString().trim(); prenom = (prenom||'').toString().trim();
+    if (!nom && !prenom) return;
+    var key = nom.toUpperCase() + '\x01' + prenom.toUpperCase();
+    if (seen[key]) return; seen[key] = true;
+    parts.push({ nom:nom, prenom:prenom, role:role||'', key:key });
+  }
+  (Array.isArray((S.staff||{})[compId]) ? S.staff[compId] : []).forEach(function(s){
+    if (!s || (s.role||'').toUpperCase() === 'NDF') return;
+    add(s.nom, s.prenom, s.role || 'Encadrant');
+  });
+  (((S.compEnroll||{})[compId]) || []).forEach(function(pid){
+    var p = (S.pilots||[]).find(function(x){ return x.id === pid; });
+    if (p) add(p.nom, p.prenom, 'Équipage');
+  });
+  parts.sort(function(a,b){ var n=(a.nom||'').localeCompare(b.nom||'','fr'); return n!==0?n:(a.prenom||'').localeCompare(b.prenom||'','fr'); });
+  return parts;
+}
+// Jours de l'événement (une entrée par journée entre dateFrom et dateTo), clé = "JJ/MM/AAAA".
+function _repasDays(compId) {
+  var cp = (S.comps||[]).find(function(c){ return c.id === compId; });
+  var out = [];
+  if (!cp || !cp.dateFrom) return out;
+  var d1 = new Date(cp.dateFrom + 'T00:00:00'); if (isNaN(d1.getTime())) return out;
+  var d2 = cp.dateTo ? new Date(cp.dateTo + 'T00:00:00') : new Date(d1); if (isNaN(d2.getTime()) || d2 < d1) d2 = new Date(d1);
+  var cur = new Date(d1), guard = 0;
+  while (cur <= d2 && guard < 62) {
+    var dd=('0'+cur.getDate()).slice(-2), mm=('0'+(cur.getMonth()+1)).slice(-2), yy=cur.getFullYear();
+    out.push({ key: dd+'/'+mm+'/'+yy, label: dd+'/'+mm+'/'+yy });
+    cur.setDate(cur.getDate()+1); guard++;
+  }
+  return out;
+}
+function _buildRepasGrid(compId) {
+  if (!S.repas) S.repas = {};
+  var data = S.repas[compId] || (S.repas[compId] = {});
+  if (!data.checks) data.checks = {};
+  var _t = (S.repasTarifs && S.repasTarifs[compId]) || {};
+  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0 };
+  var parts = _repasParticipants(compId), days = _repasDays(compId);
+
+  // Migration unique : anciens repas importés (rows) → cases cochées, par n° de jour → date.
+  if (data.rows && data.rows.length && !data._mealsMigrated && days.length) {
+    data.rows.forEach(function(r){
+      var dn = (String(r.jour).match(/\d+/)||[])[0]; if (!dn) return;
+      var day = days.find(function(dy){ return parseInt(dy.key.slice(0,2),10) === parseInt(dn,10); }); if (!day) return;
+      if (['Petit déjeuner','Déjeuner','Dîner'].indexOf(r.type) < 0) return;
+      var pk = (r.nom||'').toUpperCase() + '\x01' + (r.prenom||'').toUpperCase();
+      data.checks[pk + '|' + day.key + '\x02' + r.type] = true;
+    });
+    data._mealsMigrated = true;
+    try { saveState(); } catch(e) {}
+  }
+
+  var emptyCss = 'flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--txt3);padding:44px;text-align:center';
+  if (!parts.length) return '<div style="'+emptyCss+'"><div style="font-size:44px">👥</div><div style="font-size:15px;font-weight:700;color:var(--txt2)">Aucun participant</div><div style="font-size:12px;max-width:360px">Ajoutez des <b>encadrants</b> (onglet Staff) et des <b>équipages</b> (pilotes inscrits) : ils apparaîtront ici pour cocher leurs repas.</div></div>';
+  if (!days.length)  return '<div style="'+emptyCss+'"><div style="font-size:44px">📅</div><div style="font-size:15px;font-weight:700;color:var(--txt2)">Dates de la compétition manquantes</div><div style="font-size:12px;max-width:360px">Renseignez « Date du » et « Date au » pour générer une colonne par journée.</div></div>';
+
+  function isC(pk,dk,ty){ return !!data.checks[pk+'|'+dk+'\x02'+ty]; }
+  function pTot(pk){ var t=0; days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){ if(isC(pk,dy.key,m.type)) t+=TARIF[m.type]; }); }); return t; }
+  var grand=0; parts.forEach(function(p){ grand+=pTot(p.key); });
+
+  var _isDark = !document.body.classList.contains('theme-light');
+  var thSt = 'padding:6px 8px;font-size:10px;font-weight:700;text-align:center;white-space:nowrap;border:1px solid var(--bdr)';
+  var tdSt = 'padding:4px 6px;font-size:11px;text-align:center;border:1px solid rgba(255,255,255,.07)';
+  var totBg = _isDark ? '#0d1c3a' : '#dbeafe';
+
+  var h = '<div style="flex:1;overflow:auto;padding:14px">';
+  h += '<table style="border-collapse:collapse;font-family:inherit;min-width:max-content">';
+  h += '<thead><tr>';
+  h += '<th rowspan="2" style="'+thSt+';text-align:left;position:sticky;left:0;top:0;z-index:6;min-width:180px;background:#1e3a5f;color:#fff;border-right:2px solid #3b82f6">Nom</th>';
+  days.forEach(function(dy){
+    h += '<th colspan="3" style="'+thSt+';position:sticky;top:0;z-index:4;background:#1e3a5f;color:#fff;font-size:12px;font-weight:800;border-bottom:2px solid #3b82f6">'+dy.label
+      + ' <button onclick="_sendRepasEmail(\''+escH(compId)+'\',\''+dy.key+'\')" title="Envoyer la commande de ce jour au fournisseur repas" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px;vertical-align:middle;opacity:.85">✉️</button></th>';
+  });
+  h += '<th rowspan="2" style="'+thSt+';position:sticky;top:0;right:0;z-index:6;background:#1e3a5f;color:#f59e0b;border-left:2px solid #3b82f6;min-width:82px">Total €</th>';
+  h += '</tr><tr>';
+  days.forEach(function(){ _REPAS_MEALS.forEach(function(m){
+    h += '<th style="'+thSt+';position:sticky;top:33px;z-index:3;color:'+m.col+';background:#162f4a;min-width:58px">'+m.short+(TARIF[m.type]>0?'<br><span style="font-size:9px;opacity:.7">'+TARIF[m.type].toFixed(2)+' €</span>':'')+'</th>';
+  }); });
+  h += '</tr></thead><tbody>';
+  parts.forEach(function(p,i){
+    h += '<tr style="'+(i%2?'background:rgba(255,255,255,.025)':'')+'">';
+    h += '<td style="'+tdSt+';text-align:left;position:sticky;left:0;z-index:2;background:var(--navy);font-weight:600;white-space:nowrap;border-right:2px solid var(--bdr)">'+escH(p.nom)+' <span style="color:var(--txt3);font-weight:400">'+escH(p.prenom)+'</span>'+(p.role?' <span style="font-size:9px;color:var(--txt3);opacity:.8">· '+escH(p.role)+'</span>':'')+'</td>';
+    days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){
+      var chk = isC(p.key,dy.key,m.type);
+      var pkE=encodeURIComponent(p.key), dkE=encodeURIComponent(dy.key), tyE=encodeURIComponent(m.type);
+      h += '<td style="'+tdSt+';background:'+(chk?'rgba(99,102,241,.10)':'')+'"><input type="checkbox"'+(chk?' checked':'')+' onchange="_repasTog(this,\''+escH(compId)+'\',\''+pkE+'\',\''+dkE+'\',\''+tyE+'\')" style="width:16px;height:16px;cursor:pointer;accent-color:'+m.col+'"></td>';
+    }); });
+    h += '<td id="rprt-'+i+'" style="'+tdSt+';font-weight:800;color:#f59e0b;position:sticky;right:0;z-index:1;background:var(--navy);border-left:2px solid var(--bdr)">'+pTot(p.key).toFixed(2)+' €</td>';
+    h += '</tr>';
+  });
+  // Ligne TOTAL (comptes par colonne + total facturé)
+  h += '<tr style="border-top:2px solid rgba(99,102,241,.4)">';
+  h += '<td style="'+tdSt+';text-align:left;position:sticky;left:0;z-index:2;background:'+totBg+';font-weight:800;color:var(--stol);letter-spacing:.4px;border-right:2px solid var(--bdr)">TOTAL</td>';
+  days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){
+    var cnt=0; parts.forEach(function(p){ if(isC(p.key,dy.key,m.type)) cnt++; });
+    h += '<td id="rpct-'+dy.key.replace(/\//g,'')+'-'+m.tk+'" style="'+tdSt+';font-weight:700;color:'+m.col+';background:'+(_isDark?'rgba(30,58,95,.5)':'#eef2ff')+'">'+(cnt||'')+'</td>';
+  }); });
+  h += '<td id="rp-grand" style="'+tdSt+';font-weight:900;color:#f59e0b;position:sticky;right:0;z-index:1;background:'+totBg+';border-left:2px solid var(--bdr)">'+grand.toFixed(2)+' €</td>';
+  h += '</tr></tbody></table>';
+  h += '<div style="margin-top:10px;font-size:11px;color:var(--txt3)">Cochez les repas : le <b>total facturé se met à jour automatiquement</b> (tarifs ci-dessus). Les factures par pilote reprennent ces cases.</div>';
+  h += '</div>';
+  return h;
+}
+// Bascule d'une case + recalcul immédiat des totaux (sans re-render complet).
+function _repasTog(el, compId, pkE, dkE, tyE) {
+  var pk=decodeURIComponent(pkE), dk=decodeURIComponent(dkE), ty=decodeURIComponent(tyE);
+  if (!S.repas) S.repas = {}; if (!S.repas[compId]) S.repas[compId] = {}; if (!S.repas[compId].checks) S.repas[compId].checks = {};
+  var key = pk + '|' + dk + '\x02' + ty;
+  if (S.repas[compId].checks[key]) delete S.repas[compId].checks[key]; else S.repas[compId].checks[key] = true;
+  if (el && el.parentElement) el.parentElement.style.background = el.checked ? 'rgba(99,102,241,.10)' : '';
+  saveState(); if (typeof silentPush === 'function') silentPush();
+  _repasRefreshTotals(compId);
+}
+function _repasRefreshTotals(compId) {
+  var data = (S.repas||{})[compId] || {}, checks = data.checks || {};
+  var _t = (S.repasTarifs && S.repasTarifs[compId]) || {};
+  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0 };
+  var parts = _repasParticipants(compId), days = _repasDays(compId), grand = 0;
+  parts.forEach(function(p,i){
+    var t=0; days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){ if(checks[p.key+'|'+dy.key+'\x02'+m.type]) t+=TARIF[m.type]; }); });
+    grand += t; var el=document.getElementById('rprt-'+i); if(el) el.textContent = t.toFixed(2)+' €';
+  });
+  days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){
+    var cnt=0; parts.forEach(function(p){ if(checks[p.key+'|'+dy.key+'\x02'+m.type]) cnt++; });
+    var el=document.getElementById('rpct-'+dy.key.replace(/\//g,'')+'-'+m.tk); if(el) el.textContent = cnt||'';
+  }); });
+  var g=document.getElementById('rp-grand'); if(g) g.textContent = grand.toFixed(2)+' €';
+}
+
 function saveRepasTarifs(compId) {
   if (!S.repasTarifs) S.repasTarifs = {};
   var pDej = parseFloat((document.getElementById('repas-tarif-pDej')||{value:0}).value)||0;
@@ -20784,10 +20925,15 @@ function _sendRepasEmail(compId, jour) {
   if (!prestataire.email) {
     toast('Le fournisseur repas n\'a pas d\'adresse email renseignée', 'err'); return;
   }
-  var rows = (S.repas && S.repas[compId] && S.repas[compId].rows) || [];
-  var dayRows = rows.filter(function(r) { return r.jour === jour; });
+  var checks = (S.repas && S.repas[compId] && S.repas[compId].checks) || {};
   var counts = { 'Petit déjeuner': 0, 'Déjeuner': 0, 'Dîner': 0 };
-  dayRows.forEach(function(r) { if (counts[r.type] !== undefined) counts[r.type]++; });
+  Object.keys(checks).forEach(function(k){
+    if (!checks[k]) return;
+    var ck = k.substring(k.indexOf('|') + 1);
+    var sep = ck.indexOf('\x02'); if (sep < 0) return;
+    var day = ck.substring(0, sep), type = ck.substring(sep + 1);
+    if (day === jour && counts[type] !== undefined) counts[type]++;
+  });
   var nomPrestataire = prestataire.organisme || prestataire.representant || '';
   var sig = (((S.user && S.user.prenom) || '') + ' ' + ((S.user && S.user.nom) || '')).trim();
   var body = 'Bonjour' + (nomPrestataire ? ' ' + nomPrestataire : '') + ',\n\n';
@@ -22287,6 +22433,71 @@ function shareRanking() {
   }
 }
 
+// Numéro de facture repas : FACT-SPORT-<année>-<NNN>. Séquence continue par année,
+// stockée dans S.factRepasReg → PARTAGÉE via la synchro cloud (gardée en 4 endroits contre
+// l'effacement au merge). Réutilisée pour une même facture (aucun trou injustifié).
+// Structure : { map:{ <clé>: {num, year, seq, at} }, seq:{ <année>: dernier n° } }.
+function _factRepasNumber(year, invoiceKey) {
+  if (!S.factRepasReg || typeof S.factRepasReg !== 'object' || Array.isArray(S.factRepasReg)) {
+    // Migration depuis l'ancien stockage local (format {seq, map:{clé:"FACT-..."}}) si présent
+    var old = null; try { old = JSON.parse(localStorage.getItem('factRepasReg') || 'null'); } catch(e) {}
+    if (old && old.map) {
+      var m = {};
+      Object.keys(old.map).forEach(function(k){
+        var num = old.map[k]; var mm = (''+num).match(/FACT-SPORT-(\d{4})-(\d{3})/);
+        m[k] = { num: num, year: mm?parseInt(mm[1]):year, seq: mm?parseInt(mm[2]):0, at: 0 };
+      });
+      S.factRepasReg = { map: m, seq: old.seq || {}, _updatedAt: Date.now() };
+    } else {
+      S.factRepasReg = { map: {}, seq: {}, _updatedAt: Date.now() };
+    }
+  }
+  var reg = S.factRepasReg;
+  if (!reg.map) reg.map = {};
+  if (!reg.seq) reg.seq = {};
+  if (reg.map[invoiceKey] && reg.map[invoiceKey].num) return reg.map[invoiceKey].num; // déjà attribué
+  var taken = {}; Object.keys(reg.map).forEach(function(k){ var e = reg.map[k]; if (e && e.year === year) taken[e.seq] = 1; });
+  var next = (reg.seq[year] || 0) + 1;
+  while (taken[next]) next++;                       // jamais deux fois le même numéro
+  reg.seq[year] = Math.max(reg.seq[year] || 0, next);
+  var num = 'FACT-SPORT-' + year + '-' + ('000' + next).slice(-3);
+  reg.map[invoiceKey] = { num: num, year: year, seq: next, at: Date.now() };
+  reg._updatedAt = Date.now();
+  try { if (typeof saveState === 'function') saveState(); } catch(e) {}
+  try { if (typeof silentPush === 'function') silentPush(true); } catch(e) {}   // partage cloud
+  return num;
+}
+
+// Fusion de deux registres de numérotation (local prioritaire à égalité). Union des
+// factures par clé ; en cas de collision (année, n°) entre deux factures différentes,
+// la plus ancienne garde son numéro, la plus récente est renumérotée à la suite.
+function _mergeFactRepasReg(local, cloud) {
+  local = local || {}; cloud = cloud || {};
+  var lm = local.map || {}, cm = cloud.map || {};
+  var map = {};
+  Object.keys(cm).forEach(function(k){ map[k] = cm[k]; });
+  Object.keys(lm).forEach(function(k){ var e = lm[k], ex = map[k]; if (!ex || (e.at||0) >= (ex.at||0)) map[k] = e; });
+  var seq = {};
+  [local.seq || {}, cloud.seq || {}].forEach(function(s){ Object.keys(s).forEach(function(y){ if ((s[y]||0) > (seq[y]||0)) seq[y] = s[y]; }); });
+  var used = {};
+  Object.keys(map).sort(function(k1,k2){
+    var e1 = map[k1], e2 = map[k2];
+    if ((e1.year||0) !== (e2.year||0)) return (e1.year||0) - (e2.year||0);
+    if ((e1.seq||0)  !== (e2.seq||0))  return (e1.seq||0)  - (e2.seq||0);
+    return (e1.at||0) - (e2.at||0); // le plus ancien garde son n°
+  }).forEach(function(k){
+    var e = map[k], y = e.year || 0;
+    if (!used[y]) used[y] = {};
+    if (used[y][e.seq] !== undefined) {                 // collision → renuméroter
+      var ns = (seq[y]||0) + 1; while (used[y][ns] !== undefined) ns++;
+      e.seq = ns; e.num = 'FACT-SPORT-' + y + '-' + ('000' + ns).slice(-3);
+    }
+    used[y][e.seq] = k;
+    if ((e.seq||0) > (seq[y]||0)) seq[y] = e.seq;
+  });
+  return { map: map, seq: seq, _updatedAt: Math.max(local._updatedAt||0, cloud._updatedAt||0, Date.now()) };
+}
+
 function printRepasInvoice(pilotId) {
   var p = (S.pilots||[]).find(function(pl){ return pl.id === pilotId; });
   if (!p) return;
@@ -22334,9 +22545,39 @@ function printRepasInvoice(pilotId) {
   var pilotAdresse = p.adresse || '';
   var now = new Date();
   var dateStr = now.toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'});
+  // Affiche la date complète (jour en toutes lettres + mois/année), en complétant depuis la compétition si besoin
+  var _fjInv = function(jourStr, comp){
+    jourStr = (jourStr||'').toString().trim();
+    if(!jourStr) return jourStr;
+    // Date complète JJ/MM/AAAA (format de la nouvelle grille repas) → « Vendredi 15 août 2026 »
+    var full = jourStr.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+    if(full){ var _dd=parseInt(full[1]), _mo=parseInt(full[2])-1, _yy=parseInt(full[3]); if(_yy<100)_yy+=2000;
+      var _d=new Date(_yy,_mo,_dd); if(!isNaN(_d.getTime())){ var _s=_d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); return _s.charAt(0).toUpperCase()+_s.slice(1); } }
+    var MONTHS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    var norm=jourStr.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    var dm=jourStr.match(/\d{1,2}/); var day=dm?parseInt(dm[0]):null;
+    if(!day) return jourStr;
+    var month=null;
+    for(var i=0;i<MONTHS.length;i++){ var mn=MONTHS[i].normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,4); if(norm.indexOf(mn)>=0){ month=i; break; } }
+    var year=null;
+    if(comp && comp.dateFrom){ var df=comp.dateFrom.toString().slice(0,10).split('-'); if(df.length>=3){ if(month===null) month=parseInt(df[1])-1; year=parseInt(df[0]); } }
+    if(month===null) return jourStr;
+    if(year===null) year=now.getFullYear();
+    var d=new Date(year, month, day);
+    if(isNaN(d.getTime())) return jourStr;
+    var s=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    return s.charAt(0).toUpperCase()+s.slice(1);
+  };
+  // Numéro de facture : année = date de l'évènement (compétition), série auto continue
+  var _factYear = (function(){
+    for (var i=0;i<sections.length;i++){ var df=sections[i].comp && sections[i].comp.dateFrom; if(df){ var y=parseInt(df.toString().slice(0,4)); if(y>2000) return y; } }
+    return now.getFullYear();
+  })();
+  var _factKey = pilotId + '|' + sections.map(function(s){ return s.comp.id; }).sort().join(',');
+  var _factNum = _factRepasNumber(_factYear, _factKey);
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Facture Repas – '+pilotName+'</title>';
   html += '<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:0}';
-  html += '.page{padding:28px 32px;max-width:700px;margin:0 auto}';
+  html += '.page{padding:28px 32px;max-width:700px;margin:0 auto;box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column}';
   html += 'table{border-collapse:collapse;width:100%}';
   html += 'th,td{border:1px solid #ccc;padding:6px 10px}';
   html += 'th{background:#1e3a5f;color:#fff;font-size:11px;text-align:left}';
@@ -22348,17 +22589,17 @@ function printRepasInvoice(pilotId) {
   html += '<div class="page">';
   // Header
   html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px">';
-  if (logo) html += '<img src="'+logo+'" style="max-width:120px;max-height:70px;object-fit:contain">';
+  if (logo) html += '<img src="'+logo+'" style="max-width:139px;max-height:89px;object-fit:contain">';
   else html += '<div></div>';
   html += '<div style="text-align:right;font-size:12px;color:#555">';
-  html += '<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:4px">FACTURE REPAS</div>';
+  html += '<div style="font-size:18px;font-weight:800;color:#1e3a5f;margin-bottom:4px">FACTURE</div>';
   html += '<div>Date : '+dateStr+'</div>';
+  html += '<div style="font-weight:700;color:#1e3a5f;margin-top:2px">'+_factNum+'</div>';
   html += '</div>';
   html += '</div>';
   // Info pilote
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
   html += '<div style="border:1px solid #ccc;border-radius:6px;padding:12px">';
-  html += '<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Pilote</div>';
   html += '<div style="font-size:14px;font-weight:700">'+pilotName+'</div>';
   if (pilotAdresse) html += '<div style="font-size:12px;color:#555;margin-top:4px">'+escH(pilotAdresse)+'</div>';
   if (p.email) html += '<div style="font-size:11px;color:#6b7280;margin-top:2px">'+escH(p.email)+'</div>';
@@ -22383,25 +22624,34 @@ function printRepasInvoice(pilotId) {
     sec.rows.forEach(function(r) {
       var tarif = sec.TT[r.type]||0;
       compTotal += tarif;
-      html += '<tr><td>'+escH(r.jour||'')+'</td><td>'+escH(r.type||'')+'</td>';
+      html += '<tr><td>'+escH(_fjInv(r.jour||'', sec.comp))+'</td><td>'+escH(r.type||'')+'</td>';
       html += '<td style="text-align:right">'+(tarif>0?tarif.toFixed(2)+' €':'—')+'</td></tr>';
     });
     html += '<tr class="total-row"><td colspan="2" style="text-align:right;font-weight:700">Sous-total</td>';
     html += '<td style="text-align:right;font-weight:700">'+compTotal.toFixed(2)+' €</td></tr>';
     html += '</tbody></table></div>';
   });
-  // Grand total
+  // Grand total (mention TVA à gauche, dans le bloc bleu)
   html += '<table style="margin-top:8px"><tbody>';
-  html += '<tr class="grand-total"><td style="text-align:right;font-size:14px" colspan="2">TOTAL À PAYER</td>';
-  html += '<td style="text-align:right;font-size:14px;width:120px">'+globalTotal.toFixed(2)+' €</td></tr>';
+  html += '<tr class="grand-total"><td style="text-align:left;font-size:11px;font-weight:400">TVA non-applicable, article 293 B du CGI</td>';
+  html += '<td style="text-align:right;font-size:14px">TOTAL À PAYER</td>';
+  html += '<td style="text-align:right;font-size:14px;width:80px">'+globalTotal.toFixed(2)+' €</td></tr>';
   html += '</tbody></table>';
-  // Signature
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:32px">';
-  html += '<div style="border:1px solid #ccc;padding:10px 14px;border-radius:6px;min-height:70px">';
-  html += '<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Signature du bénéficiaire</div>';
+  // Tampon (défini dans Réglages) sous le total, à droite
+  var _stampImg = _getDocStamp();
+  if (_stampImg) html += '<div style="text-align:right;margin-top:12px"><img src="'+_stampImg+'" style="max-width:160px;max-height:120px;object-fit:contain"></div>';
+  // Bloc de bas de page poussé tout en bas
+  html += '<div style="margin-top:auto">';
+  // Mentions légales de retard (avant le pied de page)
+  html += '<div style="margin-top:26px;font-size:9.5px;color:#4b5563;line-height:1.5">';
+  html += 'Loi LME du 04-08-2008, les pénalités de retard seront calculées sur la base de 3 fois le taux d\'intérêt légal.<br>';
+  html += 'Indemnité forfaitaire pour frais de recouvrement en cas de retard de paiement : 40 €';
   html += '</div>';
-  html += '<div style="border:1px solid #ccc;padding:10px 14px;border-radius:6px;min-height:70px">';
-  html += '<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Signature organisateur</div>';
+  // Pied de page
+  html += '<div style="margin-top:20px;padding-top:10px;border-top:1px solid #ccc;text-align:center;font-size:8.5px;color:#6b7280;line-height:1.6">';
+  html += 'Association loi 1901, délégataire du Ministère chargé des Sports et inscrite au Code de l\'aviation civile du Ministère chargé des Transports<br>';
+  html += 'SIRET 378 080 386 000 22 - APE 9319Z - TVA Intracommunautaire FR91 378 080 386<br>';
+  html += '<span style="font-size:12px;font-weight:700;color:#1e3a5f">FÉDÉRATION FRANÇAISE D\'ULM - FFPLUM 96 bis, rue Marc Sangnier 94700 MAISONS-ALFORT<br><span style="font-size:10px">Tél +33(0)1 49 81 74 43&nbsp;&nbsp;-&nbsp;&nbsp;ffplum@ffplum.org</span></span>';
   html += '</div>';
   html += '</div>';
   html += '<div class="no-print" style="margin-top:20px;text-align:center"><button onclick="window.print()" style="padding:10px 24px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-family:inherit">🖨 Imprimer</button></div>';
@@ -26526,6 +26776,7 @@ async function pushToCloud() {
     _deletedAides:        S._deletedAides        || {},
     territoires:          S.territoires          || {},
     accesUsers:           S.accesUsers           || [],
+    factRepasReg:         S.factRepasReg         || {map:{},seq:{}},
     // Module Formations : absent du payload jusqu'ici → chaque envoi effaçait
     // ces données du cloud, et le rechargement re-semait les types par défaut
     // (d'où les types supprimés qui « revenaient »). Désormais persistés et
@@ -27212,6 +27463,8 @@ async function loadFromSupabaseFirst() {
     // ✅ GARDE ÉVÉNEMENTS (accidents/incidents par compétition) — DONNÉES CRITIQUES :
     // ne jamais laisser un cloud plus ancien effacer une saisie locale.
     var savedEvenements = (S.evenements && Object.keys(S.evenements).length) ? JSON.parse(JSON.stringify(S.evenements)) : null;
+    // ✅ GARDE NUMÉROTATION FACTURES : registre local préservé puis fusionné (jamais effacé par le cloud)
+    var savedFactRepasReg = (S.factRepasReg && S.factRepasReg.map && Object.keys(S.factRepasReg.map).length) ? JSON.parse(JSON.stringify(S.factRepasReg)) : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -27308,6 +27561,12 @@ async function loadFromSupabaseFirst() {
           }
         });
       });
+    }
+    // ✅ Fusionner le registre de numérotation des factures (local prioritaire, collisions résolues)
+    if (savedFactRepasReg) {
+      S.factRepasReg = _mergeFactRepasReg(savedFactRepasReg, (S.factRepasReg && S.factRepasReg.map) ? S.factRepasReg : {});
+    } else if (!S.factRepasReg || typeof S.factRepasReg !== 'object' || Array.isArray(S.factRepasReg)) {
+      S.factRepasReg = { map: {}, seq: {} };
     }
     // Fusionner les événements agenda locaux non présents dans le cloud
     if (localAgendaEvents.length) {
@@ -53356,6 +53615,17 @@ function _toggleDtnCompSub() {
   if (btn) btn.style.color = _dtnCompSubOpen ? 'var(--txt)' : '';
 }
 
+// Bouton « Agenda fédéral » : ouvre l'agenda des compétitions SANS déployer ni activer
+// le sous-menu « Détails » (qui reste replié). Corrige le fait que openDTNModule('competitions')
+// force l'ouverture/surlignage de « Détails ».
+function _openAgendaFederal() {
+  openDTNModule('competitions');
+  _dtnCompSubOpen = false;
+  var sub = document.getElementById('dtn-comp-sub'); if (sub) sub.style.display = 'none';
+  var chev = document.getElementById('dtn-comp-chevron'); if (chev) chev.style.transform = 'rotate(0deg)';
+  _dtnSetActiveNav('agenda-fed');   // surligne « Agenda fédéral », pas « Détails »
+}
+
 function _compShowSidebar() {
   // Sur mobile, pas de sidebar — la nav est dans la bottom bar
   if (window.innerWidth < 768) return;
@@ -53879,7 +54149,7 @@ function _dtnToggleSidebar() {
 
 // ── Navigation DTN sidebar ─────────────────────────────────────────
 var _dtnActiveNav = 'home';
-var _dtnNavIds = ['home','comp','collectif','agenda','gantt','espaces','acces','formations','securite','territoires','aides','faq'];
+var _dtnNavIds = ['home','agenda-fed','comp','collectif','agenda','gantt','espaces','acces','formations','securite','territoires','aides','faq'];
 
 function _dtnSetActiveNav(key) {
   _dtnActiveNav = key;
@@ -55175,12 +55445,12 @@ function _sevPrintStats() {
 
   var _barRow = function(lbl, n, mx, tot, col) {
     var w=mx>0?Math.round(n/mx*100):0, pct=tot>0?Math.round(n/tot*100):0;
-    return '<div style="margin-bottom:7px">'
-      +'<div style="display:flex;justify-content:space-between;margin-bottom:2px">'
-      +'<span style="font-size:10px;color:#374151">'+lbl+'</span>'
-      +'<span style="font-size:10px;font-weight:700;color:'+col+'">'+n+' <span style="font-weight:400;color:#94a3b8;font-size:9px">'+pct+'%</span></span>'
+    return '<div style="margin-bottom:4px">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:1px">'
+      +'<span style="font-size:9px;color:#374151">'+lbl+'</span>'
+      +'<span style="font-size:9px;font-weight:700;color:'+col+'">'+n+' <span style="font-weight:400;color:#94a3b8;font-size:8px">'+pct+'%</span></span>'
       +'</div>'
-      +'<div style="height:6px;background:#e2e8f0;border-radius:3px"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div>'
+      +'<div style="height:5px;background:#e2e8f0;border-radius:3px"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div>'
       +'</div>';
   };
 
@@ -55190,7 +55460,7 @@ function _sevPrintStats() {
     _allEvs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length!==4)return;if(!byY[y])byY[y]={c:0,m:0};if(_isMort(e))byY[y].m++;else if(_isCorp(e))byY[y].c++;});
     var _histo=_sevHisto(); Object.keys(_histo).forEach(function(y){ if(!byY[y]) byY[y]={c:0,m:0}; byY[y].c+=_histo[y].c; byY[y].m+=_histo[y].m; });
     var yrs=Object.keys(byY).sort(); if(!yrs.length) return '<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:11px">—</div>';
-    var W=320,H=160,pL=24,pR=6,pT=10,pB=28;
+    var W=filterYear?320:680,H=filterYear?160:132,pL=24,pR=6,pT=filterYear?10:8,pB=filterYear?28:26;
     var cW=W-pL-pR,cH=H-pT-pB;
     var maxV=0; yrs.forEach(function(y){maxV=Math.max(maxV,byY[y].c+byY[y].m);}); maxV=Math.ceil(maxV/5)*5||5;
     var bW=Math.min(30,Math.floor(cW/yrs.length)-4), gap=(cW-bW*yrs.length)/(yrs.length+1);
@@ -55287,55 +55557,37 @@ function _sevPrintStats() {
     return items.map(function(k,i){return _barRow(k,counts[k],mx,total,cols3[i%cols3.length]);}).join('');
   })();
 
-  // ── Treemap Origines (uniquement les événements avec une référence BEA) ──
+  // ── Origines (réf. BEA) — barres compactes sur 2 colonnes ; libellé rouge + † si accident mortel ──
   var _barsOrig = (function(){
-    var counts={};
-    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){ counts[e.refBEA]=(counts[e.refBEA]||0)+1; });
+    var counts={}, morts={}, tues={};
+    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
+      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
+      if(_isMort(e)) morts[e.refBEA]=(morts[e.refBEA]||0)+1;
+      tues[e.refBEA]=(tues[e.refBEA]||0)+(parseInt(e.nbTues||0)||0);
+    });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
     if(!items.length) return '';
-    var cols3=[C.mort,'#d97706',C.p1,C.p2,C.p3,C.p5,C.p6,C.p7,'#0891b2','#ec4899'];
-    var W=290,H=130,sum=items.reduce(function(a,k){return a+counts[k];},0);
-    var rects=[],rem=items.slice(),x=0,y=0,rw=W,rh=H,horiz=true;
-    while(rem.length){
-      var batch=rem.splice(0,Math.max(1,Math.ceil(rem.length/2)));
-      var bSum=batch.reduce(function(a,k){return a+counts[k];},0);
-      var cx=x,cy=y;
-      if(horiz){
-        var bh=Math.round(bSum/sum*rh),bx=cx;
-        batch.forEach(function(k,i){var bw=Math.round(counts[k]/bSum*rw);if(i===batch.length-1)bw=cx+rw-bx;rects.push({x:bx,y:cy,w:bw,h:bh,k:k,v:counts[k]});bx+=bw;});
-        y+=bh;rh-=bh;
-      } else {
-        var bw2=Math.round(bSum/sum*rw),by=cy;
-        batch.forEach(function(k,i){var bh2=Math.round(counts[k]/bSum*rh);if(i===batch.length-1)bh2=cy+rh-by;rects.push({x:cx,y:by,w:bw2,h:bh2,k:k,v:counts[k]});by+=bh2;});
-        x+=bw2;rw-=bw2;
-      }
-      horiz=!horiz;
-    }
-    var BLUES2=['#1e3a8a','#1e40af','#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#dbeafe','#eff6ff'];
-    var TXTS2 =['#fff','#fff','#fff','#fff','#fff','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a','#1e3a8a'];
-    var defs2='<defs>'+rects.map(function(r,i){return '<clipPath id="pcp'+i+'"><rect x="'+(r.x+1)+'" y="'+(r.y+1)+'" width="'+Math.max(r.w-3,0)+'" height="'+Math.max(r.h-3,0)+'"/></clipPath>';}).join('')+'</defs>';
-    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:4px;overflow:hidden">'+defs2;
-    rects.forEach(function(r,i){
-      var col=BLUES2[i%BLUES2.length], tc=TXTS2[i%TXTS2.length];
-      s+='<rect x="'+r.x+'" y="'+r.y+'" width="'+Math.max(r.w-1,0)+'" height="'+Math.max(r.h-1,0)+'" fill="'+col+'" rx="2"/>';
-      if(r.w<12||r.h<10) return;
-      var fs=Math.max(5,Math.min(7,Math.floor(r.w/10),Math.floor(r.h/4.5)));
-      var charsPerLine=Math.floor((r.w-4)/(fs*0.58));
-      var lbl=r.k.length>charsPerLine?r.k.slice(0,Math.max(2,charsPerLine-1))+'…':r.k;
-      var showVal=r.h>fs*3.5&&r.w>14;
-      var showLbl=r.w>12&&r.h>fs*1.8;
-      s+='<g clip-path="url(#pcp'+i+')">';
-      if(showLbl){
-        var ty=r.y+r.h/2+(showVal?-fs*0.8:0);
-        s+='<text x="'+(r.x+r.w/2)+'" y="'+ty+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="'+fs+'" fill="'+tc+'" dominant-baseline="middle">'+lbl+'</text>';
-      }
-      if(showVal){
-        var vy=r.y+r.h/2+(showLbl?fs*1.2:0);
-        s+='<text x="'+(r.x+r.w/2)+'" y="'+vy+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="'+(fs+1)+'" font-weight="700" fill="'+tc+'" dominant-baseline="middle">'+r.v+'</text>';
-      }
-      s+='</g>';
-    });
-    return s+'</svg>';
+    var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
+    var cols3=[C.p1,C.p2,C.p3,C.p4,C.p5,C.p6,C.p7,C.p8,'#0891b2','#4d7c0f'];
+    var maxV=counts[items[0]]||1;
+    var row=function(k,i){
+      var n=counts[k], dc=morts[k]||0, nt=tues[k]||0;
+      var barCol=dc>0?C.mort:cols3[i%cols3.length];
+      var w=Math.round(n/maxV*100), pct=nBEA>0?Math.round(n/nBEA*100):0;
+      return '<div style="margin-bottom:6px">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:2px;align-items:baseline">'
+          +'<span style="min-width:0;flex:1;font-size:9px;color:'+(dc>0?C.mort:'#374151')+';font-weight:'+(dc>0?'700':'400')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(k)+'</span>'
+          +'<span style="flex-shrink:0;font-size:9px;font-weight:700;color:'+barCol+'">'+(dc>0?'† '+(nt>0?nt:dc)+' · ':'')+n+' <span style="font-weight:400;color:#94a3b8;font-size:8px">'+pct+'%</span></span>'
+        +'</div>'
+        +'<div style="height:5px;background:#e2e8f0;border-radius:3px"><div style="width:'+w+'%;height:100%;background:'+barCol+';border-radius:3px"></div></div>'
+      +'</div>';
+    };
+    var half=Math.ceil(items.length/2);
+    var colA=items.slice(0,half).map(function(k,i){return row(k,i);}).join('');
+    var colB=items.slice(half).map(function(k,i){return row(k,i+half);}).join('');
+    var legend='<div style="font-size:8px;color:#64748b;margin-top:5px;text-align:right"><span style="color:'+C.mort+';font-weight:700">†</span> origine avec accident mortel (nb de tués si connu) · '+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
+    return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">'
+      +'<div style="min-width:0;overflow:hidden">'+colA+'</div><div style="min-width:0;overflow:hidden">'+colB+'</div></div>'+legend;
   })();
 
   // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
@@ -55421,7 +55673,7 @@ function _sevPrintStats() {
   ];
   if(ageMoy!==null) kpis2.push({val:ageMoy+' ans',lbl:'Âge moyen',col:'#7c3aed',sub:'min '+ageMin+' / max '+ageMax});
 
-  var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+kpis2.length+',1fr);gap:8px;margin-bottom:14px">';
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+kpis2.length+',1fr);gap:8px;margin-bottom:8px">';
   kpis2.forEach(function(k){
     kpiHtml+='<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;position:relative;overflow:hidden;background:#fff">'
       +'<div style="position:absolute;top:0;left:0;right:0;height:2.5px;background:'+k.col+'"></div>'
@@ -55434,7 +55686,7 @@ function _sevPrintStats() {
 
   // ── Carte sectionne ──
   var _sec = function(title, content) {
-    return '<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;display:flex;flex-direction:column">'
+    return '<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;display:flex;flex-direction:column">'
       +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">'+title+'</div>'
       +'<div style="flex:1">'+content+'</div>'
       +'</div>';
@@ -55459,16 +55711,16 @@ function _sevPrintStats() {
     +'  .no-print{display:none!important}'
     +'  .page-wrap{box-shadow:none!important;margin:0!important;width:100%!important}'
     +'  .row{page-break-inside:avoid}'
-    +'  #prt-map{height:190px!important}'
+    +'  #prt-map{height:140px!important}'
     +'}'
     +'.page-wrap{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:0;box-shadow:0 4px 24px rgba(0,0,0,.12)}'
-    +'.inner{padding:11mm 11mm 10mm}'
-    +'.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:9px;border-bottom:2px solid #1e3a5f;margin-bottom:11px}'
+    +'.inner{padding:8mm 10mm 8mm}'
+    +'.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:6px;border-bottom:2px solid #1e3a5f;margin-bottom:8px}'
     +'.row{display:grid;gap:8px;margin-bottom:8px}'
     +'.row-2{grid-template-columns:1fr 1fr}'
     +'.row-3{grid-template-columns:1fr 1fr 1fr}'
     +'.row-2b{grid-template-columns:1.1fr .9fr}'
-    +'#prt-map{height:190px;border-radius:6px;overflow:hidden;z-index:0}'
+    +'#prt-map{height:140px;border-radius:6px;overflow:hidden;z-index:0}'
     +'.leaflet-control-attribution{font-size:7px!important}'
     +'</style>'
     +'</head><body>'
@@ -55476,7 +55728,7 @@ function _sevPrintStats() {
 
     // ── Header ──
     +'<div class="hdr">'
-    +(logo?'<img src="'+logo+'" style="height:64px;width:auto;max-width:140px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
+    +(logo?'<img src="'+logo+'" style="height:50px;width:auto;max-width:120px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
     +'<div>'
     +'<div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px">FFPLUM · Direction Technique Nationale</div>'
     +'<div style="font-size:20px;font-weight:900;color:#1e3a5f;letter-spacing:-.3px">'+titleLabel+'</div>'
@@ -55530,8 +55782,8 @@ function _sevPrintStats() {
         +'</div>'
     )
 
-    // ── Row 4 : Origines détectées (Treemap pleine largeur) ──
-    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;margin-bottom:10px">'
+    // ── Row 4 : Origines détectées (barres 2 colonnes, pleine largeur) ──
+    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;margin-bottom:0">'
     +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
     +(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')
     +'</div>'
