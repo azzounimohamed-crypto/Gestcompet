@@ -20760,12 +20760,12 @@ var _REPAS_MEALS = [
 // Participants = encadrants (staff, hors NDF) + équipages (pilotes enrôlés), dédoublonnés et triés.
 function _repasParticipants(compId) {
   var parts = [], seen = {};
-  function add(nom, prenom, role) {
+  function add(nom, prenom, role, id) {
     nom = (nom||'').toString().trim(); prenom = (prenom||'').toString().trim();
     if (!nom && !prenom) return;
     var key = nom.toUpperCase() + '\x01' + prenom.toUpperCase();
     if (seen[key]) return; seen[key] = true;
-    parts.push({ nom:nom, prenom:prenom, role:role||'', key:key });
+    parts.push({ nom:nom, prenom:prenom, role:role||'', key:key, id:id||'' });
   }
   (Array.isArray((S.staff||{})[compId]) ? S.staff[compId] : []).forEach(function(s){
     if (!s || (s.role||'').toUpperCase() === 'NDF') return;
@@ -20773,7 +20773,7 @@ function _repasParticipants(compId) {
   });
   (((S.compEnroll||{})[compId]) || []).forEach(function(pid){
     var p = (S.pilots||[]).find(function(x){ return x.id === pid; });
-    if (p) add(p.nom, p.prenom, 'Équipage');
+    if (p) add(p.nom, p.prenom, 'Équipage', p.id);
   });
   parts.sort(function(a,b){ var n=(a.nom||'').localeCompare(b.nom||'','fr'); return n!==0?n:(a.prenom||'').localeCompare(b.prenom||'','fr'); });
   return parts;
@@ -20793,6 +20793,30 @@ function _repasDays(compId) {
   }
   return out;
 }
+// Élagage auto-correctif des cases repas : on ne garde QUE les cases correspondant à un
+// participant actuel (encadrant/équipage) × un jour valide de la compétition × un type connu.
+// Supprime ainsi toute donnée héritée qui « complique les choses » : dates hors plage (dates
+// de la compétition modifiées depuis un ancien import), personnes qui ne sont plus inscrites,
+// clés d'un ancien format. Ne touche jamais à une case valide (saisie manuelle conservée).
+// Sécurité : si on n'a pas de participants OU pas de dates, on ne supprime rien (données non validables).
+function _repasPruneChecks(compId) {
+  var data = (S.repas||{})[compId];
+  if (!data || !data.checks) return;
+  var parts = _repasParticipants(compId), days = _repasDays(compId);
+  if (!parts.length || !days.length) return;
+  var okPk = {}; parts.forEach(function(p){ okPk[p.key] = 1; });
+  var okDay = {}; days.forEach(function(d){ okDay[d.key] = 1; });
+  var okType = { 'Petit déjeuner':1, 'Déjeuner':1, 'Dîner':1 };
+  var removed = 0;
+  Object.keys(data.checks).forEach(function(k){
+    var sep = k.indexOf('|'); if (sep < 0) { delete data.checks[k]; removed++; return; }
+    var pk = k.slice(0, sep), rest = k.slice(sep + 1);
+    var s2 = rest.indexOf('\x02'); if (s2 < 0) { delete data.checks[k]; removed++; return; }
+    var day = rest.slice(0, s2), ty = rest.slice(s2 + 1);
+    if (!okPk[pk] || !okDay[day] || !okType[ty]) { delete data.checks[k]; removed++; }
+  });
+  if (removed) { try { saveState(); if (typeof silentPush === 'function') silentPush(); } catch(e) {} }
+}
 function _buildRepasGrid(compId) {
   if (!S.repas) S.repas = {};
   var data = S.repas[compId] || (S.repas[compId] = {});
@@ -20801,18 +20825,8 @@ function _buildRepasGrid(compId) {
   var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0 };
   var parts = _repasParticipants(compId), days = _repasDays(compId);
 
-  // Migration unique : anciens repas importés (rows) → cases cochées, par n° de jour → date.
-  if (data.rows && data.rows.length && !data._mealsMigrated && days.length) {
-    data.rows.forEach(function(r){
-      var dn = (String(r.jour).match(/\d+/)||[])[0]; if (!dn) return;
-      var day = days.find(function(dy){ return parseInt(dy.key.slice(0,2),10) === parseInt(dn,10); }); if (!day) return;
-      if (['Petit déjeuner','Déjeuner','Dîner'].indexOf(r.type) < 0) return;
-      var pk = (r.nom||'').toUpperCase() + '\x01' + (r.prenom||'').toUpperCase();
-      data.checks[pk + '|' + day.key + '\x02' + r.type] = true;
-    });
-    data._mealsMigrated = true;
-    try { saveState(); } catch(e) {}
-  }
+  // Élagage auto-correctif : purge les cases héritées (participant absent / date hors plage).
+  _repasPruneChecks(compId);
 
   var emptyCss = 'flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--txt3);padding:44px;text-align:center';
   if (!parts.length) return '<div style="'+emptyCss+'"><div style="font-size:44px">👥</div><div style="font-size:15px;font-weight:700;color:var(--txt2)">Aucun participant</div><div style="font-size:12px;max-width:360px">Ajoutez des <b>encadrants</b> (onglet Staff) et des <b>équipages</b> (pilotes inscrits) : ils apparaîtront ici pour cocher leurs repas.</div></div>';
@@ -20835,7 +20849,7 @@ function _buildRepasGrid(compId) {
     h += '<th colspan="3" style="'+thSt+';position:sticky;top:0;z-index:4;background:#1e3a5f;color:#fff;font-size:12px;font-weight:800;border-bottom:2px solid #3b82f6">'+dy.label
       + ' <button onclick="_sendRepasEmail(\''+escH(compId)+'\',\''+dy.key+'\')" title="Envoyer la commande de ce jour au fournisseur repas" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px;vertical-align:middle;opacity:.85">✉️</button></th>';
   });
-  h += '<th rowspan="2" style="'+thSt+';position:sticky;top:0;right:0;z-index:6;background:#1e3a5f;color:#f59e0b;border-left:2px solid #3b82f6;min-width:82px">Total €</th>';
+  h += '<th rowspan="2" style="'+thSt+';position:sticky;top:0;right:0;z-index:6;background:#dbeafe;color:#1e3a8a;border-left:2px solid #3b82f6;min-width:100px">Total €</th>';
   h += '</tr><tr>';
   days.forEach(function(){ _REPAS_MEALS.forEach(function(m){
     h += '<th style="'+thSt+';position:sticky;top:33px;z-index:3;color:'+m.col+';background:#162f4a;min-width:58px">'+m.short+(TARIF[m.type]>0?'<br><span style="font-size:9px;opacity:.7">'+TARIF[m.type].toFixed(2)+' €</span>':'')+'</th>';
@@ -20843,13 +20857,13 @@ function _buildRepasGrid(compId) {
   h += '</tr></thead><tbody>';
   parts.forEach(function(p,i){
     h += '<tr style="'+(i%2?'background:rgba(255,255,255,.025)':'')+'">';
-    h += '<td style="'+tdSt+';text-align:left;position:sticky;left:0;z-index:2;background:var(--navy);font-weight:600;white-space:nowrap;border-right:2px solid var(--bdr)">'+escH(p.nom)+' <span style="color:var(--txt3);font-weight:400">'+escH(p.prenom)+'</span>'+(p.role?' <span style="font-size:9px;color:var(--txt3);opacity:.8">· '+escH(p.role)+'</span>':'')+'</td>';
+    h += '<td style="'+tdSt+';text-align:left;position:sticky;left:0;z-index:2;background:var(--navy);font-weight:600;white-space:nowrap;border-right:2px solid var(--bdr)">'+escH((p.nom||'').toUpperCase())+' <span style="color:var(--txt3);font-weight:400">'+escH((p.prenom||'').toUpperCase())+'</span>'+(p.role?' <span style="font-size:9px;color:var(--txt3);opacity:.8">· '+escH(p.role)+'</span>':'')+'</td>';
     days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){
       var chk = isC(p.key,dy.key,m.type);
       var pkE=encodeURIComponent(p.key), dkE=encodeURIComponent(dy.key), tyE=encodeURIComponent(m.type);
       h += '<td style="'+tdSt+';background:'+(chk?'rgba(99,102,241,.10)':'')+'"><input type="checkbox"'+(chk?' checked':'')+' onchange="_repasTog(this,\''+escH(compId)+'\',\''+pkE+'\',\''+dkE+'\',\''+tyE+'\')" style="width:16px;height:16px;cursor:pointer;accent-color:'+m.col+'"></td>';
     }); });
-    h += '<td id="rprt-'+i+'" style="'+tdSt+';font-weight:800;color:#f59e0b;position:sticky;right:0;z-index:1;background:var(--navy);border-left:2px solid var(--bdr)">'+pTot(p.key).toFixed(2)+' €</td>';
+    h += '<td style="'+tdSt+';font-weight:800;color:#1e3a8a;position:sticky;right:0;z-index:1;background:#eef4ff;border-left:2px solid var(--bdr);white-space:nowrap"><span id="rprt-'+i+'">'+pTot(p.key).toFixed(2)+' €</span> <button onclick="_repasFacture(\''+escH(p.id||'')+'\',\''+encodeURIComponent(p.nom)+'\',\''+encodeURIComponent(p.prenom)+'\')" title="Ouvrir la facture à imprimer" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;vertical-align:middle;line-height:1">🖨️</button></td>';
     h += '</tr>';
   });
   // Ligne TOTAL (comptes par colonne + total facturé)
@@ -20859,7 +20873,7 @@ function _buildRepasGrid(compId) {
     var cnt=0; parts.forEach(function(p){ if(isC(p.key,dy.key,m.type)) cnt++; });
     h += '<td id="rpct-'+dy.key.replace(/\//g,'')+'-'+m.tk+'" style="'+tdSt+';font-weight:700;color:'+m.col+';background:'+(_isDark?'rgba(30,58,95,.5)':'#eef2ff')+'">'+(cnt||'')+'</td>';
   }); });
-  h += '<td id="rp-grand" style="'+tdSt+';font-weight:900;color:#f59e0b;position:sticky;right:0;z-index:1;background:'+totBg+';border-left:2px solid var(--bdr)">'+grand.toFixed(2)+' €</td>';
+  h += '<td style="'+tdSt+';font-weight:900;color:#1e3a8a;position:sticky;right:0;z-index:1;background:#dbeafe;border-left:2px solid var(--bdr)"><span id="rp-grand">'+grand.toFixed(2)+' €</span></td>';
   h += '</tr></tbody></table>';
   h += '<div style="margin-top:10px;font-size:11px;color:var(--txt3)">Cochez les repas : le <b>total facturé se met à jour automatiquement</b> (tarifs ci-dessus). Les factures par pilote reprennent ces cases.</div>';
   h += '</div>';
@@ -20889,6 +20903,12 @@ function _repasRefreshTotals(compId) {
     var el=document.getElementById('rpct-'+dy.key.replace(/\//g,'')+'-'+m.tk); if(el) el.textContent = cnt||'';
   }); });
   var g=document.getElementById('rp-grand'); if(g) g.textContent = grand.toFixed(2)+' €';
+}
+// Ouvre la facture à imprimer d'un participant : pilote (via son id) ou encadrant (par nom/prénom).
+function _repasFacture(pilotId, nomEnc, prenomEnc) {
+  var found = pilotId && (S.pilots||[]).some(function(p){ return p.id === pilotId; });
+  if (found) { printRepasInvoice(pilotId); return; }
+  printRepasInvoice(null, { id:null, nom:decodeURIComponent(nomEnc||''), prenom:decodeURIComponent(prenomEnc||'') });
 }
 
 function saveRepasTarifs(compId) {
@@ -22498,8 +22518,8 @@ function _mergeFactRepasReg(local, cloud) {
   return { map: map, seq: seq, _updatedAt: Math.max(local._updatedAt||0, cloud._updatedAt||0, Date.now()) };
 }
 
-function printRepasInvoice(pilotId) {
-  var p = (S.pilots||[]).find(function(pl){ return pl.id === pilotId; });
+function printRepasInvoice(pilotId, participant) {
+  var p = (S.pilots||[]).find(function(pl){ return pl.id === pilotId; }) || participant;
   if (!p) return;
   var logo = _getAppLogo();
   var TYPE_COLOR_I = {'Petit déjeuner':'#b45309','Déjeuner':'#065f46','Dîner':'#3730a3'};
@@ -22509,6 +22529,7 @@ function printRepasInvoice(pilotId) {
   S.comps.forEach(function(cp) {
     var rd = S.repas && S.repas[cp.id];
     if (!rd) return;
+    _repasPruneChecks(cp.id); // purge des cases héritées (participant absent / date hors plage) avant lecture
     var tarifs = (S.repasTarifs && S.repasTarifs[cp.id]) || {};
     var TT = {'Petit déjeuner': tarifs.pDej||0, 'Déjeuner': tarifs.dej||0, 'Dîner': tarifs.din||0};
     // Priorité 1 : repas cochés manuellement
@@ -22534,7 +22555,7 @@ function printRepasInvoice(pilotId) {
       return r.nom && p.nom && r.nom.trim().toLowerCase() === (p.nom||'').trim().toLowerCase()
           && (r.prenom||'').trim().toLowerCase() === (p.prenom||'').trim().toLowerCase();
     });
-    var finalRows = checkedMeals.length ? checkedMeals : matchRows;
+    var finalRows = checkedMeals; // uniquement les cases cochées (plus de repli sur l'ancien import Excel)
     if (!finalRows.length) return;
     sections.push({ comp: cp, rows: finalRows, TT: TT });
   });
@@ -22573,7 +22594,7 @@ function printRepasInvoice(pilotId) {
     for (var i=0;i<sections.length;i++){ var df=sections[i].comp && sections[i].comp.dateFrom; if(df){ var y=parseInt(df.toString().slice(0,4)); if(y>2000) return y; } }
     return now.getFullYear();
   })();
-  var _factKey = pilotId + '|' + sections.map(function(s){ return s.comp.id; }).sort().join(',');
+  var _factKey = (pilotId || ((p.nom||'')+'~'+(p.prenom||''))) + '|' + sections.map(function(s){ return s.comp.id; }).sort().join(',');
   var _factNum = _factRepasNumber(_factYear, _factKey);
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Facture Repas – '+pilotName+'</title>';
   html += '<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:0}';
@@ -22887,6 +22908,7 @@ function renderPilotDetailContent(pilotId, editMode) {
     S.comps.forEach(function(cp) {
       var rd = S.repas && S.repas[cp.id];
       if (!rd || (!rd.rows && !rd.checks && !rd.participants)) return;
+      _repasPruneChecks(cp.id);
       _hasAnyRepas = true;
       var tarifs = (S.repasTarifs && S.repasTarifs[cp.id]) || {};
       var TYPE_TARIF_MAP = {'Petit déjeuner': tarifs.pDej||0, 'Déjeuner': tarifs.dej||0, 'Dîner': tarifs.din||0};
@@ -22916,7 +22938,7 @@ function renderPilotDetailContent(pilotId, editMode) {
         if (r.prenom && (r.prenom.trim().length > 1)) return _nomMatch(r.prenom, p.prenom);
         return true;
       });
-      var finalRows = checkedMeals.length ? checkedMeals : matchRows;
+      var finalRows = checkedMeals; // uniquement les cases cochées (plus de repli sur l'ancien import Excel)
       if (finalRows.length) {
         _repasHistory.push({ comp: cp, rows: finalRows, tarifs: tarifs, TYPE_TARIF_MAP: TYPE_TARIF_MAP });
       }
@@ -56603,22 +56625,77 @@ function _formDeleteType(id){
   S.formTypes=(S.formTypes||[]).filter(function(x){ return _formTypeKey(x.nom)!==key; });
   _formSave(); renderFormationsModule();
 }
+// ── Vignettes PDF (Présentation / Programme) d'un type de formation ──
+// PDF stockés en data-URL sur le type (t.presentationPdf / t.programmePdf), édités dans une
+// variable temporaire _ftPdf le temps du dialogue, puis persistés à l'enregistrement.
+function _ftBlobUrl(dataUrl, key){
+  if(!window._ftBlob) window._ftBlob={};
+  if(window._ftBlob[key]){ try{ URL.revokeObjectURL(window._ftBlob[key]); }catch(e){} }
+  try{
+    var parts=dataUrl.split(','); var mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/pdf';
+    var bin=atob(parts[1]); var arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    var u=URL.createObjectURL(new Blob([arr],{type:mime})); window._ftBlob[key]=u; return u;
+  }catch(e){ return dataUrl; }
+}
+function _ftCardInner(which){
+  var p=(window._ftPdf&&window._ftPdf[which])||{};
+  if(p.data){
+    var url=_ftBlobUrl(p.data, which);
+    return '<div style="position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;border:1px solid var(--bdr);background:#fff;cursor:pointer" onclick="_ftView(\''+which+'\')" title="Cliquer pour afficher et imprimer">'
+      +'<embed src="'+url+'#toolbar=0&navpanes=0&scrollbar=0&view=Fit" type="application/pdf" style="width:100%;height:100%;pointer-events:none">'
+      +'<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(30,58,95,.92);color:#fff;font-size:9px;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔍 '+escH(p.name||'PDF')+'</div>'
+      +'<button onclick="event.stopPropagation();_ftRemove(\''+which+'\')" title="Retirer le PDF" style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(239,68,68,.92);color:#fff;font-size:13px;font-weight:900;cursor:pointer;line-height:1;padding:0">×</button>'
+      +'</div>';
+  }
+  return '<label style="width:100%;height:100%;border:2px dashed var(--bdr);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:var(--txt3);background:var(--navy3);text-align:center;padding:6px">'
+    +'<div style="font-size:24px">📄</div><div style="font-size:10px;font-weight:700;line-height:1.3">Ajouter<br>un PDF</div>'
+    +'<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="_ftUpload(\''+which+'\',this)"></label>';
+}
+function _ftRenderCard(which){ var el=document.getElementById('ft-card-'+which); if(el) el.innerHTML=_ftCardInner(which); }
+function _ftUpload(which, input){
+  var f=input&&input.files&&input.files[0]; if(!f) return;
+  if(f.type!=='application/pdf' && !/\.pdf$/i.test(f.name||'')){ if(typeof toast==='function')toast('Choisissez un fichier PDF','err'); return; }
+  if(f.size > 8*1024*1024){ if(typeof toast==='function')toast('PDF trop volumineux (max 8 Mo)','err'); return; }
+  var r=new FileReader();
+  r.onload=function(){ if(!window._ftPdf)window._ftPdf={}; window._ftPdf[which]={data:r.result,name:f.name}; _ftRenderCard(which); };
+  r.readAsDataURL(f);
+}
+function _ftRemove(which){ if(!window._ftPdf)window._ftPdf={}; window._ftPdf[which]={data:'',name:''}; _ftRenderCard(which); }
+function _ftView(which){
+  var p=(window._ftPdf&&window._ftPdf[which])||{}; if(!p.data) return;
+  var url=_ftBlobUrl(p.data, which+'-view');
+  var w=window.open(url,'_blank');
+  if(!w && typeof toast==='function') toast('Autorisez les popups pour ouvrir le PDF','');
+}
 function _formEditType(id){
   var t=id?_formTypeById(id):null;
+  window._ftPdf={ presentation:{ data:(t&&t.presentationPdf)||'', name:(t&&t.presentationPdfName)||'' }, programme:{ data:(t&&t.programmePdf)||'', name:(t&&t.programmePdfName)||'' } };
   var ov=document.getElementById('form-modal'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.id='form-modal';
   ov.style.cssText='position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
-  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:22px;width:min(460px,100%);box-shadow:0 24px 70px rgba(0,0,0,.6)">'
-    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:16px">'+(t?'Modifier le type':'Nouveau type de formation')+'</div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Nom *</label><input id="ft-nom" value="'+_formEsc(t?t.nom:'')+'" placeholder="Ex : Directeur de vol" style="'+fSt+'"></div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Description</label><textarea id="ft-desc" rows="3" style="'+fSt+';resize:vertical">'+_formEsc(t?t.description:'')+'</textarea></div>'
-    + '<div style="margin-bottom:12px"><label style="'+lSt+'">Durée de validité (mois, optionnel)</label><input id="ft-val" type="number" min="0" value="'+(t&&t.dureeValidite!=null?t.dureeValidite:'')+'" placeholder="Ex : 24 — laisser vide si sans expiration" style="'+fSt+'"></div>'
-    + '<label style="display:flex;align-items:center;gap:8px;margin-bottom:18px;cursor:pointer;font-size:13px;color:var(--txt)"><input id="ft-actif" type="checkbox" '+(!t||t.actif?'checked':'')+' style="width:16px;height:16px;cursor:pointer"> Actif</label>'
-    + '<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
-    + '<button onclick="_formSaveType(\''+(t?t.id:'')+'\')" style="flex:1;padding:10px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:26px;width:min(1400px,96vw);max-height:92vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:20px">'+(t?'Modifier le type':'Nouveau type de formation')+'</div>'
+    + '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">'
+    +   '<div style="flex:1;min-width:300px;display:flex;flex-direction:column">'
+    +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Nom *</label><input id="ft-nom" value="'+_formEsc(t?t.nom:'')+'" placeholder="Ex : Directeur de vol" style="'+fSt+'"></div>'
+    +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Description</label><textarea id="ft-desc" rows="5" style="'+fSt+';resize:vertical">'+_formEsc(t?t.description:'')+'</textarea></div>'
+    +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Durée de validité (mois, optionnel)</label><input id="ft-val" type="number" min="0" value="'+(t&&t.dureeValidite!=null?t.dureeValidite:'')+'" placeholder="Ex : 24 — laisser vide si sans expiration" style="'+fSt+'"></div>'
+    +     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--txt)"><input id="ft-actif" type="checkbox" '+(!t||t.actif?'checked':'')+' style="width:16px;height:16px;cursor:pointer"> Actif</label>'
+    +   '</div>'
+    +   '<div style="display:flex;flex-direction:column;gap:8px">'
+    +     '<label style="'+lSt+'">Documents (PDF)</label>'
+    +     '<div style="display:flex;gap:20px;flex-wrap:wrap">'
+    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Présentation</div><div id="ft-card-presentation" style="width:113px;height:151px">'+_ftCardInner('presentation')+'</div></div>'
+    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Programme</div><div id="ft-card-programme" style="width:113px;height:151px">'+_ftCardInner('programme')+'</div></div>'
+    +     '</div>'
+    +     '<div style="font-size:10px;color:var(--txt3);max-width:290px;line-height:1.4">Format affiche 3×4 cm. Cliquez sur une vignette pour <b>afficher</b> le PDF et l\'<b>imprimer</b>.</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;margin-top:26px"><button onclick="document.getElementById(\'form-modal\').remove()" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_formSaveType(\''+(t?t.id:'')+'\')" style="flex:1;padding:11px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">💾 Enregistrer</button></div>'
     + '</div>';
   document.body.appendChild(ov);
   setTimeout(function(){ var el=document.getElementById('ft-nom'); if(el)el.focus(); },60);
@@ -56632,9 +56709,14 @@ function _formSaveType(id){
   var actif=!!(document.getElementById('ft-actif')||{}).checked;
   // Recréer/renommer un type sur un nom supprimé lève sa pierre tombale.
   if (S._deletedFormTypes) { delete S._deletedFormTypes[_formTypeKey(nom)]; }
+  var _pp=(window._ftPdf&&window._ftPdf.presentation)||{}, _pg=(window._ftPdf&&window._ftPdf.programme)||{};
   var t=id?_formTypeById(id):null;
-  if(t){ t.nom=nom; t.description=desc; t.dureeValidite=val; t.actif=actif; t._updatedAt=Date.now(); }
-  else { S.formTypes.push({ id:_formUid('ft'), nom:nom, description:desc, dureeValidite:val, actif:actif, _updatedAt:Date.now() }); }
+  if(t){ t.nom=nom; t.description=desc; t.dureeValidite=val; t.actif=actif;
+    t.presentationPdf=_pp.data||''; t.presentationPdfName=_pp.name||''; t.programmePdf=_pg.data||''; t.programmePdfName=_pg.name||'';
+    t._updatedAt=Date.now(); }
+  else { S.formTypes.push({ id:_formUid('ft'), nom:nom, description:desc, dureeValidite:val, actif:actif,
+    presentationPdf:_pp.data||'', presentationPdfName:_pp.name||'', programmePdf:_pg.data||'', programmePdfName:_pg.name||'',
+    _updatedAt:Date.now() }); }
   _formSave();
   var ov=document.getElementById('form-modal'); if(ov)ov.remove();
   renderFormationsModule('types');
