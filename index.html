@@ -1516,7 +1516,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
     <div class="page" id="page-sites">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px">
         <div style="font-size:18px;font-weight:700">Sites sportifs</div>
-        <button id="btn-add-site" onclick="openAddSite()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:20px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau</button>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--txt3)">Nouveau site</span><button id="btn-add-site" onclick="openAddSite()" title="Nouveau site" aria-label="Nouveau site" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--stol);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.25)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
       </div>
       <div style="padding:0 12px 8px">
         <select id="sites-pratique-filter" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:var(--rs);color:var(--txt);font-family:inherit;font-size:13px;padding:8px 12px;width:100%;outline:none" onchange="renderSitesSportifs()">
@@ -25330,7 +25330,7 @@ function renderSitesSportifs() {
     html += '<div style="font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(s.gestionnaire||'—')+'</div>';
     html += '<div style="font-size:10px;font-weight:700;background:rgba(0,87,255,.15);color:var(--stol);padding:2px 6px;border-radius:10px;text-align:center">'+pratiqueLabel+'</div>';
     if (canEdit) {
-      html += '<button onclick="openEditSite(\''+s.id+'\')" title="Modifier" style="padding:4px 5px;border:1px solid var(--bdr);border-radius:6px;background:none;color:var(--stol);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+      html += '<div style="display:flex;justify-content:center">'+uiIconBtn('edit', "openEditSite('"+s.id+"')", 'Modifier', 28)+'</div>';
     } else { html += '<div></div>'; }
     html += '</div>';
   });
@@ -44389,8 +44389,7 @@ function renderAides(containerEl) {
         +'<td style="'+cellSt+';text-align:right;color:'+rc+';font-weight:700">'+fmt(reste)+'</td>'
         +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
         +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
-          +'<button onclick="_aideFormOpen(\''+a.id+'\')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:5px;background:none;color:var(--stol);cursor:pointer;font-size:13px;margin-right:3px">✎</button>'
-          +'<button id="aide-del-'+a.id+'" onclick="_aideDelete(\''+a.id+'\')" title="Supprimer" style="width:26px;height:26px;border:none;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;font-weight:900;line-height:1">×</button>'
+          +'<span style="display:inline-flex;gap:6px;align-items:center">'+uiIconBtn('edit', "_aideFormOpen('"+a.id+"')", 'Modifier', 28)+uiIconBtn('delete', "_aideDelete('"+a.id+"')", 'Supprimer', 28)+'</span>'
         +'</td></tr>';
     });
 
@@ -45169,17 +45168,7 @@ function _aideFormSave() {
 }
 
 function _aideDelete(id) {
-  var btn=document.getElementById('aide-del-'+id); if(!btn) return;
-  if(btn.dataset.confirm!=='1'){
-    btn.dataset.confirm='1'; btn.innerHTML='<span style="font-size:9px;font-weight:800;white-space:nowrap">OK?</span>';
-    btn.style.width='auto'; btn.style.padding='0 6px'; btn.style.color='#fff'; btn.style.background='#ef4444';
-    setTimeout(function(){
-      if(btn.dataset.confirm==='1'){
-        btn.dataset.confirm='0'; btn.innerHTML='×';
-        btn.style.cssText='width:26px;height:26px;border:none;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171;cursor:pointer;font-size:14px;font-weight:900;line-height:1';
-      }
-    },3000); return;
-  }
+  if(!confirm('Supprimer cette aide ?')) return;
   if(!S.aides) return;
   // Tombstone : mémoriser la suppression pour qu'elle survive aux merges cloud
   if(!S._deletedAides) S._deletedAides={};
@@ -54405,13 +54394,13 @@ function _territRenderComites(){
       +'<td style="padding:3px 6px">'+mkIn(c,'president')+'</td>'
       +'<td style="padding:3px 6px">'+mkIn(c,'tel')+'</td>'
       +'<td style="padding:3px 6px">'+mkIn(c,'email')+'</td>'
-      +'<td style="padding:3px 6px;text-align:center;width:44px"><button onclick="_territDel(\''+c.id+'\')" title="Supprimer" style="width:30px;height:30px;border:1px solid rgba(239,68,68,.3);border-radius:8px;background:rgba(239,68,68,.08);color:#f87171;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button></td>'
+      +'<td style="padding:3px 6px;text-align:center;width:44px">'+uiIconBtn('delete', "_territDel('"+c.id+"')", 'Supprimer', 30)+'</td>'
       +'</tr>';
   }).join('');
   el.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
     + '<div style="font-size:12px;font-weight:700;color:var(--txt3)">'+list.length+' comité'+(list.length>1?'s':'')+' régional'+(list.length>1?'aux':'')+'</div>'
-    + '<button onclick="_territAdd()" style="padding:8px 16px;border:none;border-radius:9px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">＋ Ajouter un comité</button>'
+    + uiAddBtn("_territAdd()", 'Ajouter un comité')
     + '</div>'
     + '<div style="overflow:auto;border:1px solid var(--bdr);border-radius:12px;max-width:1000px">'
     + '<table style="width:100%;border-collapse:collapse;min-width:720px">'
@@ -54881,11 +54870,9 @@ function _renderRegistreEvenement() {
       '<td style="padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.refBEA||'').replace(/"/g,"&quot;")+'">'+(ev.refBEA?'<span style="font-size:10px;color:#6366f1;font-weight:600">'+ev.refBEA+'</span>':'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'+
       '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+statutLabel+'</span></td>'+
       '<td style="padding:8px 8px;text-align:center;white-space:nowrap">'+
-        '<div style="display:flex;gap:4px;align-items:center;justify-content:center">'+
-          '<button onclick="openSecuriteEventForm(\''+ev.id+'\')" title="Modifier" style="'+_btnSt+';color:var(--txt3)">✎</button>'+
-          '<button id="sev-del-'+ev.id+'" onclick="_securiteEventDelete(\''+ev.id+'\')" title="Supprimer" style="'+_btnSt+';color:#ef4444;border-color:rgba(239,68,68,.3)">'+
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>'+
-          '</button>'+
+        '<div style="display:flex;gap:6px;align-items:center;justify-content:center">'+
+          uiIconBtn('edit', "openSecuriteEventForm('"+ev.id+"')", 'Modifier', 28)+
+          uiIconBtn('delete', "_securiteEventDelete('"+ev.id+"')", 'Supprimer', 28)+
         '</div>'+
       '</td></tr>';
   });
@@ -56425,19 +56412,8 @@ function _sevDeduplicateRegistre() {
 }
 
 function _securiteEventDelete(evId) {
-  var btn = document.getElementById('sev-del-'+evId);
-  if (!btn) return;
-  if (btn.dataset.confirm !== '1') {
-    btn.dataset.confirm = '1';
-    btn.innerHTML = '<span style="font-size:9px;font-weight:800;white-space:nowrap">Confirmer?</span>';
-    btn.style.width = 'auto';
-    btn.style.padding = '0 6px';
-    btn.style.color = '#fff';
-    btn.style.background = '#ef4444';
-    btn.style.borderColor = '#ef4444';
-    setTimeout(function(){ if(btn.dataset.confirm==='1'){btn.dataset.confirm='';btn.style.cssText='';btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';} }, 3000);
-    return;
-  }
+  var ev = (S.securiteEvents||[]).find(function(e){ return e.id===evId; });
+  if (!confirm('Supprimer cet événement'+(ev&&ev.date?' du '+ev.date.split('-').reverse().join('/'):'')+' ?')) return;
   S.securiteEvents = (S.securiteEvents||[]).filter(function(e){ return e.id!==evId; });
   // Marqueur de suppression (tombstone) : empêche le cloud/IDB de réajouter
   // l'événement à la synchro ou à la réouverture — suppression durable.
@@ -56568,49 +56544,162 @@ function _formFrDate(d){ var m=(''+(d||'')).match(/^(\d{4})-(\d{2})-(\d{2})/); r
 function renderFormationsModule(tab){
   _formInit();
   if (tab) _formTab = tab;
+  // 2 espaces : « Nos formations » (catalogue) + « Stages & inscrits ». Compat. anciens noms d'onglets.
+  if (_formTab==='types') _formTab='formations';
+  else if (_formTab==='sessions'||_formTab==='inscriptions'||_formTab==='qualifs'||_formTab==='dashboard') _formTab='stages';
+  if (_formTab!=='formations' && _formTab!=='stages') _formTab='formations';
   var body = document.getElementById('dtn-workspace-body') || document.getElementById('formations-body');
   if (!body) return;
-  var tabs=[['types','Types de formation'],['sessions','Sessions'],['inscriptions','Inscriptions'],['qualifs','Qualifications'],['dashboard','Tableau de bord']];
+  var tabs=[['formations','Nos formations'],['stages','Stages & inscrits']];
   var head='<div style="font-size:17px;font-weight:900;color:var(--txt);text-align:center;margin-bottom:16px">🎓 Formations</div>';
   var nav='<div style="display:flex;gap:3px;padding:3px;background:var(--navy3);border-radius:10px;width:fit-content;margin:0 auto 22px;flex-wrap:wrap">';
-  tabs.forEach(function(t){ var a=_formTab===t[0]; nav+='<button onclick="renderFormationsModule(\''+t[0]+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt3)')+';font-size:12px;font-weight:'+(a?'800':'600')+';font-family:inherit;cursor:pointer;transition:all .15s">'+t[1]+'</button>'; });
+  tabs.forEach(function(t){ var a=_formTab===t[0]; nav+='<button onclick="renderFormationsModule(\''+t[0]+'\')" style="padding:8px 20px;border:none;border-radius:8px;background:'+(a?'var(--stol)':'transparent')+';color:'+(a?'#fff':'var(--txt3)')+';font-size:12px;font-weight:'+(a?'800':'600')+';font-family:inherit;cursor:pointer;transition:all .15s">'+t[1]+'</button>'; });
   nav+='</div>';
-  var content = _formTab==='types' ? _formRenderTypes()
-              : _formTab==='sessions' ? _formRenderSessions()
-              : _formTab==='inscriptions' ? _formRenderInscriptions()
-              : '<div style="text-align:center;color:var(--txt3);padding:70px 20px;font-size:13px;border:1px dashed var(--bdr);border-radius:14px">🛠 Onglet « '+_formEsc((tabs.find(function(x){return x[0]===_formTab;})||[])[1])+' » — à venir (phase suivante).</div>';
+  var content = _formTab==='formations' ? _formRenderCatalogue() : _formRenderStages();
   body.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:24px 28px 70px">'+head+nav+content+'</div>';
 }
 
-// ── ONGLET 1 : TYPES DE FORMATION ──────────────────────────────────
-function _formRenderTypes(){
+// ══════════ ESPACE 1 : « NOS FORMATIONS » (catalogue + affiches PDF) ══════════
+function _formCatViewPdf(typeId, which){
+  var t=_formTypeById(typeId); if(!t) return;
+  var data = which==='presentation' ? t.presentationPdf : t.programmePdf;
+  if(!data){ if(typeof toast==='function')toast('Aucun PDF pour cette rubrique','warn'); return; }
+  var url=(typeof _ftBlobUrl==='function')?_ftBlobUrl(data,'cat-'+typeId+'-'+which):data;
+  var w=window.open(url,'_blank');
+  if(!w && typeof toast==='function') toast('Autorisez les popups pour ouvrir le PDF','');
+}
+// Bouton rond moderne GLOBAL (glyphe SVG blanc) — style unifié ajouter / modifier / supprimer,
+// réutilisable dans TOUTE l'app. kind: 'add' | 'edit' | 'delete'. onclick = code JS (chaîne).
+function uiIconBtn(kind, onclick, title, size){
+  size = size || 38;
+  var isz = Math.round(size*0.47);
+  var ICON={
+    edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>',
+    delete:'<path d="M18 6 6 18M6 6l12 12"/>',
+    add:'<path d="M12 5v14M5 12h14"/>'
+  };
+  var bg = (kind==='delete') ? '#dc2626' : 'var(--stol)';
+  var sw = (kind==='edit') ? '2' : '2.6';
+  return '<button onclick="'+onclick+'" title="'+title+'" aria-label="'+title+'" style="width:'+size+'px;height:'+size+'px;border-radius:50%;border:none;background:'+bg+';cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.25);transition:filter .15s,transform .15s;flex-shrink:0;vertical-align:middle" onmouseover="this.style.filter=\'brightness(1.12)\';this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.filter=\'\';this.style.transform=\'\'">'
+    +'<svg viewBox="0 0 24 24" width="'+isz+'" height="'+isz+'" fill="none" stroke="#fff" stroke-width="'+sw+'" stroke-linecap="round" stroke-linejoin="round">'+ICON[kind]+'</svg></button>';
+}
+// Alias historique (module Formations).
+function _formIconBtn(kind, onclick, title, size){ return uiIconBtn(kind, onclick, title, size); }
+// Bouton d'ajout standard = libellé + rond bleu « + » (action principale claire mais homogène).
+function uiAddBtn(onclick, label, size){
+  return '<span style="display:inline-flex;align-items:center;gap:9px;vertical-align:middle"><span style="font-size:12px;font-weight:700;color:var(--txt3)">'+label+'</span>'+uiIconBtn('add', onclick, label, size||38)+'</span>';
+}
+// Miniature réelle d'un PDF (1re page) — cliquable pour ouvrir/imprimer.
+function _formCatDoc(t, which, label){
+  var data = which==='presentation' ? t.presentationPdf : t.programmePdf;
+  if(!data) return '';
+  var url=(typeof _ftBlobUrl==='function')?_ftBlobUrl(data,'cat-'+t.id+'-'+which):data;
+  return '<div onclick="_formCatViewPdf(\''+t.id+'\',\''+which+'\')" title="Ouvrir / imprimer '+label+'" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;transition:transform .15s" onmouseover="this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.transform=\'\'">'
+    +'<div style="position:relative;width:112px;height:149px;border-radius:9px;overflow:hidden;background:#fff;border:1px solid var(--bdr);box-shadow:0 5px 16px rgba(0,0,0,.28)"><embed src="'+url+'#toolbar=0&navpanes=0&scrollbar=0&view=Fit" type="application/pdf" style="width:100%;height:100%;pointer-events:none"><div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(30,58,95,.85));color:#fff;font-size:9px;font-weight:700;text-align:center;padding:10px 4px 4px">🔍 Ouvrir</div></div>'
+    +'<span style="font-size:10.5px;font-weight:700;color:var(--txt2)">'+label+'</span></div>';
+}
+function _formRenderCatalogue(){
   var types=(S.formTypes||[]).slice().sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
-    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Types de formation</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Créez librement de nouveaux types — immédiatement disponibles dans les sessions.</div></div>'
-    + '<button onclick="_formEditType(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouveau type</button>'
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap">'
+    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Nos formations</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">'+types.length+' formation'+(types.length>1?'s':'')+' au catalogue — description et affiches PDF (Présentation / Programme).</div></div>'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-shrink:0"><span style="font-size:12px;font-weight:700;color:var(--txt3)">Nouvelle formation</span>'+_formIconBtn('add', "_formEditType('')", 'Nouvelle formation', 42)+'</div>'
     + '</div>';
-  if (!types.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucun type de formation. Cliquez sur « + Nouveau type ».</div>';
-  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3)';
-  var td='padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:top';
-  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:640px">'
-    + '<thead><tr><th style="'+th+'">Nom</th><th style="'+th+'">Description</th><th style="'+th+';width:120px">Validité</th><th style="'+th+';width:90px">État</th><th style="'+th+';width:110px;text-align:right">Actions</th></tr></thead><tbody>';
+  if(!types.length) return h+'<div style="text-align:center;color:var(--txt3);padding:56px 20px;border:1px dashed var(--bdr);border-radius:16px"><div style="font-size:40px;margin-bottom:10px">🎓</div><div style="font-size:14px;font-weight:700;color:var(--txt2)">Aucune formation au catalogue</div><div style="font-size:12px;margin-top:4px">Cliquez sur le bouton <b>+</b> pour commencer.</div></div>';
+  h+='<div style="display:flex;flex-direction:column;gap:14px">';
   types.forEach(function(t){
-    var val = (t.dureeValidite!=null && t.dureeValidite!=='') ? (t.dureeValidite+' mois') : '<span style="color:var(--txt3)">—</span>';
-    var badge = t.actif
-      ? '<span style="font-size:11px;font-weight:700;color:#10b981;background:rgba(16,185,129,.12);padding:2px 9px;border-radius:20px">Actif</span>'
-      : '<span style="font-size:11px;font-weight:700;color:#f87171;background:rgba(239,68,68,.12);padding:2px 9px;border-radius:20px">Inactif</span>';
-    h+='<tr><td style="'+td+';font-weight:700;color:var(--txt)">'+_formEsc(t.nom)+'</td>'
-      + '<td style="'+td+';color:var(--txt2)">'+(t.description?_formEsc(t.description):'<span style="color:var(--txt3)">—</span>')+'</td>'
-      + '<td style="'+td+'">'+val+'</td>'
-      + '<td style="'+td+'"><span onclick="_formToggleType(\''+t.id+'\')" style="cursor:pointer" title="Activer / désactiver">'+badge+'</span></td>'
-      + '<td style="'+td+';text-align:right;white-space:nowrap">'
-      + '<button onclick="_formEditType(\''+t.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">✏️</button> '
-      + '<button onclick="_formDeleteType(\''+t.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button>'
-      + '</td></tr>';
+    var pill = t.actif
+      ? '<span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:#10b981;background:rgba(16,185,129,.10);padding:3px 10px;border-radius:20px"><span style="width:6px;height:6px;border-radius:50%;background:#10b981"></span>Active</span>'
+      : '<span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--txt3);background:rgba(255,255,255,.05);padding:3px 10px;border-radius:20px"><span style="width:6px;height:6px;border-radius:50%;background:var(--txt3)"></span>Inactive</span>';
+    var meta = (t.dureeValidite!=null && t.dureeValidite!=='')
+      ? 'Validité '+_formEsc(''+t.dureeValidite)+' mois' : 'Sans expiration';
+    var docs = _formCatDoc(t,'presentation','Présentation')+_formCatDoc(t,'programme','Programme');
+    var docsBlock = docs
+      ? '<div style="display:flex;gap:12px;flex-shrink:0;align-self:center">'+docs+'</div>'
+      : '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:7px;align-self:center"><div style="width:112px;height:149px;border-radius:9px;border:1.5px dashed var(--bdr);background:var(--navy3);display:flex;align-items:center;justify-content:center;color:var(--txt3)"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div><span style="font-size:10.5px;color:var(--txt3)">Aucune affiche</span></div>';
+    h+='<div style="border:1px solid var(--bdr);border-radius:14px;background:var(--navy2);padding:16px 18px;display:flex;gap:20px;transition:box-shadow .15s,border-color .15s" onmouseover="this.style.boxShadow=\'0 8px 26px rgba(0,0,0,.24)\';this.style.borderColor=\'rgba(255,255,255,.16)\'" onmouseout="this.style.boxShadow=\'\';this.style.borderColor=\'var(--bdr)\'">'
+      + docsBlock
+      + '<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">'
+          + '<div style="font-size:16px;font-weight:800;color:var(--txt);line-height:1.25">'+_formEsc(t.nom)+'</div>'
+          + pill
+        + '</div>'
+        + '<div style="font-size:11.5px;color:var(--txt3);margin-top:5px;display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'+meta+'</div>'
+        + (t.description?'<div style="flex:1;font-size:12.5px;color:var(--txt2);line-height:1.5;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+_formEsc(t.description)+'</div>':'<div style="flex:1"></div>')
+        + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:10px">'
+          + _formIconBtn('edit', "_formEditType('"+t.id+"')", 'Modifier')
+          + _formIconBtn('delete', "_formDeleteType('"+t.id+"')", 'Supprimer')
+        + '</div>'
+      + '</div>'
+    + '</div>';
   });
-  h+='</tbody></table></div></div>';
+  h+='</div>';
   return h;
 }
+
+// ══════════ ESPACE 2 : « STAGES & INSCRITS » (sessions + participants) ══════════
+function _formAddInscTo(sessionId){ _formInscFilter=sessionId||''; _formEditInscription(''); }
+function _formRenderStages(){
+  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
+  var actifs=(S.formTypes||[]).filter(function(t){ return t.actif; });
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">'
+    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Stages &amp; inscrits</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Chaque stage affiche directement ses participants ; places restantes calculées automatiquement.</div></div>'
+    + '<div style="display:flex;align-items:center;gap:9px;flex-shrink:0"><span style="font-size:12px;font-weight:700;color:var(--txt3)">Nouveau stage</span>'+_formIconBtn('add', "_formEditSession('')", 'Nouveau stage', 42)+'</div>'
+    + '</div>';
+  if(!actifs.length) h='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#d97706">⚠️ Créez d\'abord au moins une <b>formation active</b> (espace « Nos formations »).</div>'+h;
+  if(!sessions.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucun stage. Cliquez sur « + Nouveau stage ».</div>';
+  var ith='padding:7px 10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt3);border-bottom:1px solid var(--bdr)';
+  var itd='padding:7px 10px;border-bottom:1px solid var(--bdr);font-size:12px;vertical-align:middle';
+  var selSt='background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:11px;padding:4px 7px;cursor:pointer;font-weight:700';
+  sessions.forEach(function(s){
+    var type=_formTypeById(s.typeId); var typeName=type?type.nom:(s.typeName||'—');
+    var inscrits=_formSessionCount(s.id);
+    var max=(s.maxParticipants!=null&&s.maxParticipants!=='')?parseInt(s.maxParticipants,10):null;
+    var rest = max!=null ? Math.max(0,max-inscrits) : null;
+    var dates=_formFrDate(s.dateFrom)+(s.dateTo&&s.dateTo!==s.dateFrom?' → '+_formFrDate(s.dateTo):'');
+    var mode = s.mode==='distance' ? '💻 À distance' : '📍 Présentiel';
+    var list=(S.formInscriptions||[]).filter(function(x){ return x.sessionId===s.id; })
+      .sort(function(a,b){ var na=((_formPilotInfo(a.pilotId)||{}).nom||a.nom||''), nb=((_formPilotInfo(b.pilotId)||{}).nom||b.nom||''); return (''+na).localeCompare(''+nb); });
+    var meta=[];
+    meta.push('📅 '+_formEsc(dates)); meta.push(mode);
+    if(s.mode!=='distance'&&s.lieu) meta.push('📍 '+_formEsc(s.lieu));
+    if(s.responsable) meta.push('👤 '+_formEsc(s.responsable));
+    if(s.tarif) meta.push('💶 '+_formEsc(''+s.tarif)+' €');
+    var placesLbl = inscrits+(max!=null?(' / '+max):'')+' inscrit'+(inscrits>1?'s':'')+(rest!=null?' · '+rest+' place'+(rest>1?'s':'')+' restante'+(rest>1?'s':''):'');
+    h+='<div style="border:1px solid var(--bdr);border-radius:14px;margin-bottom:14px;overflow:hidden;background:var(--navy2)">'
+      +'<div style="padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--bdr)">'
+        +'<div style="min-width:0"><div style="font-size:15px;font-weight:800;color:var(--txt)">'+_formEsc(typeName)+' <span style="font-size:12px;font-weight:700;color:var(--stol)">'+_formEsc(s.ref||'')+'</span></div>'
+          +'<div style="font-size:12px;color:var(--txt3);margin-top:5px;display:flex;gap:14px;flex-wrap:wrap"><span>'+meta.join('</span><span>')+'</span></div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+          +'<span style="font-size:11px;font-weight:800;color:'+(max!=null&&rest===0?'#f87171':'#10b981')+'">'+placesLbl+'</span>'
+          +_formIconBtn('edit', "_formEditSession('"+s.id+"')", 'Modifier le stage', 34)
+          +_formIconBtn('delete', "_formDeleteSession('"+s.id+"')", 'Supprimer le stage', 34)
+        +'</div>'
+      +'</div>'
+      +'<div style="padding:10px 16px 14px">';
+    if(list.length){
+      h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:560px"><thead><tr>'
+        +'<th style="'+ith+'">Participant</th><th style="'+ith+'">N° licence</th><th style="'+ith+'">Région</th><th style="'+ith+';width:140px">Statut</th><th style="'+ith+';width:70px;text-align:right">Actions</th></tr></thead><tbody>';
+      list.forEach(function(x){
+        var info=_formPilotInfo(x.pilotId)||{ nom:x.nom, licence:x.licence, region:x.region };
+        var stOpts=_FORM_STATUTS_INSC.map(function(st){ return '<option value="'+st[0]+'"'+(x.statut===st[0]?' selected':'')+'>'+st[1]+'</option>'; }).join('');
+        h+='<tr><td style="'+itd+';font-weight:700"><span onclick="_formOpenPilot(\''+x.id+'\')" title="Ouvrir la fiche compétiteur" style="color:var(--stol);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">'+_formEsc(info.nom||'—')+'</span></td>'
+          +'<td style="'+itd+';color:var(--stol);font-weight:700">'+_formEsc(info.licence||'—')+'</td>'
+          +'<td style="'+itd+';color:var(--txt2)">'+_formEsc(info.region||'—')+'</td>'
+          +'<td style="'+itd+'"><select onchange="_formSetInscStatut(\''+x.id+'\',this.value)" style="'+selSt+';color:'+_formStatutColor(x.statut)+'">'+stOpts+'</select></td>'
+          +'<td style="'+itd+';text-align:right;white-space:nowrap"><div style="display:inline-flex;gap:6px;align-items:center">'+_formIconBtn('edit', "_formEditInscription('"+x.id+"')", 'Modifier', 30)+_formIconBtn('delete', "_formDeleteInscription('"+x.id+"')", 'Retirer', 30)+'</div></td></tr>';
+      });
+      h+='</tbody></table></div>';
+    } else {
+      h+='<div style="font-size:12px;color:var(--txt3);padding:6px 0 10px">Aucun participant inscrit à ce stage.</div>';
+    }
+    h+='<div style="margin-top:12px;display:flex;align-items:center;gap:9px">'+_formIconBtn('add', "_formAddInscTo('"+s.id+"')", 'Ajouter un participant', 34)+'<span style="font-size:12px;font-weight:700;color:var(--txt3)">Ajouter un participant</span></div>';
+    h+='</div></div>';
+  });
+  return h;
+}
+
+// (Ancien _formRenderTypes supprimé — remplacé par _formRenderCatalogue.)
 function _formToggleType(id){ var t=_formTypeById(id); if(!t)return; t.actif=!t.actif; t._updatedAt=Date.now(); _formSave(); renderFormationsModule(); }
 function _formDeleteType(id){
   var t=_formTypeById(id); if(!t)return;
@@ -56648,18 +56737,22 @@ function _ftCardInner(which){
       +'</div>';
   }
   return '<label style="width:100%;height:100%;border:2px dashed var(--bdr);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:var(--txt3);background:var(--navy3);text-align:center;padding:6px">'
-    +'<div style="font-size:24px">📄</div><div style="font-size:10px;font-weight:700;line-height:1.3">Ajouter<br>un PDF</div>'
+    +'<div style="font-size:24px">📄</div><div style="font-size:10px;font-weight:700;line-height:1.3">Glisser un PDF<br>ou cliquer</div>'
     +'<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="_ftUpload(\''+which+'\',this)"></label>';
 }
 function _ftRenderCard(which){ var el=document.getElementById('ft-card-'+which); if(el) el.innerHTML=_ftCardInner(which); }
-function _ftUpload(which, input){
-  var f=input&&input.files&&input.files[0]; if(!f) return;
+function _ftUploadFile(which, f){
+  if(!f) return;
   if(f.type!=='application/pdf' && !/\.pdf$/i.test(f.name||'')){ if(typeof toast==='function')toast('Choisissez un fichier PDF','err'); return; }
   if(f.size > 8*1024*1024){ if(typeof toast==='function')toast('PDF trop volumineux (max 8 Mo)','err'); return; }
   var r=new FileReader();
   r.onload=function(){ if(!window._ftPdf)window._ftPdf={}; window._ftPdf[which]={data:r.result,name:f.name}; _ftRenderCard(which); };
   r.readAsDataURL(f);
 }
+function _ftUpload(which, input){ _ftUploadFile(which, input&&input.files&&input.files[0]); }
+function _ftDragOver(el, ev){ ev.preventDefault(); if(ev.dataTransfer) ev.dataTransfer.dropEffect='copy'; if(el){ el.style.outline='2px solid var(--stol)'; el.style.outlineOffset='2px'; } }
+function _ftDragLeave(el){ if(el){ el.style.outline=''; el.style.outlineOffset=''; } }
+function _ftDrop(which, el, ev){ ev.preventDefault(); if(el){ el.style.outline=''; el.style.outlineOffset=''; } var f=ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if(f) _ftUploadFile(which, f); }
 function _ftRemove(which){ if(!window._ftPdf)window._ftPdf={}; window._ftPdf[which]={data:'',name:''}; _ftRenderCard(which); }
 function _ftView(which){
   var p=(window._ftPdf&&window._ftPdf[which])||{}; if(!p.data) return;
@@ -56676,20 +56769,20 @@ function _formEditType(id){
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   var fSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none';
   var lSt='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block';
-  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:26px;width:min(1400px,96vw);max-height:92vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;padding:26px;width:min(920px,96vw);max-height:92vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)">'
     + '<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:20px">'+(t?'Modifier le type':'Nouveau type de formation')+'</div>'
-    + '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">'
-    +   '<div style="flex:1;min-width:300px;display:flex;flex-direction:column">'
+    + '<div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start;justify-content:center">'
+    +   '<div style="flex:1 1 360px;max-width:500px;min-width:280px;display:flex;flex-direction:column">'
     +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Nom *</label><input id="ft-nom" value="'+_formEsc(t?t.nom:'')+'" placeholder="Ex : Directeur de vol" style="'+fSt+'"></div>'
-    +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Description</label><textarea id="ft-desc" rows="5" style="'+fSt+';resize:vertical">'+_formEsc(t?t.description:'')+'</textarea></div>'
+    +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Description</label><textarea id="ft-desc" rows="4" style="'+fSt+';resize:vertical">'+_formEsc(t?t.description:'')+'</textarea></div>'
     +     '<div style="margin-bottom:14px"><label style="'+lSt+'">Durée de validité (mois, optionnel)</label><input id="ft-val" type="number" min="0" value="'+(t&&t.dureeValidite!=null?t.dureeValidite:'')+'" placeholder="Ex : 24 — laisser vide si sans expiration" style="'+fSt+'"></div>'
     +     '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--txt)"><input id="ft-actif" type="checkbox" '+(!t||t.actif?'checked':'')+' style="width:16px;height:16px;cursor:pointer"> Actif</label>'
     +   '</div>'
     +   '<div style="display:flex;flex-direction:column;gap:8px">'
     +     '<label style="'+lSt+'">Documents (PDF)</label>'
     +     '<div style="display:flex;gap:20px;flex-wrap:wrap">'
-    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Présentation</div><div id="ft-card-presentation" style="width:113px;height:151px">'+_ftCardInner('presentation')+'</div></div>'
-    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Programme</div><div id="ft-card-programme" style="width:113px;height:151px">'+_ftCardInner('programme')+'</div></div>'
+    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Présentation</div><div id="ft-card-presentation" style="width:113px;height:151px;border-radius:9px" ondragover="_ftDragOver(this,event)" ondragleave="_ftDragLeave(this)" ondrop="_ftDrop(\'presentation\',this,event)">'+_ftCardInner('presentation')+'</div></div>'
+    +       '<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--txt2)">Programme</div><div id="ft-card-programme" style="width:113px;height:151px;border-radius:9px" ondragover="_ftDragOver(this,event)" ondragleave="_ftDragLeave(this)" ondrop="_ftDrop(\'programme\',this,event)">'+_ftCardInner('programme')+'</div></div>'
     +     '</div>'
     +     '<div style="font-size:10px;color:var(--txt3);max-width:290px;line-height:1.4">Format affiche 3×4 cm. Cliquez sur une vignette pour <b>afficher</b> le PDF et l\'<b>imprimer</b>.</div>'
     +   '</div>'
@@ -56723,41 +56816,7 @@ function _formSaveType(id){
   if(typeof toast==='function')toast(t?'Type mis à jour ✓':'Type créé ✓','ok');
 }
 
-// ── ONGLET 2 : SESSIONS DE FORMATION ───────────────────────────────
-function _formRenderSessions(){
-  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
-    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Sessions de formation</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Planifiez les sessions ; inscrits et places restantes se calculent automatiquement.</div></div>'
-    + '<button onclick="_formEditSession(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouvelle session</button>'
-    + '</div>';
-  var actifs=(S.formTypes||[]).filter(function(t){ return t.actif; });
-  if(!actifs.length) h='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#d97706">⚠️ Créez d\'abord au moins un <b>type de formation actif</b> (onglet Types).</div>'+h;
-  if(!sessions.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucune session. Cliquez sur « + Nouvelle session ».</div>';
-  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3);white-space:nowrap';
-  var td='padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:top';
-  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">'
-    + '<thead><tr><th style="'+th+'">Réf.</th><th style="'+th+'">Type</th><th style="'+th+'">Dates</th><th style="'+th+'">Mode</th><th style="'+th+'">Lieu</th><th style="'+th+'">Responsable</th><th style="'+th+';text-align:right">Tarif</th><th style="'+th+';text-align:center">Inscrits</th><th style="'+th+';text-align:center">Restantes</th><th style="'+th+';width:100px;text-align:right">Actions</th></tr></thead><tbody>';
-  sessions.forEach(function(s){
-    var type=_formTypeById(s.typeId); var typeName=type?type.nom:(s.typeName||'—');
-    var inscrits=_formSessionCount(s.id);
-    var max=(s.maxParticipants!=null&&s.maxParticipants!=='')?parseInt(s.maxParticipants,10):null;
-    var rest = max!=null ? Math.max(0,max-inscrits) : '∞';
-    var dates=_formFrDate(s.dateFrom)+(s.dateTo&&s.dateTo!==s.dateFrom?' → '+_formFrDate(s.dateTo):'');
-    var mode = s.mode==='distance' ? '💻 À distance' : '📍 Présentiel';
-    h+='<tr><td style="'+td+';font-weight:700;color:var(--stol);white-space:nowrap">'+_formEsc(s.ref||'—')+'</td>'
-      + '<td style="'+td+';font-weight:600">'+_formEsc(typeName)+'</td>'
-      + '<td style="'+td+';white-space:nowrap">'+_formEsc(dates)+'</td>'
-      + '<td style="'+td+';white-space:nowrap">'+mode+'</td>'
-      + '<td style="'+td+'">'+(s.mode==='distance'?'<span style="color:var(--txt3)">—</span>':_formEsc(s.lieu||'—'))+'</td>'
-      + '<td style="'+td+'">'+_formEsc(s.responsable||'—')+'</td>'
-      + '<td style="'+td+';text-align:right;white-space:nowrap">'+(s.tarif?_formEsc(s.tarif)+' €':'<span style="color:var(--txt3)">—</span>')+'</td>'
-      + '<td style="'+td+';text-align:center;font-weight:700">'+inscrits+'</td>'
-      + '<td style="'+td+';text-align:center;font-weight:700;color:'+(max!=null&&rest===0?'#f87171':'#10b981')+'">'+rest+'</td>'
-      + '<td style="'+td+';text-align:right;white-space:nowrap"><button onclick="_formEditSession(\''+s.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">✏️</button> <button onclick="_formDeleteSession(\''+s.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button></td></tr>';
-  });
-  h+='</tbody></table></div></div>';
-  return h;
-}
+// (Ancien _formRenderSessions supprimé — remplacé par _formRenderStages.)
 function _formDeleteSession(id){
   var s=_formSessionById(id); if(!s)return;
   var n=_formSessionCount(id);
@@ -56836,42 +56895,7 @@ function _formSessionLabel(s){
   var t=_formTypeById(s.typeId); var tn=t?t.nom:(s.typeName||'');
   return (s.ref||'')+(tn?' · '+tn:'')+' · '+_formFrDate(s.dateFrom);
 }
-function _formRenderInscriptions(){
-  var sessions=(S.formSessions||[]).slice().sort(function(a,b){ return (b.dateFrom||'').localeCompare(a.dateFrom||''); });
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">'
-    + '<div><div style="font-size:16px;font-weight:800;color:var(--txt)">Inscriptions</div><div style="font-size:12px;color:var(--txt3);margin-top:2px">Inscrivez un licencié à une session — nom, N° de licence et région sont renseignés automatiquement.</div></div>'
-    + '<button onclick="_formEditInscription(\'\')" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouvelle inscription</button>'
-    + '</div>';
-  if(!sessions.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Créez d\'abord une <b>session</b> (onglet Sessions).</div>';
-  // Filtre par session
-  if(_formInscFilter && !sessions.some(function(s){return s.id===_formInscFilter;})) _formInscFilter='';
-  var filterOpts='<option value="">Toutes les sessions</option>'+sessions.map(function(s){ return '<option value="'+s.id+'"'+(_formInscFilter===s.id?' selected':'')+'>'+_formEsc(_formSessionLabel(s))+'</option>'; }).join('');
-  h+='<div style="margin-bottom:12px"><select onchange="_formInscFilter=this.value;renderFormationsModule(\'inscriptions\')" style="background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 10px;cursor:pointer;max-width:100%">'+filterOpts+'</select></div>';
-  var list=(S.formInscriptions||[]).filter(function(x){ return !_formInscFilter || x.sessionId===_formInscFilter; })
-    .sort(function(a,b){ return (''+((_formPilotInfo(a.pilotId)||{}).nom||a.nom||'')).localeCompare((_formPilotInfo(b.pilotId)||{}).nom||b.nom||''); });
-  if(!list.length) return h+'<div style="text-align:center;color:var(--txt3);padding:50px;border:1px dashed var(--bdr);border-radius:14px">Aucune inscription'+(_formInscFilter?' pour cette session':'')+'. Cliquez sur « + Nouvelle inscription ».</div>';
-  var th='padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3);white-space:nowrap';
-  var td='padding:9px 12px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:middle';
-  h+='<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:820px">'
-    + '<thead><tr><th style="'+th+'">Nom</th><th style="'+th+'">N° licence</th><th style="'+th+'">Région</th><th style="'+th+'">Session</th><th style="'+th+';width:150px">Statut</th><th style="'+th+';width:70px;text-align:right">Actions</th></tr></thead><tbody>';
-  var _selSt='background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:5px 8px;cursor:pointer;font-weight:700';
-  list.forEach(function(x){
-    var info=_formPilotInfo(x.pilotId)||{ nom:x.nom, licence:x.licence, region:x.region };
-    var sess=_formSessionById(x.sessionId);
-    var stOpts=_FORM_STATUTS_INSC.map(function(s){ return '<option value="'+s[0]+'"'+(x.statut===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('');
-    h+='<tr><td style="'+td+';font-weight:700"><span onclick="_formOpenPilot(\''+x.id+'\')" title="Ouvrir la fiche compétiteur" style="color:var(--stol);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">'+_formEsc(info.nom||'—')+'</span></td>'
-      + '<td style="'+td+';color:var(--stol);font-weight:700">'+_formEsc(info.licence||'—')+'</td>'
-      + '<td style="'+td+';color:var(--txt2)">'+_formEsc(info.region||'—')+'</td>'
-      + '<td style="'+td+';color:var(--txt2);font-size:12px">'+_formEsc(sess?_formSessionLabel(sess):'—')+'</td>'
-      + '<td style="'+td+'"><select onchange="_formSetInscStatut(\''+x.id+'\',this.value)" style="'+_selSt+';color:'+_formStatutColor(x.statut)+'">'+stOpts+'</select></td>'
-      + '<td style="'+td+';text-align:right;white-space:nowrap">'
-      +   '<button onclick="_formEditInscription(\''+x.id+'\')" title="Modifier" style="background:none;border:1px solid var(--bdr);border-radius:7px;color:var(--txt2);cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit;margin-right:5px">✏️</button>'
-      +   '<button onclick="_formDeleteInscription(\''+x.id+'\')" title="Supprimer" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:7px;color:#f87171;cursor:pointer;padding:5px 9px;font-size:12px;font-family:inherit">🗑</button>'
-      + '</td></tr>';
-  });
-  h+='</tbody></table></div></div>';
-  return h;
-}
+// (Ancien _formRenderInscriptions supprimé — remplacé par _formRenderStages.)
 // Ouvre la fiche Compétiteur depuis une inscription. L'inscription garde un
 // pilotId quand le licencié vient de la base ; sinon on tente de le retrouver
 // par le numéro de licence.
