@@ -6209,7 +6209,9 @@ function updateSeasonFilter() {
   var sel = document.getElementById('comp-season-filter'); if (!sel) return;
   var prev = sel.value;
   var seasons = [];
-  S.comps.forEach(function(c){ if (c.saison && !seasons.includes(c.saison)) seasons.push(c.saison); });
+  // Saison effective : champ `saison` s'il existe, sinon année déduite de la date de début.
+  // Évite qu'une compétition sans `saison` (import/legacy) devienne introuvable dans la liste.
+  S.comps.forEach(function(c){ var s = c.saison || (c.dateFrom ? c.dateFrom.slice(0,4) : ''); if (s && !seasons.includes(s)) seasons.push(s); });
   seasons.sort().reverse();
   sel.innerHTML = '';
   seasons.forEach(function(s) {
@@ -6275,7 +6277,8 @@ function renderCompetitions() {
   var _comps = Array.isArray(S.comps) ? S.comps : [];
   var _runs  = S.runs && typeof S.runs === 'object' ? S.runs : {};
   var list = _comps.filter(function(cp){
-    if (saison   !== 'all' && cp.saison    !== saison)   return false;
+    var cpSaison = cp.saison || (cp.dateFrom ? cp.dateFrom.slice(0,4) : '');
+    if (saison   !== 'all' && cpSaison     !== saison)   return false;
     if (pratique !== 'all' && cp.pratique  !== pratique) return false;
     if (discipl  !== 'all' && cp.discipline !== discipl) return false;
     if (search && !(
@@ -6568,7 +6571,8 @@ function printComps() {
   var discipl  = (document.getElementById('comp-discipline-filter') || {}).value || 'all';
   var search   = ((document.getElementById('comp-search-filter') || {}).value || '').trim().toLowerCase();
   var list = (S.comps || []).filter(function(cp){
-    if (saison   !== 'all' && cp.saison    !== saison)   return false;
+    var cpSaison = cp.saison || (cp.dateFrom ? cp.dateFrom.slice(0,4) : '');
+    if (saison   !== 'all' && cpSaison     !== saison)   return false;
     if (pratique !== 'all' && cp.pratique  !== pratique) return false;
     if (discipl  !== 'all' && cp.discipline !== discipl) return false;
     if (search && !((cp.name||'').toLowerCase().includes(search)||(cp.lieu||'').toLowerCase().includes(search))) return false;
@@ -27128,6 +27132,32 @@ function _cleanupAllDuplicates() {
       return false;
     });
     if (_b44MergeCount > 0) { _cleanupAllDuplicates._pendingSave = true; }
+
+    // ── Purge des compétitions « coquilles vides » (artefacts de test/import) ──
+    // Toute compétition réelle porte au moins une métadonnée de classement
+    // (saison — toujours renseignée par le formulaire —, type, pratique, discipline)
+    // ou de lieu (lieu/oaci/region), plus une config de volets. Un enregistrement
+    // réduit à {id, name, dateFrom, dateTo} n'est jamais produit par les formulaires
+    // ni les imports : c'est un résidu (ex. la fausse « Championnat Feurs » du 15 août
+    // qui polluait le tableau de bord). On le retire + tombstone pour qu'il ne
+    // réapparaisse pas à la synchro cloud.
+    var _orphanRemoved = 0;
+    S.comps = S.comps.filter(function(c){
+      var vide = !c.saison && !c.type && !c.pratique && !c.discipline
+              && !c.lieu && !c.oaci && !c.region
+              && !c.voletsConfig && (!c.etapes || !c.etapes.length)
+              && !c.affiche && !c.desc && !c.objectifs && !c.candidatureDoc;
+      if (!vide) return true;
+      if (!S._deletedComps) S._deletedComps = [];
+      S._deletedComps.push({ id: c.id, deletedAt: Date.now() });
+      if (S.compEnroll) delete S.compEnroll[c.id];
+      if (S.staff)      delete S.staff[c.id];
+      if (S.runs)       delete S.runs[c.id];
+      console.log('[GestSTOL] Purge compétition coquille vide: ' + c.id + ' (' + (c.name || c.nom || '?') + ')');
+      _orphanRemoved++;
+      return false;
+    });
+    if (_orphanRemoved > 0) { _cleanupAllDuplicates._pendingSave = true; }
   }
   return !!_cleanupAllDuplicates._pendingSave;
 
@@ -27699,8 +27729,10 @@ async function loadFromSupabaseFirst() {
         if (!cloud) { S.securiteEvents.push(loc); _seById[loc.id] = loc; return; }
         if ((loc._updatedAt||0) >= (cloud._updatedAt||0)) {
           Object.assign(cloud, loc);                       // local plus récent → gagne
-        } else if (!cloud.refBEA && loc.refBEA) {
-          cloud.refBEA = loc.refBEA;                        // ne pas perdre la réf. BEA locale
+        } else {
+          if (!cloud.refBEA  && loc.refBEA)  cloud.refBEA  = loc.refBEA;   // ne pas perdre les réfs BEA locales
+          if (!cloud.refBEA2 && loc.refBEA2) cloud.refBEA2 = loc.refBEA2;
+          if (!cloud.refBEA3 && loc.refBEA3) cloud.refBEA3 = loc.refBEA3;
         }
       });
       // Dédoublonnage AUTOMATIQUE après fusion : les doublons (mêmes date+éléments)
@@ -27783,8 +27815,13 @@ async function loadFromSupabaseFirst() {
     }
     if (savedDeletedComps) {
       if (!S._deletedComps) S._deletedComps = [];
-      savedDeletedComps.forEach(function(cid){
-        if (S._deletedComps.indexOf(cid) === -1) S._deletedComps.push(cid);
+      // ⚠️ _deletedComps contient des objets {id, deletedAt}, PAS des chaînes.
+      // (bug historique : la comparaison c.id !== cid avec cid=objet était toujours
+      //  vraie → la compétition supprimée revenait à chaque rechargement cloud.)
+      savedDeletedComps.forEach(function(t){
+        var cid = (t && typeof t === 'object') ? t.id : t;
+        if (!cid) return;
+        if (!S._deletedComps.some(function(x){ return ((x && x.id) || x) === cid; })) S._deletedComps.push(t);
         // Retirer la compétition revenue via cloud
         if (S.comps) S.comps = S.comps.filter(function(c){ return c.id !== cid; });
       });
@@ -54646,6 +54683,43 @@ function _beaSuggest(text, max) {
   return scored.slice(0, max).map(function(s){ return s.ref; });
 }
 
+// ── Références BEA multiples (jusqu'à 3 par événement) ──────────────────────
+// Un accident résulte souvent de plusieurs causes qui s'enchaînent : on autorise
+// jusqu'à 3 références BEA par événement (refBEA principale + refBEA2 + refBEA3).
+// Les statistiques comptabilisent CHACUNE des références pour recenser toutes les
+// origines et thématiques.
+function _beaRefsOf(e){
+  var out=[];
+  [e&&e.refBEA, e&&e.refBEA2, e&&e.refBEA3].forEach(function(r){
+    r=(r||'').toString().trim();
+    if(r && out.indexOf(r)===-1) out.push(r);
+  });
+  return out;
+}
+// Options d'un <select> BEA : exclut les réfs déjà choisies ailleurs (`exclude`),
+// sauf la valeur courante `cur` qui reste toujours sélectionnable.
+function _beaOptions(cur, exclude, placeholder){
+  cur=(cur||'').toString(); exclude=exclude||[];
+  var html='<option value=""'+(cur===''?' selected':'')+'>'+(placeholder||'— Non classifié —')+'</option>';
+  _BEA_REFS.forEach(function(r){
+    if(exclude.indexOf(r)!==-1 && r!==cur) return;   // masquée : déjà utilisée par une autre colonne
+    html+='<option value="'+r.replace(/"/g,'&quot;')+'"'+(r===cur?' selected':'')+'>'+r+'</option>';
+  });
+  return html;
+}
+// Rafraîchit un groupe de 3 selects pour que chacun exclue les valeurs des 2 autres.
+function _beaRefreshGroup(ids, placeholder){
+  var sels=ids.map(function(id){ return document.getElementById(id); });
+  var vals=sels.map(function(s){ return s?s.value:''; });
+  sels.forEach(function(s,i){
+    if(!s) return;
+    var others=vals.filter(function(v,j){ return j!==i && v; });
+    var keep=s.value;
+    s.innerHTML=_beaOptions(vals[i], others, placeholder);
+    s.value=keep;   // conserver la sélection courante
+  });
+}
+
 function openSecuriteEvents(volet) {
   volet = volet || 'stats';
   var wb = document.getElementById('dtn-workspace-body');
@@ -54676,23 +54750,15 @@ function openSecuriteEvents(volet) {
   if (volet === 'stats') setTimeout(_initSevLeafletMap, 80);
 }
 
+// Carte des événements — rendu SVG 100 % autonome (aucune tuile réseau, donc
+// aucune erreur 401/hors-ligne). La silhouette de la France est esquissée par
+// les centroïdes de tous les départements ; les événements sont des marqueurs
+// colorés par gravité (rouge mortel · orange corporel · gris matériel).
 function _initSevLeafletMap() {
   var el = document.getElementById('sev-leaflet-map');
   if (!el) return;
-  if (typeof L === 'undefined') { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--txt3);font-size:13px">Leaflet non chargé — connexion requise</div>'; return; }
 
-  if (el._sevMap) { try { el._sevMap.remove(); } catch(e){} }
-
-  var map = L.map(el, { zoomControl: true, attributionControl: true });
-  el._sevMap = map;
-
-  // Vue initiale sur la France métropolitaine — sera ajustée si des marqueurs existent
-  map.setView([46.5, 2.5], 6);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18, attribution: '© OpenStreetMap'
-  }).addTo(map);
-
+  var esc = function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
   var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
 
@@ -54705,7 +54771,6 @@ function _initSevLeafletMap() {
   var deptMap = {};
   _sevMapEvs.forEach(function(e){
     var raw = (e.dept||'').toString().trim();
-    // Essayer la valeur brute, puis sans zéros initiaux
     var d = _DEPT_COORDS[raw] ? raw : _DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null;
     if (!d) return;
     var coord = _DEPT_COORDS[d];
@@ -54716,30 +54781,57 @@ function _initSevLeafletMap() {
     if (e.lieu) deptMap[d].labels.push(e.lieu);
   });
 
-  // Séparer métropole (lat 41-52, lon -6 à 10) et DOM-TOM
-  var metroBounds = [], allKeys = Object.keys(deptMap);
-  allKeys.forEach(function(d) {
-    var pt = deptMap[d];
-    var col = pt.mort > 0 ? '#ef4444' : pt.corp > 0 ? '#f59e0b' : '#64748b';
-    var r = Math.max(7, Math.min(20, 6 + pt.n * 2));
-    var marker = L.circleMarker([pt.lat, pt.lon], {
-      radius: r, color: 'rgba(0,0,0,0.6)', weight: 1.5,
-      fillColor: col, fillOpacity: 0.85
-    }).addTo(map);
-    var lbl = '<b style="color:'+col+'">'+pt.n+' événement'+(pt.n>1?'s':'')+'</b>'
-      + (pt.mort ? '<br>⚫ '+pt.mort+' mortel'+(pt.mort>1?'s':'') : '')
-      + (pt.corp ? '<br>🟡 '+pt.corp+' corporel'+(pt.corp>1?'s':'') : '')
-      + (pt.labels.length ? '<br><span style="color:#64748b;font-size:11px">'+pt.labels.slice(0,3).join(', ')+'</span>' : '');
-    marker.bindPopup(lbl);
-    // N'inclure dans les bounds que la métropole
-    if (pt.lat >= 41 && pt.lat <= 52 && pt.lon >= -6 && pt.lon <= 10) {
-      metroBounds.push([pt.lat, pt.lon]);
-    }
-  });
+  // Projection équirectangulaire sur la métropole + Corse.
+  var latMin=41.3, latMax=51.2, lonMin=-5.2, lonMax=9.7, latMid=46.6;
+  var cosLat = Math.cos(latMid*Math.PI/180);
+  var pad=12, k=236/(latMax-latMin);
+  var W=Math.round((lonMax-lonMin)*k*cosLat+2*pad), H=Math.round((latMax-latMin)*k+2*pad);
+  var X=function(lon){ return (pad+(lon-lonMin)*k*cosLat); };
+  var Y=function(lat){ return (pad+(latMax-lat)*k); };
+  var inMetro=function(lat,lon){ return lat>=latMin&&lat<=latMax&&lon>=lonMin&&lon<=lonMax; };
 
-  if (metroBounds.length) {
-    map.fitBounds(metroBounds, { padding: [28, 28], maxZoom: 9 });
+  // Contours métropole + Corse (constantes module _FR_OUTLINE / _CORSE_OUTLINE).
+  var _poly=function(pts){ return pts.map(function(c){ return X(c[1]).toFixed(1)+','+Y(c[0]).toFixed(1); }).join(' '); };
+
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">';
+  // Fond : silhouette France + Corse (contours simples, aucune tuile réseau).
+  svg+='<polygon points="'+_poly(_FR_OUTLINE)+'" fill="rgba(148,163,184,.10)" stroke="rgba(148,163,184,.55)" stroke-width="1.2" stroke-linejoin="round"/>';
+  svg+='<polygon points="'+_poly(_CORSE_OUTLINE)+'" fill="rgba(148,163,184,.10)" stroke="rgba(148,163,184,.55)" stroke-width="1.2" stroke-linejoin="round"/>';
+  // Marqueurs événements (au-dessus). DOM-TOM listés à part.
+  var domtom=[];
+  Object.keys(deptMap).sort(function(a,b){ return deptMap[a].n-deptMap[b].n; }).forEach(function(d){
+    var pt=deptMap[d];
+    var col = pt.mort>0 ? '#ef4444' : pt.corp>0 ? '#f59e0b' : '#64748b';
+    if(!inMetro(pt.lat,pt.lon)){ domtom.push({d:d,pt:pt,col:col}); return; }
+    var r=Math.max(4,Math.min(14,4+pt.n*1.7));
+    var tip=pt.n+' événement'+(pt.n>1?'s':'')
+      +(pt.mort?' · '+pt.mort+' mortel'+(pt.mort>1?'s':''):'')
+      +(pt.corp?' · '+pt.corp+' corporel'+(pt.corp>1?'s':''):'')
+      +(pt.labels.length?' ('+pt.labels.slice(0,3).join(', ')+')':'');
+    svg+='<circle cx="'+X(pt.lon).toFixed(1)+'" cy="'+Y(pt.lat).toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+col+'" fill-opacity="0.85" stroke="rgba(0,0,0,.4)" stroke-width="1"><title>'+esc(tip)+'</title></circle>';
+  });
+  svg+='</svg>';
+
+  // Légende + DOM-TOM éventuels.
+  var totMarq = Object.keys(deptMap).length;
+  var legend='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;padding:6px 4px 0;font-size:10px;color:var(--txt3)">'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444"></span>Mortel</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b"></span>Corporel</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#64748b"></span>Matériel</span>'
+    +'</div>';
+  var domHtml = domtom.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;padding:6px 4px 0">'
+      + domtom.map(function(o){ return '<span title="'+esc('DOM-TOM · dépt '+o.d)+'" style="font-size:9px;font-weight:700;color:#fff;background:'+o.col+';border-radius:20px;padding:2px 8px">'+o.d+' · '+o.pt.n+'</span>'; }).join('')
+      + '</div>'
+    : '';
+
+  if (!totMarq){
+    el.innerHTML = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;text-align:center;padding:10px">Aucun événement localisé'+(_sevMapYear?' en '+_sevMapYear:'')+'</div>';
+    el.style.display='flex'; el.style.flexDirection='column';
+    return;
   }
+  el.style.display='flex'; el.style.flexDirection='column';
+  el.innerHTML = '<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center">'+svg+'</div>'+legend+domHtml;
 }
 
 function _renderRegistreEvenement() {
@@ -54775,6 +54867,9 @@ function _renderRegistreEvenement() {
     + (filterY ? '<button onclick="window._sevRegYear=\'\';openSecuriteEvents(\'registre\')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕ Tout afficher</button>' : '')
     + '</div>'
     + '<div style="display:flex;gap:8px">'
+    + '<button onclick="_sevRecalcInstructeur()" title="Recalculer « Instructeur à bord » à partir des descriptions (détecteur strict). Les fiches réglées manuellement sont préservées." style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid rgba(99,102,241,.35);border-radius:9px;background:rgba(99,102,241,.07);color:#818cf8;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>'
+    + 'Recalcul instructeur</button>'
     + '<button onclick="_sevDeduplicateRegistre()" title="Supprimer les doublons détectés (même date + mêmes premiers éléments)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid rgba(239,68,68,.3);border-radius:9px;background:rgba(239,68,68,.06);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>'
     + 'Supprimer doublons</button>'
@@ -54814,13 +54909,15 @@ function _renderRegistreEvenement() {
     var sc = _statCol[ev.statut] || '#64748b';
     var statutLabel = _SEV_STATUT[ev.statut] || ev.statut || '—';
     var descCourt = (ev.description||'').slice(0,80)+(ev.description&&ev.description.length>80?'…':'');
+    var _instrYes = (ev.instructeurBord===true||ev.instructeurBord==='oui'||ev.instructeurBord==='true');
+    var _flags = (_instrYes?'<span title="Instructeur à bord" style="margin-left:5px">👨‍🏫</span>':'')+(ev.paraDeclenche?'<span title="Parachute de secours déclenché" style="margin-left:3px">🪂</span>':'');
     var _btnSt = 'width:26px;height:26px;border:1px solid var(--bdr);border-radius:6px;background:transparent;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center';
     html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr);transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(i%2===0?'':'rgba(255,255,255,.02)')+'\'">'+
       '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap">'+d+'</td>'+
       '<td style="padding:8px 10px;color:var(--txt2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.lieu||'—')+'</td>'+
       '<td style="padding:8px 10px;color:var(--txt2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.appareil||'—')+'</td>'+
-      '<td style="padding:8px 10px;color:var(--txt2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.description||'').replace(/"/g,"&quot;")+'">'+descCourt+'</td>'+
-      '<td style="padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(ev.refBEA||'').replace(/"/g,"&quot;")+'">'+(ev.refBEA?'<span style="font-size:10px;color:#6366f1;font-weight:600">'+ev.refBEA+'</span>':'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'+
+      '<td style="padding:8px 10px;color:var(--txt2);max-width:230px;white-space:nowrap" title="'+(ev.description||'').replace(/"/g,"&quot;")+'"><span style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle">'+descCourt+'</span>'+_flags+'</td>'+
+      (function(){ var _r=_beaRefsOf(ev); return '<td style="padding:8px 10px;max-width:180px" title="'+_r.join(' · ').replace(/"/g,"&quot;")+'">'+(_r.length?_r.map(function(x){return '<span style="display:block;font-size:10px;color:#6366f1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x+'</span>';}).join(''):'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'; })()+
       '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+statutLabel+'</span></td>'+
       '<td style="padding:8px 8px;text-align:center;white-space:nowrap">'+
         '<div style="display:flex;gap:6px;align-items:center;justify-content:center">'+
@@ -54842,15 +54939,12 @@ function _renderReferencesBEA() {
   // restent accessibles via le Registre Événement.
   var evs = _all.filter(function(e){ return !e.refBEA; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
 
-  var optBEAHtml = '<option value="" selected>— Non classifié —</option>'
-    + _BEA_REFS.map(function(r){ return '<option value="'+r.replace(/"/g,'&quot;')+'">'+r+'</option>'; }).join('');
-
   // Même police/taille que la colonne « Premiers éléments » (12px)
   var _sel = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);font-family:inherit;font-size:12px;padding:6px 8px;cursor:pointer;outline:none';
 
   var html = '<div style="margin-bottom:14px">'
     + '<div style="font-size:13px;color:var(--txt3)">À référencer · <b style="color:var(--txt)">'+evs.length+'</b> à traiter'+(doneCount?' · <span style="color:#10b981;font-weight:700">'+doneCount+' traité(s)</span>':'')+'</div>'
-    + '<div style="font-size:11px;color:var(--txt3);margin-top:4px">Un événement validé quitte cette liste et le curseur passe automatiquement à la ligne suivante. Retrouvez les événements traités dans le <b>Registre Événement</b>.</div>'
+    + '<div style="font-size:11px;color:var(--txt3);margin-top:4px">Un accident pouvant avoir plusieurs causes qui s\'enchaînent, renseignez jusqu\'à <b>3 origines</b> par événement — les 2ᵉ et 3ᵉ listes n\'affichent plus la référence déjà choisie. Dès que l\'origine principale est saisie, le curseur passe à la ligne suivante ; l\'événement rejoint le <b>Registre Événement</b>.</div>'
     + '</div>';
 
   if (!evs.length) {
@@ -54864,78 +54958,81 @@ function _renderReferencesBEA() {
   var _thB = 'padding:9px 10px;text-align:left;border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:2;background:var(--navy3)';
   html += '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
     + '<div style="overflow-x:auto;max-height:calc(100vh - 280px);overflow-y:auto">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;table-layout:fixed">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:860px;table-layout:fixed">'
     + '<thead><tr style="color:var(--txt3);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase">'
-    + '<th style="'+_thB+';width:84px">Date</th>'
-    + '<th style="'+_thB+';width:48%">Premiers éléments</th>'
-    + '<th style="'+_thB+';color:#6366f1;width:48%">Référence BEA</th>'
+    + '<th style="'+_thB+';width:74px">Date</th>'
+    + '<th style="'+_thB+';width:31%">Premiers éléments</th>'
+    + '<th style="'+_thB+';color:#6366f1">Réf. BEA principale</th>'
+    + '<th style="'+_thB+';color:#818cf8">2ᵉ origine</th>'
+    + '<th style="'+_thB+';color:#818cf8">3ᵉ origine</th>'
     + '</tr></thead><tbody>';
 
   evs.forEach(function(ev, i) {
     var d = ev.date ? ev.date.split('-').reverse().join('/') : '—';
     var bg = i % 2 === 0 ? '' : 'background:rgba(255,255,255,.02)';
     var descCourt = ev.description || '';
-    var selId = 'sev-beasel-'+ev.id;
+    var b0 = ev.refBEA||'', b1 = ev.refBEA2||'', b2 = ev.refBEA3||'';
+    var sid = function(slot){ return 'sev-beasel-'+ev.id+'-'+slot; };
+    var mkSel = function(slot, cur, others, primary){
+      return '<select id="'+sid(slot)+'"'+(primary?' data-sevprimary="'+i+'"':'')+' style="'+_sel+'" '
+        + 'onchange="_sevOnBeaChange(\''+ev.id+'\','+slot+','+i+')">'
+        + _beaOptions(cur, others) + '</select>';
+    };
 
     var suggestions = _beaSuggest(ev.description, 3);
     var suggHtml = suggestions.length
       ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'
         + suggestions.map(function(r){
-            return '<button type="button" onclick="_sevApplyBeaSuggestion(\''+ev.id+'\',\''+r.replace(/'/g,"\\'")+'\','+i+')" title="Appliquer cette suggestion" style="font-size:10px;padding:3px 9px;border-radius:99px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-family:inherit;cursor:pointer;white-space:nowrap">💡 '+r+'</button>';
+            return '<button type="button" onclick="_sevApplyBeaSuggestion(\''+ev.id+'\',\''+r.replace(/'/g,"\\'")+'\','+i+')" title="Appliquer cette suggestion comme origine principale" style="font-size:10px;padding:3px 9px;border-radius:99px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;font-family:inherit;cursor:pointer;white-space:nowrap">💡 '+r+'</button>';
           }).join('')
         + '</div>'
       : '';
 
-    html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr)">'
+    html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr)'+(b0?';box-shadow:inset 3px 0 0 #10b981':'')+'">'
       + '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap;vertical-align:top">'+d+'</td>'
       + '<td style="padding:8px 10px;color:var(--txt2);vertical-align:top;line-height:1.5;font-size:12px;word-break:break-word">'+descCourt+'</td>'
-      + '<td style="padding:6px 8px;vertical-align:top">'
-      + '<select id="'+selId+'" data-sevrow="'+i+'" style="'+_sel+'" onchange="_sevSaveRefBEA(\''+ev.id+'\',this.value,'+i+')">'
-      + optBEAHtml
-      + '</select>'
-      + suggHtml
-      + '</td>'
+      + '<td style="padding:6px 8px;vertical-align:top">'+mkSel(0,b0,[b1,b2],true)+suggHtml+'</td>'
+      + '<td style="padding:6px 8px;vertical-align:top">'+mkSel(1,b1,[b0,b2],false)+'</td>'
+      + '<td style="padding:6px 8px;vertical-align:top">'+mkSel(2,b2,[b0,b1],false)+'</td>'
       + '</tr>';
   });
 
   html += '</tbody></table></div></div>';
   return html;
 }
-// Après validation d'une référence : le volet se recharge (l'événement traité
-// disparaît) et le curseur se place sur la ligne suivante (même index).
-function _sevRefreshRefsAndAdvance(rowIndex) {
-  openSecuriteEvents('refs');
-  setTimeout(function(){
-    var sels = document.querySelectorAll('#dtn-workspace-body select[data-sevrow]');
-    if (!sels.length) return;
-    var idx = (typeof rowIndex === 'number') ? rowIndex : 0;
-    var target = sels[idx] || sels[sels.length-1];
-    if (target) { try { target.scrollIntoView({block:'center', behavior:'smooth'}); target.focus(); } catch(e){} }
-  }, 60);
-}
-
 function _sevApplyBeaSuggestion(evId, ref, rowIndex) {
-  if (!S.securiteEvents) return;
-  var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
-  if (!ev) return;
-  ev.refBEA = ref || null;
-  ev._updatedAt = Date.now();
-  saveState();
-  if (typeof silentPush === 'function') silentPush();
-  _sevRefreshRefsAndAdvance(rowIndex);
+  // La suggestion s'applique à l'origine PRINCIPALE (colonne 1).
+  var el = document.getElementById('sev-beasel-'+evId+'-0');
+  if (el) { el.value = ref || ''; }
+  _sevOnBeaChange(evId, 0, rowIndex);
 }
 
-function _sevSaveRefBEA(evId, val, rowIndex) {
+// Sauvegarde en place des 3 colonnes de référence BEA d'une ligne, sans recharger
+// le volet (pour laisser saisir les 2ᵉ/3ᵉ origines). Les 3 listes s'excluent
+// mutuellement ; l'origine principale déclenche l'avance vers la ligne suivante.
+function _sevOnBeaChange(evId, slot, rowIndex) {
   if (!S.securiteEvents) return;
   var ev = S.securiteEvents.find(function(e){ return e.id === evId; });
   if (!ev) return;
-  ev.refBEA = val || null;
+  var ids = [0,1,2].map(function(s){ return 'sev-beasel-'+evId+'-'+s; });
+  _beaRefreshGroup(ids);                                   // exclusion entre les 3 colonnes
+  var v = function(s){ var el = document.getElementById('sev-beasel-'+evId+'-'+s); return el ? (el.value||'').trim() : ''; };
+  ev.refBEA  = v(0) || null;
+  ev.refBEA2 = v(1) || null;
+  ev.refBEA3 = v(2) || null;
   ev._updatedAt = Date.now();
   saveState();
   if (typeof silentPush === 'function') silentPush();
-  // Si une référence a été validée, l'événement quitte la liste ; on recharge et on
-  // passe à la ligne suivante. Si « Non classifié » (val vide), on ne bouge pas.
-  if (val) _sevRefreshRefsAndAdvance(rowIndex);
+  // Marqueur « classé » (liseré vert) dès qu'une origine principale est présente.
+  var prim = document.getElementById('sev-beasel-'+evId+'-0');
+  if (prim) { var tr = prim.closest('tr'); if (tr) tr.style.boxShadow = ev.refBEA ? 'inset 3px 0 0 #10b981' : ''; }
+  // Avance auto : quand l'origine PRINCIPALE vient d'être renseignée, on place le
+  // curseur sur l'origine principale de la ligne suivante.
+  if (slot === 0 && ev.refBEA) {
+    var prims = document.querySelectorAll('#dtn-workspace-body select[data-sevprimary]');
+    var next = prims[rowIndex + 1];
+    if (next) { try { next.scrollIntoView({block:'center', behavior:'smooth'}); next.focus(); } catch(e){} }
+  }
 }
 
 // ── Coordonnées centroides des départements (lat, lon) ──
@@ -54959,8 +55056,15 @@ var _DEPT_COORDS = {
   '82':[44.00,1.22],'83':[43.43,6.22],'84':[43.99,5.08],'85':[46.67,-1.41],'86':[46.58,0.34],
   '87':[45.84,1.28],'88':[48.17,6.36],'89':[47.80,3.60],'90':[47.63,6.86],'91':[48.50,2.24],
   '92':[48.83,2.23],'93':[48.91,2.47],'94':[48.78,2.45],'95':[49.07,2.09],
-  '971':[16.18,-61.31],'972':[14.64,-61.02],'973':[4.00,-53.00],'974':[-21.11,55.53],'976':[-12.83,45.15]
+  '971':[16.18,-61.31],'972':[14.64,-61.02],'973':[4.00,-53.00],'974':[-21.11,55.53],'976':[-12.83,45.15],
+  // Corse (2A/2B, et code historique 20)
+  '2A':[41.86,8.94],'2B':[42.40,9.16],'20':[42.15,9.10]
 };
+
+// Contours simplifiés [lat,lon] — France métropolitaine + Corse. Partagés par la
+// carte écran (SVG) et l'impression A4 (SVG), aucun réseau requis.
+var _FR_OUTLINE=[[51.05,2.55],[50.35,4.15],[49.55,4.85],[49.50,5.90],[49.05,8.05],[48.55,7.80],[47.55,7.55],[46.75,6.45],[46.25,6.10],[45.55,6.90],[44.90,6.95],[44.20,7.00],[43.70,7.35],[43.10,6.70],[43.05,5.95],[43.20,5.10],[43.35,4.20],[43.20,3.30],[42.50,3.10],[42.35,2.55],[42.55,1.45],[42.72,0.65],[42.80,-0.75],[43.30,-1.78],[43.55,-1.55],[44.65,-1.25],[45.70,-1.20],[46.50,-1.80],[47.25,-2.20],[47.80,-4.30],[48.35,-4.78],[48.75,-3.95],[48.62,-2.80],[48.65,-1.52],[49.72,-1.35],[49.50,-0.20],[49.70,0.20],[50.80,1.58]];
+var _CORSE_OUTLINE=[[43.00,9.40],[42.70,9.55],[41.60,9.28],[41.75,8.70],[42.35,8.55],[42.80,9.15]];
 
 // Données nationales historiques (Tués/DCD et Blessés) issues du registre FFPLUM, pour compléter le graphique "Par année" sur les années non couvertes par S.securiteEvents
 var _SEV_HISTO = {
@@ -55111,6 +55215,8 @@ function _renderSecuriteStats() {
   var nMat  = total-nMort-nCorp;
   var nTues = evs.reduce(function(s,e){return s+parseInt(e.nbTues||0);},0);
   var nBless= evs.reduce(function(s,e){return s+parseInt(e.nbBlesses||0);},0);
+  var nInstr= evs.filter(function(e){return e.instructeurBord;}).length;
+  var nPara = evs.filter(function(e){return e.paraDeclenche;}).length;
   var allYrs={}; evs.forEach(function(e){var y=(e.date||'').slice(0,4);if(y.length===4)allYrs[y]=1;});
   var nYears=Object.keys(allYrs).length;
 
@@ -55166,6 +55272,8 @@ function _renderSecuriteStats() {
   if (ageMoy !== null) {
     kpis.push({val:ageMoy+' ans', lbl:'Âge moyen', col:'#8b5cf6', sub:'min '+ageMin+' · max '+ageMax});
   }
+  kpis.push({val:nInstr, lbl:'Instructeur à bord', col:'#6366f1', sub:'👨‍🏫 vol en instruction'});
+  kpis.push({val:nPara,  lbl:'Parachute déclenché', col:'#10b981', sub:'🪂 secours activé'});
   html+='<div style="display:grid;grid-template-columns:repeat('+(kpis.length)+',1fr);gap:10px;margin-bottom:14px">';
   kpis.forEach(function(k){
     html+='<div style="'+_cSt+';padding:12px 14px 10px;position:relative;overflow:hidden">'
@@ -55296,13 +55404,18 @@ function _renderSecuriteStats() {
   (function(){
     var PAL_O=['#ef4444','#f97316','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#10b981','#64748b','#ec4899','#0891b2'];
     var counts={}, morts={}, tues={};
-    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
-      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
-      if(_isMort(e)) morts[e.refBEA]=(morts[e.refBEA]||0)+1;       // nb d'accidents mortels
-      tues[e.refBEA]=(tues[e.refBEA]||0)+(parseInt(e.nbTues||0)||0); // nb de tués (si renseigné)
+    // Comptabilise CHACUNE des 3 réfs BEA possibles par événement (multi-causes).
+    evs.forEach(function(e){
+      var refs=_beaRefsOf(e); if(!refs.length) return;
+      var isM=_isMort(e), nt=parseInt(e.nbTues||0)||0;
+      refs.forEach(function(r){
+        counts[r]=(counts[r]||0)+1;
+        if(isM) morts[r]=(morts[r]||0)+1;       // nb d'accidents mortels impliquant cette origine
+        tues[r]=(tues[r]||0)+nt;                 // nb de tués (si renseigné)
+      });
     });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
-    var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
+    var nBEA=evs.filter(function(e){return _beaRefsOf(e).length>0;}).length;
     var footer='<div style="flex-shrink:0;font-size:9px;color:#6366f1;margin-top:8px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
     if(!items.length){
       html+=_card('Origines','<div style="flex:1;display:flex;flex-direction:column;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer,2);
@@ -55333,23 +55446,30 @@ function _renderSecuriteStats() {
     html+=_card('Origines',body,2);
   })();
 
-  // ── Card 7 : Instructeur à bord (donut) ──
+  // ── Card 7 : Instructeur à bord / Parachute de secours (2 donuts) ──
   (function(){
-    var nOui=0,nNon=0;
-    evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')nOui++;else nNon++;});
-    var tot=nOui+nNon, pctOui=tot>0?Math.round(nOui/tot*100):0;
-    var svgD='<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:140px;display:block;margin:0 auto">';
-    svgD+=_donut([{v:nOui},{v:nNon}],['#ef4444','#3b82f6'],70,70,52,20);
-    svgD+='<text x="70" y="64" text-anchor="middle" font-family="inherit" font-size="28" font-weight="900" fill="var(--txt)">'+pctOui+'%</text>';
-    svgD+='<text x="70" y="82" text-anchor="middle" font-family="inherit" font-size="10" fill="var(--txt3)">avec instructeur</text>';
-    svgD+='</svg>';
-    var leg='<div style="display:flex;justify-content:center;gap:20px;margin-top:10px">'
-      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#ef4444"></div>'
-      +'<span style="font-size:11px;color:var(--txt2)">Avec · <b style="color:#ef4444">'+nOui+'</b></span></div>'
-      +'<div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:50%;background:#3b82f6"></div>'
-      +'<span style="font-size:11px;color:var(--txt2)">Sans · <b style="color:#3b82f6">'+nNon+'</b></span></div>'
+    var _subTitle = function(t){ return '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:11px;flex-shrink:0">'+t+'</div>'; };
+    var _miniDonut = function(nOui,nNon,colOui,colNon,centerLbl){
+      var tot=nOui+nNon, pct=tot>0?Math.round(nOui/tot*100):0;
+      var s='<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:112px;display:block;margin:0 auto">';
+      s+=_donut([{v:nOui},{v:nNon}],[colOui,colNon],60,60,44,17);
+      s+='<text x="60" y="56" text-anchor="middle" font-family="inherit" font-size="22" font-weight="900" fill="var(--txt)">'+pct+'%</text>';
+      s+='<text x="60" y="71" text-anchor="middle" font-family="inherit" font-size="8" fill="var(--txt3)">'+centerLbl+'</text>';
+      s+='</svg>';
+      var leg='<div style="display:flex;justify-content:center;gap:14px;margin-top:8px">'
+        +'<div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:'+colOui+'"></div><span style="font-size:10px;color:var(--txt2)">Oui · <b style="color:'+colOui+'">'+nOui+'</b></span></div>'
+        +'<div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:'+colNon+'"></div><span style="font-size:10px;color:var(--txt2)">Non · <b style="color:'+colNon+'">'+nNon+'</b></span></div>'
+        +'</div>';
+      return s+leg;
+    };
+    var iOui=0; evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')iOui++;});
+    var dInst='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_miniDonut(iOui,total-iOui,'#ef4444','#cbd5e1','instructeur')+'</div>';
+    var dPara='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_miniDonut(nPara,total-nPara,'#ef4444','#cbd5e1','parachute')+'</div>';
+    html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:row;gap:14px;min-height:0">'
+      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('👨‍🏫 Instructeur à bord')+dInst+'</div>'
+      +'<div style="width:1px;background:var(--bdr);flex-shrink:0;align-self:stretch"></div>'
+      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('🪂 Parachute de secours')+dPara+'</div>'
       +'</div>';
-    html+=_card('Instructeur à bord','<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+svgD+leg+'</div>');
   })();
 
   // ── Card 8 : Carte Leaflet ──
@@ -55502,11 +55622,24 @@ function _sevPrintStats() {
     evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')nOui++;else nNon++;});
     var tot2=nOui+nNon; var pct=tot2>0?Math.round(nOui/tot2*100):0;
     var s='<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg" style="width:110px;height:110px;display:block;margin:0 auto"><rect width="130" height="130" fill="#fff"/>';
-    s+=_donutP([{v:nOui},{v:nNon}],['#059669',C.mort],48,16,65,65,'avec inst.',pct+'%');
+    s+=_donutP([{v:nOui},{v:nNon}],['#ef4444','#cbd5e1'],48,16,65,65,'avec inst.',pct+'%');
     s+='</svg>';
     return s+'<div style="display:flex;justify-content:center;gap:12px;margin-top:6px">'
-      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:#059669"></div><span style="font-size:9px;color:#374151">Avec · <b>'+nOui+'</b></span></div>'
-      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:'+C.mort+'"></div><span style="font-size:9px;color:#374151">Sans · <b>'+nNon+'</b></span></div>'
+      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:#ef4444"></div><span style="font-size:9px;color:#374151">Avec · <b>'+nOui+'</b></span></div>'
+      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:#cbd5e1"></div><span style="font-size:9px;color:#374151">Sans · <b>'+nNon+'</b></span></div>'
+      +'</div>';
+  })();
+
+  // ── Donut Parachute de secours ──
+  var _svgD4 = (function(){
+    var nOui=evs.filter(function(e){return e.paraDeclenche;}).length, nNon=evs.length-nOui;
+    var tot2=nOui+nNon; var pct=tot2>0?Math.round(nOui/tot2*100):0;
+    var s='<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg" style="width:110px;height:110px;display:block;margin:0 auto"><rect width="130" height="130" fill="#fff"/>';
+    s+=_donutP([{v:nOui},{v:nNon}],['#ef4444','#cbd5e1'],48,16,65,65,'déclenché',pct+'%');
+    s+='</svg>';
+    return s+'<div style="display:flex;justify-content:center;gap:12px;margin-top:6px">'
+      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:#ef4444"></div><span style="font-size:9px;color:#374151">Oui · <b>'+nOui+'</b></span></div>'
+      +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:#cbd5e1"></div><span style="font-size:9px;color:#374151">Non · <b>'+nNon+'</b></span></div>'
       +'</div>';
   })();
 
@@ -55522,14 +55655,19 @@ function _sevPrintStats() {
   // ── Origines (réf. BEA) — barres compactes sur 2 colonnes ; libellé rouge + † si accident mortel ──
   var _barsOrig = (function(){
     var counts={}, morts={}, tues={};
-    evs.filter(function(e){ return !!e.refBEA; }).forEach(function(e){
-      counts[e.refBEA]=(counts[e.refBEA]||0)+1;
-      if(_isMort(e)) morts[e.refBEA]=(morts[e.refBEA]||0)+1;
-      tues[e.refBEA]=(tues[e.refBEA]||0)+(parseInt(e.nbTues||0)||0);
+    // Comptabilise CHACUNE des 3 réfs BEA possibles par événement (multi-causes).
+    evs.forEach(function(e){
+      var refs=_beaRefsOf(e); if(!refs.length) return;
+      var isM=_isMort(e), nt=parseInt(e.nbTues||0)||0;
+      refs.forEach(function(r){
+        counts[r]=(counts[r]||0)+1;
+        if(isM) morts[r]=(morts[r]||0)+1;
+        tues[r]=(tues[r]||0)+nt;
+      });
     });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
     if(!items.length) return '';
-    var nBEA=evs.filter(function(e){return !!e.refBEA;}).length;
+    var nBEA=evs.filter(function(e){return _beaRefsOf(e).length>0;}).length;
     var cols3=[C.p1,C.p2,C.p3,C.p4,C.p5,C.p6,C.p7,C.p8,'#0891b2','#4d7c0f'];
     var maxV=counts[items[0]]||1;
     var row=function(k,i){
@@ -55565,6 +55703,29 @@ function _sevPrintStats() {
     else if (_isCorp(e)) _printDeptMap[d].corp++;
   });
   var _deptMapJson = JSON.stringify(_printDeptMap);
+
+  // ── Carte France (SVG statique, thème clair, aucune tuile réseau) ──
+  var _prtFranceSVG = (function(){
+    var latMin=41.3, latMax=51.2, lonMin=-5.2, lonMax=9.7, latMid=46.6;
+    var cosLat=Math.cos(latMid*Math.PI/180);
+    var pad=8, k=196/(latMax-latMin);
+    var W=Math.round((lonMax-lonMin)*k*cosLat+2*pad), H=Math.round((latMax-latMin)*k+2*pad);
+    var X=function(lon){ return (pad+(lon-lonMin)*k*cosLat); };
+    var Y=function(lat){ return (pad+(latMax-lat)*k); };
+    var inM=function(lat,lon){ return lat>=latMin&&lat<=latMax&&lon>=lonMin&&lon<=lonMax; };
+    var poly=function(pts){ return pts.map(function(c){ return X(c[1]).toFixed(1)+','+Y(c[0]).toFixed(1); }).join(' '); };
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width:100%;height:140px;display:block">';
+    s+='<polygon points="'+poly(_FR_OUTLINE)+'" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" stroke-linejoin="round"/>';
+    s+='<polygon points="'+poly(_CORSE_OUTLINE)+'" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" stroke-linejoin="round"/>';
+    Object.keys(_printDeptMap).sort(function(a,b){ return _printDeptMap[a].n-_printDeptMap[b].n; }).forEach(function(d){
+      var p=_printDeptMap[d]; if(!inM(p.lat,p.lon)) return;
+      var col=p.mort>0?'#b91c1c':p.corp>0?'#d97706':'#475569';
+      var r=Math.max(3.5,Math.min(12,3.5+p.n*1.6));
+      s+='<circle cx="'+X(p.lon).toFixed(1)+'" cy="'+Y(p.lat).toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+col+'" fill-opacity="0.88" stroke="#fff" stroke-width="1"/>';
+    });
+    s+='</svg>';
+    return s;
+  })();
 
   // ── Carte Monde : événements hors Europe (dept non reconnu comme dept français) ──
   var _WORLD_COORDS = {
@@ -55625,6 +55786,26 @@ function _sevPrintStats() {
   var _hasWorldMap = _worldPoints.length > 0;
   var _worldMapJson = JSON.stringify(_worldPoints);
 
+  // ── Carte monde (SVG statique : grille + points localisés + libellés) ──
+  var _prtWorldSVG = _hasWorldMap ? (function(){
+    var pad=6, W=360, H=188, lonMin=-180, lonMax=180, latMax=78, latMin=-58;
+    var X=function(lon){ return pad+(lon-lonMin)/(lonMax-lonMin)*(W-2*pad); };
+    var Y=function(lat){ return pad+(latMax-lat)/(latMax-latMin)*(H-2*pad); };
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width:100%;height:180px;display:block">';
+    s+='<rect x="'+pad+'" y="'+pad+'" width="'+(W-2*pad)+'" height="'+(H-2*pad)+'" fill="#eff6ff" stroke="#dbeafe" stroke-width="1"/>';
+    for(var lo=-120;lo<=120;lo+=60){ s+='<line x1="'+X(lo).toFixed(1)+'" y1="'+pad+'" x2="'+X(lo).toFixed(1)+'" y2="'+(H-pad)+'" stroke="#dbeafe" stroke-width="0.7"/>'; }
+    for(var la=-40;la<=60;la+=40){ s+='<line x1="'+pad+'" y1="'+Y(la).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+Y(la).toFixed(1)+'" stroke="#dbeafe" stroke-width="0.7"/>'; }
+    s+='<line x1="'+pad+'" y1="'+Y(0).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+Y(0).toFixed(1)+'" stroke="#bfdbfe" stroke-width="1"/>';
+    _worldPoints.forEach(function(p){
+      var col=p.mort>0?'#b91c1c':'#d97706';
+      var cx=X(p.lon), cy=Y(p.lat);
+      s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="4" fill="'+col+'" stroke="#fff" stroke-width="1"/>';
+      s+='<text x="'+(cx+5).toFixed(1)+'" y="'+(cy+2.5).toFixed(1)+'" font-family="Arial" font-size="6" fill="#334155">'+_esc((p.lieu||'').slice(0,16))+'</text>';
+    });
+    s+='</svg>';
+    return s;
+  })() : '';
+
   // ── KPI tiles HTML ──
   var kpis2=[
     {val:periodeStr||'—',lbl:'Période',col:'#64748b'},
@@ -55663,7 +55844,6 @@ function _sevPrintStats() {
   if (!w) { alert('Veuillez autoriser les popups pour imprimer.'); return; }
   w.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
     +'<title>RASU — FFPLUM</title>'
-    +'<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">'
     +'<style>'
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'body{font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;color:#1e293b;font-size:11px}'
@@ -55673,7 +55853,6 @@ function _sevPrintStats() {
     +'  .no-print{display:none!important}'
     +'  .page-wrap{box-shadow:none!important;margin:0!important;width:100%!important}'
     +'  .row{page-break-inside:avoid}'
-    +'  #prt-map{height:140px!important}'
     +'}'
     +'.page-wrap{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:0;box-shadow:0 4px 24px rgba(0,0,0,.12)}'
     +'.inner{padding:8mm 10mm 8mm}'
@@ -55682,8 +55861,6 @@ function _sevPrintStats() {
     +'.row-2{grid-template-columns:1fr 1fr}'
     +'.row-3{grid-template-columns:1fr 1fr 1fr}'
     +'.row-2b{grid-template-columns:1.1fr .9fr}'
-    +'#prt-map{height:140px;border-radius:6px;overflow:hidden;z-index:0}'
-    +'.leaflet-control-attribution{font-size:7px!important}'
     +'</style>'
     +'</head><body>'
     +'<div class="page-wrap"><div class="inner">'
@@ -55719,7 +55896,7 @@ function _sevPrintStats() {
       +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:'+C.corp+'"></div><span style="font-size:9px;color:#374151">Corporels · <b>'+nCorp+'</b></span></div>'
       +'</div>')
     + _sec('Classes ULM', _svgD2)
-    + _sec('Instructeur à bord', _svgD3)
+    + _sec('Instructeur / Parachute','<div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">👨‍🏫 Instructeur</div>'+_svgD3+'</div><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">🪂 Parachute</div>'+_svgD4+'</div></div>')
     +'</div>'
 
     // ── Row 3 : Type de vol + [Carte Monde si hors Europe] + Carte France ──
@@ -55728,18 +55905,18 @@ function _sevPrintStats() {
         + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
         +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
         +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte mondiale des événements</div>'
-        +'<div id="prt-world-map" style="height:190px;border-radius:6px;overflow:hidden"></div>'
+        +_prtWorldSVG
         +'</div>'
         +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
         +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France métropolitaine</div>'
-        +'<div id="prt-map"></div>'
+        +_prtFranceSVG
         +'</div>'
         +'</div>'
       : '<div class="row row-2b" style="margin-bottom:10px">'
         + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
         +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
         +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France métropolitaine</div>'
-        +'<div id="prt-map"></div>'
+        +_prtFranceSVG
         +'</div>'
         +'</div>'
     )
@@ -55751,40 +55928,7 @@ function _sevPrintStats() {
     +'</div>'
 
     +'</div></div>'
-    +'<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"><\/script>'
-    +'<script>'
-    +'function doPrint(){ window.focus(); window.print(); }'
-    +'var _tile="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";'
-    +'var _attr="© OSM";'
-    +'try{'
-    +'var _dm='+_deptMapJson+';'
-    +'var _map=L.map("prt-map",{zoomControl:false,attributionControl:true});'
-    +'L.tileLayer(_tile,{maxZoom:18,attribution:_attr}).addTo(_map);'
-    +'var _b=[];'
-    +'Object.keys(_dm).forEach(function(d){'
-    +'var p=_dm[d];'
-    +'var col=p.mort>0?"#b91c1c":p.corp>0?"#d97706":"#475569";'
-    +'var r=Math.max(6,Math.min(16,5+p.n*2));'
-    +'L.circleMarker([p.lat,p.lon],{radius:r,color:"#fff",weight:1.5,fillColor:col,fillOpacity:0.9}).addTo(_map);'
-    +'if(p.lat>=41&&p.lat<=52)_b.push([p.lat,p.lon]);'
-    +'});'
-    +'if(_b.length)_map.fitBounds(_b,{padding:[20,20],maxZoom:8});'
-    +'else _map.setView([46.5,2.5],6);'
-    +'}catch(e){}'
-    +(_hasWorldMap
-      ? 'try{'
-        +'var _wm='+_worldMapJson+';'
-        +'var _wmap=L.map("prt-world-map",{zoomControl:false,attributionControl:false});'
-        +'L.tileLayer(_tile,{maxZoom:18,attribution:_attr}).addTo(_wmap);'
-        +'_wm.forEach(function(p){'
-        +'var col=p.mort>0?"#b91c1c":"#d97706";'
-        +'L.circleMarker([p.lat,p.lon],{radius:8,color:"#fff",weight:1.5,fillColor:col,fillOpacity:0.9})'
-        +'.bindTooltip(p.lieu,{permanent:false}).addTo(_wmap);'
-        +'});'
-        +'_wmap.setView([20,0],1);'
-        +'}catch(e){}'
-      : '')
-    +'<\/script>'
+    +'<script>function doPrint(){ window.focus(); window.print(); }<\/script>'
     +'</body></html>');
   w.document.close();
 }
@@ -55817,8 +55961,112 @@ function _sevDocUpload(input){ _sevDocUploadFile(input&&input.files&&input.files
 function _sevDocDrop(el,ev){ ev.preventDefault(); if(el){el.style.outline='';el.style.outlineOffset='';} var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(f)_sevDocUploadFile(f); }
 function _sevDocRemove(){ window._sevDoc={data:'',name:''}; _sevDocRender(); }
 function _sevDocView(){ var d=window._sevDoc||{}; if(!d.data)return; var url=/^data:application\/pdf/.test(d.data)?((typeof _ftBlobUrl==='function')?_ftBlobUrl(d.data,'sevdoc-view'):d.data):d.data; var w=window.open(url,'_blank'); if(!w&&typeof toast==='function')toast('Autorisez les popups pour ouvrir le document',''); }
+// ── Helpers des toggles « Circonstances particulières » ─────────────────────
+// Restyle un chip (bordure + fond) selon l'état de sa case.
+function _sevSyncChip(cb){
+  var l = cb && cb.closest ? cb.closest('label') : null; if(!l) return;
+  l.style.borderColor = cb.checked ? (l.getAttribute('data-onc')||'#6366f1') : 'var(--bdr)';
+  l.style.background  = cb.checked ? (l.getAttribute('data-onbg')||'rgba(99,102,241,.10)') : 'var(--navy3)';
+}
+// Détecte un vol d'instruction à partir du texte de la description.
+function _sevDetectInstruction(desc){
+  var t = (desc||'').toString().toLowerCase();
+  return /instruction|formation|[ée]l[èe]ve|[ée]cole|double\s*commande|moniteur|apprentissage|l[âa]cher|\bstage\b|\bcours\b/.test(t);
+}
+// Détecte un INSTRUCTEUR À BORD de façon stricte : uniquement des mentions
+// indiscutables (double commande, instructeur/moniteur « à bord » ou « avec »…).
+// La simple présence d'un âge instructeur ou d'un vol d'instruction ne suffit PAS
+// (un lâcher / solo se fait sans instructeur à bord).
+function _sevDetectInstructeurBord(desc){
+  var t = (desc||'').toString().toLowerCase();
+  var dc = /double\s*-?\s*commande/.test(t);
+  var aboard = dc
+    || /(instructeur|moniteur)\s+[àa]\s+bord/.test(t)
+    || /avec\s+(?:son\s+|un\s+|une\s+|le\s+|la\s+|l['’]\s*)?(instructeur|moniteur)/.test(t)
+    || /accompagn[ée]\s+(?:par|de|d['’])\s*(?:son\s+|l['’]\s*|un\s+)?(instructeur|moniteur)/.test(t)
+    || /(instructeur|moniteur)\s+et\s+(?:son\s+|l['’]\s*)?[ée]l[èe]ve/.test(t)
+    || /[ée]l[èe]ve\s+et\s+(?:son\s+|l['’]\s*)?(instructeur|moniteur)/.test(t);
+  if (!aboard) return false;
+  // Exclusion : élève lâché / vol solo (sauf si double commande explicitement citée).
+  if (!dc && /\bsolo\b|l[âa]ch[ée]|seul[e]?\s+[àa]\s+bord/.test(t)) return false;
+  return true;
+}
+// Instructeur à bord déduit des DONNÉES d'une fiche : description indiscutable
+// OU âge instructeur plausible (15–100). Utilisé par l'import, le recalcul et le
+// formulaire pour une comptabilisation cohérente.
+function _sevInstrFromData(e){
+  if (!e) return false;
+  if (_sevDetectInstructeurBord(e.description)) return true;
+  var a = parseInt(e.ageInstructeur, 10);
+  return a >= 15 && a <= 100;
+}
+// À la saisie de la description : ajuste automatiquement « Vol d'instruction » et
+// « Instructeur à bord » tant que l'utilisateur ne les a pas réglés manuellement
+// (data-auto="0"). L'instructeur reste coché si un âge instructeur est connu
+// (data-agebased="1"), même sans mot-clé dans la description.
+function _sevOnDescInput(el){
+  var v = el.value;
+  var cbV = document.getElementById('sev-volinstr');
+  if (cbV && cbV.getAttribute('data-auto') !== '0'){ cbV.checked = _sevDetectInstruction(v); _sevSyncChip(cbV); }
+  var cbI = document.getElementById('sev-instructeur');
+  if (cbI && cbI.getAttribute('data-auto') !== '0'){ cbI.checked = _sevDetectInstructeurBord(v) || cbI.getAttribute('data-agebased') === '1'; _sevSyncChip(cbI); }
+}
+// Recalcule « Instructeur à bord » pour toutes les fiches à partir de leur
+// description (détecteur strict). Les fiches réglées manuellement (_instrUser)
+// sont préservées. Corrige les faux positifs issus d'anciens imports.
+function _sevRecalcInstructeur(){
+  if (!S.securiteEvents || !S.securiteEvents.length){ toast('Aucun événement au registre','ok'); return; }
+  var n = 0, protectedN = 0;
+  S.securiteEvents.forEach(function(e){
+    if (e._instrUser){ protectedN++; return; }   // décision utilisateur : on n'y touche pas
+    var want = _sevInstrFromData(e);             // description indiscutable OU âge instructeur connu
+    var cur  = (e.instructeurBord === true || e.instructeurBord === 'oui' || e.instructeurBord === 'true');
+    if (want !== cur){ e.instructeurBord = want; e._updatedAt = Date.now(); n++; }
+  });
+  saveState();
+  if (typeof openSecuriteEvents === 'function') openSecuriteEvents('registre');
+  toast(n ? ('Instructeur recalculé — '+n+' fiche'+(n>1?'s':'')+' corrigée'+(n>1?'s':'')+(protectedN?' · '+protectedN+' manuelle'+(protectedN>1?'s':'')+' préservée'+(protectedN>1?'s':''):'')) : 'Aucune correction nécessaire', 'ok');
+}
+// « Vol d'instruction » coché manuellement ⇒ « Instructeur à bord » validé
+// automatiquement (décision humaine). Le clic verrouille les deux (data-auto=0).
+function _sevVolChange(cb){
+  cb.setAttribute('data-auto','0');
+  _sevSyncChip(cb);
+  if (cb.checked){
+    var i = document.getElementById('sev-instructeur');
+    if (i && !i.checked){ i.checked = true; i.setAttribute('data-auto','0'); _sevSyncChip(i); }
+  }
+}
+// Lien parachute : un parachute déclenché implique un parachute à bord ;
+// retirer « à bord » retire aussi « déclenché ».
+function _sevParaChange(which){
+  var bord = document.getElementById('sev-parabord'), decl = document.getElementById('sev-para');
+  if(!bord||!decl) return;
+  if(which==='decl' && decl.checked) bord.checked = true;
+  if(which==='bord' && !bord.checked) decl.checked = false;
+  _sevSyncChip(bord); _sevSyncChip(decl);
+}
+// Construit un chip toggle (case + libellé) pour la grille des circonstances.
+function _sevChip(id, color, onbg, emoji, text, checked, onchange, extraAttr){
+  return '<label data-onc="'+color+'" data-onbg="'+onbg+'" style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:9px;cursor:pointer;user-select:none;border:1px solid '+(checked?color:'var(--bdr)')+';background:'+(checked?onbg:'var(--navy3)')+'">'
+    + '<input id="'+id+'" type="checkbox"'+(checked?' checked':'')+(extraAttr||'')+' style="width:17px;height:17px;accent-color:'+color+';cursor:pointer;flex-shrink:0" onchange="'+onchange+'">'
+    + '<span style="font-size:12.5px;font-weight:700;color:var(--txt)">'+emoji+' '+text+'</span>'
+    + '</label>';
+}
+
 function openSecuriteEventForm(evId) {
   var ev = evId ? (S.securiteEvents||[]).find(function(e){ return e.id===evId; }) : null;
+  var _paraOn = !!(ev&&ev.paraDeclenche);
+  var _paraBordOn = !!(ev&&ev.paraBord) || _paraOn;  // un parachute déclenché implique un parachute à bord
+  // « Instructeur à bord » : décision utilisateur mémorisée (verrouillée) sinon
+  // déduite des données — description indiscutable OU âge instructeur connu.
+  var _instrLocked = !!(ev && ev._instrUser);
+  var _instrStored = !!(ev && (ev.instructeurBord === true || ev.instructeurBord === 'oui' || ev.instructeurBord === 'true'));
+  var _instrAgeBased = !!(ev && parseInt(ev.ageInstructeur,10) >= 15 && parseInt(ev.ageInstructeur,10) <= 100);
+  var _instrOn = _instrLocked ? _instrStored : _sevInstrFromData(ev);
+  // « Vol d'instruction » : valeur mémorisée si elle existe (verrouillée), sinon déduite de la description.
+  var _volLocked = !!(ev && typeof ev.volInstruction === 'boolean');
+  var _volInstrOn = _volLocked ? ev.volInstruction : _sevDetectInstruction(ev&&ev.description);
   window._sevDoc = { data:(ev&&ev.document)||'', name:(ev&&ev.documentName)||'' };
   var _inp = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box';
   var _sel = _inp + ';cursor:pointer';
@@ -55837,13 +56085,19 @@ function openSecuriteEventForm(evId) {
   var optTypes = Object.keys(_SEV_TYPES).map(function(k){ return '<option value="'+k+'"'+(ev&&ev.type===k?' selected':'')+'>'+_SEV_TYPES[k]+'</option>'; }).join('');
   var optGrav  = [1,2,3,4,5].map(function(g){ return '<option value="'+g+'"'+(ev&&parseInt(ev.gravite)===g?' selected':'')+'>'+g+' — '+_SEV_GRAVITE[g]+'</option>'; }).join('');
   var optStat  = Object.keys(_SEV_STATUT).map(function(k){ return '<option value="'+k+'"'+(ev?ev.statut===k?' selected':'':k==='ouvert'?' selected':'')+'>'+_SEV_STATUT[k]+'</option>'; }).join('');
-  var optBEA   = _BEA_REFS.map(function(r){ return '<option value="'+r.replace(/"/g,'&quot;')+'"'+(ev&&ev.refBEA===r?' selected':'')+'>'+r+'</option>'; }).join('');
+  var _bea0=(ev&&ev.refBEA)||'', _bea1=(ev&&ev.refBEA2)||'', _bea2=(ev&&ev.refBEA3)||'';
+  var optBEA0=_beaOptions(_bea0,[_bea1,_bea2]), optBEA1=_beaOptions(_bea1,[_bea0,_bea2]), optBEA2=_beaOptions(_bea2,[_bea0,_bea1]);
+  var _beaGrp="_beaRefreshGroup(['sev-refbea','sev-refbea2','sev-refbea3'])";
 
   var _lab = 'font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px';
   var _st  = 'font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:10px';
-  panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1">'
+  panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1;flex-wrap:wrap">'
     + '<div style="font-size:15px;font-weight:800;color:var(--txt)">⚠️ '+(evId?'Modifier l\'événement':'Nouvel événement')+'</div>'
-    + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:19px;cursor:pointer">×</button>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + (evId?'<button onclick="_securiteEventDelete(\''+evId+'\')" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">🗑 Supprimer</button>':'')
+      + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="padding:8px 16px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
+      + '<button onclick="_securiteEventSave(\''+( evId||''  )+'\')" style="padding:8px 20px;border-radius:9px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">💾 Enregistrer</button>'
+    + '</div>'
     + '</div>'
     + '<div style="padding:18px;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'
 
@@ -55857,15 +56111,19 @@ function openSecuriteEventForm(evId) {
           + '<div><label style="'+_lab+'">GRAVITÉ (1–5)</label><select id="sev-gravite" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'"><option value="">— Choisir —</option>'+optGrav+'</select></div>'
           + '<div><label style="'+_lab+'">STATUT</label><select id="sev-statut" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'">'+optStat+'</select></div>'
         + '</div>'
-        + '<div style="margin-top:10px"><label style="font-size:11px;font-weight:700;color:#6366f1;display:block;margin-bottom:5px">RÉFÉRENCE BEA</label><select id="sev-refbea" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'"><option value="">— Non classifié —</option>'+optBEA+'</select></div>'
+        + '<div style="margin-top:10px"><label style="font-size:11px;font-weight:700;color:#6366f1;display:block;margin-bottom:5px">RÉFÉRENCE BEA <span style="font-weight:600;color:var(--txt3)">— jusqu\'à 3 origines (multi-causes)</span></label>'
+          + '<select id="sev-refbea" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'" onchange="'+_beaGrp+'">'+optBEA0+'</select>'
+          + '<select id="sev-refbea2" style="'+_sel+';margin-top:6px" onfocus="'+_foc+'" onblur="'+_blr+'" onchange="'+_beaGrp+'">'+optBEA1+'</select>'
+          + '<select id="sev-refbea3" style="'+_sel+';margin-top:6px" onfocus="'+_foc+'" onblur="'+_blr+'" onchange="'+_beaGrp+'">'+optBEA2+'</select>'
+        + '</div>'
       + '</div>'
       + '<div>'
         + '<div style="'+_st+'">Lieu, pilote &amp; appareil</div>'
         + '<div><label style="'+_lab+'">LIEU / AÉRODROME</label><input id="sev-lieu" type="text" value="'+(ev?ev.lieu||'':'')+'" placeholder="Ex : LFCR, Belmont/Rance…" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">'
           + '<div><label style="'+_lab+'">PILOTE</label><input id="sev-pilote" type="text" value="'+(ev?ev.pilote||'':'')+'" placeholder="Nom prénom" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
-          + '<div><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?ev.appareil||'':'')+'" placeholder="Marque / immat." style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
           + '<div><label style="'+_lab+'">ÂGE PILOTE</label><input id="sev-age" type="number" min="14" max="110" value="'+(ev&&ev.agePilote?ev.agePilote:'')+'" placeholder="ans" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+          + '<div><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?ev.appareil||'':'')+'" placeholder="Marque / immat." style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
           + '<div></div>'
         + '</div>'
       + '</div>'
@@ -55876,13 +56134,23 @@ function openSecuriteEventForm(evId) {
           + '<div><label style="font-size:11px;font-weight:700;color:#ef4444;display:block;margin-bottom:5px">MORTEL — NB TUÉS</label><input id="sev-tues" type="number" min="0" value="'+(ev?ev.nbTues||0:0)+'" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
         + '</div>'
       + '</div>'
+      // ── Circonstances particulières (alimentent les statistiques) ──
+      + '<div>'
+        + '<div style="'+_st+'">Circonstances particulières</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+          + _sevChip('sev-instructeur','#6366f1','rgba(99,102,241,.10)','👨‍🏫','Instructeur à bord',_instrOn,'this.setAttribute(\'data-auto\',\'0\');_sevSyncChip(this)',' data-auto="'+(_instrLocked?'0':'1')+'" data-agebased="'+(_instrAgeBased?'1':'0')+'"')
+          + _sevChip('sev-volinstr','#8b5cf6','rgba(139,92,246,.10)','🎓','Vol d\'instruction',_volInstrOn,'_sevVolChange(this)',' data-auto="'+(_volLocked?'0':'1')+'"')
+          + _sevChip('sev-parabord','#0891b2','rgba(8,145,178,.10)','🪂','Parachute à bord',_paraBordOn,'_sevParaChange(\'bord\')')
+          + _sevChip('sev-para','#10b981','rgba(16,185,129,.10)','🪂','Parachute déclenché',_paraOn,'_sevParaChange(\'decl\')')
+        + '</div>'
+      + '</div>'
     + '</div>'
 
     // ── COLONNE 2 : récit & suivi (place élargie) ──
     + '<div style="flex:1.3 1 320px;min-width:280px;display:flex;flex-direction:column;gap:18px">'
       + '<div style="display:flex;flex-direction:column;height:100%">'
         + '<div style="'+_st+'">Récit &amp; suivi</div>'
-        + '<div><label style="'+_lab+'">DESCRIPTION *</label><textarea id="sev-desc" placeholder="Description des circonstances de l\'événement…" style="'+_inp+';resize:vertical;min-height:190px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.description||'':'')+'</textarea></div>'
+        + '<div><label style="'+_lab+'">DESCRIPTION *</label><textarea id="sev-desc" placeholder="Description des circonstances de l\'événement…" style="'+_inp+';resize:vertical;min-height:190px" onfocus="'+_foc+'" onblur="'+_blr+'" oninput="_sevOnDescInput(this)">'+(ev?ev.description||'':'')+'</textarea></div>'
         + '<div style="margin-top:12px"><label style="'+_lab+'">MESURES PRISES</label><textarea id="sev-mesures" placeholder="Actions correctives, enquête, suivi…" style="'+_inp+';resize:vertical;min-height:130px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.mesures||'':'')+'</textarea></div>'
       + '</div>'
     + '</div>'
@@ -55895,12 +56163,6 @@ function openSecuriteEventForm(evId) {
         + '<div style="font-size:10px;color:var(--txt3);margin-top:6px">Glisser-déposer ou cliquer. Clic sur l\'aperçu pour afficher/imprimer.</div>'
       + '</div>'
     + '</div>'
-    + '</div>'
-
-    + '<div style="display:flex;gap:8px;justify-content:flex-end;padding:0 18px 18px;flex-wrap:wrap;align-items:center">'
-    + (evId?'<button onclick="_securiteEventDelete(\''+evId+'\')" style="padding:9px 16px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-right:auto">🗑 Supprimer</button>':'')
-    + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="padding:9px 18px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
-    + '<button onclick="_securiteEventSave(\''+( evId||''  )+'\')" style="padding:9px 22px;border-radius:9px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">💾 Enregistrer</button>'
     + '</div>';
 
   ov.appendChild(panel);
@@ -55929,10 +56191,17 @@ function _securiteEventSave(evId) {
     description: desc.trim(),
     mesures:     ((document.getElementById('sev-mesures')||{}).value||'').trim(),
     refBEA:      ((document.getElementById('sev-refbea')||{}).value||'').trim()||null,
+    refBEA2:     ((document.getElementById('sev-refbea2')||{}).value||'').trim()||null,
+    refBEA3:     ((document.getElementById('sev-refbea3')||{}).value||'').trim()||null,
     document:    (window._sevDoc&&window._sevDoc.data)||'',
     documentName:(window._sevDoc&&window._sevDoc.name)||'',
     nbBlesses:   nbBlesses,
     nbTues:      nbTues,
+    instructeurBord: !!(document.getElementById('sev-instructeur')||{}).checked,
+    _instrUser:  true,   // décision humaine : préservée par le recalcul automatique
+    volInstruction:  !!(document.getElementById('sev-volinstr')||{}).checked,
+    paraDeclenche:   !!(document.getElementById('sev-para')||{}).checked,
+    paraBord:        !!(document.getElementById('sev-parabord')||{}).checked || !!(document.getElementById('sev-para')||{}).checked,
     isCorporel:  nbBlesses > 0 || type === 'accident',
     isMortel:    nbTues > 0,
     _updatedAt:  Date.now()
@@ -56275,9 +56544,14 @@ function importSecuriteEvents(input) {
           if(tl.indexOf('privé')>=0||tl.indexOf('prive')>=0||tl.indexOf('loisir')>=0||tl.indexOf('personnel')>=0) return 'Privé / Loisir';
           return 'Autre';
         };
-        // Instructeur à bord : présence d'un âge instructeur = instructeur à bord
-        var instrCell = C.instBord >= 0 ? _v(row, C.instBord) : '';
-        var instructeurBord = (instrCell && instrCell.toString().trim().length > 0) ? 'oui' : 'non';
+        // Instructeur à bord : indiscutable si la description l'indique OU si un
+        // ÂGE INSTRUCTEUR plausible (15–100 ans) figure dans le fichier. On exige
+        // un vrai nombre d'âge — une cellule vide/junk (« - », « 0 », espace) ne
+        // suffit pas (c'était la cause des faux positifs de l'ancien import).
+        var instrAgeRaw = C.instBord >= 0 ? _v(row, C.instBord) : '';
+        var instrAge = parseInt((instrAgeRaw||'').toString().replace(/[^\d]/g,''), 10);
+        var hasInstrAge = instrAge >= 15 && instrAge <= 100;
+        var instructeurBord = _sevDetectInstructeurBord(desc) || hasInstrAge;
 
         S.securiteEvents.push({
           id:             'sev'+Date.now().toString(36)+'_'+added,
@@ -56291,6 +56565,7 @@ function importSecuriteEvents(input) {
           appareil:       appareil,
           classeUlm:      _normClasse(typeUlm),
           agePilote:      agePilNum,
+          ageInstructeur: hasInstrAge ? instrAge : null,
           instructeurBord:instructeurBord,
           typeVol:        _normVol(natVol),
           description:    desc,
@@ -56377,7 +56652,7 @@ function _sevDedupList(list){
   list.forEach(function(e){
     var k = _sevDedupKey(e);
     if (!byKey[k]) { byKey[k] = e; out.push(e); }
-    else { var kept = byKey[k]; if (!kept.refBEA && e && e.refBEA) kept.refBEA = e.refBEA; }
+    else { var kept = byKey[k]; if (e) { if (!kept.refBEA && e.refBEA) kept.refBEA = e.refBEA; if (!kept.refBEA2 && e.refBEA2) kept.refBEA2 = e.refBEA2; if (!kept.refBEA3 && e.refBEA3) kept.refBEA3 = e.refBEA3; } }
   });
   return out;
 }
