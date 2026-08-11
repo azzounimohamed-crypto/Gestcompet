@@ -43808,7 +43808,7 @@ function _faqRefEdit(idx){
     + '<div style="flex:1;overflow-y:auto;padding:18px 22px">'
     +   '<div style="display:grid;grid-template-columns:190px 1fr;gap:12px;margin-bottom:12px;align-items:start">'
     +     '<div><label style="'+lSt+'">Niveau</label><select id="faqref-niveau" style="'+fSt+';cursor:pointer">'+nivOpts+'</select></div>'
-    +     '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔎 Chercher le texte</button></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
+    +     '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔎 Chercher</button><button type="button" id="faqref-autofill-btn" onclick="_faqRefAutoFill('+idx+')" title="Récupérer le texte depuis le lien et pré-remplir Résumé, Motifs et Dispositif (champs vides uniquement)" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#22c55e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">✨ Compléter</button></div></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
     +   '</div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Titre</label><textarea id="faqref-titre" rows="2" placeholder="Titre / intitulé du texte" style="'+taSt+'">'+e(rec.titre||r.texte||'')+'</textarea></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📝 Sens du texte (résumé)</label><textarea id="faqref-resume" rows="3" placeholder="Ce que dit le texte, en quelques lignes…" style="'+taSt+'">'+e(rec.resume||'')+'</textarea></div>'
@@ -43836,6 +43836,72 @@ function _faqRefSave(idx){
   var ov=document.getElementById('faqref-modal'); if(ov)ov.remove();
   renderFaq();
   if(typeof toast==='function') toast('Référence enregistrée ✓','ok');
+}
+// Extrait Titre / Résumé / Motifs / Dispositif du HTML d'une page de texte
+// officiel (Légifrance, EUR-Lex…). Heuristique — le résultat est un brouillon
+// éditable, jamais enregistré sans relecture.
+function _faqRefExtract(html){
+  var out={titre:'',resume:'',motifs:'',dispositif:''};
+  var doc; try { doc=new DOMParser().parseFromString(html||'','text/html'); } catch(e){ return out; }
+  // Titre : og:title / h1 / <title>
+  var mt=doc.querySelector('meta[property="og:title"],meta[name="title"]');
+  out.titre=((mt&&mt.getAttribute('content'))||'').trim()
+    || ((doc.querySelector('h1')&&doc.querySelector('h1').textContent)||'').replace(/\s+/g,' ').trim()
+    || (doc.title||'').replace(/\s+/g,' ').trim();
+  // Résumé : meta description
+  var md=doc.querySelector('meta[name="description"],meta[property="og:description"]');
+  if(md&&md.getAttribute('content')) out.resume=md.getAttribute('content').replace(/\s+/g,' ').trim();
+  // Nettoyage puis texte brut
+  ['script','style','nav','header','footer','noscript','svg'].forEach(function(sel){ try{ doc.querySelectorAll(sel).forEach(function(n){ n.remove(); }); }catch(e){} });
+  var txt=((doc.body&&doc.body.textContent)||'').replace(/ /g,' ').replace(/[ \t]+/g,' ').replace(/\s*\n\s*/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  var flat=txt.replace(/\s+/g,' ');
+  var low=flat.toLowerCase();
+  if(!out.resume){
+    var paras=Array.prototype.map.call(doc.querySelectorAll('p'),function(p){ return p.textContent.replace(/\s+/g,' ').trim(); }).filter(function(s){ return s.length>80; });
+    if(paras.length) out.resume=paras[0];
+  }
+  // Motifs : préambule « Vu … » / « considérant … » jusqu'à Arrête/Décrète/ont adopté/Article 1
+  var mStart=low.search(/consid[ée]rant|(?:^|[^a-zéè])vu\s+(?:la|le|l['’]|les)\s/);
+  var dStart=low.search(/article\s*(?:1er|premier|1(?:\b|\s|\.))/);
+  if(mStart>=0){
+    var mEnd=-1;
+    ['arrête','arrete','décrète','decrete','ont adopté','ont adopte','ont arrêté'].forEach(function(w){ var i=low.indexOf(w,mStart); if(i>=0 && (mEnd<0||i<mEnd)) mEnd=i+w.length; });
+    if(dStart>mStart && (mEnd<0||dStart<mEnd)) mEnd=dStart;
+    if(mEnd<0) mEnd=Math.min(mStart+1800,flat.length);
+    out.motifs=flat.slice(mStart,Math.min(mEnd,mStart+2000)).trim();
+  }
+  // Dispositif : à partir de « Article 1er » (quelques articles)
+  if(dStart>=0){
+    var end=low.indexOf('fait à',dStart); if(end<0||end>dStart+2400) end=dStart+2400;
+    out.dispositif=flat.slice(dStart,Math.min(end,flat.length)).trim();
+  }
+  out.titre=(out.titre||'').slice(0,240);
+  out.resume=(out.resume||'').slice(0,800);
+  out.motifs=(out.motifs||'').slice(0,2000);
+  out.dispositif=(out.dispositif||'').slice(0,2400);
+  return out;
+}
+// Récupère le texte via le lien (proxys CORS) et pré-remplit les champs VIDES.
+async function _faqRefAutoFill(idx){
+  var lienEl=document.getElementById('faqref-lien');
+  var lien=_faqNormUrl(lienEl?lienEl.value:'');
+  if(!lien){ if(typeof toast==='function') toast('Renseignez d\'abord le lien vers le texte','err'); return; }
+  var btn=document.getElementById('faqref-autofill-btn');
+  var oldTxt=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳'; btn.style.opacity='.6'; }
+  if(typeof toast==='function') toast('Récupération du texte…','info');
+  var html='';
+  try { var r1=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(lien)); var j1=await r1.json(); if(j1&&j1.contents) html=j1.contents; } catch(e){}
+  if(!html){ try { var r2=await fetch('https://corsproxy.io/?url='+encodeURIComponent(lien)); if(r2.ok) html=await r2.text(); } catch(e){} }
+  if(btn){ btn.disabled=false; btn.innerHTML=oldTxt; btn.style.opacity='1'; }
+  if(!html){ if(typeof toast==='function') toast('Récupération impossible (site protégé). Ouvrez le lien et copiez le contenu.','err'); return; }
+  var ex=_faqRefExtract(html);
+  var filled=[];
+  var setIf=function(id,val,label){ var el=document.getElementById(id); if(el && (val||'').trim() && !el.value.trim()){ el.value=val; filled.push(label); } };
+  setIf('faqref-titre', ex.titre, 'Titre');
+  setIf('faqref-resume', ex.resume, 'Résumé');
+  setIf('faqref-motifs', ex.motifs, 'Motifs');
+  setIf('faqref-dispositif', ex.dispositif, 'Dispositif');
+  if(typeof toast==='function') toast(filled.length ? ('Complété : '+filled.join(', ')+' — relisez avant d\'enregistrer') : 'Aucun champ vide à compléter (ou contenu non exploitable)','ok');
 }
 function _faqRefsHtml(){
   _faqInit();
@@ -54207,9 +54273,120 @@ function _dtnGoHome() {
     + '<div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>'
     + '<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions — 30 jours</div>'
     + '</div><div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
+    + '<div id="dtn-todo-zone" style="margin-top:34px"></div>'
     + '</div>';
   _dtnSetActiveNav('home');
   _dtnRefreshStats();
+  if (typeof _dtnRenderTodo === 'function') _dtnRenderTodo();
+}
+
+// ══ To-do liste personnelle du tableau de bord DTN ═════════════════════════
+// Attachée au titulaire du compte (S.user) et stockée en localStorage UNIQUEMENT
+// (jamais synchronisée dans S / le cloud) → invisible des autres utilisateurs.
+var _DTN_TODO_LS = 'gestdtn_dtntodos';
+function _dtnTodoUserKey(){ return (S.user && (S.user.id || S.user.email)) || 'anon'; }
+function _dtnTodoLoadAll(){ try { return JSON.parse(localStorage.getItem(_DTN_TODO_LS) || '{}') || {}; } catch(e){ return {}; } }
+function _dtnTodoSaveAll(obj){ try { localStorage.setItem(_DTN_TODO_LS, JSON.stringify(obj||{})); } catch(e){} }
+function _dtnTodoList(){
+  var all = _dtnTodoLoadAll(); var arr = all[_dtnTodoUserKey()] || [];
+  return arr.slice().sort(function(a,b){
+    if(!!a.done !== !!b.done) return a.done ? 1 : -1;           // à faire d'abord
+    return (a.dateDu||'~').localeCompare(b.dateDu||'~');        // puis échéance croissante
+  });
+}
+function _dtnTodoMutate(fn){
+  var all = _dtnTodoLoadAll(); var k = _dtnTodoUserKey();
+  var arr = all[k] || []; arr = fn(arr) || arr; all[k] = arr; _dtnTodoSaveAll(all);
+}
+function _dtnTodoToggle(id){
+  _dtnTodoMutate(function(arr){ var t=arr.find(function(x){return x.id===id;}); if(t){ t.done=!t.done; t._doneAt=t.done?Date.now():null; } return arr; });
+  _dtnRenderTodo();
+}
+function _dtnTodoDelete(id){
+  if(!confirm('Supprimer cette tâche ?')) return;
+  _dtnTodoMutate(function(arr){ return arr.filter(function(x){return x.id!==id;}); });
+  _dtnRenderTodo();
+}
+function _dtnRenderTodo(){
+  var el = document.getElementById('dtn-todo-zone'); if(!el) return;
+  var list = _dtnTodoList();
+  var today = new Date().toISOString().slice(0,10);
+  var esc = (typeof escH==='function') ? escH : function(s){ return (s||'').replace(/</g,'&lt;'); };
+  var open = list.filter(function(t){ return !t.done; }).length;
+  var head = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<div style="width:3px;height:13px;border-radius:2px;background:#0891b2;flex-shrink:0"></div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Ma to-do liste</div>'
+    +'<span style="font-size:11px;color:var(--txt3)">'+open+' à faire</span>'
+    +'<button onclick="_dtnTodoOpenForm()" style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:8px;background:#0891b2;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nouvelle tâche</button>'
+    +'</div>';
+  if(!list.length){
+    el.innerHTML = head + '<div style="padding:26px;text-align:center;color:var(--txt3);font-size:13px;border:1px dashed var(--bdr);border-radius:12px">Aucune tâche pour l\'instant.<br><span style="font-size:11px;opacity:.85">Liste privée — visible de vous seul.</span></div>';
+    return;
+  }
+  var th='padding:8px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--txt3);border-bottom:1px solid var(--bdr);background:var(--navy3)';
+  var rows = list.map(function(t){
+    var overdue = !t.done && t.dateDu && t.dateDu < today;
+    var dCol = overdue ? '#ef4444' : 'var(--txt2)';
+    var dTxt = t.dateDu ? t.dateDu.split('-').reverse().join('/') : '—';
+    var strike = t.done ? 'text-decoration:line-through;opacity:.5' : '';
+    return '<tr style="border-bottom:1px solid var(--bdr)">'
+      +'<td style="padding:8px 10px;white-space:nowrap;color:'+dCol+';font-weight:'+(overdue?'700':'600')+';'+strike+'">'+dTxt+(overdue?' ⚠':'')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--txt);font-weight:600;'+strike+'">'+esc(t.thematique||'—')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--txt2);'+strike+'">'+esc(t.action||'')+'</td>'
+      +'<td style="padding:8px 10px;color:var(--txt2);white-space:nowrap;'+strike+'">'+esc(t.contact||'')+'</td>'
+      +'<td style="padding:8px 8px;text-align:center;white-space:nowrap">'
+        +'<input type="checkbox"'+(t.done?' checked':'')+' onchange="_dtnTodoToggle(\''+t.id+'\')" title="Clore la tâche" style="width:18px;height:18px;accent-color:#10b981;cursor:pointer;vertical-align:middle">'
+        +'<button onclick="_dtnTodoDelete(\''+t.id+'\')" title="Supprimer" style="margin-left:8px;width:24px;height:24px;border:1px solid var(--bdr);border-radius:6px;background:transparent;color:#f87171;cursor:pointer;vertical-align:middle;font-size:12px">🗑</button>'
+      +'</td></tr>';
+  }).join('');
+  el.innerHTML = head
+    + '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px">'
+    + '<thead><tr>'
+      +'<th style="'+th+';width:104px">Échéance</th>'
+      +'<th style="'+th+';width:160px">Thématique</th>'
+      +'<th style="'+th+'">Action</th>'
+      +'<th style="'+th+';width:150px">Contact</th>'
+      +'<th style="'+th+';width:84px;text-align:center">Clore</th>'
+    + '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function _dtnTodoOpenForm(){
+  var existing=document.getElementById('dtn-todo-ov'); if(existing) existing.remove();
+  var ov=document.createElement('div'); ov.id='dtn-todo-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:3200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box';
+  var lab='font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px';
+  var panel=document.createElement('div');
+  panel.style.cssText='background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:460px;overflow:hidden';
+  panel.onclick=function(e){ e.stopPropagation(); };
+  panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--bdr)">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">📝 Nouvelle tâche</div>'
+    +'<button onclick="document.getElementById(\'dtn-todo-ov\').remove()" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:19px;cursor:pointer">×</button>'
+    +'</div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+      +'<div><label style="'+lab+'">DATE DU (échéance)</label><input id="dtn-todo-date" type="date" style="'+inp+'"></div>'
+      +'<div><label style="'+lab+'">THÉMATIQUE</label><input id="dtn-todo-thematique" type="text" placeholder="Ex : Sécurité, Formation, Territoires…" style="'+inp+'"></div>'
+      +'<div><label style="'+lab+'">ACTION</label><textarea id="dtn-todo-action" placeholder="Décrire l\'action à mener…" style="'+inp+';resize:vertical;min-height:72px"></textarea></div>'
+      +'<div><label style="'+lab+'">CONTACT</label><input id="dtn-todo-contact" type="text" placeholder="Nom / email / téléphone" style="'+inp+'"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding:0 16px 16px">'
+      +'<button onclick="document.getElementById(\'dtn-todo-ov\').remove()" style="padding:9px 18px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
+      +'<button onclick="_dtnTodoSaveNew()" style="padding:9px 22px;border-radius:9px;border:none;background:#0891b2;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">Ajouter</button>'
+    +'</div>';
+  ov.appendChild(panel); document.body.appendChild(ov);
+  setTimeout(function(){ var el=document.getElementById('dtn-todo-thematique'); if(el) el.focus(); }, 60);
+}
+function _dtnTodoSaveNew(){
+  var g=function(id){ return (document.getElementById(id)||{}).value||''; };
+  var thematique=g('dtn-todo-thematique').trim();
+  var action=g('dtn-todo-action').trim();
+  if(!thematique && !action){ if(typeof toast==='function') toast('Renseignez au moins la thématique ou l\'action','err'); return; }
+  var t={ id:'todo'+Date.now().toString(36), dateDu:g('dtn-todo-date'), thematique:thematique, action:action, contact:g('dtn-todo-contact').trim(), done:false, _createdAt:Date.now() };
+  _dtnTodoMutate(function(arr){ arr.push(t); return arr; });
+  var ov=document.getElementById('dtn-todo-ov'); if(ov) ov.remove();
+  _dtnRenderTodo();
+  if(typeof toast==='function') toast('Tâche ajoutée ✓','ok');
 }
 
 function _dtnShowPanel(module) {
@@ -55464,12 +55641,20 @@ function _renderSecuriteStats() {
     };
     var iOui=0; evs.forEach(function(e){if(e.instructeurBord==='oui'||e.instructeurBord===true||e.instructeurBord==='true')iOui++;});
     var dInst='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_miniDonut(iOui,total-iOui,'#ef4444','#cbd5e1','instructeur')+'</div>';
-    var dPara='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_miniDonut(nPara,total-nPara,'#ef4444','#cbd5e1','parachute')+'</div>';
-    html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:row;gap:14px;min-height:0">'
-      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('👨‍🏫 Instructeur à bord')+dInst+'</div>'
-      +'<div style="width:1px;background:var(--bdr);flex-shrink:0;align-self:stretch"></div>'
-      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('🪂 Parachute de secours')+dPara+'</div>'
-      +'</div>';
+    // Règle : pas de graphe parachute si aucune donnée parachute.
+    var _hasPara = evs.some(function(e){ return e.paraDeclenche || e.paraBord; });
+    if(_hasPara){
+      var dPara='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_miniDonut(nPara,total-nPara,'#ef4444','#cbd5e1','parachute')+'</div>';
+      html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:row;gap:14px;min-height:0">'
+        +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('👨‍🏫 Instructeur à bord')+dInst+'</div>'
+        +'<div style="width:1px;background:var(--bdr);flex-shrink:0;align-self:stretch"></div>'
+        +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('🪂 Parachute de secours')+dPara+'</div>'
+        +'</div>';
+    } else {
+      html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:column;min-height:0">'
+        +_subTitle('👨‍🏫 Instructeur à bord')+dInst
+        +'</div>';
+    }
   })();
 
   // ── Card 8 : Carte Leaflet ──
@@ -55727,6 +55912,33 @@ function _sevPrintStats() {
     return s;
   })();
 
+  // Légende de la carte France (gravité).
+  var _prtFranceLegend = '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px">'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#b91c1c"></span><span style="font-size:8px;color:#374151">Mortel</span></span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#d97706"></span><span style="font-size:8px;color:#374151">Corporel</span></span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#475569"></span><span style="font-size:8px;color:#374151">Matériel</span></span>'
+    +'</div>';
+
+  // Décompte outre-mer (DOM-TOM) — remplace la carte mondiale. Départements hors
+  // bornes métropolitaines listés en pastilles (dept · nombre).
+  var _prtDomTomHtml = (function(){
+    var latMin=41.3, latMax=51.2, lonMin=-5.2, lonMax=9.7;
+    var items=[];
+    Object.keys(_printDeptMap).forEach(function(d){
+      var p=_printDeptMap[d];
+      if(p.lat>=latMin&&p.lat<=latMax&&p.lon>=lonMin&&p.lon<=lonMax) return; // métropole
+      items.push({d:d,p:p});
+    });
+    if(!items.length) return '';
+    items.sort(function(a,b){ return b.p.n-a.p.n; });
+    var tot=items.reduce(function(s,o){ return s+o.p.n; },0);
+    return '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">'
+      +'<span style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Outre-mer · '+tot+' :</span>'
+      + items.map(function(o){ var col=o.p.mort>0?'#b91c1c':o.p.corp>0?'#d97706':'#475569'; return '<span title="dépt '+o.d+'" style="font-size:8px;font-weight:700;color:#fff;background:'+col+';border-radius:20px;padding:1px 7px">'+o.d+' · '+o.p.n+'</span>'; }).join('')
+      +'</div></div>';
+  })();
+
   // ── Carte Monde : événements hors Europe (dept non reconnu comme dept français) ──
   var _WORLD_COORDS = {
     'allemagne':[51.17,10.45],'austria':[47.52,14.55],'autriche':[47.52,14.55],
@@ -55896,30 +56108,22 @@ function _sevPrintStats() {
       +'<div style="display:flex;align-items:center;gap:4px"><div style="width:7px;height:7px;border-radius:50%;background:'+C.corp+'"></div><span style="font-size:9px;color:#374151">Corporels · <b>'+nCorp+'</b></span></div>'
       +'</div>')
     + _sec('Classes ULM', _svgD2)
-    + _sec('Instructeur / Parachute','<div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">👨‍🏫 Instructeur</div>'+_svgD3+'</div><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">🪂 Parachute</div>'+_svgD4+'</div></div>')
+    // Règle : pas de graphe parachute si aucune donnée parachute.
+    + (evs.some(function(e){ return e.paraDeclenche || e.paraBord; })
+        ? _sec('Instructeur / Parachute','<div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">👨‍🏫 Instructeur</div>'+_svgD3+'</div><div style="flex:1;min-width:0"><div style="font-size:8px;font-weight:700;color:#64748b;text-align:center;margin-bottom:4px">🪂 Parachute</div>'+_svgD4+'</div></div>')
+        : _sec('Instructeur à bord', _svgD3))
     +'</div>'
 
-    // ── Row 3 : Type de vol + [Carte Monde si hors Europe] + Carte France ──
-    +(_hasWorldMap
-      ? '<div class="row row-3" style="margin-bottom:10px">'
-        + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
-        +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
-        +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte mondiale des événements</div>'
-        +_prtWorldSVG
-        +'</div>'
-        +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
-        +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France métropolitaine</div>'
-        +_prtFranceSVG
-        +'</div>'
-        +'</div>'
-      : '<div class="row row-2b" style="margin-bottom:10px">'
-        + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
-        +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
-        +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France métropolitaine</div>'
-        +_prtFranceSVG
-        +'</div>'
-        +'</div>'
-    )
+    // ── Row 3 : Type de vol + Carte France (le décompte outre-mer remplace la carte mondiale) ──
+    +'<div class="row row-2b" style="margin-bottom:10px">'
+    + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
+    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff">'
+    +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France'+(_prtDomTomHtml?' &amp; outre-mer':' métropolitaine')+'</div>'
+    +_prtFranceSVG
+    +_prtFranceLegend
+    +_prtDomTomHtml
+    +'</div>'
+    +'</div>'
 
     // ── Row 4 : Origines détectées (barres 2 colonnes, pleine largeur) ──
     +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;margin-bottom:0">'
@@ -55934,33 +56138,36 @@ function _sevPrintStats() {
 }
 
 // ── Rubrique « Document » d'un événement sécurité (PDF ou image, glisser-déposer) ──
-function _sevDocInner(){
-  var d=window._sevDoc||{};
+// ── Documents d'un événement sécurité — 3 emplacements (slots 0,1,2) ─────────
+function _sevDocGet(slot){ slot=slot||0; if(!window._sevDocs) window._sevDocs=[{data:'',name:''},{data:'',name:''},{data:'',name:''}]; return window._sevDocs[slot]||(window._sevDocs[slot]={data:'',name:''}); }
+function _sevDocInner(slot){
+  slot = slot||0;
+  var d=_sevDocGet(slot);
   if(d.data){
     var isImg=/^data:image\//.test(d.data);
     var preview = isImg
       ? '<img src="'+d.data+'" style="width:100%;height:100%;object-fit:cover;pointer-events:none">'
-      : '<embed src="'+((typeof _ftBlobUrl==='function')?_ftBlobUrl(d.data,'sevdoc'):d.data)+'#toolbar=0&navpanes=0&scrollbar=0&view=Fit" type="application/pdf" style="width:100%;height:100%;pointer-events:none">';
-    return '<div style="position:relative;width:100%;height:100%;border-radius:9px;overflow:hidden;background:#fff;border:1px solid var(--bdr);cursor:pointer" onclick="_sevDocView()" title="Afficher / imprimer">'
+      : '<embed src="'+((typeof _ftBlobUrl==='function')?_ftBlobUrl(d.data,'sevdoc'+slot):d.data)+'#toolbar=0&navpanes=0&scrollbar=0&view=Fit" type="application/pdf" style="width:100%;height:100%;pointer-events:none">';
+    return '<div style="position:relative;width:100%;height:100%;border-radius:9px;overflow:hidden;background:#fff;border:1px solid var(--bdr);cursor:pointer" onclick="_sevDocView('+slot+')" title="Afficher / imprimer">'
       + preview
       + '<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(30,58,95,.92);color:#fff;font-size:10px;font-weight:600;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔍 '+escH(d.name||'Document')+'</div>'
-      + '<button onclick="event.stopPropagation();_sevDocRemove()" title="Retirer le document" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(239,68,68,.92);color:#fff;font-size:15px;font-weight:900;cursor:pointer;line-height:1;padding:0">×</button>'
+      + '<button onclick="event.stopPropagation();_sevDocRemove('+slot+')" title="Retirer le document" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(239,68,68,.92);color:#fff;font-size:15px;font-weight:900;cursor:pointer;line-height:1;padding:0">×</button>'
       + '</div>';
   }
-  return '<label style="width:100%;height:100%;border:2px dashed var(--bdr);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;color:var(--txt3);background:var(--navy3);text-align:center;padding:12px">'
-    +'<div style="font-size:30px">📎</div><div style="font-size:12px;font-weight:700;line-height:1.35">Glisser un document<br>ou cliquer</div><div style="font-size:10px;opacity:.8">PDF ou image · max 8 Mo</div>'
-    +'<input type="file" accept="application/pdf,image/*" style="display:none" onchange="_sevDocUpload(this)"></label>';
+  return '<label style="width:100%;height:100%;border:2px dashed var(--bdr);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:var(--txt3);background:var(--navy3);text-align:center;padding:8px">'
+    +'<div style="font-size:22px">📎</div><div style="font-size:11px;font-weight:700;line-height:1.3">Glisser un document<br>ou cliquer</div><div style="font-size:9px;opacity:.8">PDF ou image · max 8 Mo</div>'
+    +'<input type="file" accept="application/pdf,image/*" style="display:none" onchange="_sevDocUpload(this,'+slot+')"></label>';
 }
-function _sevDocRender(){ var el=document.getElementById('sev-doc-card'); if(el) el.innerHTML=_sevDocInner(); }
-function _sevDocUploadFile(f){
-  if(!f) return;
+function _sevDocRender(slot){ slot=slot||0; var el=document.getElementById('sev-doc-card-'+slot); if(el) el.innerHTML=_sevDocInner(slot); }
+function _sevDocUploadFile(f,slot){
+  if(!f) return; slot=slot||0;
   if(f.size>8*1024*1024){ if(typeof toast==='function')toast('Fichier trop volumineux (max 8 Mo)','err'); return; }
-  var r=new FileReader(); r.onload=function(){ window._sevDoc={data:r.result,name:f.name}; _sevDocRender(); }; r.readAsDataURL(f);
+  var r=new FileReader(); r.onload=function(){ _sevDocGet(slot); window._sevDocs[slot]={data:r.result,name:f.name}; _sevDocRender(slot); }; r.readAsDataURL(f);
 }
-function _sevDocUpload(input){ _sevDocUploadFile(input&&input.files&&input.files[0]); }
-function _sevDocDrop(el,ev){ ev.preventDefault(); if(el){el.style.outline='';el.style.outlineOffset='';} var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(f)_sevDocUploadFile(f); }
-function _sevDocRemove(){ window._sevDoc={data:'',name:''}; _sevDocRender(); }
-function _sevDocView(){ var d=window._sevDoc||{}; if(!d.data)return; var url=/^data:application\/pdf/.test(d.data)?((typeof _ftBlobUrl==='function')?_ftBlobUrl(d.data,'sevdoc-view'):d.data):d.data; var w=window.open(url,'_blank'); if(!w&&typeof toast==='function')toast('Autorisez les popups pour ouvrir le document',''); }
+function _sevDocUpload(input,slot){ _sevDocUploadFile(input&&input.files&&input.files[0], slot||0); }
+function _sevDocDrop(el,ev,slot){ ev.preventDefault(); if(el){el.style.outline='';el.style.outlineOffset='';} var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(f)_sevDocUploadFile(f, slot||0); }
+function _sevDocRemove(slot){ slot=slot||0; window._sevDocs[slot]={data:'',name:''}; _sevDocRender(slot); }
+function _sevDocView(slot){ slot=slot||0; var d=_sevDocGet(slot); if(!d.data)return; var url=/^data:application\/pdf/.test(d.data)?((typeof _ftBlobUrl==='function')?_ftBlobUrl(d.data,'sevdoc-view'+slot):d.data):d.data; var w=window.open(url,'_blank'); if(!w&&typeof toast==='function')toast('Autorisez les popups pour ouvrir le document',''); }
 // ── Helpers des toggles « Circonstances particulières » ─────────────────────
 // Restyle un chip (bordure + fond) selon l'état de sa case.
 function _sevSyncChip(cb){
@@ -56053,6 +56260,23 @@ function _sevChip(id, color, onbg, emoji, text, checked, onchange, extraAttr){
     + '<span style="font-size:12.5px;font-weight:700;color:var(--txt)">'+emoji+' '+text+'</span>'
     + '</label>';
 }
+// Navigation dans la fiche : ouvre l'événement précédent (-1) / suivant (+1) de
+// la liste du Registre (date décroissante, filtre année courant).
+function _sevFormNav(dir){
+  if(!window._sevFormEvId) return;
+  // Enregistre d'abord la fiche courante. Si la validation échoue (champs
+  // obligatoires manquants), on reste sur la fiche (toast d'erreur déjà affiché).
+  var savedId = _sevBuildAndStore(window._sevFormEvId);
+  if(!savedId) return;
+  var all = (S.securiteEvents||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var fy = window._sevRegYear || '';
+  var list = fy ? all.filter(function(e){ return (e.date||'').slice(0,4)===fy; }) : all;
+  var idx = list.findIndex(function(e){ return e.id===savedId; });
+  if(idx < 0) return;
+  var ni = idx + dir;
+  if(ni < 0 || ni >= list.length) return;
+  openSecuriteEventForm(list[ni].id);
+}
 
 function openSecuriteEventForm(evId) {
   var ev = evId ? (S.securiteEvents||[]).find(function(e){ return e.id===evId; }) : null;
@@ -56067,8 +56291,22 @@ function openSecuriteEventForm(evId) {
   // « Vol d'instruction » : valeur mémorisée si elle existe (verrouillée), sinon déduite de la description.
   var _volLocked = !!(ev && typeof ev.volInstruction === 'boolean');
   var _volInstrOn = _volLocked ? ev.volInstruction : _sevDetectInstruction(ev&&ev.description);
-  window._sevDoc = { data:(ev&&ev.document)||'', name:(ev&&ev.documentName)||'' };
-  var _inp = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:9px 11px;outline:none;box-sizing:border-box';
+  window._sevDocs = [
+    { data:(ev&&ev.document)||'',  name:(ev&&ev.documentName)||'' },
+    { data:(ev&&ev.document2)||'', name:(ev&&ev.documentName2)||'' },
+    { data:(ev&&ev.document3)||'', name:(ev&&ev.documentName3)||'' }
+  ];
+  window._sevFormEvId = evId || null;
+  // Liste de navigation (même ordre que le Registre : date décroissante, filtre année courant).
+  var _navList = evId ? (function(){
+    var all = (S.securiteEvents||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var fy = window._sevRegYear || '';
+    return fy ? all.filter(function(e){ return (e.date||'').slice(0,4)===fy; }) : all;
+  })() : [];
+  var _navIdx  = evId ? _navList.findIndex(function(e){ return e.id===evId; }) : -1;
+  var _navPrev = _navIdx > 0;
+  var _navNext = _navIdx >= 0 && _navIdx < _navList.length-1;
+  var _inp = 'width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 10px;outline:none;box-sizing:border-box';
   var _sel = _inp + ';cursor:pointer';
   var _foc = "this.style.borderColor='var(--stol)'" , _blr = "this.style.borderColor='var(--bdr)'";
 
@@ -56089,20 +56327,31 @@ function openSecuriteEventForm(evId) {
   var optBEA0=_beaOptions(_bea0,[_bea1,_bea2]), optBEA1=_beaOptions(_bea1,[_bea0,_bea2]), optBEA2=_beaOptions(_bea2,[_bea0,_bea1]);
   var _beaGrp="_beaRefreshGroup(['sev-refbea','sev-refbea2','sev-refbea3'])";
 
-  var _lab = 'font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px';
-  var _st  = 'font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:10px';
+  var _lab = 'font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:3px';
+  var _st  = 'font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:7px';
+  var _navBtn = 'width:30px;height:30px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-size:14px;font-weight:900;font-family:inherit;display:inline-flex;align-items:center;justify-content:center';
+  var _navHtml = evId
+    ? '<div style="display:flex;align-items:center;gap:6px">'
+      + '<button title="Précédent (recul)" onclick="_sevFormNav(-1)"'+(_navPrev?'':' disabled')+' style="'+_navBtn+';cursor:'+(_navPrev?'pointer':'not-allowed')+';opacity:'+(_navPrev?'1':'.4')+'">◀</button>'
+      + '<span style="font-size:11px;font-weight:700;color:var(--txt3);min-width:44px;text-align:center">'+(_navIdx+1)+' / '+_navList.length+'</span>'
+      + '<button title="Suivant (avance)" onclick="_sevFormNav(1)"'+(_navNext?'':' disabled')+' style="'+_navBtn+';cursor:'+(_navNext?'pointer':'not-allowed')+';opacity:'+(_navNext?'1':'.4')+'">▶</button>'
+      + '</div>'
+    : '';
   panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1;flex-wrap:wrap">'
-    + '<div style="font-size:15px;font-weight:800;color:var(--txt)">⚠️ '+(evId?'Modifier l\'événement':'Nouvel événement')+'</div>'
+    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<div style="font-size:15px;font-weight:800;color:var(--txt)">⚠️ '+(evId?'Modifier l\'événement':'Nouvel événement')+'</div>'
+      + _navHtml
+    + '</div>'
     + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
       + (evId?'<button onclick="_securiteEventDelete(\''+evId+'\')" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">🗑 Supprimer</button>':'')
       + '<button onclick="document.getElementById(\'sev-form-ov\').remove()" style="padding:8px 16px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
       + '<button onclick="_securiteEventSave(\''+( evId||''  )+'\')" style="padding:8px 20px;border-radius:9px;border:none;background:#10b981;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">💾 Enregistrer</button>'
     + '</div>'
     + '</div>'
-    + '<div style="padding:18px;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'
+    + '<div style="padding:14px 16px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'
 
     // ── COLONNE GAUCHE : caractéristiques de l'événement ──
-    + '<div style="flex:1 1 300px;min-width:270px;display:flex;flex-direction:column;gap:18px">'
+    + '<div style="flex:1 1 300px;min-width:270px;display:flex;flex-direction:column;gap:12px">'
       + '<div>'
         + '<div style="'+_st+'">Événement</div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
@@ -56120,12 +56369,12 @@ function openSecuriteEventForm(evId) {
       + '<div>'
         + '<div style="'+_st+'">Lieu, pilote &amp; appareil</div>'
         + '<div><label style="'+_lab+'">LIEU / AÉRODROME</label><input id="sev-lieu" type="text" value="'+(ev?ev.lieu||'':'')+'" placeholder="Ex : LFCR, Belmont/Rance…" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">'
-          + '<div><label style="'+_lab+'">PILOTE</label><input id="sev-pilote" type="text" value="'+(ev?ev.pilote||'':'')+'" placeholder="Nom prénom" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
-          + '<div><label style="'+_lab+'">ÂGE PILOTE</label><input id="sev-age" type="number" min="14" max="110" value="'+(ev&&ev.agePilote?ev.agePilote:'')+'" placeholder="ans" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
-          + '<div><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?ev.appareil||'':'')+'" placeholder="Marque / immat." style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
-          + '<div></div>'
+        + '<div style="display:grid;grid-template-columns:92px 1fr 54px;gap:10px;margin-top:10px">'
+          + '<div><label style="'+_lab+'" title="N° de licence (6 chiffres)">N° LICENCE</label><input id="sev-licence" type="text" inputmode="numeric" maxlength="6" value="'+(ev?escH(ev.licence||''):'')+'" placeholder="000000" style="'+_inp+';padding-left:8px;padding-right:6px;text-align:center" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+          + '<div><label style="'+_lab+'">PILOTE</label><input id="sev-pilote" type="text" value="'+(ev?escH(ev.pilote||''):'')+'" placeholder="Nom et prénom" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+          + '<div><label style="'+_lab+'" title="Âge du pilote (2 chiffres)">ÂGE</label><input id="sev-age" type="number" min="14" max="110" value="'+(ev&&ev.agePilote?ev.agePilote:'')+'" placeholder="ans" style="'+_inp+';padding-left:6px;padding-right:2px;text-align:center" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
         + '</div>'
+        + '<div style="margin-top:10px"><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?escH(ev.appareil||''):'')+'" placeholder="Marque / immatriculation" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
       + '</div>'
       + '<div>'
         + '<div style="'+_st+'">Bilan humain</div>'
@@ -56147,21 +56396,24 @@ function openSecuriteEventForm(evId) {
     + '</div>'
 
     // ── COLONNE 2 : récit & suivi (place élargie) ──
-    + '<div style="flex:1.3 1 320px;min-width:280px;display:flex;flex-direction:column;gap:18px">'
+    + '<div style="flex:1.3 1 320px;min-width:280px;display:flex;flex-direction:column;gap:12px">'
       + '<div style="display:flex;flex-direction:column;height:100%">'
         + '<div style="'+_st+'">Récit &amp; suivi</div>'
-        + '<div><label style="'+_lab+'">DESCRIPTION *</label><textarea id="sev-desc" placeholder="Description des circonstances de l\'événement…" style="'+_inp+';resize:vertical;min-height:190px" onfocus="'+_foc+'" onblur="'+_blr+'" oninput="_sevOnDescInput(this)">'+(ev?ev.description||'':'')+'</textarea></div>'
-        + '<div style="margin-top:12px"><label style="'+_lab+'">MESURES PRISES</label><textarea id="sev-mesures" placeholder="Actions correctives, enquête, suivi…" style="'+_inp+';resize:vertical;min-height:130px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.mesures||'':'')+'</textarea></div>'
+        + '<div><label style="'+_lab+'">DESCRIPTION *</label><textarea id="sev-desc" placeholder="Description des circonstances de l\'événement…" style="'+_inp+';resize:vertical;min-height:132px" onfocus="'+_foc+'" onblur="'+_blr+'" oninput="_sevOnDescInput(this)">'+(ev?ev.description||'':'')+'</textarea></div>'
+        + '<div style="margin-top:10px"><label style="'+_lab+'">MESURES PRISES</label><textarea id="sev-mesures" placeholder="Actions correctives, enquête, suivi…" style="'+_inp+';resize:vertical;min-height:88px" onfocus="'+_foc+'" onblur="'+_blr+'">'+(ev?ev.mesures||'':'')+'</textarea></div>'
       + '</div>'
     + '</div>'
 
-    // ── COLONNE 3 : document ──
-    + '<div style="flex:1 1 220px;min-width:220px;display:flex;flex-direction:column;gap:18px">'
-      + '<div>'
-        + '<div style="'+_st+'">Document (rapport, photo, PV…)</div>'
-        + '<div id="sev-doc-card" style="width:100%;height:230px" ondragover="event.preventDefault();this.style.outline=\'2px solid var(--stol)\';this.style.outlineOffset=\'2px\'" ondragleave="this.style.outline=\'\';this.style.outlineOffset=\'\'" ondrop="_sevDocDrop(this,event)">'+_sevDocInner()+'</div>'
-        + '<div style="font-size:10px;color:var(--txt3);margin-top:6px">Glisser-déposer ou cliquer. Clic sur l\'aperçu pour afficher/imprimer.</div>'
-      + '</div>'
+    // ── COLONNE 3 : documents (3 emplacements) ──
+    + '<div style="flex:1 1 220px;min-width:220px;display:flex;flex-direction:column;gap:12px">'
+      + '<div style="'+_st+'">Documents (rapport, photo, PV…)</div>'
+      + [0,1,2].map(function(slot){
+          return '<div>'
+            + '<div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:5px">Document '+(slot+1)+'</div>'
+            + '<div id="sev-doc-card-'+slot+'" style="width:100%;height:104px" ondragover="event.preventDefault();this.style.outline=\'2px solid var(--stol)\';this.style.outlineOffset=\'2px\'" ondragleave="this.style.outline=\'\';this.style.outlineOffset=\'\'" ondrop="_sevDocDrop(this,event,'+slot+')">'+_sevDocInner(slot)+'</div>'
+          + '</div>';
+        }).join('')
+      + '<div style="font-size:10px;color:var(--txt3)">Glisser-déposer ou cliquer. Clic sur l\'aperçu pour afficher/imprimer.</div>'
     + '</div>'
     + '</div>';
 
@@ -56170,11 +56422,14 @@ function openSecuriteEventForm(evId) {
   setTimeout(function(){ var el=document.getElementById('sev-date'); if(el) el.focus(); }, 80);
 }
 
-function _securiteEventSave(evId) {
+// Construit l'enregistrement depuis le formulaire, valide et le stocke (+saveState).
+// Retourne l'id stocké, ou null si la validation échoue. Ne ferme rien, n'affiche
+// pas de toast de succès — réutilisé par l'enregistrement ET par la navigation.
+function _sevBuildAndStore(evId) {
   var date  = (document.getElementById('sev-date')||{}).value||'';
   var type  = (document.getElementById('sev-type')||{}).value||'';
   var desc  = (document.getElementById('sev-desc')||{}).value||'';
-  if (!date||!type||!desc.trim()) { toast('Date, type et description sont obligatoires','err'); return; }
+  if (!date||!type||!desc.trim()) { toast('Date, type et description sont obligatoires','err'); return null; }
   if (!S.securiteEvents) S.securiteEvents = [];
   var nbBlesses = parseInt((document.getElementById('sev-blesses')||{}).value||0)||0;
   var nbTues    = parseInt((document.getElementById('sev-tues')||{}).value||0)||0;
@@ -56186,6 +56441,7 @@ function _securiteEventSave(evId) {
     statut:      (document.getElementById('sev-statut')||{}).value||'ouvert',
     lieu:        ((document.getElementById('sev-lieu')||{}).value||'').trim(),
     pilote:      ((document.getElementById('sev-pilote')||{}).value||'').trim(),
+    licence:     ((document.getElementById('sev-licence')||{}).value||'').trim(),
     agePilote:   _ageVal,
     appareil:    ((document.getElementById('sev-appareil')||{}).value||'').trim(),
     description: desc.trim(),
@@ -56193,8 +56449,12 @@ function _securiteEventSave(evId) {
     refBEA:      ((document.getElementById('sev-refbea')||{}).value||'').trim()||null,
     refBEA2:     ((document.getElementById('sev-refbea2')||{}).value||'').trim()||null,
     refBEA3:     ((document.getElementById('sev-refbea3')||{}).value||'').trim()||null,
-    document:    (window._sevDoc&&window._sevDoc.data)||'',
-    documentName:(window._sevDoc&&window._sevDoc.name)||'',
+    document:    ((window._sevDocs&&window._sevDocs[0])||{}).data||'',
+    documentName:((window._sevDocs&&window._sevDocs[0])||{}).name||'',
+    document2:   ((window._sevDocs&&window._sevDocs[1])||{}).data||'',
+    documentName2:((window._sevDocs&&window._sevDocs[1])||{}).name||'',
+    document3:   ((window._sevDocs&&window._sevDocs[2])||{}).data||'',
+    documentName3:((window._sevDocs&&window._sevDocs[2])||{}).name||'',
     nbBlesses:   nbBlesses,
     nbTues:      nbTues,
     instructeurBord: !!(document.getElementById('sev-instructeur')||{}).checked,
@@ -56215,6 +56475,12 @@ function _securiteEventSave(evId) {
     S.securiteEvents.push(rec);
   }
   saveState();
+  return rec.id;
+}
+
+function _securiteEventSave(evId) {
+  var id = _sevBuildAndStore(evId);
+  if (!id) return;
   var ov = document.getElementById('sev-form-ov'); if(ov) ov.remove();
   openSecuriteEvents('registre');
   toast('Événement enregistré ✓','ok');
@@ -56565,6 +56831,7 @@ function importSecuriteEvents(input) {
           appareil:       appareil,
           classeUlm:      _normClasse(typeUlm),
           agePilote:      agePilNum,
+          licence:        (licence||'').toString().trim(),
           ageInstructeur: hasInstrAge ? instrAge : null,
           instructeurBord:instructeurBord,
           typeVol:        _normVol(natVol),
