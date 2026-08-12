@@ -54414,7 +54414,7 @@ function _dtnGoHome() {
 // 'local_…' ou 'guest_…'), repli en localStorage — privé à l'appareil seulement,
 // faute d'identité durable côté serveur.
 var _DTN_TODO_LS = 'gestdtn_dtntodos';
-function _dtnTodoUserKey(){ return (S.user && (S.user.id || S.user.email)) || 'anon'; }
+function _dtnTodoUserKey(){ return (S.user && S.user.id) || 'anon'; }
 function _dtnTodoIsGuest(){ var id=S.user&&S.user.id; return !id || /^(local_|guest_)/.test(id); }
 // ── Repli local (mode invité / hors-ligne) ──
 function _dtnTodoLoadAllLS(){ try { return JSON.parse(localStorage.getItem(_DTN_TODO_LS) || '{}') || {}; } catch(e){ return {}; } }
@@ -54429,7 +54429,7 @@ async function _dtnTodoRemoteFetch(){
   var sb = (typeof getSB==='function') ? getSB() : null;
   if(!sb || _dtnTodoIsGuest()) return null;
   try {
-    var res = await sb.from('dtn_todos').select('*').order('created_at',{ascending:true});
+    var res = await sb.from('dtn_todos').select('*').eq('user_id', _dtnTodoUserKey()).order('created_at',{ascending:true});
     if(res.error) throw res.error;
     var mapped = (res.data||[]).map(function(r){
       return { id:r.id, dateDu:r.date_du||'', thematique:r.thematique||'', action:r.action||'', contact:r.contact||'', done:!!r.done, _createdAt:r.created_at };
@@ -54578,7 +54578,7 @@ async function _dtnTodoSaveNew(){
   if(!sb){ if(typeof toast==='function') toast('Connexion indisponible','err'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Ajout…'; }
   try {
-    var r=await sb.from('dtn_todos').insert({ date_du:dateDu||null, thematique:thematique, action:action, contact:contact });
+    var r=await sb.from('dtn_todos').insert({ user_id:_dtnTodoUserKey(), date_du:dateDu||null, thematique:thematique, action:action, contact:contact });
     if(r.error) throw r.error;
     delete window._dtnTodoRemote[_dtnTodoUserKey()];   // force le rechargement (id/created_at générés côté serveur)
     await _dtnTodoRemoteFetch();
