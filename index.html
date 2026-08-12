@@ -28500,13 +28500,16 @@ function startAutoSync() {
         // serveur) — on ne compare jamais avec Date.now() du client, source de bug si les
         // horloges diffèrent (le PC ne tirait alors jamais les données du smartphone).
         if (_lastRemoteFileTs === 0) {
-          // Premier passage : en mode live (scoring) on tire tout de suite pour être à jour ;
-          // sinon on prend juste la référence (pas de pull ni toast au démarrage).
+          // Premier passage : toujours tirer, live ou pas. Se contenter de poser la
+          // référence sans tirer laissait un onglet ouvert/rechargé APRÈS une
+          // modification distante « avaler » silencieusement ce changement : plus
+          // aucun pull n'était déclenché tant que personne d'autre ne poussait un
+          // nouveau changement, donnant l'illusion d'une synchro saine alors que
+          // les données affichées restaient indéfiniment en retard sur le cloud.
           _lastRemoteFileTs = remoteTs;
-          if (!live) { if(dbg) console.log('[AutoSync] baseline posée (non-live) — pas de pull au démarrage'); return; }
-          if(dbg) console.log('[AutoSync] baseline + pull initial (live)');
+          if(dbg) console.log('[AutoSync] baseline + pull initial (live='+live+')');
           _autoSyncFails = 0;
-          return pullFromCloud().then(function(){ if(dbg) console.log('[AutoSync] ✓ pull initial appliqué'); _autoSyncApplyPull(true); }).catch(function(e){ console.warn('[AutoSync] pull échoué:', e); });
+          return pullFromCloud().then(function(){ if(dbg) console.log('[AutoSync] ✓ pull initial appliqué'); _autoSyncApplyPull(live); }).catch(function(e){ console.warn('[AutoSync] pull échoué:', e); });
         }
         // Ensuite : ne tirer QUE si le fichier a réellement changé côté serveur (économe).
         if (remoteTs > _lastRemoteFileTs) {
