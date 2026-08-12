@@ -26492,6 +26492,7 @@ async function sbReset() {
 // s'affiche sans attendre ; la déconnexion Supabase part en arrière-plan.
 function sbLogout() {
   S.user = null;
+  window._dtnTodoRemote = {};   // purge le cache mémoire de la to-do liste (isolation entre utilisateurs sur un même poste)
   saveState();
   try { if (typeof renderSettings==='function') renderSettings(); } catch(e){}
   try { if (typeof updateHeader==='function')  updateHeader();  } catch(e){}
@@ -43751,6 +43752,19 @@ function _faqValues(champ){
 // questions (une référence par ligne), dédoublonne, compte les questions qui
 // l'utilisent, et associe un résumé éditable (le sens du texte), synchronisé.
 var _faqRefsCache = [];
+// État ouvert/fermé des détails (accordéon), gardé par clé de référence — replié
+// par défaut pour éviter d'afficher tous les textes d'un coup ; persiste tant que
+// l'onglet reste ouvert (survit aux re-rendus après enregistrement).
+var _faqRefOpen = {};
+function _faqRefToggleDet(i){
+  var r=_faqRefsCache[i]; if(!r) return;
+  var open = !_faqRefOpen[r.key];
+  _faqRefOpen[r.key] = open;
+  var det=document.getElementById('faqrefdet-'+i);
+  var chev=document.getElementById('faqrefchev-'+i);
+  if(det) det.style.display = open ? 'block' : 'none';
+  if(chev) chev.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+}
 function _faqRefsCollect(){
   var map={};
   (S.faq||[]).forEach(function(f){
@@ -43808,7 +43822,7 @@ function _faqRefEdit(idx){
     + '<div style="flex:1;overflow-y:auto;padding:18px 22px">'
     +   '<div style="display:grid;grid-template-columns:190px 1fr;gap:12px;margin-bottom:12px;align-items:start">'
     +     '<div><label style="'+lSt+'">Niveau</label><select id="faqref-niveau" style="'+fSt+';cursor:pointer">'+nivOpts+'</select></div>'
-    +     '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔎 Chercher</button><button type="button" id="faqref-autofill-btn" onclick="_faqRefAutoFill('+idx+')" title="Récupérer le texte depuis le lien et pré-remplir Résumé, Motifs et Dispositif (champs vides uniquement)" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#22c55e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">✨ Compléter</button></div></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
+    +     '<div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px"><label style="'+lSt+';margin:0">🔗 Lien vers le texte</label><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button type="button" onclick="_faqRefSearchOpen('+idx+')" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔎 Chercher</button><button type="button" id="faqref-autofill-btn" onclick="_faqRefAutoFill('+idx+')" title="Essayer une récupération automatique (échoue souvent sur Légifrance/EUR-Lex, protégés contre les robots)" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#22c55e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">✨ Auto</button><button type="button" onclick="_faqRefPasteOpen('+idx+',true)" title="Ouvrir le lien, coller le texte copié : fonctionne toujours, même quand le site bloque la récupération automatique" style="padding:5px 10px;border-radius:7px;border:1px solid rgba(99,102,241,.4);background:rgba(99,102,241,.12);color:#818cf8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">📋 Coller le texte</button></div></div><input id="faqref-lien" type="url" value="'+e(rec.lien||'')+'" placeholder="Collez l\'URL (Légifrance, EUR-Lex…)" style="'+fSt+'"></div>'
     +   '</div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">Titre</label><textarea id="faqref-titre" rows="2" placeholder="Titre / intitulé du texte" style="'+taSt+'">'+e(rec.titre||r.texte||'')+'</textarea></div>'
     +   '<div style="margin-bottom:12px"><label style="'+lSt+'">📝 Sens du texte (résumé)</label><textarea id="faqref-resume" rows="3" placeholder="Ce que dit le texte, en quelques lignes…" style="'+taSt+'">'+e(rec.resume||'')+'</textarea></div>'
@@ -43881,7 +43895,25 @@ function _faqRefExtract(html){
   out.dispositif=(out.dispositif||'').slice(0,2400);
   return out;
 }
-// Récupère le texte via le lien (proxys CORS) et pré-remplit les champs VIDES.
+// Tente l'edge function Supabase (fetch CÔTÉ SERVEUR, sans contrainte CORS —
+// plus fiable que les proxys publics, mais Légifrance/EUR-Lex peuvent tout de
+// même bloquer selon la page : anti-bot côté Légifrance, rendu JS côté EUR-Lex).
+// Retourne {titre,resume,motifs,dispositif} avec du contenu, ou null.
+async function _faqRefFetchViaEdge(lien){
+  var sb = (typeof getSB==='function') ? getSB() : null;
+  if(!sb || !sb.functions) return null;
+  try {
+    var res = await sb.functions.invoke('legifrance-extract', { body: { url: lien } });
+    if(res.error) throw res.error;
+    var d = res.data;
+    if(d && (d.titre||d.resume||d.motifs||d.dispositif) && !/javascript is disabled/i.test(d.titre||'')) return d;
+    return null;
+  } catch(e){ console.warn('[legifrance-extract]', e && e.message); return null; }
+}
+// Récupère le texte via le lien et pré-remplit les champs VIDES.
+// Ordre d'essai : edge function (serveur, sans CORS) → proxys CORS publics
+// (repli navigateur). Certaines pages Légifrance/EUR-Lex restent inaccessibles
+// (protection anti-bot / rendu JavaScript) — dans ce cas, copier/coller manuel.
 async function _faqRefAutoFill(idx){
   var lienEl=document.getElementById('faqref-lien');
   var lien=_faqNormUrl(lienEl?lienEl.value:'');
@@ -43889,12 +43921,22 @@ async function _faqRefAutoFill(idx){
   var btn=document.getElementById('faqref-autofill-btn');
   var oldTxt=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳'; btn.style.opacity='.6'; }
   if(typeof toast==='function') toast('Récupération du texte…','info');
-  var html='';
-  try { var r1=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(lien)); var j1=await r1.json(); if(j1&&j1.contents) html=j1.contents; } catch(e){}
-  if(!html){ try { var r2=await fetch('https://corsproxy.io/?url='+encodeURIComponent(lien)); if(r2.ok) html=await r2.text(); } catch(e){} }
+
+  var ex = await _faqRefFetchViaEdge(lien);
+  if(!ex){
+    var html='';
+    try { var r1=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(lien)); var j1=await r1.json(); if(j1&&j1.contents) html=j1.contents; } catch(e){}
+    if(!html){ try { var r2=await fetch('https://corsproxy.io/?url='+encodeURIComponent(lien)); if(r2.ok) html=await r2.text(); } catch(e){} }
+    if(html) ex=_faqRefExtract(html);
+  }
   if(btn){ btn.disabled=false; btn.innerHTML=oldTxt; btn.style.opacity='1'; }
-  if(!html){ if(typeof toast==='function') toast('Récupération impossible (site protégé). Ouvrez le lien et copiez le contenu.','err'); return; }
-  var ex=_faqRefExtract(html);
+  if(!ex){
+    // Repli simple et fiable : Légifrance/EUR-Lex bloquent la récupération automatique
+    // (anti-bot / rendu JS) — on passe directement au mode « coller le texte ».
+    if(typeof toast==='function') toast('Récupération automatique impossible (site protégé) — collez le texte à la main.','');
+    _faqRefPasteOpen(idx, true);
+    return;
+  }
   var filled=[];
   var setIf=function(id,val,label){ var el=document.getElementById(id); if(el && (val||'').trim() && !el.value.trim()){ el.value=val; filled.push(label); } };
   setIf('faqref-titre', ex.titre, 'Titre');
@@ -43902,6 +43944,87 @@ async function _faqRefAutoFill(idx){
   setIf('faqref-motifs', ex.motifs, 'Motifs');
   setIf('faqref-dispositif', ex.dispositif, 'Dispositif');
   if(typeof toast==='function') toast(filled.length ? ('Complété : '+filled.join(', ')+' — relisez avant d\'enregistrer') : 'Aucun champ vide à compléter (ou contenu non exploitable)','ok');
+}
+// Extraction depuis du TEXTE BRUT (copié-collé par l'utilisateur depuis son
+// propre navigateur — donc jamais bloqué par une protection anti-bot ou un
+// rendu JavaScript, contrairement à la récupération automatique).
+function _faqRefExtractText(raw){
+  var out={titre:'',resume:'',motifs:'',dispositif:''};
+  var lines=(raw||'').split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+  if(!lines.length) return out;
+  out.titre=lines[0].slice(0,240);
+  var flat=lines.join(' ').replace(/\s+/g,' ').trim();
+  var low=flat.toLowerCase();
+  var mStart=low.search(/consid[ée]rant|(?:^|[^a-zéè])vu\s+(?:la|le|l['’]|les)\s/);
+  var dStart=low.search(/article\s*(?:1er|premier|1(?:\b|\s|\.))/);
+  // Résumé : première ligne substantielle (hors titre), avant le préambule Vu/Considérant si présent.
+  for(var i=1;i<lines.length;i++){
+    if(lines[i].length>35 && (mStart<0 || flat.indexOf(lines[i])<mStart)){ out.resume=lines[i].slice(0,800); break; }
+  }
+  if(mStart>=0){
+    var mEnd=-1;
+    ['arrête','arrete','décrète','decrete','ont adopté','ont adopte','ont arrêté'].forEach(function(w){ var j=low.indexOf(w,mStart); if(j>=0 && (mEnd<0||j<mEnd)) mEnd=j+w.length; });
+    if(dStart>mStart && (mEnd<0||dStart<mEnd)) mEnd=dStart;
+    if(mEnd<0) mEnd=Math.min(mStart+1800,flat.length);
+    out.motifs=flat.slice(mStart, Math.min(mEnd, mStart+2000)).trim();
+  }
+  if(dStart>=0){
+    var end=low.indexOf('fait à',dStart); if(end<0||end>dStart+2400) end=dStart+2400;
+    out.dispositif=flat.slice(dStart, Math.min(end, flat.length)).trim();
+  }
+  out.resume=(out.resume||'').slice(0,800);
+  out.motifs=(out.motifs||'').slice(0,2000);
+  out.dispositif=(out.dispositif||'').slice(0,2400);
+  return out;
+}
+// Boîte de dialogue « coller le texte » — repli simple et TOUJOURS fonctionnel :
+// l'utilisateur copie le texte depuis son propre navigateur (jamais bloqué),
+// le colle, et l'app pré-remplit les champs vides à partir du texte collé.
+function _faqRefPasteOpen(idx, autoOpenLink){
+  var existing=document.getElementById('faqref-paste-modal'); if(existing) existing.remove();
+  var lien=(document.getElementById('faqref-lien')||{}).value||'';
+  var lienEsc=(lien||'').replace(/"/g,'&quot;');
+  var ov=document.createElement('div'); ov.id='faqref-paste-modal';
+  ov.style.cssText='position:fixed;inset:0;z-index:9700;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.65)';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var panel=document.createElement('div');
+  panel.style.cssText='background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:min(620px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)';
+  panel.onclick=function(e){ e.stopPropagation(); };
+  var lab='font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:block';
+  var taSt='width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:10px 12px;outline:none;resize:vertical;line-height:1.5';
+  panel.innerHTML = '<div style="padding:16px 20px;border-bottom:1px solid var(--bdr)">'
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:5px">📋 Compléter depuis le texte</div>'
+    + '<div style="font-size:12px;color:var(--txt2);line-height:1.5">'
+    + (lien
+        ? 'Ouvrez le lien, sélectionnez tout le texte (Ctrl+A / Cmd+A), copiez-le (Ctrl+C), puis collez-le ci-dessous (Ctrl+V).'
+        : 'Collez ci-dessous le texte du document (copié depuis un site, un PDF, un document…).')
+    + '</div>'
+    + (lien ? '<a href="'+lienEsc+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:700;padding:6px 12px;border:1px solid rgba(34,197,94,.4);border-radius:7px;background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none">🔗 Ouvrir le lien dans un nouvel onglet</a>' : '')
+    + '</div>'
+    + '<div style="flex:1;overflow-y:auto;padding:16px 20px">'
+    + '<label style="'+lab+'">Texte copié</label>'
+    + '<textarea id="faqref-paste-text" rows="10" placeholder="Collez ici le texte du document…" style="'+taSt+'"></textarea>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--bdr)">'
+    + '<button onclick="document.getElementById(\'faqref-paste-modal\').remove()" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_faqRefPasteExtract()" style="flex:2;padding:11px;border-radius:9px;border:none;background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✨ Extraire et compléter</button>'
+    + '</div>';
+  ov.appendChild(panel); document.body.appendChild(ov);
+  setTimeout(function(){ var el=document.getElementById('faqref-paste-text'); if(el) el.focus(); }, 60);
+  if(lien && autoOpenLink){ try { window.open(lien,'_blank','noopener'); } catch(e){} }
+}
+function _faqRefPasteExtract(){
+  var txt=(document.getElementById('faqref-paste-text')||{}).value||'';
+  if(!txt.trim()){ if(typeof toast==='function') toast('Collez d\'abord le texte','err'); return; }
+  var ex=_faqRefExtractText(txt);
+  var filled=[];
+  var setIf=function(id,val,label){ var el=document.getElementById(id); if(el && (val||'').trim() && !el.value.trim()){ el.value=val; filled.push(label); } };
+  setIf('faqref-titre', ex.titre, 'Titre');
+  setIf('faqref-resume', ex.resume, 'Résumé');
+  setIf('faqref-motifs', ex.motifs, 'Motifs');
+  setIf('faqref-dispositif', ex.dispositif, 'Dispositif');
+  var ov=document.getElementById('faqref-paste-modal'); if(ov) ov.remove();
+  if(typeof toast==='function') toast(filled.length ? ('Complété : '+filled.join(', ')+' — relisez avant d\'enregistrer') : 'Aucun champ vide à compléter (ou texte non exploitable)','ok');
 }
 function _faqRefsHtml(){
   _faqInit();
@@ -43916,6 +44039,12 @@ function _faqRefsHtml(){
     refs.forEach(function(r, i){
       var rec=_faqRefRec(r.key);
       var niv=rec.niveau||'';
+      // Détails (calculés avant l'en-tête pour savoir si le bouton accordéon est nécessaire).
+      var det='';
+      det+=bloc('📝 Sens du texte', rec.resume);
+      det+=bloc('Motifs', rec.motifs);
+      det+=bloc('Dispositif', rec.dispositif);
+      var isOpen=!!_faqRefOpen[r.key];
       h+='<div style="border:1px solid var(--bdr);border-radius:12px;margin-bottom:10px;background:var(--navy2);padding:13px 15px">';
       h+='<div style="display:flex;align-items:flex-start;gap:10px">';
       h+='<span style="flex-shrink:0;font-size:16px;margin-top:1px">⚖️</span>';
@@ -43925,18 +44054,15 @@ function _faqRefsHtml(){
       // citation d'origine en sous-titre, sauf si le titre la reprend déjà à l'identique
       if(!rec.titre || _faqNormQ(rec.titre)!==_faqNormQ(r.texte)) h+='<div style="font-size:'+(rec.titre?'12px':'13px')+';font-weight:'+(rec.titre?'400':'700')+';color:'+(rec.titre?'var(--txt3)':'var(--txt)')+';line-height:1.4">'+esc(r.texte)+'</div>';
       h+='</div>';
-      h+='<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+      h+='<div style="flex-shrink:0;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px">';
       h+='<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(99,102,241,.15);color:#818cf8;white-space:nowrap" title="Questions citant ce texte">'+r.count+' question'+(r.count>1?'s':'')+'</span>';
-      if((rec.lien||'').trim()) h+='<a href="'+esc(rec.lien)+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid rgba(34,197,94,.35);border-radius:7px;background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none;white-space:nowrap">🔗 Ouvrir le texte</a>';
+      if((rec.lien||'').trim()) h+='<a href="'+esc(rec.lien)+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid rgba(34,197,94,.35);border-radius:7px;background:rgba(34,197,94,.1);color:#22c55e;text-decoration:none;white-space:nowrap">🔗 Lien</a>';
       if(canEd) h+='<button onclick="_faqRefEdit('+i+')" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit;white-space:nowrap">✏️ Modifier</button>';
+      if(det) h+='<button onclick="_faqRefToggleDet('+i+')" title="Afficher / masquer le résumé, les motifs et le dispositif" style="font-size:11px;font-weight:700;padding:4px 10px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px"><svg id="faqrefchev-'+i+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="11" height="11" style="transition:transform .18s;transform:rotate('+(isOpen?'180':'0')+'deg);flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>Détails</button>';
       h+='</div>';
       h+='</div>';
-      // Détails renseignés
-      var det='';
-      det+=bloc('📝 Sens du texte', rec.resume);
-      det+=bloc('Motifs', rec.motifs);
-      det+=bloc('Dispositif', rec.dispositif);
-      if(det) h+='<div style="padding-left:26px">'+det+'</div>';
+      // Détails repliés par défaut (accordéon) — évite d'afficher tous les textes d'un coup.
+      if(det) h+='<div id="faqrefdet-'+i+'" style="padding-left:26px;display:'+(isOpen?'block':'none')+'">'+det+'</div>';
       else if(canEd) h+='<div style="padding-left:26px;margin-top:8px;font-size:12px;color:var(--txt3);font-style:italic">Cliquez sur « Modifier » pour renseigner niveau, titre, motifs et dispositif.</div>';
       h+='</div>';
     });
@@ -54281,34 +54407,90 @@ function _dtnGoHome() {
 }
 
 // ══ To-do liste personnelle du tableau de bord DTN ═════════════════════════
-// Attachée au titulaire du compte (S.user) et stockée en localStorage UNIQUEMENT
-// (jamais synchronisée dans S / le cloud) → invisible des autres utilisateurs.
+// Attachée au titulaire du compte : stockée dans la table Supabase dtn_todos,
+// protégée par RLS (auth.uid() = user_id) → invisible des autres utilisateurs,
+// durable et disponible sur tous les appareils du compte (contrairement à un
+// simple localStorage). En mode invité (pas de session Supabase réelle : id
+// 'local_…' ou 'guest_…'), repli en localStorage — privé à l'appareil seulement,
+// faute d'identité durable côté serveur.
 var _DTN_TODO_LS = 'gestdtn_dtntodos';
 function _dtnTodoUserKey(){ return (S.user && (S.user.id || S.user.email)) || 'anon'; }
-function _dtnTodoLoadAll(){ try { return JSON.parse(localStorage.getItem(_DTN_TODO_LS) || '{}') || {}; } catch(e){ return {}; } }
-function _dtnTodoSaveAll(obj){ try { localStorage.setItem(_DTN_TODO_LS, JSON.stringify(obj||{})); } catch(e){} }
-function _dtnTodoList(){
-  var all = _dtnTodoLoadAll(); var arr = all[_dtnTodoUserKey()] || [];
+function _dtnTodoIsGuest(){ var id=S.user&&S.user.id; return !id || /^(local_|guest_)/.test(id); }
+// ── Repli local (mode invité / hors-ligne) ──
+function _dtnTodoLoadAllLS(){ try { return JSON.parse(localStorage.getItem(_DTN_TODO_LS) || '{}') || {}; } catch(e){ return {}; } }
+function _dtnTodoSaveAllLS(obj){ try { localStorage.setItem(_DTN_TODO_LS, JSON.stringify(obj||{})); } catch(e){} }
+function _dtnTodoMutateLS(fn){
+  var all = _dtnTodoLoadAllLS(); var k = _dtnTodoUserKey();
+  var arr = all[k] || []; arr = fn(arr) || arr; all[k] = arr; _dtnTodoSaveAllLS(all);
+}
+// ── Cache mémoire des tâches distantes (Supabase), par utilisateur ──
+window._dtnTodoRemote = window._dtnTodoRemote || {};
+async function _dtnTodoRemoteFetch(){
+  var sb = (typeof getSB==='function') ? getSB() : null;
+  if(!sb || _dtnTodoIsGuest()) return null;
+  try {
+    var res = await sb.from('dtn_todos').select('*').order('created_at',{ascending:true});
+    if(res.error) throw res.error;
+    var mapped = (res.data||[]).map(function(r){
+      return { id:r.id, dateDu:r.date_du||'', thematique:r.thematique||'', action:r.action||'', contact:r.contact||'', done:!!r.done, _createdAt:r.created_at };
+    });
+    window._dtnTodoRemote[_dtnTodoUserKey()] = mapped;
+    return mapped;
+  } catch(e){ console.warn('[dtnTodo] fetch', e && e.message); return null; }
+}
+function _dtnTodoSort(arr){
   return arr.slice().sort(function(a,b){
     if(!!a.done !== !!b.done) return a.done ? 1 : -1;           // à faire d'abord
     return (a.dateDu||'~').localeCompare(b.dateDu||'~');        // puis échéance croissante
   });
 }
-function _dtnTodoMutate(fn){
-  var all = _dtnTodoLoadAll(); var k = _dtnTodoUserKey();
-  var arr = all[k] || []; arr = fn(arr) || arr; all[k] = arr; _dtnTodoSaveAll(all);
+function _dtnTodoList(){
+  if(_dtnTodoIsGuest()){ var all=_dtnTodoLoadAllLS(); return _dtnTodoSort(all[_dtnTodoUserKey()]||[]); }
+  return _dtnTodoSort(window._dtnTodoRemote[_dtnTodoUserKey()] || []);
 }
-function _dtnTodoToggle(id){
-  _dtnTodoMutate(function(arr){ var t=arr.find(function(x){return x.id===id;}); if(t){ t.done=!t.done; t._doneAt=t.done?Date.now():null; } return arr; });
+async function _dtnTodoToggle(id){
+  if(_dtnTodoIsGuest()){
+    _dtnTodoMutateLS(function(arr){ var t=arr.find(function(x){return x.id===id;}); if(t){ t.done=!t.done; t._doneAt=t.done?Date.now():null; } return arr; });
+    _dtnRenderTodo();
+    return;
+  }
+  var sb=(typeof getSB==='function')?getSB():null; if(!sb) return;
+  var arr = window._dtnTodoRemote[_dtnTodoUserKey()]||[];
+  var t = arr.find(function(x){return x.id===id;}); if(!t) return;
+  t.done = !t.done;                    // optimiste : réaffiche immédiatement
   _dtnRenderTodo();
+  try {
+    var r=await sb.from('dtn_todos').update({ done:t.done, done_at: t.done?new Date().toISOString():null }).eq('id', id);
+    if(r.error) throw r.error;
+  } catch(e){ t.done=!t.done; _dtnRenderTodo(); if(typeof toast==='function') toast('Synchronisation impossible : '+(e&&e.message||''),'err'); }
 }
-function _dtnTodoDelete(id){
+async function _dtnTodoDelete(id){
   if(!confirm('Supprimer cette tâche ?')) return;
-  _dtnTodoMutate(function(arr){ return arr.filter(function(x){return x.id!==id;}); });
+  if(_dtnTodoIsGuest()){
+    _dtnTodoMutateLS(function(arr){ return arr.filter(function(x){return x.id!==id;}); });
+    _dtnRenderTodo();
+    return;
+  }
+  var sb=(typeof getSB==='function')?getSB():null; if(!sb) return;
+  var k=_dtnTodoUserKey(); var arr = window._dtnTodoRemote[k]||[];
+  var backup = arr.slice();
+  window._dtnTodoRemote[k] = arr.filter(function(x){return x.id!==id;}); // optimiste
   _dtnRenderTodo();
+  try {
+    var r=await sb.from('dtn_todos').delete().eq('id', id);
+    if(r.error) throw r.error;
+  } catch(e){ window._dtnTodoRemote[k]=backup; _dtnRenderTodo(); if(typeof toast==='function') toast('Suppression non synchronisée : '+(e&&e.message||''),'err'); }
 }
 function _dtnRenderTodo(){
   var el = document.getElementById('dtn-todo-zone'); if(!el) return;
+  if(!_dtnTodoIsGuest() && !window._dtnTodoRemote[_dtnTodoUserKey()]){
+    el.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement de votre to-do liste…</div>';
+    _dtnTodoRemoteFetch().then(function(){ _dtnRenderTodo(); });
+    return;
+  }
+  _dtnRenderTodoNow(el);
+}
+function _dtnRenderTodoNow(el){
   var list = _dtnTodoList();
   var today = new Date().toISOString().slice(0,10);
   var esc = (typeof escH==='function') ? escH : function(s){ return (s||'').replace(/</g,'&lt;'); };
@@ -54377,16 +54559,36 @@ function _dtnTodoOpenForm(){
   ov.appendChild(panel); document.body.appendChild(ov);
   setTimeout(function(){ var el=document.getElementById('dtn-todo-thematique'); if(el) el.focus(); }, 60);
 }
-function _dtnTodoSaveNew(){
+async function _dtnTodoSaveNew(){
   var g=function(id){ return (document.getElementById(id)||{}).value||''; };
   var thematique=g('dtn-todo-thematique').trim();
   var action=g('dtn-todo-action').trim();
   if(!thematique && !action){ if(typeof toast==='function') toast('Renseignez au moins la thématique ou l\'action','err'); return; }
-  var t={ id:'todo'+Date.now().toString(36), dateDu:g('dtn-todo-date'), thematique:thematique, action:action, contact:g('dtn-todo-contact').trim(), done:false, _createdAt:Date.now() };
-  _dtnTodoMutate(function(arr){ arr.push(t); return arr; });
-  var ov=document.getElementById('dtn-todo-ov'); if(ov) ov.remove();
-  _dtnRenderTodo();
-  if(typeof toast==='function') toast('Tâche ajoutée ✓','ok');
+  var dateDu=g('dtn-todo-date'), contact=g('dtn-todo-contact').trim();
+  var btn=document.querySelector('#dtn-todo-ov button[onclick="_dtnTodoSaveNew()"]');
+  if(_dtnTodoIsGuest()){
+    var t={ id:'todo'+Date.now().toString(36), dateDu:dateDu, thematique:thematique, action:action, contact:contact, done:false, _createdAt:Date.now() };
+    _dtnTodoMutateLS(function(arr){ arr.push(t); return arr; });
+    var ov=document.getElementById('dtn-todo-ov'); if(ov) ov.remove();
+    _dtnRenderTodo();
+    if(typeof toast==='function') toast('Tâche ajoutée ✓','ok');
+    return;
+  }
+  var sb=(typeof getSB==='function')?getSB():null;
+  if(!sb){ if(typeof toast==='function') toast('Connexion indisponible','err'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='Ajout…'; }
+  try {
+    var r=await sb.from('dtn_todos').insert({ date_du:dateDu||null, thematique:thematique, action:action, contact:contact });
+    if(r.error) throw r.error;
+    delete window._dtnTodoRemote[_dtnTodoUserKey()];   // force le rechargement (id/created_at générés côté serveur)
+    await _dtnTodoRemoteFetch();
+    var ov2=document.getElementById('dtn-todo-ov'); if(ov2) ov2.remove();
+    _dtnRenderTodo();
+    if(typeof toast==='function') toast('Tâche ajoutée ✓','ok');
+  } catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Ajouter'; }
+    if(typeof toast==='function') toast('Enregistrement impossible : '+(e&&e.message||''),'err');
+  }
 }
 
 function _dtnShowPanel(module) {
