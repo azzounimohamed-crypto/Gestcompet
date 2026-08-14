@@ -2403,14 +2403,16 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>
             <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions</div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start">
             <div>
               <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>
               <div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
-            </div>
-            <div>
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b;margin-bottom:8px">Au-delà</div>
-              <div id="dtn-prochaines-audela"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
+              <button onclick="_dtnToggleAudela()" id="dtn-audela-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-top:16px;padding:9px 2px;border:none;border-top:1px solid var(--bdr);background:transparent;cursor:pointer;font-family:inherit;text-align:left">
+                <span id="dtn-audela-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(0deg)">▶</span>
+                <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b">Au-delà</span>
+                <span id="dtn-audela-count" style="font-size:10px;color:var(--txt3)"></span>
+              </button>
+              <div id="dtn-prochaines-audela" style="display:none;margin-top:8px"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
             </div>
             <div id="dtn-todo-zone"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
           </div>
@@ -52512,6 +52514,28 @@ function showDTNPortal() {
 function _dtnRefreshStats() {
   _dtnRenderToday();
   _dtnRenderProchaines();
+  if (typeof _dtnRenderTodo === 'function') _dtnRenderTodo();
+}
+
+// ── Accordéon « Au-delà » ──
+function _dtnToggleAudela() {
+  var cont = document.getElementById('dtn-prochaines-audela');
+  var chev = document.getElementById('dtn-audela-chevron');
+  if (!cont) return;
+  var willOpen = cont.style.display === 'none';
+  cont.style.display = willOpen ? 'block' : 'none';
+  if (chev) chev.style.transform = willOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+// ── Coche une tâche « À faire » directement depuis le tableau de bord ──
+function _dtnActionToggleAfaire(compId, taskId, checked) {
+  var arr = S.homeTodosByComp && S.homeTodosByComp[compId];
+  var t = arr && arr.find(function(x){ return x.id === taskId; });
+  if (!t) return;
+  t.done = checked; t._updatedAt = Date.now();
+  saveState(); silentPush();
+  if (typeof toast === 'function') toast(checked ? 'Tâche cochée ✓' : 'Tâche décochée', 'ok');
+  _dtnRenderProchaines();
 }
 
 function _dtnRenderToday() {
@@ -52735,6 +52759,7 @@ function _dtnRenderProchaines() {
         tag:     'À faire',
         tagCol:  '#10b981',
         ico:     '✅',
+        checkable: { compId: compId, taskId: t.id },
         onClick: 'showHomeCompDetail&&showHomeCompDetail(\''+compId.replace(/'/g,"\\'")+'\');if(typeof _crpToggle===\'function\')_crpToggle(\'todo\')'
       });
     });
@@ -52762,10 +52787,18 @@ function _dtnRenderProchaines() {
     var shown = cap ? items.slice(0, cap) : items;
     var html = '<div style="display:flex;flex-direction:column;gap:1px">';
     shown.forEach(function(item) {
+      var cb = '';
+      if (item.checkable) {
+        var _cId = item.checkable.compId.replace(/'/g,"\\'");
+        var _tId = item.checkable.taskId.replace(/'/g,"\\'");
+        cb = '<input type="checkbox" onclick="event.stopPropagation()" onchange="_dtnActionToggleAfaire(\''+_cId+'\',\''+_tId+'\',this.checked)" '
+           + 'style="flex-shrink:0;width:14px;height:14px;cursor:pointer;accent-color:#10b981" title="Marquer comme fait">';
+      }
       html += '<div onclick="(function(){'+item.onClick+'})()" '
             + 'style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;border-radius:5px;transition:background .1s" '
             + 'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" '
             + 'onmouseout="this.style.background=\'\'">';
+      html += cb;
       html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+'</span>';
       html += '<span style="color:rgba(255,255,255,.12);flex-shrink:0">·</span>';
       html += '<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+item.title+'</span>';
@@ -52781,6 +52814,9 @@ function _dtnRenderProchaines() {
 
   _renderList(cont30,     items30,     'Aucune action dans les 30 prochains jours.', null);
   _renderList(contBeyond, itemsBeyond, 'Aucune action au-delà de 30 jours.', 60);
+
+  var audelaCount = document.getElementById('dtn-audela-count');
+  if (audelaCount) audelaCount.textContent = itemsBeyond.length ? '('+itemsBeyond.length+')' : '';
 }
 
 // ── Ferme agenda et gantt (utilitaire partagé) ────────────────────────
@@ -54439,11 +54475,15 @@ function _dtnGoHome() {
     + '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
     + '<div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>'
     + '<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions</div>'
-    + '</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start">'
+    + '</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start">'
     + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>'
-    + '<div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
-    + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b;margin-bottom:8px">Au-delà</div>'
-    + '<div id="dtn-prochaines-audela"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
+    + '<div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>'
+    + '<button onclick="_dtnToggleAudela()" id="dtn-audela-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-top:16px;padding:9px 2px;border:none;border-top:1px solid var(--bdr);background:transparent;cursor:pointer;font-family:inherit;text-align:left">'
+    + '<span id="dtn-audela-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(0deg)">▶</span>'
+    + '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b">Au-delà</span>'
+    + '<span id="dtn-audela-count" style="font-size:10px;color:var(--txt3)"></span>'
+    + '</button>'
+    + '<div id="dtn-prochaines-audela" style="display:none;margin-top:8px"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
     + '<div id="dtn-todo-zone"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>'
     + '</div></div>'
     + '</div>';
