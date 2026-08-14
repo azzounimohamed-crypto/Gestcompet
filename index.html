@@ -2399,12 +2399,20 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
         <!-- Prochaines actions -->
         <div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
             <div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions — 30 jours</div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions</div>
           </div>
-          <div id="dtn-prochaines-section">
-            <div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start">
+            <div>
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>
+              <div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b;margin-bottom:8px">Au-delà</div>
+              <div id="dtn-prochaines-audela"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
+            </div>
+            <div id="dtn-todo-zone"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
           </div>
         </div>
 
@@ -52601,8 +52609,9 @@ function _dtnRenderToday() {
 }
 
 function _dtnRenderProchaines() {
-  var cont = document.getElementById('dtn-prochaines-section');
-  if (!cont) return;
+  var cont30    = document.getElementById('dtn-prochaines-section');
+  var contBeyond = document.getElementById('dtn-prochaines-audela');
+  if (!cont30 && !contBeyond) return;
 
   var today   = new Date();
   today.setHours(0,0,0,0);
@@ -52610,12 +52619,13 @@ function _dtnRenderProchaines() {
   var limit     = new Date(today); limit.setDate(limit.getDate() + 30);
   var limitStr  = limit.toISOString().slice(0,10);
 
-  var items = [];
+  var items30 = [], itemsBeyond = [];
+  var _push = function(item) { (item.date <= limitStr ? items30 : itemsBeyond).push(item); };
 
-  // ── 1. Compétitions dont dateFrom est dans les 30 jours ──
+  // ── 1. Compétitions à venir (planning général) ──
   (S.comps || []).forEach(function(c) {
     if (!c.dateFrom) return;
-    if (c.dateFrom < todayStr || c.dateFrom > limitStr) return;
+    if (c.dateFrom < todayStr) return;
     var typeLabel = {
       'comp-internationale': 'Compétition internationale',
       'cdf':                 'Compétition nationale',
@@ -52625,7 +52635,7 @@ function _dtnRenderProchaines() {
       'entrainement':        'Entraînement',
       'stage':               'Stage'
     }[c.type] || (c.type || 'Compétition');
-    items.push({
+    _push({
       date:    c.dateFrom,
       dateFin: c.dateTo || c.dateFrom,
       title:   c.name || c.nom || 'Compétition',
@@ -52637,16 +52647,16 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── 2. Événements du calendrier général dans les 30 jours ──
+  // ── 2. Événements du calendrier général à venir (planning général) ──
   var _uid = S.user && S.user.id;
   (S.agendaEvents || []).forEach(function(ev) {
     if (!ev.dateFrom) return;
     if (ev.privateUserId && ev.privateUserId !== _uid) return;
     var evEnd = ev.dateTo || ev.dateFrom;
-    // Inclure si l'événement commence dans les 30 jours OU est en cours (commencé avant mais pas encore terminé)
-    if (evEnd < todayStr || ev.dateFrom > limitStr) return;
+    // Inclure si l'événement commence à l'avenir OU est en cours (commencé avant mais pas encore terminé)
+    if (evEnd < todayStr) return;
     var timeLabel = ev.heureDebut ? ' · ' + ev.heureDebut + (ev.heureFin ? '–' + ev.heureFin : '') : '';
-    items.push({
+    _push({
       date:    ev.dateFrom,
       dateFin: ev.dateTo || ev.dateFrom,
       title:   ev.titre || 'Événement',
@@ -52658,16 +52668,20 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── 3. Tâches Gantt (niveau tâche) dans les 30 jours ──
+  // ── 3. Tâches Gantt à venir (planning général) — on mémorise aussi tous les
+  //      intitulés (toutes dates confondues) pour dédoublonner le volet À faire ──
   var gantt = S.ganttTasks || {};
+  var ganttTitlesByComp = {};
   Object.keys(gantt).forEach(function(compId) {
     var comp  = (S.comps || []).find(function(c){ return c.id === compId; });
     var compNom = comp ? (comp.name || comp.nom || compId) : compId;
     var tasks = gantt[compId] || [];
+    var titles = ganttTitlesByComp[compId] || (ganttTitlesByComp[compId] = {});
     tasks.forEach(function(task) {
+      if (task.titre) titles[task.titre.trim().toLowerCase()] = true;
       // Tâche principale
-      if (task.dateDebut && task.dateDebut >= todayStr && task.dateDebut <= limitStr) {
-        items.push({
+      if (task.dateDebut && task.dateDebut >= todayStr) {
+        _push({
           date:    task.dateDebut,
           dateFin: task.dateFin || task.dateDebut,
           title:   task.titre || 'Tâche planning',
@@ -52680,8 +52694,9 @@ function _dtnRenderProchaines() {
       }
       // Sous-tâches
       (task.sousTaches || []).forEach(function(st) {
-        if (!st.dateDebut || st.dateDebut < todayStr || st.dateDebut > limitStr) return;
-        items.push({
+        if (st.titre) titles[st.titre.trim().toLowerCase()] = true;
+        if (!st.dateDebut || st.dateDebut < todayStr) return;
+        _push({
           date:    st.dateDebut,
           dateFin: st.dateFin || st.dateDebut,
           title:   st.titre || 'Sous-tâche',
@@ -52695,15 +52710,35 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── Tri par date ──
-  items.sort(function(a, b) {
-    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+  // ── 4. Volet « À faire » des compétitions (non cochées) — évite les doublons
+  //      déjà couverts par le planning général (Gantt) de la même compétition ──
+  var todosByComp = S.homeTodosByComp || {};
+  Object.keys(todosByComp).forEach(function(compId) {
+    var comp = (S.comps || []).find(function(c){ return c.id === compId; });
+    if (!comp || !comp.dateFrom) return;
+    var compEnd = comp.dateTo || comp.dateFrom;
+    if (compEnd < todayStr) return; // compétition déjà terminée : on ignore son À faire résiduel
+    var arr = todosByComp[compId] || [];
+    var domaines = {};
+    arr.forEach(function(t){ if (t.type === 'domaine') domaines[t.id] = t.label; });
+    var titles = ganttTitlesByComp[compId] || {};
+    var compNom = comp.name || comp.nom || 'Compétition';
+    arr.forEach(function(t) {
+      if (t.type === 'domaine' || t.done) return;
+      var key = (t.label || '').trim().toLowerCase();
+      if (!key || titles[key]) return; // déjà présent dans le planning général de cette compétition
+      _push({
+        date:    comp.dateFrom,
+        dateFin: comp.dateTo || comp.dateFrom,
+        title:   t.label || 'Tâche',
+        sub:     compNom + (t.domaineId && domaines[t.domaineId] ? ' · ' + domaines[t.domaineId] : ''),
+        tag:     'À faire',
+        tagCol:  '#10b981',
+        ico:     '✅',
+        onClick: 'showHomeCompDetail&&showHomeCompDetail(\''+compId.replace(/'/g,"\\'")+'\');if(typeof _crpToggle===\'function\')_crpToggle(\'todo\')'
+      });
+    });
   });
-
-  if (!items.length) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:4px 0">Aucune action dans les 30 prochains jours.</div>';
-    return;
-  }
 
   // ── Formatage date court ──
   var _fmtD = function(str) {
@@ -52717,32 +52752,35 @@ function _dtnRenderProchaines() {
     return s;
   };
 
-  // ── Rendu : une ligne par action ──
-  var html = '<div style="display:flex;flex-direction:column;gap:1px">';
-
-  items.forEach(function(item) {
-    html += '<div onclick="(function(){'+item.onClick+'})()" '
-          + 'style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;border-radius:5px;transition:background .1s" '
-          + 'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" '
-          + 'onmouseout="this.style.background=\'\'">';
-
-    // Date
-    html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+'</span>';
-
-    // Séparateur
-    html += '<span style="color:rgba(255,255,255,.12);flex-shrink:0">·</span>';
-
-    // Titre
-    html += '<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+item.title+'</span>';
-
-    // Lieu / info secondaire
-    if (item.sub) html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;flex-shrink:0">'+item.sub+'</span>';
-
+  var _renderList = function(cont, items, emptyMsg, cap) {
+    if (!cont) return;
+    if (!items.length) {
+      cont.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:4px 0">'+emptyMsg+'</div>';
+      return;
+    }
+    items.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    var shown = cap ? items.slice(0, cap) : items;
+    var html = '<div style="display:flex;flex-direction:column;gap:1px">';
+    shown.forEach(function(item) {
+      html += '<div onclick="(function(){'+item.onClick+'})()" '
+            + 'style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;border-radius:5px;transition:background .1s" '
+            + 'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" '
+            + 'onmouseout="this.style.background=\'\'">';
+      html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+'</span>';
+      html += '<span style="color:rgba(255,255,255,.12);flex-shrink:0">·</span>';
+      html += '<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+item.title+'</span>';
+      if (item.sub) html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;flex-shrink:0">'+item.sub+'</span>';
+      html += '</div>';
+    });
     html += '</div>';
-  });
+    if (cap && items.length > cap) {
+      html += '<div style="font-size:11px;color:var(--txt3);padding:6px 4px 0">+ '+(items.length - cap)+' autre(s)…</div>';
+    }
+    cont.innerHTML = html;
+  };
 
-  html += '</div>';
-  cont.innerHTML = html;
+  _renderList(cont30,     items30,     'Aucune action dans les 30 prochains jours.', null);
+  _renderList(contBeyond, itemsBeyond, 'Aucune action au-delà de 30 jours.', 60);
 }
 
 // ── Ferme agenda et gantt (utilitaire partagé) ────────────────────────
@@ -54398,11 +54436,16 @@ function _dtnGoHome() {
   var wb = document.getElementById('dtn-workspace-body');
   if (wb) wb.innerHTML = '<div style="padding:28px 32px 52px">'
     + '<div id="dtn-today-zone" style="margin-bottom:32px"><div style="font-size:12px;color:var(--txt3)">Chargement…</div></div>'
-    + '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    + '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
     + '<div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>'
-    + '<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions — 30 jours</div>'
-    + '</div><div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
-    + '<div id="dtn-todo-zone" style="margin-top:34px"></div>'
+    + '<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions</div>'
+    + '</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start">'
+    + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>'
+    + '<div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
+    + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b;margin-bottom:8px">Au-delà</div>'
+    + '<div id="dtn-prochaines-audela"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div></div>'
+    + '<div id="dtn-todo-zone"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>'
+    + '</div></div>'
     + '</div>';
   _dtnSetActiveNav('home');
   _dtnRefreshStats();
