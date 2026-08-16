@@ -28317,6 +28317,48 @@ async function pullFromCloud() {
     Object.assign(S.repasTarifs, r.repasTarifs);
   }
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
+  // ✅ Site & Étapes : cette clé n'était fusionnée qu'au démarrage (_applyCloudData),
+  // jamais pendant la synchro périodique (3 min) d'un onglet resté ouvert. Un onglet
+  // ouvert avant l'ajout de coordonnées GPS ailleurs gardait donc des étapes figées
+  // sans lat/lng, et le moindre push ultérieur écrasait le cloud avec cette version
+  // périmée — cause probable de la perte répétée du marqueur carte.
+  S.etapes             = _mergeObjOfArrays(S.etapes,             r.etapes);
+  // ✅ Module Formations : même lacune — un onglet resté ouvert ne recevait jamais
+  // les types/sessions/inscriptions ajoutés ailleurs pendant la synchro périodique,
+  // et pouvait donc effacer un type (ex. "Qualif Sport") en le repoussant au cloud
+  // dans son état local figé au démarrage.
+  (function() {
+    ['formTypes','formSessions','formInscriptions','formQualifs'].forEach(function(k) {
+      S[k] = _mergeById(S[k] || [], r[k] || []);
+    });
+    var rDT = (r._deletedFormTypes && typeof r._deletedFormTypes==='object') ? r._deletedFormTypes : {};
+    var lDT = (S._deletedFormTypes && typeof S._deletedFormTypes==='object') ? S._deletedFormTypes : {};
+    S._deletedFormTypes = {};
+    Object.keys(Object.assign({}, lDT, rDT)).forEach(function(key) {
+      S._deletedFormTypes[key] = Math.max(lDT[key]||0, rDT[key]||0);
+    });
+    var _tomb = S._deletedFormTypes;
+    S.formTypes = (S.formTypes||[]).filter(function(t) {
+      if (!t) return false;
+      var d = _tomb[_formTypeKey(t.nom)];
+      return !(d && d >= (t._updatedAt||0));
+    });
+    // Dédoublonnage par nom, le plus récent gagne (hérité du semis à id aléatoire).
+    var _vus = {};
+    S.formTypes = S.formTypes.filter(function(t) {
+      var k = _formTypeKey(t.nom);
+      if (_vus[k] !== undefined) {
+        if ((t._updatedAt||0) > (_vus[k]._updatedAt||0)) {
+          var idx = S.formTypes.indexOf(_vus[k]); if (idx>=0) S.formTypes[idx] = null; _vus[k] = t; return true;
+        }
+        return false;
+      }
+      _vus[k] = t; return true;
+    }).filter(function(t){ return !!t; });
+    // Auto-guérison : horodater les types legacy sans _updatedAt pour ne plus jamais
+    // les perdre sur une égalité 0>=0 face à une pierre tombale.
+    S.formTypes.forEach(function(t){ if (t && !t._updatedAt) t._updatedAt = Date.now(); });
+  })();
   // Merge profond pour budgets : {compId: {engagement:[...], ressources:[...]}}
   (function() {
     function _mergeBgtLines(la, ra, tombs) {
