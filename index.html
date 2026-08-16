@@ -17119,6 +17119,11 @@ function initInfosCharts() {
     var isCur = !!data.isCurrency;
     var total = data.series.reduce(function(a,b){return a+b;},0);
     var o = _base('donut', h||260);
+    // Empêche ApexCharts de se re-mesurer/rétrécir après le montage initial
+    // (évite un rendu trop petit si la grille CSS environnante — avec cartes
+    // sur 2 lignes — finit de se stabiliser après le premier rendu du chart)
+    o.chart.redrawOnParentResize = false;
+    o.chart.redrawOnWindowResize = false;
     // Adapter les couleurs au thème actif (dark ou light)
     var _isLight = document.body.classList.contains('theme-light');
     // Fond explicite = couleur de la carte → le centre du donut sera sur ce fond
@@ -17176,18 +17181,19 @@ function initInfosCharts() {
       style:{ fontSize:'11px', fontWeight:700, colors:['#ffffff'] },
       dropShadow:{ enabled:true, top:1, left:1, blur:3, opacity:.7 }
     };
-    // Légende hauteur fixe → même diamètre pour les deux donuts budget
+    // Légende à droite du donut (au lieu d'en dessous) → récupère de la
+    // hauteur pour agrandir le donut lui-même, plus lisible
     o.legend = {
-      position:'bottom', fontSize:'11px', fontFamily:_F,
-      height:90,
+      position:'right', fontSize:'10px', fontFamily:_F,
+      width:115,
       labels:{ colors:_legCol },
-      markers:{ width:8, height:8, radius:4, offsetX:-2 },
-      itemMargin:{ horizontal:8, vertical:4 },
+      markers:{ width:7, height:7, radius:4, offsetX:-2 },
+      itemMargin:{ horizontal:4, vertical:5 },
       formatter:function(lbl, opts){
         var v=opts.w.globals.series[opts.seriesIndex];
         var pct=total>0?Math.round(v/total*100):0;
         var disp=isCur?(v>=1000?Math.round(v/1000)+'k€':v+'€'):(''+v);
-        return lbl+' — '+disp+' ('+pct+'%)';
+        return lbl+' '+disp+' · '+pct+'%';
       }
     };
     _mount(id, o);
@@ -17356,8 +17362,19 @@ function initInfosCharts() {
     leg+='</div>';
     return '<div style="display:flex;flex-direction:column;align-items:center;padding:10px 4px 14px">'+out+leg+'</div>';
   };
-  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, window.innerWidth<768?150:160);
-  if (d.budgetRes) _donutChart('apex-budget-res', d.budgetRes, window.innerWidth<768?150:160);
+  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, window.innerWidth<768?130:220);
+  if (d.budgetRes) _donutChart('apex-budget-res', d.budgetRes, window.innerWidth<768?130:220);
+  // Filet : la grille environnante (Provenance/Carte sur 2 lignes) peut encore
+  // bouger juste après ce rendu initial — on force un recalcul propre une fois
+  // le DOM stabilisé, pour éviter un donut mesuré/figé trop petit au montage.
+  (function(){
+    var _budgetH = window.innerWidth<768?130:220;
+    setTimeout(function(){
+      _apexInfosInst.forEach(function(c){
+        try { c.updateOptions({ chart:{ height:_budgetH } }, true, false); } catch(e){}
+      });
+    }, 400);
+  })();
 }
 
 function initInfosMaps(cp, enrolled) {
@@ -18116,23 +18133,27 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ── Compétiteurs & Classement — une seule ligne (Genre, Âge, Catégories,
     //    Classes, Équipages selon ce qui existe pour cette compétition) ──
     if (_compCards.length > 0) {
-      html += _sep('Compétiteurs & Classement');
       var _gComp = isMobile ? 'display:flex;flex-direction:column;gap:8px' : 'display:grid;grid-template-columns:repeat('+_compCards.length+',1fr);gap:8px';
       html += '<div style="'+_gComp+'">'+_compCards.join('')+'</div>';
     }
 
-    // ── Matériels, Clubs & Provenance — fusionnés sur une seule ligne (2ᵉ ligne,
-    //    après Compétiteurs & Classement) : jusqu'à 5 cartes — Multiaxes &
-    //    Pendulaire, Paramoteur, Classement clubs, Régions, Carte géographique —
-    //    hauteur fixe partagée, chaque liste défile en interne si trop longue ──
+    // ── Budget (donuts) + Matériels, Clubs & Provenance — grille unique 4
+    //    colonnes / 2 lignes : Dépenses/Recettes (donuts, col 1-2, ligne 1),
+    //    Provenance — Régions et Carte géographique (col 3-4, sur les 2
+    //    lignes — plus grandes), Matériels/Clubs complètent la ligne 2
+    //    (col 1-2). Le résumé Dépenses/Recettes/Solde est retiré (redondant
+    //    avec les tuiles KPI et les totaux des donuts). ──
     var _icd = window._infosChartsData;
     var _hasMat   = _icd.ailesML || _icd.moteurML || _icd.aileMP || _icd.moteurMP || _icd.heliceMP;
     var _hasClubs = Object.keys(clubCounts).length > 0;
     var _hasProv  = pilotsWithRegion > 0;
-    if (_hasMat || _hasClubs || _hasProv) {
-      html += _sep('Matériels, Clubs & Provenance');
-      var _rowH = isMobile ? '200px' : '230px';
+    var _hasBdep  = _icd.budgetDep && _icd.budgetDep.series.length>0;
+    var _hasBres  = _icd.budgetRes && _icd.budgetRes.series.length>0;
+    if (_hasMat || _hasClubs || _hasProv || _hasBdep) {
+      var _rowH = isMobile ? '200px' : '230px';   // hauteur des cartes col 1-3 (sur 2 lignes)
+      var _spanStyle = isMobile ? '' : 'grid-row:span 2;';
       var _row2Cards = [];
+      // ── Col 1 (2 lignes) : Matériels — Multiaxes/Pendulaire + Paramoteur fusionnés en un seul bloc ──
       if (_hasMat) {
         // Normalisation des variantes de marques (« ROTAX 912 » / « Rotax 912iS » →
         // une seule ligne) — perdue si on lit les compteurs bruts directement.
@@ -18143,74 +18164,40 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         var _moteurPMNorm  = _normBrand(moteurPMCounts);
         var _helicePMNorm  = _normBrand(helicePMCounts);
         var _matCap = 6;
-        if (Object.keys(_aileMLNorm).length || Object.keys(_ailePendNorm).length || Object.keys(_moteurMLNorm).length) {
-          _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+';flex-shrink:0">Multiaxes & Pendulaire</div><div style="overflow-y:auto;min-height:0">'
-            + _rankMini('Ailes — Multiaxes / ML', _aileMLNorm, '#0891b2', _matCap)
-            + _rankMini('Ailes — Pendulaire',     _ailePendNorm, '#06b6d4', _matCap)
-            + _rankMini('Moteurs',                _moteurMLNorm, '#0d9488', _matCap)
-            + '</div></div>');
-        }
-        if (Object.keys(_ailePMNorm).length || Object.keys(_moteurPMNorm).length || Object.keys(_helicePMNorm).length) {
-          _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+';flex-shrink:0">Paramoteur</div><div style="overflow-y:auto;min-height:0">'
-            + _rankMini('Ailes',   _ailePMNorm,   '#f59e0b', _matCap)
-            + _rankMini('Moteurs', _moteurPMNorm, '#ef4444', _matCap)
-            + _rankMini('Hélices', _helicePMNorm, '#8b5cf6', _matCap)
-            + '</div></div>');
-        }
+        _row2Cards.push('<div style="'+_cSt+';'+_spanStyle+'padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+';flex-shrink:0">Matériels</div><div style="overflow-y:auto;min-height:0">'
+          + _rankMini('Multiaxes / ML — Ailes',  _aileMLNorm,   '#0891b2', _matCap)
+          + _rankMini('Pendulaire — Ailes',      _ailePendNorm, '#06b6d4', _matCap)
+          + _rankMini('Multiaxes / ML — Moteurs',_moteurMLNorm, '#0d9488', _matCap)
+          + _rankMini('Paramoteur — Ailes',      _ailePMNorm,   '#f59e0b', _matCap)
+          + _rankMini('Paramoteur — Moteurs',    _moteurPMNorm, '#ef4444', _matCap)
+          + _rankMini('Paramoteur — Hélices',    _helicePMNorm, '#8b5cf6', _matCap)
+          + '</div></div>');
       }
+      // ── Col 2 (2 lignes) : Classement clubs ──
       if (_hasClubs) {
-        _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'">'
+        _row2Cards.push('<div style="'+_cSt+';'+_spanStyle+'padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'">'
           + '<div style="'+_tSt+';flex-shrink:0">Classement clubs</div>'
           + '<div style="overflow-y:auto;min-height:0">'+_rankRows(clubCounts,'#6366f1')+'</div>'
           + '</div>');
       }
+      // ── Col 3 (2 lignes) : Provenance — Régions ──
       if (_hasProv) {
-        _row2Cards.push('<div id="infos-region-bars" style="display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"></div>');
-        _row2Cards.push('<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;'+(isMobile?'height:'+_rowH:'height:100%')+'">'
-          + '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>'
-          + '<div id="infos-map-region" style="flex:1;min-height:0"></div>'
-          + '</div>');
+        _row2Cards.push('<div id="infos-region-bars" style="'+_spanStyle+'display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"></div>');
       } else {
         _row2Cards.push('<div id="infos-region-bars"></div>');
       }
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:repeat('+_row2Cards.length+',1fr);gap:8px;height:'+_rowH)+'">'+_row2Cards.join('')+'</div>';
+      // ── Col 4 (1 ligne) : Carte géographique ──
+      if (_hasProv) {
+        _row2Cards.push('<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;height:'+_rowH+'">'
+          + '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>'
+          + '<div id="infos-map-region" style="flex:1;min-height:0"></div>'
+          + '</div>');
+      }
+      // ── Col 5 (1 ligne) : Dépenses par domaine — même taille que les donuts Genre/Équipages ──
+      if (_hasBdep) _row2Cards.push(_aCard('apex-budget-dep', 'Dépenses par domaine', 130));
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:repeat(5,1fr);gap:8px')+'">'+_row2Cards.join('')+'</div>';
     } else {
       html += '<div id="infos-region-bars"></div>';
-    }
-
-    // ── 5. BUDGET — résumé + graphiques sur une seule ligne (3 colonnes) ──
-    if (_hasBgt) {
-      var _bSolde2 = _bgtRes - _bgtEng;
-      var _bSoldeCol2 = _bSolde2 >= 0 ? '#10b981' : '#f43f5e';
-      html += _sep('Budget détaillé');
-      var _hasBdep = _icd.budgetDep && _icd.budgetDep.series.length>0;
-      var _hasBres = _icd.budgetRes && _icd.budgetRes.series.length>0;
-      var _isMobBgt = window.innerWidth < 768;
-      var _BH = _isMobBgt ? 150 : 160; // hauteur réduite (plus compacte que l'ancien résumé)
-      // Résumé solde — chiffres étalés sur toute la largeur de la carte
-      var _bSummary = '<div style="'+_cSt+';padding:10px 14px;display:flex;flex-direction:column;justify-content:center;'+(_isMobBgt?'':'height:'+_BH+'px')+'">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'
-        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #f43f5e">'
-        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>'
-        + '<div style="font-size:18px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>'
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #10b981">'
-        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Recettes</div>'
-        + '<div style="font-size:18px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>'
-        + '</div>'
-        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid '+_bSoldeCol2+'">'
-        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Solde</div>'
-        + '<div style="font-size:18px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>'
-        + '</div>'
-        + '</div></div>';
-      var _bCards3 = [_bSummary];
-      if (_hasBdep) _bCards3.push(_aCard('apex-budget-dep', 'Dépenses par domaine', _BH));
-      if (_hasBres) _bCards3.push(_aCard('apex-budget-res', 'Recettes par domaine', _BH));
-      if (_isMobBgt) {
-        html += '<div style="display:flex;flex-direction:column;gap:8px">'+_bCards3.join('')+'</div>';
-      } else {
-        html += '<div style="display:grid;grid-template-columns:repeat('+_bCards3.length+',1fr);gap:8px">'+_bCards3.join('')+'</div>';
-      }
     }
 
     html += '</div>'; // fermeture du div principal dashboard
