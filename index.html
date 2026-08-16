@@ -276,12 +276,12 @@ body.theme-light .ag-list-row:hover{background:#f1f5f9}
 body.theme-light .ag-chip{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
 body.theme-light #agenda-side,body.theme-light #agenda-side-content,body.theme-light #agenda-side-empty{background:var(--navy3)}
 @keyframes barFill{from{width:0}to{width:100%}}
-/* Photo splash */
-#photo-splash{position:fixed;inset:0;z-index:1100;background:#0a0d18;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;overflow:hidden;transition:opacity .5s ease}
-#photo-splash-bg{position:absolute;inset:0;background-size:cover;background-position:center 30%;background-repeat:no-repeat}
-#photo-splash-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.1) 0%,rgba(0,0,0,.0) 40%,rgba(0,0,0,.75) 100%)}
-#photo-splash-content{position:relative;z-index:2;padding:28px 24px 44px}
-@keyframes zoomSlow{from{transform:scale(1)}to{transform:scale(1.06)}}
+/* Splash : logo — rotation continue pendant l'agrandissement, puis figé (forwards) */
+@keyframes splashLogoSpin{0%{transform:rotate(0deg)}100%{transform:rotate(720deg)}}
+#splash-logo-wrap{transition:width 1.5s cubic-bezier(.22,1,.36,1),height 1.5s cubic-bezier(.22,1,.36,1)}
+#splash-logo-wrap.grow{width:220px!important;height:220px!important}
+#splash-logo-inner.spin{animation:splashLogoSpin 1.5s cubic-bezier(.45,.05,.55,.95) forwards}
+#splash-title,#splash-banner-photo{transition:opacity .6s ease}
 /* Compét cards */
 .comp-card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:14px;margin:10px 12px;cursor:pointer;transition:border-color .15s}
 .comp-card:active{border-color:var(--stol)}
@@ -767,7 +767,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 </head>
 <body>
 <script>
-// Secours indépendant : force la disparition du splash après 4s
+// Secours indépendant : force la disparition du splash après 6s
+// (marge au-delà des ~4.3s de la séquence logo → titre → photo)
 (function(){
   function _forceHideSplash(){
     var sp=document.getElementById('splash');
@@ -781,33 +782,21 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       },500);
     }
   }
-  setTimeout(_forceHideSplash,4000);
   setTimeout(_forceHideSplash,8000);
+  setTimeout(_forceHideSplash,11000);
 })();
 </script>
 
-<!-- PHOTO SPLASH -->
-<div id="photo-splash" style="display:none">
-  <div id="photo-splash-bg"></div>
-  <div id="photo-splash-overlay"></div>
-  <div id="photo-splash-fallback" style="position:absolute;inset:0;background:linear-gradient(135deg,#0a0d18 0%,#0a2a5e 45%,#0a0d18 100%);display:flex;align-items:center;justify-content:center"><div style="font-size:96px;opacity:.12">✈️</div></div>
-  <div id="photo-splash-content">
-    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:6px">FFPLUM · Compétitions STOL</div>
-    <div style="font-size:30px;font-weight:900;letter-spacing:-1px;color:#fff;line-height:1.1">Gest<span style="color:#f5a623">'STOL</span></div>
-    <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px">Short Take-Off & Landing</div>
-    <div style="width:100%;height:2px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:22px;overflow:hidden">
-      <div id="photo-splash-bar" style="height:100%;width:0;background:#f5a623;border-radius:2px;transition:width 2.4s linear"></div>
-    </div>
-  </div>
-</div>
-
-<!-- SPLASH -->
+<!-- SPLASH — séquence : 1) logo qui tourne + zoom (x2) puis se fige,
+     2) Gest'DTN apparaît et reste fixé avec le logo,
+     3) l'image déposée apparaît en dessous (largeur max 6cm, non pixélisée) -->
 <div id="splash" style="transition:opacity .5s ease">
-  <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
-    <div id="splash-logo-wrap" style="width:110px;height:110px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.18);overflow:hidden">
-      <div id="splash-logo-inner" style="width:90px;height:90px;display:flex;align-items:center;justify-content:center"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:0 24px">
+    <div id="splash-logo-wrap" style="width:110px;height:110px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.18);overflow:hidden;flex-shrink:0">
+      <div id="splash-logo-inner" style="width:94%;height:94%;display:flex;align-items:center;justify-content:center"></div>
     </div>
-    <div style="font-size:24px;font-weight:900;letter-spacing:-.5px;color:var(--txt)" id="splash-title">Gest'<span style="color:var(--stol,#0057FF)">DTN</span></div>
+    <div id="splash-title" style="font-size:46px;font-weight:900;letter-spacing:-.5px;color:var(--txt);opacity:0">Gest'<span style="color:var(--stol,#0057FF)">DTN</span></div>
+    <img id="splash-banner-photo" src="" style="max-width:6cm;width:100%;height:auto;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);opacity:0;display:block">
   </div>
 </div>
 
@@ -2372,6 +2361,8 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <svg id="dtn-fs-icon-reduce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
         <span id="dtn-fs-label" style="display:none"></span>
       </button>
+
+      <div id="dtn-presence-stack" style="display:flex;align-items:center;margin-right:6px"></div>
 
       <div onclick="openUserAccountPopup()" style="display:flex;align-items:center;gap:5px;cursor:pointer;border-radius:24px;padding:3px 6px 3px 3px;transition:background .15s" onmouseover="this.style.background='var(--navy3)'" onmouseout="this.style.background=''">
         <div class="avatar" id="dtn-avatar" style="width:40px;height:40px;font-size:15px;font-weight:900;overflow:hidden;border:2px solid var(--stol);background:var(--navy3);color:var(--stol);flex-shrink:0">?</div>
@@ -4423,12 +4414,12 @@ function _restoreCritical() {
 }
 
 // ══════════════════════════════════════════════
-// PHOTO SPLASH — coller ici l'URL ou base64
-// ex: 'https://example.com/photo.jpg'  ou  'data:image/jpeg;base64,…'
+// PHOTO SPLASH — réutilise l'image déjà embarquée dans l'onglet « À propos »
+// (#apropos-photo), affichée temporairement juste après le logo au démarrage
 // ══════════════════════════════════════════════
-var STOL_SPLASH_PHOTO = '';
+var STOL_SPLASH_PHOTO = (document.getElementById('apropos-photo') || {}).src || '';
 
-// ── Filet de sécurité : force la disparition du splash après 5s quoi qu'il arrive ──
+// ── Filet de sécurité : force la disparition du splash après 8.5s quoi qu'il arrive ──
 setTimeout(function() {
   var sp = document.getElementById('splash');
   if (sp && sp.style.display !== 'none') {
@@ -4442,7 +4433,7 @@ setTimeout(function() {
       try { showDTNPortal(); } catch(e) {}
     }
   }
-}, 5000);
+}, 8500);
 
 var S = {
   user: null,
@@ -18129,66 +18120,59 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html += '<div style="'+_gComp+'">'+_compCards.join('')+'</div>';
     }
 
-    // ── Matériels — regroupé par pratique (2 cartes denses au lieu de 5 mini-
-    //    graphiques séparés) ; une seule teinte par sous-liste, listes classées ──
-    var _icd = window._infosChartsData;
-    var _hasMat = _icd.ailesML || _icd.moteurML || _icd.aileMP || _icd.moteurMP || _icd.heliceMP;
-    if (_hasMat) {
-      html += _sep('Matériels');
-      // Normalisation des variantes de marques (« ROTAX 912 » / « Rotax 912iS » →
-      // une seule ligne) — perdue si on lit les compteurs bruts directement.
-      var _aileMLNorm    = _normBrand(aileMLCounts);
-      var _ailePendNorm  = _normBrand(ailePendCounts);
-      var _moteurMLNorm  = _normBrand(moteurMLCounts);
-      var _ailePMNorm    = _normBrand(ailePMCounts);
-      var _moteurPMNorm  = _normBrand(moteurPMCounts);
-      var _helicePMNorm  = _normBrand(helicePMCounts);
-      var _matCap = 6;
-      var _matCards = [];
-      if (Object.keys(_aileMLNorm).length || Object.keys(_ailePendNorm).length || Object.keys(_moteurMLNorm).length) {
-        var _mc1 = '<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">Multiaxes & Pendulaire</div>'
-          + _rankMini('Ailes — Multiaxes / ML', _aileMLNorm, '#0891b2', _matCap)
-          + _rankMini('Ailes — Pendulaire',     _ailePendNorm, '#06b6d4', _matCap)
-          + _rankMini('Moteurs',                _moteurMLNorm, '#0d9488', _matCap)
-          + '</div>';
-        _matCards.push(_mc1);
-      }
-      if (Object.keys(_ailePMNorm).length || Object.keys(_moteurPMNorm).length || Object.keys(_helicePMNorm).length) {
-        var _mc2 = '<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">Paramoteur</div>'
-          + _rankMini('Ailes',   _ailePMNorm,   '#f59e0b', _matCap)
-          + _rankMini('Moteurs', _moteurPMNorm, '#ef4444', _matCap)
-          + _rankMini('Hélices', _helicePMNorm, '#8b5cf6', _matCap)
-          + '</div>';
-        _matCards.push(_mc2);
-      }
-      html += _matCards.length===2 ? '<div style="'+_g2+'">'+_matCards.join('')+'</div>' : _matCards.join('');
-    }
-
-    // ── Clubs & Provenance — une seule ligne (classement clubs, régions, carte) ;
+    // ── Matériels, Clubs & Provenance — fusionnés sur une seule ligne (2ᵉ ligne,
+    //    après Compétiteurs & Classement) : jusqu'à 5 cartes — Multiaxes &
+    //    Pendulaire, Paramoteur, Classement clubs, Régions, Carte géographique —
     //    hauteur fixe partagée, chaque liste défile en interne si trop longue ──
+    var _icd = window._infosChartsData;
+    var _hasMat   = _icd.ailesML || _icd.moteurML || _icd.aileMP || _icd.moteurMP || _icd.heliceMP;
     var _hasClubs = Object.keys(clubCounts).length > 0;
     var _hasProv  = pilotsWithRegion > 0;
-    if (_hasClubs || _hasProv) {
-      html += _sep('Clubs & Provenance');
+    if (_hasMat || _hasClubs || _hasProv) {
+      html += _sep('Matériels, Clubs & Provenance');
       var _rowH = isMobile ? '200px' : '230px';
-      var _tpl = (_hasClubs?'1fr ':'') + (_hasProv?'1fr 1.5fr':'');
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:'+_tpl.trim()+';gap:8px;height:'+_rowH)+'">';
+      var _row2Cards = [];
+      if (_hasMat) {
+        // Normalisation des variantes de marques (« ROTAX 912 » / « Rotax 912iS » →
+        // une seule ligne) — perdue si on lit les compteurs bruts directement.
+        var _aileMLNorm    = _normBrand(aileMLCounts);
+        var _ailePendNorm  = _normBrand(ailePendCounts);
+        var _moteurMLNorm  = _normBrand(moteurMLCounts);
+        var _ailePMNorm    = _normBrand(ailePMCounts);
+        var _moteurPMNorm  = _normBrand(moteurPMCounts);
+        var _helicePMNorm  = _normBrand(helicePMCounts);
+        var _matCap = 6;
+        if (Object.keys(_aileMLNorm).length || Object.keys(_ailePendNorm).length || Object.keys(_moteurMLNorm).length) {
+          _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+';flex-shrink:0">Multiaxes & Pendulaire</div><div style="overflow-y:auto;min-height:0">'
+            + _rankMini('Ailes — Multiaxes / ML', _aileMLNorm, '#0891b2', _matCap)
+            + _rankMini('Ailes — Pendulaire',     _ailePendNorm, '#06b6d4', _matCap)
+            + _rankMini('Moteurs',                _moteurMLNorm, '#0d9488', _matCap)
+            + '</div></div>');
+        }
+        if (Object.keys(_ailePMNorm).length || Object.keys(_moteurPMNorm).length || Object.keys(_helicePMNorm).length) {
+          _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+';flex-shrink:0">Paramoteur</div><div style="overflow-y:auto;min-height:0">'
+            + _rankMini('Ailes',   _ailePMNorm,   '#f59e0b', _matCap)
+            + _rankMini('Moteurs', _moteurPMNorm, '#ef4444', _matCap)
+            + _rankMini('Hélices', _helicePMNorm, '#8b5cf6', _matCap)
+            + '</div></div>');
+        }
+      }
       if (_hasClubs) {
-        html += '<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'">'
+        _row2Cards.push('<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'">'
           + '<div style="'+_tSt+';flex-shrink:0">Classement clubs</div>'
           + '<div style="overflow-y:auto;min-height:0">'+_rankRows(clubCounts,'#6366f1')+'</div>'
-          + '</div>';
+          + '</div>');
       }
       if (_hasProv) {
-        html += '<div id="infos-region-bars" style="display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"></div>';
-        html += '<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;'+(isMobile?'height:'+_rowH:'height:100%')+'">';
-        html += '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>';
-        html += '<div id="infos-map-region" style="flex:1;min-height:0"></div>';
-        html += '</div>';
+        _row2Cards.push('<div id="infos-region-bars" style="display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"></div>');
+        _row2Cards.push('<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;'+(isMobile?'height:'+_rowH:'height:100%')+'">'
+          + '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>'
+          + '<div id="infos-map-region" style="flex:1;min-height:0"></div>'
+          + '</div>');
       } else {
-        html += '<div id="infos-region-bars"></div>';
+        _row2Cards.push('<div id="infos-region-bars"></div>');
       }
-      html += '</div>';
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:repeat('+_row2Cards.length+',1fr);gap:8px;height:'+_rowH)+'">'+_row2Cards.join('')+'</div>';
     } else {
       html += '<div id="infos-region-bars"></div>';
     }
@@ -52489,6 +52473,70 @@ function saveBudgetDetailModal() {
 }
 
 // ═══════════════════════════════════════════════════
+// PRÉSENCE — qui est connecté à Gest'DTN en ce moment
+// Battement de cœur + sondage sur la table Supabase dtn_presence (RLS),
+// même principe que dtn_todos. Un utilisateur est considéré « connecté »
+// si sa dernière présence (last_seen) date de moins de 90 s. Les invités
+// (pas d'identité durable) ne sont pas remontés dans la liste partagée.
+// ⚠️ Nécessite la table dtn_presence côté Supabase (voir SQL fourni) —
+// tant qu'elle n'existe pas, la présence reste silencieusement vide.
+// ═══════════════════════════════════════════════════
+var _dtnPresenceTimer = null;
+var _dtnPresenceList = [];
+function _dtnPresenceInit() {
+  if (_dtnPresenceTimer) return; // déjà démarré pour cette session
+  _dtnPresenceHeartbeat();
+  _dtnPresencePoll();
+  _dtnPresenceTimer = setInterval(function(){ _dtnPresenceHeartbeat(); _dtnPresencePoll(); }, 25000);
+}
+async function _dtnPresenceHeartbeat() {
+  if (typeof _dtnTodoIsGuest === 'function' && _dtnTodoIsGuest()) return; // pas d'identité durable
+  var sb = (typeof getSB === 'function') ? getSB() : null;
+  var u = S.user || {};
+  if (!sb || !u.id) return;
+  try {
+    await sb.from('dtn_presence').upsert({
+      user_id: u.id, prenom: u.prenom || '', nom: u.nom || '', email: u.email || '',
+      last_seen: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+  } catch (e) { /* table absente ou RLS non configurée — présence désactivée silencieusement */ }
+}
+async function _dtnPresencePoll() {
+  var sb = (typeof getSB === 'function') ? getSB() : null;
+  if (!sb) return;
+  try {
+    var since = new Date(Date.now() - 90000).toISOString();
+    var res = await sb.from('dtn_presence').select('*').gte('last_seen', since);
+    if (res.error) throw res.error;
+    _dtnPresenceList = res.data || [];
+    _dtnRenderPresence();
+  } catch (e) { /* silencieux */ }
+}
+function _dtnRenderPresence() {
+  var cont = document.getElementById('dtn-presence-stack');
+  if (!cont) return;
+  var list = _dtnPresenceList;
+  if (!list.length) { cont.innerHTML = ''; return; }
+  var _ini = function(p) {
+    var s = ((p.prenom||'')[0]||'') + ((p.nom||'')[0]||'');
+    return s.toUpperCase() || ((p.email||'?')[0]||'?').toUpperCase();
+  };
+  var max = 4;
+  var shown = list.slice(0, max);
+  var html = '<div style="display:flex;align-items:center" title="'+list.length+' connecté'+(list.length>1?'s':'')+' à Gest\'DTN">';
+  shown.forEach(function(p, i) {
+    var nomComplet = ((p.prenom||'')+' '+(p.nom||'')).trim() || p.email || '—';
+    html += '<div style="width:26px;height:26px;border-radius:50%;background:var(--navy3);border:2px solid var(--navy2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--stol);margin-left:'+(i>0?'-8px':'0')+';box-shadow:0 0 0 1px rgba(255,255,255,.08)" title="'+nomComplet+'">'+_ini(p)+'</div>';
+  });
+  if (list.length > max) {
+    html += '<div style="width:26px;height:26px;border-radius:50%;background:var(--navy3);border:2px solid var(--navy2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--txt3);margin-left:-8px">+'+(list.length-max)+'</div>';
+  }
+  html += '<span style="margin-left:8px;font-size:11px;font-weight:700;color:var(--txt3);display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0"></span>'+list.length+'</span>';
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
 // PORTAIL GEST'DTN — navigation entre modules
 // ═══════════════════════════════════════════════════
 var _fromDTN = false; // true si l'app a été ouverte depuis le portail DTN
@@ -52560,6 +52608,9 @@ function showDTNPortal() {
   _dtnSetActiveNav('home');
   // Rafraîchir les stats live
   _dtnRefreshStats();
+  // Présence — qui est connecté à Gest'DTN
+  _dtnPresenceInit();
+  _dtnRenderPresence();
 }
 
 function _dtnRefreshStats() {
@@ -53130,14 +53181,16 @@ function _collectifRenderStats(){
       +'<div style="flex:1;display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">'+svg+legend+'</div></div>';
   };
   // Choisit automatiquement : anneau si < 4 catégories (plus visuel), sinon barres
-  var _barsCard=function(title,obj,limit){
+  // gridStyle (optionnel) : styles de placement grid additionnels (ex: grid-row:span 2)
+  var _barsCard=function(title,obj,limit,gridStyle){
+    gridStyle = gridStyle || '';
     var keys=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a];});
     if(limit) keys=keys.slice(0,limit);
-    if(!keys.length) return '<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px">—</div></div>';
+    if(!keys.length) return '<div style="'+_cSt+';'+gridStyle+'"><div style="'+_tSt+'">'+title+'</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px">—</div></div>';
     if(keys.length<4) return _donutCard(title,keys,obj);
     var mx=obj[keys[0]];
     var inner=keys.map(function(k,i){return _bar(k,obj[k],mx,_COLL_STAT_PAL[i%_COLL_STAT_PAL.length]);}).join('');
-    return '<div style="'+_cSt+'"><div style="'+_tSt+'">'+title+'</div><div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+inner+'</div></div>';
+    return '<div style="'+_cSt+';'+gridStyle+'"><div style="'+_tSt+'">'+title+'</div><div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;overflow-y:auto">'+inner+'</div></div>';
   };
 
   // KPI tiles
@@ -53145,9 +53198,10 @@ function _collectifRenderStats(){
     {v:total, l:'Membres', c:'#0891b2'},
     {v:nbH,   l:'Hommes',  c:'#3b82f6'},
     {v:nbF,   l:'Femmes',  c:'#ec4899'},
-    {v:(ageMoy!==null?ageMoy+' ans':'—'), l:'Âge moyen', c:'#8b5cf6', sub:(ageMin!==null?'min '+ageMin+' · max '+ageMax:'')}
+    {v:(ageMoy!==null?ageMoy+' ans':'—'), l:'Âge moyen', c:'#8b5cf6', sub:(ageMin!==null?'min '+ageMin+' · max '+ageMax:'')},
+    {v:Object.keys(regions).length, l:'Régions', c:'#10b981'}
   ];
-  var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+(_isMob?2:4)+',1fr);gap:10px;margin-bottom:14px">'
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+(_isMob?2:5)+',1fr);gap:10px;margin-bottom:14px">'
     +kpis.map(function(k){ return '<div style="'+_cSt+';padding:12px 14px;position:relative;overflow:hidden">'
       +'<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+k.c+'"></div>'
       +'<div style="font-size:26px;font-weight:900;color:'+k.c+';line-height:1;margin-bottom:4px">'+k.v+'</div>'
@@ -53165,17 +53219,27 @@ function _collectifRenderStats(){
     : '<div style="'+_cSt+'"><div style="'+_tSt+'">Répartition H / F</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px">—</div></div>';
   // Tranches d'âge en barres
   var trMx=Math.max.apply(null,trancheDefs.map(function(t){return tranches[t[0]];}).concat([1]));
-  var ageCard='<div style="'+_cSt+'"><div style="'+_tSt+'">Tranches d\'âge</div><div style="flex:1;display:flex;flex-direction:column;justify-content:center">'
+  var ageCard='<div style="'+_cSt+'"><div style="'+_tSt+'">Tranches d\'âge</div><div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start">'
     +(ages.length?trancheDefs.map(function(t,i){return _bar(t[0]+' ans',tranches[t[0]],trMx,_COLL_STAT_PAL[i%_COLL_STAT_PAL.length]);}).join('')
       :'<div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune date de naissance renseignée</div>')
     +'</div></div>';
 
-  var _statCols = _isMob ? 1 : (window.innerWidth < 1100 ? 2 : 4);
+  // Ligne 1 (5 colonnes pleines) : Pratiques, Disciplines, Répartition H/F,
+  // Tranche d'âge, Clubs — Clubs occupe la 5ᵉ colonne et descend sur la
+  // 2ᵉ ligne (grid-row:span 2). Ligne 2 : carte de France, puis à côté — sur
+  // deux colonnes, en liste compacte — le détail de la région cliquée ; la
+  // 5ᵉ colonne de cette ligne est la suite (bas) de la carte Clubs.
+  var _statCols = _isMob ? 1 : (window.innerWidth < 1100 ? 2 : 5);
+  var regionDetailPlaceholder = '<div id="collstats-region-detail" class="no-print" style="'+_cSt+';grid-column:span 3">'
+    + '<div style="'+_tSt+'">Compétiteurs par région</div>'
+    + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Cliquez sur une région de la carte pour afficher la liste des compétiteurs</div>'
+    + '</div>';
   var grid='<div style="display:grid;grid-template-columns:repeat('+_statCols+',1fr);grid-auto-flow:dense;gap:12px;align-items:stretch">'
     + _barsCard('Pratiques',prat) + _barsCard('Disciplines',disc)
     + hfCard + ageCard
-    + _barsCard('Clubs (top 15)',clubs,15)
+    + _barsCard('Clubs (top 15)',clubs,15,'grid-row:span 2')
     + _collStatsRegionSVG(regions)
+    + regionDetailPlaceholder
     + '</div>';
 
   // Conserve le rendu exact pour l'impression A4 « à l'identique »
@@ -53195,7 +53259,7 @@ function _collStatsRegionSVG(regions){
   var esc=function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var SHORT={'Auvergne-Rhône-Alpes':'ARA','Bourgogne-Franche-Comté':'BFC','Bretagne':'BRE','Centre-Val de Loire':'CVL','Corse':'COR','Grand Est':'GES','Hauts-de-France':'HDF','Île-de-France':'IDF','Normandie':'NOR','Nouvelle-Aquitaine':'NAQ','Occitanie':'OCC','Pays de la Loire':'PDL',"Provence-Alpes-Côte d'Azur":'PACA'};
   var G=(typeof _FR_REGION_GEO!=='undefined')?_FR_REGION_GEO:null;
-  var _gcol = (window.innerWidth<768) ? 'auto' : 'span 2'; // pas de span sur smartphone (grille 1 colonne)
+  var _gcol = 'auto'; // carte réduite à la taille d'une carte standard (une seule cellule)
   var keys=Object.keys(regions);
   if(!keys.length || !G) return '<div style="'+_cSt+';grid-column:'+_gcol+'"><div style="'+_tSt+'">Régions d\'origine</div><div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucune région renseignée</div></div>';
   // Répartir les effectifs : métropole (présente dans la géométrie) vs hors métropole
@@ -53207,16 +53271,18 @@ function _collStatsRegionSVG(regions){
   var col=function(n){ if(!n) return 'rgba(148,163,184,.12)'; return 'rgba(8,145,178,'+(0.20+0.75*(n/mx)).toFixed(3)+')'; };
   var svg='<svg viewBox="'+G.viewBox+'" style="width:100%;max-width:540px;display:block;margin:0 auto">';
   // 1) polygones — filet fin gris neutre pour toujours entrevoir le contour de la France
-  Object.keys(G.regions).forEach(function(n){ var r=G.regions[n];
-    svg+='<path d="'+r.d+'" fill="'+col(metro[n])+'" stroke="rgba(100,116,139,.55)" stroke-width="1" stroke-linejoin="round"><title>'+esc(n)+' : '+metro[n]+' membre'+(metro[n]>1?'s':'')+'</title></path>';
+  //    cliquables : affiche le détail des compétiteurs de la région à côté
+  Object.keys(G.regions).forEach(function(n){ var r=G.regions[n]; var _rn=n.replace(/'/g,"\\'");
+    svg+='<path d="'+r.d+'" fill="'+col(metro[n])+'" stroke="rgba(100,116,139,.55)" stroke-width="1" stroke-linejoin="round" style="cursor:pointer" onclick="_collStatsClickRegion(this,\''+_rn+'\')"><title>'+esc(n)+' : '+metro[n]+' membre'+(metro[n]>1?'s':'')+'</title></path>';
   });
-  // 2) libellés au-dessus (chiffre + code région)
+  // 2) libellés au-dessus (chiffre + code région) — pointer-events:none pour laisser
+  //    passer le clic vers le polygone sous-jacent
   Object.keys(G.regions).forEach(function(n){ var r=G.regions[n], v=metro[n], code=SHORT[n]||n;
     if(v>0){
-      svg+='<text x="'+r.cx+'" y="'+(r.cy-1)+'" text-anchor="middle" font-family="inherit" font-size="30" font-weight="900" fill="#fff" paint-order="stroke" stroke="rgba(0,0,0,.4)" stroke-width="3.5">'+v+'</text>';
-      svg+='<text x="'+r.cx+'" y="'+(r.cy+18)+'" text-anchor="middle" font-family="inherit" font-size="15" font-weight="700" fill="rgba(255,255,255,.92)" paint-order="stroke" stroke="rgba(0,0,0,.3)" stroke-width="2.5">'+esc(code)+'</text>';
+      svg+='<text x="'+r.cx+'" y="'+(r.cy+2)+'" text-anchor="middle" font-family="inherit" font-size="44" font-weight="900" fill="#0f172a" paint-order="stroke" stroke="rgba(255,255,255,.85)" stroke-width="4.5" style="pointer-events:none">'+v+'</text>';
+      svg+='<text x="'+r.cx+'" y="'+(r.cy+24)+'" text-anchor="middle" font-family="inherit" font-size="17" font-weight="700" fill="rgba(15,23,42,.85)" paint-order="stroke" stroke="rgba(255,255,255,.75)" stroke-width="2.5" style="pointer-events:none">'+esc(code)+'</text>';
     } else {
-      svg+='<text x="'+r.cx+'" y="'+(r.cy+5)+'" text-anchor="middle" font-family="inherit" font-size="14" font-weight="700" fill="rgba(148,163,184,.75)">'+esc(code)+'</text>';
+      svg+='<text x="'+r.cx+'" y="'+(r.cy+5)+'" text-anchor="middle" font-family="inherit" font-size="14" font-weight="700" fill="rgba(148,163,184,.75)" style="pointer-events:none">'+esc(code)+'</text>';
     }
   });
   svg+='</svg>';
@@ -53225,10 +53291,81 @@ function _collStatsRegionSVG(regions){
       +others.sort(function(a,b){ return b[1]-a[1]; }).map(function(o){ return esc(o[0])+' <b style="color:var(--txt2)">'+o[1]+'</b>'; }).join(' · ')
       +'</div>'
     : '';
-  // Cadre (trait fin) autour de la carte — maintenu même en présence de non-résidents
+  // Pas d'encadrement/fond superflu autour de la carte (déjà encadrée par la carte-mère)
   var mapFramed='<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'
-    +'<div style="border:1px solid var(--bdr);border-radius:10px;padding:10px;background:rgba(127,127,127,.03)">'+svg+'</div>'+footer+'</div>';
-  return '<div style="'+_cSt+';grid-column:'+_gcol+'"><div style="'+_tSt+'">Régions d\'origine</div>'+mapFramed+'</div>';
+    +svg+footer
+    +'<div class="no-print" style="margin-top:8px;font-size:10px;color:var(--txt3);text-align:center">Cliquez sur une région pour voir le détail des compétiteurs</div></div>';
+  return '<div class="region-map-card" style="'+_cSt+';grid-column:'+_gcol+'"><div style="'+_tSt+'">Régions d\'origine</div>'+mapFramed+'</div>';
+}
+
+// ── Clic sur une région de la carte : affiche à côté le détail des
+//    compétiteurs de cette région (photo, nom/prénom, licence, département,
+//    ville, pratique, disciplines, statut SHN) ──
+function _collStatsClickRegion(el, region){
+  // Surligne la région sélectionnée, réinitialise les autres
+  var svg = (el && el.closest) ? el.closest('svg') : null;
+  if (svg) {
+    svg.querySelectorAll('path').forEach(function(p){ p.setAttribute('stroke','rgba(100,116,139,.55)'); p.setAttribute('stroke-width','1'); });
+    if (el.setAttribute) { el.setAttribute('stroke','#0891b2'); el.setAttribute('stroke-width','3'); }
+  }
+  var cont = document.getElementById('collstats-region-detail');
+  if (!cont) return;
+  var esc=function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var members = (typeof _statsMembers==='function') ? _statsMembers() : [];
+  var list = members.filter(function(m){ return _collNormRegion(m.region||m.ligue||m.regionSportive||'') === region; })
+    .sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||'','fr') || (a.prenom||'').localeCompare(b.prenom||'','fr'); });
+  var pratLabel = { microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur' };
+  var discLabel = { classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+  var _findPilotOf = function(m){
+    var p = m.pilotId ? (S.pilots||[]).find(function(x){ return x.id===m.pilotId; }) : null;
+    if (!p && m.licence) p = (S.pilots||[]).find(function(x){ return x.licence && String(x.licence)===String(m.licence); });
+    return p || null;
+  };
+  // Liste compacte (une ligne par compétiteur, pas de grande fiche photo)
+  // pour tenir sur l'écran : avatar minuscule + nom, puis une seule ligne
+  // de méta-infos tronquée (titre complet au survol).
+  var _tSt2='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;flex-shrink:0';
+  var rows = list.map(function(m){
+    var pil = _findPilotOf(m);
+    var photo = m.photo || (pil && pil.photo) || '';
+    var dept  = m.departement || (pil && pil.departement) || '';
+    var ville = m.ville || (pil && pil.ville) || '';
+    var ini = ((m.prenom||'').charAt(0)+(m.nom||'').charAt(0)).toUpperCase();
+    var av = photo
+      ? '<img src="'+photo+'" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--bdr)">'
+      : '<div style="width:22px;height:22px;border-radius:50%;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini)+'</div>';
+    var discs = [m.discipline,m.discipline2].filter(Boolean).map(function(d){ return discLabel[d]||d; }).join(', ') || '—';
+    // Dépt/Ville : omis entièrement quand la donnée n'existe pas (pas de « Dépt — »)
+    var metaSegs = [ m.club ? esc(m.club) : '—', 'Licence '+(m.licence?esc(m.licence):'—') ];
+    if (dept) metaSegs.push('Dépt '+esc(dept));
+    if (ville) metaSegs.push(esc(ville));
+    metaSegs.push(esc(pratLabel[m.pratique]||m.pratique||'—'), esc(discs));
+    if (m.statut_shn) metaSegs.push('SHN '+esc(m.statut_shn));
+    var meta = metaSegs.join(' · ');
+    var nom = esc((m.prenom||'').toUpperCase())+' '+esc((m.nom||'').toUpperCase());
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bdr);overflow:hidden">'
+      + av
+      + '<div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+nom+' · '+meta+'">'
+      + '<span style="font-size:11.5px;font-weight:700;color:var(--txt)">'+nom+'</span>'
+      + '<span style="font-size:10px;color:var(--txt3)"> · '+meta+'</span>'
+      + '</div></div>';
+  }).join('');
+  cont.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:8px">'
+    + '<div style="'+_tSt2+';margin-bottom:0">'+esc(region)+' <span style="color:var(--txt2);font-weight:600;text-transform:none;letter-spacing:0">('+list.length+' compétiteur'+(list.length>1?'s':'')+')</span></div>'
+    + '<button onclick="_collStatsCloseRegion()" title="Fermer" style="width:20px;height:20px;border:none;border-radius:6px;background:transparent;color:var(--txt3);font-size:15px;line-height:1;cursor:pointer;flex-shrink:0">×</button>'
+    + '</div>'
+    + '<div style="flex:1;overflow-y:auto">'
+    + (rows || '<div style="color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Aucun compétiteur pour cette région.</div>')
+    + '</div>';
+}
+function _collStatsCloseRegion(){
+  var cont = document.getElementById('collstats-region-detail');
+  if (cont) {
+    cont.innerHTML = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;flex-shrink:0">Compétiteurs par région</div>'
+      + '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;text-align:center;padding:16px 0">Cliquez sur une région de la carte pour afficher la liste des compétiteurs</div>';
+  }
+  var svgEl = document.querySelector('#collectif-body svg');
+  if (svgEl) svgEl.querySelectorAll('path').forEach(function(p){ p.setAttribute('stroke','rgba(100,116,139,.55)'); p.setAttribute('stroke-width','1'); });
 }
 
 // Impression A4 (paysage) — reprend à l'identique les KPI, graphiques et carte
@@ -53244,27 +53381,65 @@ function _collStatsPrintA4(){
   var sais=_statsSaison?('Saison '+_statsSaison):'Toutes saisons';
   var dateStr=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   var css=''
-    +'@page{size:A4 portrait;margin:9mm}'
+    +'@page{size:A4 landscape;margin:8mm}'
     +':root{--txt:#0f172a;--txt2:#334155;--txt3:#64748b;--navy:#f8fafc;--navy2:#ffffff;--navy3:#eef2f7;--navy4:#e2e8f0;--bdr:#d7dee7;--stol:#10b981}'
     +'*{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box}'
-    +'body{margin:0;background:#fff;color:#0f172a;font-family:"Segoe UI",Arial,sans-serif}'
-    +'.sp-head{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #0891b2;padding-bottom:8px;margin-bottom:12px}'
-    +'.sp-head h1{margin:0;font-size:17px;color:#0f172a}.sp-head .sub{font-size:12px;color:#64748b;margin-top:2px}'
-    +'.sp-head .meta{font-size:11px;color:#64748b;text-align:right}'
-    +'.sp [style*="margin-bottom:14px"][style*="grid-template-columns"]{grid-template-columns:repeat(4,1fr)!important}'  /* KPI : une seule ligne */
-    +'.sp [style*="grid-auto-flow:dense"]{grid-template-columns:repeat(2,1fr)!important}'                              /* graphiques : 2 colonnes */
-    +'.sp [style*="grid-column:span 2"]{grid-column:auto!important}'                                                   /* carte : 1 colonne → à côté des clubs */
-    +'.sp [style*="border-radius:14px"]{break-inside:avoid;padding:10px 12px!important}'
-    +'.sp svg{max-height:300px}'
+    +'html,body{margin:0;background:#fff;color:#0f172a;font-family:"Segoe UI",Arial,sans-serif;height:100%}'
+    +'.sp{zoom:.86;height:100%;display:flex;flex-direction:column}'                                                    /* marge de sécurité pour tenir sur 1 page */
+    +'.sp-head{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #0891b2;padding-bottom:6px;margin-bottom:10px;flex-shrink:0}'
+    +'.sp-head h1{margin:0;font-size:16px;color:#0f172a}.sp-head .sub{font-size:11px;color:#64748b;margin-top:2px}'
+    +'.sp-head .meta{font-size:10px;color:#64748b;text-align:right}'
+    +'.sp [style*="margin-bottom:14px"][style*="grid-template-columns"]{grid-template-columns:repeat(5,1fr)!important;margin-bottom:10px!important}'  /* 5 tuiles KPI sur une seule ligne */
+    +'.sp [style*="grid-auto-flow:dense"]{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}'            /* graphiques : 3 colonnes → 2 lignes */
+    +'.sp [style*="grid-row:span 2"]{grid-row:auto!important}'                                                         /* clubs : plus besoin d\'être haut sur 2 lignes */
+    +'.sp [style*="grid-column:span 3"]{display:none!important}'                                                       /* détail région (interactif) : jamais imprimé */
+    +'.sp [style*="border-radius:14px"]{break-inside:avoid;padding:8px 10px!important}'
+    +'.sp .region-map-card svg{max-height:290px}'                                                                      /* carte agrandie — de la place disponible */
     +'.sp svg path{stroke:#94a3b8!important}'
     +'.sp svg circle[stroke="rgba(255,255,255,.07)"]{stroke:#e6ebf1!important}'
     +'.sp [style*="background:rgba(255,255,255,.07)"]{background:#e6ebf1!important}'
-    +'.no-print{display:none}';
-  var head='<div class="sp-head"><div><h1>Chiffres &amp; statistiques — '+esc(titre)+'</h1>'
-    +'<div class="sub">'+esc(sais)+'</div></div>'
+    +'.no-print{display:none!important}'
+    // ── Page 2 (verso) : liste des compétiteurs triée par région ──
+    +'.roster-page{page-break-before:always;padding-top:2mm}'
+    +'.roster-head{font-size:13px;font-weight:800;color:#0f172a;border-bottom:2px solid #0891b2;padding-bottom:5px;margin-bottom:8px}'
+    +'.roster-head span{font-weight:600;color:#64748b;font-size:10px;margin-left:8px}'
+    +'.roster-cols{column-count:2;column-gap:20px}'
+    +'.roster-region{break-inside:avoid;margin-bottom:6px}'
+    +'.roster-region h2{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#0891b2;border-bottom:1px solid #d7dee7;padding-bottom:2px;margin:0 0 3px}'
+    +'.roster-region h2 span{font-weight:600;color:#64748b;text-transform:none;letter-spacing:0}'
+    +'.roster-row{font-size:11px;line-height:1.4;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    +'.roster-row b{color:#0f172a}';
+  var logoSrc = (typeof _getAppLogo==='function') ? _getAppLogo() : '';
+  var logoHtml = logoSrc
+    ? '<img src="'+logoSrc+'" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;border-radius:50%">'
+    : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="46" height="46" style="flex-shrink:0"><circle cx="30" cy="30" r="29" fill="#1e3d78"/><circle cx="30" cy="30" r="24" fill="#fff"/><path d="M8 34Q19 20 30 24Q41 20 52 34Q40 26 30 28Q20 26 8 34Z" fill="#1e3d78"/><rect x="18" y="40" width="7" height="5" rx="1" fill="#002395"/><rect x="26" y="40" width="8" height="5" rx="1" fill="#eee"/><rect x="35" y="40" width="7" height="5" rx="1" fill="#ED2939"/><text x="30" y="19" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="8" fill="#1e3d78">FFPLUM</text></svg>';
+  var head='<div class="sp-head"><div style="display:flex;align-items:center;gap:12px">'+logoHtml+'<div><h1>Chiffres &amp; statistiques — '+esc(titre)+'</h1>'
+    +'<div class="sub">'+esc(sais)+'</div></div></div>'
     +'<div class="meta">Gest\'DTN · FFPLUM<br>Édité le '+esc(dateStr)+'</div></div>';
+  // ── Page 2 : liste des compétiteurs triée par région (nom, prénom, licence, club, pratique, disciplines, SHN) ──
+  var pratLabel2={ microlight:'Microlight', paramotor:'Paramoteur', paramoteur:'Paramoteur' };
+  var discLabel2={ classic:'Classic', classique:'Classic', slalom:'Slalom', stol:'STOL', cross:'Cross', precision:'Précision' };
+  var rosterMembers = (typeof _statsMembers==='function') ? _statsMembers() : [];
+  var byRegion={};
+  rosterMembers.forEach(function(m){
+    var rg=(typeof _collNormRegion==='function') ? (_collNormRegion(m.region||m.ligue||m.regionSportive||'')||'Non renseignée') : (m.region||'Non renseignée');
+    (byRegion[rg]=byRegion[rg]||[]).push(m);
+  });
+  var regionNames=Object.keys(byRegion).sort(function(a,b){ return a.localeCompare(b,'fr'); });
+  var rosterHtml='<div class="roster-page"><div class="roster-head">Liste des compétiteurs par région<span>'+rosterMembers.length+' compétiteur'+(rosterMembers.length>1?'s':'')+' · '+esc(titre)+' · '+esc(sais)+'</span></div><div class="roster-cols">'
+    +regionNames.map(function(rg){
+      var arr=byRegion[rg].slice().sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||'','fr') || (a.prenom||'').localeCompare(b.prenom||'','fr'); });
+      return '<div class="roster-region"><h2>'+esc(rg)+' <span>('+arr.length+')</span></h2>'
+        +arr.map(function(m){
+          var discs=[m.discipline,m.discipline2].filter(Boolean).map(function(d){ return discLabel2[d]||d; }).join(', ')||'—';
+          var shn=m.statut_shn?' · SHN '+esc(m.statut_shn):'';
+          return '<div class="roster-row"><b>'+esc((m.nom||'').toUpperCase())+'</b> '+esc((m.prenom||'').toUpperCase())+' · N°'+esc(m.licence||'—')+' · '+esc(m.club||'—')+' · '+esc(pratLabel2[m.pratique]||m.pratique||'—')+' · '+esc(discs)+shn+'</div>';
+        }).join('')
+        +'</div>';
+    }).join('')
+    +'</div></div>';
   var w=window.open('','_blank','width=1180,height=840'); if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer','warn'); return; }
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Chiffres & stats — '+esc(titre)+'</title><style>'+css+'</style></head><body><div class="sp">'+head+html+'</div>'
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Chiffres & stats — '+esc(titre)+'</title><style>'+css+'</style></head><body><div class="sp">'+head+html+'</div>'+rosterHtml
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},250);};<\/scr'+'ipt></body></html>');
   w.document.close();
 }
@@ -54663,6 +54838,69 @@ async function _dtnTodoDelete(id){
     if(r.error) throw r.error;
   } catch(e){ window._dtnTodoRemote[k]=backup; _dtnRenderTodo(); if(typeof toast==='function') toast('Suppression non synchronisée : '+(e&&e.message||''),'err'); }
 }
+
+// ── Glisser-déposer : déplacer une tâche fait adopter la date d'échéance
+//    de la tâche sur laquelle elle est lâchée (ex : déposée entre deux
+//    tâches du 18/08 → prend le 18/08 comme nouvelle échéance) ──
+var _dtnTodoDragId = null;
+function _dtnTodoDragStart(ev, id){
+  _dtnTodoDragId = id;
+  if (ev.dataTransfer) {
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', id); } catch(e){}
+  }
+}
+function _dtnTodoDragOver(ev){
+  ev.preventDefault();
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+  var tr = ev.currentTarget;
+  if (tr) tr.style.background = 'rgba(8,145,178,.1)';
+}
+function _dtnTodoDragLeave(ev){
+  var tr = ev.currentTarget;
+  if (tr) tr.style.background = '';
+}
+async function _dtnTodoDrop(ev, targetId){
+  ev.preventDefault();
+  var tr = ev.currentTarget;
+  if (tr) tr.style.background = '';
+  var draggedId = _dtnTodoDragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+  _dtnTodoDragId = null;
+  if (!draggedId || draggedId === targetId) return;
+  await _dtnTodoMoveToDate(draggedId, targetId);
+}
+async function _dtnTodoMoveToDate(draggedId, targetId){
+  var list = _dtnTodoList();
+  var target = list.find(function(x){ return x.id === targetId; });
+  if (!target) return;
+  var newDate = target.dateDu || '';
+  var dTxt = newDate ? newDate.split('-').reverse().join('/') : 'sans échéance';
+  if (_dtnTodoIsGuest()){
+    _dtnTodoMutateLS(function(arr){
+      var t = arr.find(function(x){ return x.id === draggedId; });
+      if (t) t.dateDu = newDate;
+      return arr;
+    });
+    _dtnRenderTodo();
+    if (typeof toast==='function') toast('Échéance déplacée au '+dTxt, 'ok');
+    return;
+  }
+  var sb=(typeof getSB==='function')?getSB():null; if(!sb) return;
+  var arr = window._dtnTodoRemote[_dtnTodoUserKey()]||[];
+  var t = arr.find(function(x){ return x.id === draggedId; });
+  if (!t) return;
+  var backup = t.dateDu;
+  t.dateDu = newDate; // optimiste
+  _dtnRenderTodo();
+  try {
+    var r = await sb.from('dtn_todos').update({ date_du: newDate || null }).eq('id', draggedId);
+    if (r.error) throw r.error;
+    if (typeof toast==='function') toast('Échéance déplacée au '+dTxt, 'ok');
+  } catch(e){
+    t.dateDu = backup; _dtnRenderTodo();
+    if (typeof toast==='function') toast('Synchronisation impossible : '+(e&&e.message||''),'err');
+  }
+}
 function _dtnRenderTodo(){
   var el = document.getElementById('dtn-todo-zone'); if(!el) return;
   if(!_dtnTodoIsGuest() && !window._dtnTodoRemote[_dtnTodoUserKey()]){
@@ -54693,7 +54931,8 @@ function _dtnRenderTodoNow(el){
     var dCol = overdue ? '#ef4444' : 'var(--txt2)';
     var dTxt = t.dateDu ? t.dateDu.split('-').reverse().join('/') : '—';
     var strike = t.done ? 'text-decoration:line-through;opacity:.5' : '';
-    return '<tr style="border-bottom:1px solid var(--bdr)">'
+    return '<tr draggable="true" ondragstart="_dtnTodoDragStart(event,\''+t.id+'\')" ondragover="_dtnTodoDragOver(event)" ondragleave="_dtnTodoDragLeave(event)" ondrop="_dtnTodoDrop(event,\''+t.id+'\')" style="border-bottom:1px solid var(--bdr);transition:background .1s">'
+      +'<td style="padding:8px 2px 8px 8px;text-align:center;color:var(--txt3);font-size:13px;cursor:grab;user-select:none" title="Glisser pour déplacer — dépose sur une tâche pour reprendre son échéance">⠿</td>'
       +'<td style="padding:8px 10px;white-space:nowrap;color:'+dCol+';font-weight:'+(overdue?'700':'600')+';'+strike+'">'+dTxt+(overdue?' ⚠':'')+'</td>'
       +'<td style="padding:8px 10px;color:var(--txt);font-weight:600;'+strike+'">'+esc(t.thematique||'—')+'</td>'
       +'<td style="padding:8px 10px;color:var(--txt2);'+strike+'">'+esc(t.action||'')+'</td>'
@@ -54704,9 +54943,11 @@ function _dtnRenderTodoNow(el){
       +'</td></tr>';
   }).join('');
   el.innerHTML = head
+    + '<div style="font-size:10px;color:var(--txt3);margin-bottom:6px">Glissez ⠿ une tâche sur une autre pour lui reprendre son échéance.</div>'
     + '<div style="border:1px solid var(--bdr);border-radius:12px;overflow:hidden">'
-    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px">'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:660px">'
     + '<thead><tr>'
+      +'<th style="'+th+';width:26px"></th>'
       +'<th style="'+th+';width:104px">Échéance</th>'
       +'<th style="'+th+';width:160px">Thématique</th>'
       +'<th style="'+th+'">Action</th>'
@@ -58792,20 +59033,56 @@ document.addEventListener('DOMContentLoaded', async function() {
     var theme = localStorage.getItem('geststol_theme') || 'auto';
     var isDark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     splash.style.background = isDark ? '#000' : '#fff';
+    var logoWrap  = document.getElementById('splash-logo-wrap');
     var logoInner = document.getElementById('splash-logo-inner');
     if (logoInner) {
       var savedLogo = _getAppLogo();
       var logoSrc = savedLogo || _FFPLUM_LOGO_DEFAULT;
       window._FFPLUM_LOGO_SRC = logoSrc; // accessible globalement
-      logoInner.innerHTML = '<img src="' + logoSrc + '" style="width:88px;height:88px;object-fit:contain">';
+      logoInner.innerHTML = '<img src="' + logoSrc + '" style="width:100%;height:100%;object-fit:contain">';
     }
+    // 1) Logo : rotation + zoom (x2), puis figé dans cet état agrandi
+    requestAnimationFrame(function(){
+      if (logoWrap)  logoWrap.classList.add('grow');
+      if (logoInner) logoInner.classList.add('spin');
+    });
     setTimeout(function() {
-      splash.style.opacity = '0';
+      // 2) Gest'DTN apparaît et reste fixé avec le logo
+      var title = document.getElementById('splash-title');
+      if (title) title.style.opacity = '1';
       setTimeout(function() {
-        splash.style.display = 'none';
-        afterSplash();
-      }, 500);
-    }, 2500);
+        // ── Pause après le titre, puis 3) l'image apparaît ──
+        var photo = document.getElementById('splash-banner-photo');
+        var hasPhoto = !!(photo && STOL_SPLASH_PHOTO);
+        if (hasPhoto) {
+          photo.src = STOL_SPLASH_PHOTO;
+          photo.style.opacity = '1';
+        }
+        setTimeout(function() {
+          // ── Pause après l'image, puis FONDU CROISÉ : le splash s'estompe
+          //    PENDANT que la page de destination apparaît en fondu, au même
+          //    moment (plutôt qu'un enchaînement séquentiel) et plus lentement,
+          //    pour un effet de fondu-enchaîné plus doux ──
+          var fadeMs = 1400;
+          afterSplash(); // affiche la destination (opacité mise à 0 juste après, avant peinture)
+          splash.style.transition = 'opacity ' + fadeMs + 'ms ease';
+          var destEls = ['page-dtn','app','welcome-screen'].map(function(id){
+            return document.getElementById(id);
+          }).filter(function(el){ return el && el.style.display !== 'none'; });
+          destEls.forEach(function(el){
+            el.style.opacity = '0';
+            el.style.transition = 'opacity ' + fadeMs + 'ms ease';
+          });
+          requestAnimationFrame(function(){
+            requestAnimationFrame(function(){
+              splash.style.opacity = '0';
+              destEls.forEach(function(el){ el.style.opacity = '1'; });
+            });
+          });
+          setTimeout(function(){ splash.style.display = 'none'; }, fadeMs + 100);
+        }, hasPhoto ? 1800 : 900); // pause après l'image (ou après le titre si pas d'image)
+      }, 1200); // pause après le titre, avant l'image
+    }, 1500); // durée de l'animation logo
   }
   function afterSplash() {
     // CRITICAL: Ajouter classe startup-lock directement sur page-competitions pour la masquer
@@ -58850,22 +59127,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       _isStartup = false;
     }, 250);
   }
-  var photoSplash = document.getElementById('photo-splash');
-  var psBg = document.getElementById('photo-splash-bg');
-  var psFallback = document.getElementById('photo-splash-fallback');
-  var psBar = document.getElementById('photo-splash-bar');
-  if (STOL_SPLASH_PHOTO) {
-    if (psBg) { psBg.style.backgroundImage = 'url(' + STOL_SPLASH_PHOTO + ')'; psBg.style.animation = 'zoomSlow 3s ease forwards'; }
-    if (psFallback) psFallback.style.display = 'none';
-    if (photoSplash) photoSplash.style.display = 'flex';
-    requestAnimationFrame(function(){ if (psBar) psBar.style.width = '100%'; });
-    setTimeout(function(){
-      if (photoSplash) { photoSplash.style.opacity = '0'; setTimeout(function(){ photoSplash.style.display='none'; }, 520); }
-      showMainSplash();
-    }, 2600);
-  } else {
-    showMainSplash();
-  }
+  showMainSplash();
 
   // Supabase auth state
   var sb = getSB();
