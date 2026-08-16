@@ -17405,7 +17405,8 @@ function initInfosMaps(cp, enrolled) {
     var franceSvg = _frDeptChoroplethSVG(regionStatsByCode, {
       bg: '#eef2f6', heightCss: '100%',
       colorFn: function(st){ return { fill: stolColor, stroke: stolColor, op: Math.max(0.25, Math.min(1, st.n / maxC)) }; },
-      tipFn: function(st){ return ' — '+st.n+' compétiteur'+(st.n>1?'s':''); }
+      tipFn: function(st){ return ' — '+st.n+' compétiteur'+(st.n>1?'s':''); },
+      numColor: '#fff', numStroke: 'rgba(15,23,42,.55)'
     });
     var hasEurope = Object.keys(europeCounts).length > 0;
     var offNote = offMapCount > 0
@@ -17928,7 +17929,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (_hasBgt && _bgtEng>0) _kpi.push({val:_fmtK(_bgtEng), lbl:'Dépenses', col:_bgtEng>35000?'#f43f5e':'#10b981', sub:_bgtEng>35000?'Budget élevé':'Budget maîtrisé', tab:'budget'});
 
     // ── 1. TUILES KPI — grille uniforme, budget inclus comme dernière tuile ──
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px">';
     _kpi.forEach(function(t){
       var _onclick = t.tab ? ' onclick="switchHomeDetailTab(\''+t.tab+'\')"' : '';
       var _cursor  = t.tab ? 'cursor:pointer;' : '';
@@ -18177,37 +18178,38 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html += '<div id="infos-region-bars"></div>';
     }
 
-    // ── 5. BUDGET — en fin de tableau de bord ─────────────────────
+    // ── 5. BUDGET — résumé + graphiques sur une seule ligne (3 colonnes) ──
     if (_hasBgt) {
       var _bSolde2 = _bgtRes - _bgtEng;
       var _bSoldeCol2 = _bSolde2 >= 0 ? '#10b981' : '#f43f5e';
       html += _sep('Budget détaillé');
-      // Résumé solde (bande synthèse)
-      html += '<div style="'+_cSt+';padding:10px 14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #f43f5e">';
-      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>';
-      html += '<div style="font-size:18px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>';
-      html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #10b981">';
-      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Recettes</div>';
-      html += '<div style="font-size:18px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>';
-      html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid '+_bSoldeCol2+'">';
-      html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Solde</div>';
-      html += '<div style="font-size:18px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>';
-      html += '</div>';
-      html += '</div>';
-      // Donuts dépenses & recettes — même hauteur fixe, grille 1fr 1fr toujours
       var _hasBdep = _icd.budgetDep && _icd.budgetDep.series.length>0;
       var _hasBres = _icd.budgetRes && _icd.budgetRes.series.length>0;
       var _isMobBgt = window.innerWidth < 768;
       var _BH = _isMobBgt ? 200 : 220; // hauteur réduite sur mobile
-      if (_hasBdep || _hasBres) {
-        var _bCards2 = [];
-        if (_hasBdep) _bCards2.push(_aCard('apex-budget-dep', 'Dépenses par domaine', _BH));
-        if (_hasBres) _bCards2.push(_aCard('apex-budget-res', 'Recettes par domaine', _BH));
-        var _bCols2 = (_isMobBgt || _bCards2.length===1) ? '1fr' : '1fr 1fr';
-        html += '<div style="display:grid;grid-template-columns:'+_bCols2+';gap:8px">'+_bCards2.join('')+'</div>';
+      // Résumé solde — chiffres étalés sur toute la largeur de la carte
+      var _bSummary = '<div style="'+_cSt+';padding:10px 14px;display:flex;flex-direction:column;justify-content:center;'+(_isMobBgt?'':'height:'+_BH+'px')+'">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'
+        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #f43f5e">'
+        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>'
+        + '<div style="font-size:18px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>'
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #10b981">'
+        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Recettes</div>'
+        + '<div style="font-size:18px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>'
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid '+_bSoldeCol2+'">'
+        + '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Solde</div>'
+        + '<div style="font-size:18px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>'
+        + '</div>'
+        + '</div></div>';
+      var _bCards3 = [_bSummary];
+      if (_hasBdep) _bCards3.push(_aCard('apex-budget-dep', 'Dépenses par domaine', _BH));
+      if (_hasBres) _bCards3.push(_aCard('apex-budget-res', 'Recettes par domaine', _BH));
+      if (_isMobBgt) {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">'+_bCards3.join('')+'</div>';
+      } else {
+        html += '<div style="display:grid;grid-template-columns:repeat('+_bCards3.length+',1fr);gap:8px">'+_bCards3.join('')+'</div>';
       }
     }
 
@@ -55923,7 +55925,7 @@ function _frDeptChoroplethSVG(zoneStats, opts){
   Object.keys(zoneStats).forEach(function(code){
     var st = zoneStats[code]; if (!st || !st.n) return;
     var c = ZC[code]; if (!c) return;
-    svg += '<text x="'+c[0]+'" y="'+c[1]+'" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="'+(opts.numFontSize||30)+'" font-weight="900" fill="#1e293b" stroke="rgba(255,255,255,.9)" stroke-width="4" paint-order="stroke fill" style="pointer-events:none">'+st.n+'</text>';
+    svg += '<text x="'+c[0]+'" y="'+c[1]+'" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="'+(opts.numFontSize||30)+'" font-weight="900" fill="'+(opts.numColor||'#1e293b')+'" stroke="'+(opts.numStroke||'rgba(255,255,255,.9)')+'" stroke-width="4" paint-order="stroke fill" style="pointer-events:none">'+st.n+'</text>';
   });
   svg += '</svg>';
   return svg;
