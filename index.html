@@ -7386,7 +7386,8 @@ function _etapeSave(compId, etId) {
   // Géocodage asynchrone si pas encore de coordonnées (lieu sans OACI ou fetch Nominatim raté)
   var savedEt = (S.etapes[compId]||[]).find(function(x){ return x.id===(etId||rec.id); });
   if (savedEt && (!savedEt.lat || !savedEt.lng)) {
-    var _geoQ = oaci ? oaci+' aerodrome france' : lieu+' france';
+    // Pas de suffixe pays forcé — géocode aussi les sites à l'étranger (ex. Pologne)
+    var _geoQ = oaci ? oaci+' aerodrome' : lieu;
     fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(_geoQ)+'&format=json&limit=1',
           {headers:{'Accept-Language':'fr'}})
       .then(function(r){return r.json();})
@@ -7465,7 +7466,7 @@ function _etapeMapInit(compId) {
   function _nextGeo() {
     if (idx >= toGeo.length) return;
     var et = toGeo[idx++];
-    var q = et.oaci ? et.oaci+' aerodrome france' : (et.lieu||et.nom)+' france';
+    var q = et.oaci ? et.oaci+' aerodrome' : (et.lieu||et.nom); // pas de suffixe pays forcé (étranger)
     fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1',
           {headers:{'Accept-Language':'fr'}})
       .then(function(r){return r.json();})
@@ -8289,7 +8290,7 @@ function _etapeInlineOACI(compId, etId, val, inputEl) {
   }
   // Repli coordonnées via Nominatim seulement si BASULM n'a rien donné
   if (oaci.length >= 4 && !et.lat) {
-    var geoQ = oaci + ' aerodrome france';
+    var geoQ = oaci + ' aerodrome'; // pas de suffixe pays forcé (étranger)
     fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(geoQ)+'&format=json&limit=1',{headers:{'Accept-Language':'fr'}})
       .then(function(r){return r.json();})
       .then(function(d){ if(d&&d[0]&&!et.lat){ et.lat=d[0].lat; et.lng=d[0].lon; saveState(); _etapeMapRefresh(compId); } })
@@ -21990,7 +21991,7 @@ function initHDPMap(cp) {
     _hdpMap.setView([46.5, 2.5], 5);
     // Geocoder l'aérodrome via Nominatim
     if (cp.oaci) {
-      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cp.oaci+' aerodrome france')+'&format=json&limit=1')
+      fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cp.oaci+' aerodrome')+'&format=json&limit=1')
         .then(function(r){return r.json();})
         .then(function(d){
           if (d && d[0]) {
@@ -26790,6 +26791,7 @@ async function pushToCloud() {
     compEnroll:       S.compEnroll         || {},
     materiel:         S.materiel           || {},
     evenements:       S.evenements         || {},
+    etapes:           S.etapes             || {},
     budgets:          S.budgets            || {},
     partenaires:      S.partenaires        || {},
     deroulement:      S.deroulement        || {},
@@ -27397,7 +27399,11 @@ async function loadFromSupabaseFirst() {
   }
   function _countMaterielNamed(d) {
     var mt = (d && d.materiel) || {};
-    return Object.values(mt).reduce(function(t,a){ return t + (Array.isArray(a)?a.filter(function(i){ return i&&(i.nom||i.name); }).length:0); }, 0);
+    // Le champ contenant le nom de l'article s'appelle "materiel" (voir push
+    // à la création, ex. index.html:28637) — pas "nom"/"name" comme testé
+    // avant. Avec le mauvais nom de champ, ce compteur valait toujours 0,
+    // donc la garde anti-perte du matériel local ne se déclenchait jamais.
+    return Object.values(mt).reduce(function(t,a){ return t + (Array.isArray(a)?a.filter(function(i){ return i&&(i.materiel||i.nom||i.name); }).length:0); }, 0);
   }
 
   // Applique les données cloud dans S (remplace tout sauf données strictement locales)
@@ -27543,6 +27549,10 @@ async function loadFromSupabaseFirst() {
     var savedEvenements = (S.evenements && Object.keys(S.evenements).length) ? JSON.parse(JSON.stringify(S.evenements)) : null;
     // ✅ GARDE NUMÉROTATION FACTURES : registre local préservé puis fusionné (jamais effacé par le cloud)
     var savedFactRepasReg = (S.factRepasReg && S.factRepasReg.map && Object.keys(S.factRepasReg.map).length) ? JSON.parse(JSON.stringify(S.factRepasReg)) : null;
+    // ✅ GARDE SITE & ÉTAPES : n'était pas fusionné du tout (absent de cette fonction)
+    // → un cloud plus ancien écrasait silencieusement les étapes/aérodromes saisis
+    // localement. Fusion par id, compétition par compétition (comme évenements).
+    var savedEtapes = (S.etapes && Object.keys(S.etapes).length) ? JSON.parse(JSON.stringify(S.etapes)) : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -27636,6 +27646,27 @@ async function loadFromSupabaseFirst() {
           else {
             var lTs = ev._updatedAt || 0, cTs = (cloudArr[idx] && cloudArr[idx]._updatedAt) || 0;
             if (lTs >= cTs) cloudArr[idx] = ev; // local prioritaire à égalité
+          }
+        });
+      });
+    }
+    // ✅ Fusionner SITE & ÉTAPES local avec le cloud, compétition par compétition,
+    // étape par id : union + dernier _updatedAt gagne (défaut = local). Cette clé
+    // n'était pas du tout protégée auparavant (perte silencieuse à chaque sync).
+    if (savedEtapes) {
+      if (!S.etapes || typeof S.etapes !== 'object') S.etapes = {};
+      Object.keys(savedEtapes).forEach(function(cid) {
+        var localArr = Array.isArray(savedEtapes[cid]) ? savedEtapes[cid] : [];
+        if (!Array.isArray(S.etapes[cid])) S.etapes[cid] = [];
+        var cloudArr = S.etapes[cid];
+        localArr.forEach(function(et) {
+          if (!et) return;
+          if (!et.id) { cloudArr.push(et); return; }
+          var idx = cloudArr.findIndex(function(x){ return x && x.id === et.id; });
+          if (idx === -1) { cloudArr.push(et); }
+          else {
+            var lTs = et._updatedAt || 0, cTs = (cloudArr[idx] && cloudArr[idx]._updatedAt) || 0;
+            if (lTs >= cTs) cloudArr[idx] = et; // local prioritaire à égalité
           }
         });
       });
