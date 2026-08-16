@@ -27724,6 +27724,18 @@ async function loadFromSupabaseFirst() {
       if (!S._deletedFormTypes || typeof S._deletedFormTypes!=='object' || Array.isArray(S._deletedFormTypes)) S._deletedFormTypes={};
       var _dt=_formSnap.delTypes||{};
       Object.keys(_dt).forEach(function(key){ if((_dt[key]||0) > (S._deletedFormTypes[key]||0)) S._deletedFormTypes[key]=_dt[key]; });
+      // ✅ Anti-résurrection-fantôme (bug "un type recréé disparaît au sync suivant") :
+      // recréer un type efface SA pierre tombale localement (_formSaveType) mais ce
+      // nettoyage n'est jamais poussé au cloud en tant que tel — un autre appareil (ou
+      // une synchro antérieure) peut donc réinjecter une pierre tombale périmée pour ce
+      // même nom. Si CE dispositif a le type actif dans son propre instantané local et
+      // n'a PAS de pierre tombale locale pour ce nom, ce signal est faisant foi : on
+      // retire toute pierre tombale héritée du cloud pour ce nom avant filtrage.
+      var _localActiveKeys={};
+      (_formSnap.formTypes||[]).forEach(function(t){ if(t&&t.nom) _localActiveKeys[_formTypeKey(t.nom)]=true; });
+      Object.keys(S._deletedFormTypes).forEach(function(key){
+        if (_localActiveKeys[key] && !_dt[key]) delete S._deletedFormTypes[key];
+      });
       var _tomb=S._deletedFormTypes;
       S.formTypes=(S.formTypes||[]).filter(function(t){
         if(!t) return false;
