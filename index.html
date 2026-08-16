@@ -26676,6 +26676,10 @@ function _withTimeout(promise, ms) {
 function _stolPushSignature() {
   try {
     var gtCount = Object.values(S.ganttTasks||{}).reduce(function(t,a){ return t+(Array.isArray(a)?a.length:0); }, 0);
+    var etapesCount = Object.values(S.etapes||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0);
+    var materielCount = Object.values(S.materiel||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0);
+    var partenairesCount = Object.values(S.partenaires||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0);
+    var evenementsCount = Object.values(S.evenements||{}).reduce(function(t,a){return t+(Array.isArray(a)?a.length:0);},0);
     var sig = [
       (S.comps||[]).length,
       Object.keys(S.staff||{}).length,
@@ -26689,7 +26693,31 @@ function _stolPushSignature() {
       Object.keys(S._deletedEnroll||{}).length,
       gtCount,
       (S.aides||[]).length,
-      (S.aides||[]).reduce(function(s,a){return s+(a._updatedAt||a._createdAt||0);},0)%1e9
+      (S.aides||[]).reduce(function(s,a){return s+(a._updatedAt||a._createdAt||0);},0)%1e9,
+      // ── Modules ajoutés après coup : sans ces lignes, une création/modif ici
+      // ne changeait jamais la signature → le push était silencieusement sauté
+      // pour toujours (cause du "ça disparaît" répété sur Formations/Étapes/
+      // Matériel malgré des recréations multiples : rien n'était réellement
+      // envoyé au cloud, l'app croyait n'avoir rien à sauvegarder). ──
+      (S.formTypes||[]).length,
+      (S.formTypes||[]).reduce(function(s,t){return s+(t._updatedAt||0);},0)%1e9,
+      (S.formSessions||[]).length,
+      (S.formInscriptions||[]).length,
+      (S.formQualifs||[]).length,
+      Object.keys(S._deletedFormTypes||{}).length,
+      etapesCount,
+      materielCount,
+      partenairesCount,
+      evenementsCount,
+      (S.faq||[]).length,
+      ((S.territoires||{}).comites||[]).length,
+      (S.accesUsers||[]).length,
+      (S.documents||[]).length,
+      (S.messages||[]).length,
+      (S.sitesSportifs||[]).length,
+      (S.collectif||[]).length,
+      (S.agendaEvents||[]).length,
+      (S.securiteEvents||[]).length
     ].join(':');
     return sig;
   } catch(e) { return Date.now().toString(); }
