@@ -2362,7 +2362,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         </div>
       </div>
 
-      <div style="flex:1"></div>
+      <div id="dtn-header-today" style="flex:1;display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0;overflow:hidden;padding-left:4px;padding-right:12px"></div>
 
       <button id="dtn-fs-btn" onclick="toggleFullscreen()" title="Plein écran"
         style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.05);color:var(--txt2);cursor:pointer;font-family:inherit;transition:all .15s;flex-shrink:0"
@@ -2405,8 +2405,12 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start">
             <div>
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>
-              <div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
+              <button onclick="_dtnToggle30j()" id="dtn-30j-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:8px;padding:0 2px;border:none;background:transparent;cursor:pointer;font-family:inherit;text-align:left">
+                <span id="dtn-30j-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(90deg)">▶</span>
+                <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e">30 jours</span>
+                <span id="dtn-30j-count" style="font-size:10px;color:var(--txt3)"></span>
+              </button>
+              <div id="dtn-prochaines-section" style="display:block"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>
               <button onclick="_dtnToggleAudela()" id="dtn-audela-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-top:16px;padding:9px 2px;border:none;border-top:1px solid var(--bdr);background:transparent;cursor:pointer;font-family:inherit;text-align:left">
                 <span id="dtn-audela-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(0deg)">▶</span>
                 <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b">Au-delà</span>
@@ -16536,13 +16540,21 @@ function showHomeCompDetail(compId) {
 function renderHomeDetailPanel(cp, _overrideContainer) {
   if (!cp) { cp = S.comps.find(function(c){ return c.id === _currentCompId; }); }
   if (!cp) return;
-  // Auto-détection du container : comp-detail-body si page-comp-detail est active, sinon home-detail-comp
+  // Auto-détection du container : comp-detail-body si page-comp-detail est active, sinon
+  // home-detail-comp — mais seulement si page-home est vraiment la page active. Sans cette
+  // vérification d'ancêtre, un home-detail-comp resté à display:flex depuis un précédent
+  // affichage (page-home elle-même masquée depuis) reçoit silencieusement le rendu à la
+  // place du panneau réellement visible (ex. lors d'un rafraîchissement AutoSync), et des
+  // ids comme #infos-map-region se retrouvent dupliqués — le vrai panneau visible reste vide.
   var detail = _overrideContainer;
   if (!detail) {
     var _pcd = document.getElementById('page-comp-detail');
-    detail = (_pcd && _pcd.classList.contains('active'))
-      ? document.getElementById('comp-detail-body')
-      : document.getElementById('home-detail-comp');
+    if (_pcd && _pcd.classList.contains('active')) {
+      detail = document.getElementById('comp-detail-body');
+    } else {
+      var _ph = document.getElementById('page-home');
+      detail = (_ph && _ph.classList.contains('active')) ? document.getElementById('home-detail-comp') : null;
+    }
   }
   if (!detail) return;
   var typeLabel = {'comp-internationale':'Compétition internationale','cdf':'Compétition nationale','regional':'Compétition régionale','comp-regionale':'Compétition régionale','entrainement-national':'Entraînement national','entrainement':'Entraînement','stage':'Stage'}[cp.type] || (cp.type||'');
@@ -16918,6 +16930,18 @@ var _COUNTRY_FLAGS = {
   'Étranger':'🌍'
 };
 
+// Sous-ensemble européen de _COUNTRY_FLAGS — sert à choisir quels pays affiche
+// la carte Europe du Provenance (hors DOM-TOM et pays hors Europe, qui sortent
+// du cadrage géographique de cette carte).
+var _EU_COUNTRIES = [
+  'Albanie','Allemagne','Andorre','Autriche','Belgique','Biélorussie','Bosnie-Herzégovine',
+  'Bulgarie','Chypre','Croatie','Danemark','Espagne','Estonie','Finlande','Géorgie','Grèce',
+  'Hongrie','Irlande','Islande','Italie','Kosovo','Lettonie','Liechtenstein','Lituanie',
+  'Luxembourg','Macédoine du Nord','Malte','Moldavie','Monaco','Monténégro','Norvège',
+  'Pays-Bas','Pologne','Portugal','République tchèque','Roumanie','Royaume-Uni','Russie',
+  'Saint-Marin','Serbie','Slovaquie','Slovénie','Suède','Suisse','Turquie','Ukraine'
+];
+
 // Normalisation d'un nom de pays (peu importe le format : FR/EN/natif/code ISO) → clé française.
 // Ex. "Germany", "Deutschland", "DE", "GER" → "Allemagne".
 var _PAYS_ALIAS = {
@@ -17226,21 +17250,10 @@ function initInfosCharts() {
   }
 
   // ── Rendu des graphiques ──
-
-  // Genre & Équipages — donuts
-  _donutChart('apex-genre', d.genre, 220);
-  _colBar('apex-age', d.age, '#0891b2', 200);
-
-  // Catégories & Classes — barres distribuées (couleur par entrée)
-  if (d.cats) _hBar('apex-cats', d.cats, d.cats.colors,
-    Math.max(160, d.cats.labels.length*36+40), true);
-  if (d.cls)  _hBar('apex-cls',  d.cls,  d.cls.colors,
-    Math.max(160, d.cls.labels.length*36+40),  true);
-  _donutChart('apex-equi', d.equi, 220);
-
-  // Clubs
-  if (d.clubs) _hBar('apex-clubs', d.clubs, '#6366f1',
-    Math.max(180, d.clubs.labels.length*36+30));
+  // Genre, âge, équipages, catégories, classes, matériels et clubs sont rendus
+  // en SVG natif / listes classées directement dans le HTML (voir _rankCard,
+  // _donut) — plus dense et sans dépendance ApexCharts pour ces blocs. Seuls les
+  // donuts budget restent ici.
 
   // Budget — donut 3D éclaté
   var _svgPie3D = function(data) {
@@ -17352,43 +17365,21 @@ function initInfosCharts() {
     leg+='</div>';
     return '<div style="display:flex;flex-direction:column;align-items:center;padding:10px 4px 14px">'+out+leg+'</div>';
   };
-  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, 300);
-  if (d.budgetRes) _donutChart('apex-budget-res', d.budgetRes, 300);
-
-  // Ailes ML + Pendulaire — graphique groupé
-  if (d.ailesML) {
-    var _ag = _base('bar', Math.max(160, d.ailesML.labels.length*44+50));
-    _ag.series = d.ailesML.series;
-    _ag.xaxis = { categories:d.ailesML.labels, axisBorder:{show:false}, axisTicks:{show:false},
-      labels:{ style:{fontSize:'11px', fontFamily:_F} } };
-    _ag.yaxis = { labels:{ style:{fontSize:'11px', fontFamily:_F}, maxWidth:130 } };
-    _ag.colors = d.ailesML.colors;
-    _ag.stroke = { show:true, width:1, colors:['transparent'] };
-    _ag.plotOptions = { bar:{ horizontal:true, borderRadius:3, barHeight:'70%',
-      grouped:true, dataLabels:{ position:'top' } } };
-    _ag.legend = { position:'top', fontSize:'12px', fontFamily:_F,
-      markers:{width:8,height:8,radius:4}, itemMargin:{horizontal:10} };
-    _ag.dataLabels = { enabled:true, style:{fontSize:'10px', fontWeight:700, colors:['#fff']}, offsetX:6,
-      formatter:function(v){ return v>0?v:''; } };
-    _mount('apex-ailes-ml', _ag);
-  }
-
-  // Moteurs Microlight/Pendulaire
-  _hBar('apex-moteur-ml', d.moteurML, '#0d9488',
-    d.moteurML ? Math.max(140, d.moteurML.labels.length*32+40) : 140);
-
-  // Paramoteur — sources strictement isolées (classe='paramotor' uniquement)
-  _hBar('apex-aile-pm',   d.aileMP,   '#f59e0b',
-    d.aileMP   ? Math.max(140, d.aileMP.labels.length*32+40)   : 140);
-  _hBar('apex-moteur-pm', d.moteurMP, '#ef4444',
-    d.moteurMP ? Math.max(140, d.moteurMP.labels.length*32+40) : 140);
-  _hBar('apex-helice-pm', d.heliceMP, '#8b5cf6',
-    d.heliceMP ? Math.max(140, d.heliceMP.labels.length*32+40) : 140);
+  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, window.innerWidth<768?200:220);
+  if (d.budgetRes) _donutChart('apex-budget-res', d.budgetRes, window.innerWidth<768?200:220);
 }
 
 function initInfosMaps(cp, enrolled) {
-  var divR    = document.getElementById('infos-map-region');
-  var divBars = document.getElementById('infos-region-bars');
+  // Portée sur le conteneur réellement actif (comp-detail-body si la fiche
+  // compétition avec sidebar DTN est affichée, sinon home-detail-comp) — évite
+  // qu'un id dupliqué (résidu du panneau "Accueil classique" pré-rendu au
+  // démarrage) ne fasse écrire les données dans un nœud invisible.
+  var _pcd = document.getElementById('page-comp-detail');
+  var _scope = (_pcd && _pcd.classList.contains('active'))
+    ? document.getElementById('comp-detail-body')
+    : (document.getElementById('home-detail-comp') || document);
+  var divR    = _scope.querySelector('#infos-map-region');
+  var divBars = _scope.querySelector('#infos-region-bars');
   if (!divR && !divBars) return;
   var divBarsWrap = divBars; // alias
 
@@ -17404,39 +17395,47 @@ function initInfosMaps(cp, enrolled) {
     regionCount[r] = (regionCount[r]||0) + 1;
   });
 
-  // ── MAP : bubble par région / pays — zoom adaptatif ──
-  if (divR && typeof L !== 'undefined') {
-    if (_infoMapR) { try{ _infoMapR.remove(); }catch(e){} _infoMapR=null; }
-    _infoMapR = L.map(divR, {zoomControl:false, attributionControl:false});
-    // Déterminer l'étendue géographique des pilotes
-    var _overseas = ['Guadeloupe','Guyane','La Réunion','Martinique','Mayotte'];
-    var _euCountries = ['Albanie','Allemagne','Andorre','Autriche','Belgique','Biélorussie','Bosnie-Herzégovine','Bulgarie','Chypre','Croatie','Danemark','Espagne','Estonie','Finlande','Géorgie','Grèce','Hongrie','Irlande','Islande','Italie','Kosovo','Lettonie','Liechtenstein','Lituanie','Luxembourg','Macédoine du Nord','Malte','Moldavie','Monaco','Monténégro','Norvège','Pays-Bas','Pologne','Portugal','République tchèque','Roumanie','Royaume-Uni','Russie','Saint-Marin','Serbie','Slovaquie','Slovénie','Suède','Suisse','Turquie','Ukraine'];
-    var _worldCountries = ['Afrique du Sud','Algérie','Argentine','Australie','Brésil','Canada','Chili','Colombie','États-Unis','Japon','Maroc','Mexique','Nouvelle-Zélande','Pérou','Tunisie','Uruguay'];
-    var _regs = Object.keys(regionCount);
-    var hasWorld = _regs.some(function(r){ return _worldCountries.indexOf(r)>=0; });
-    var hasEurope = _regs.some(function(r){ return _euCountries.indexOf(r)>=0; });
-    var hasOverseas = _regs.some(function(r){ return _overseas.indexOf(r)>=0; });
-    if (hasWorld || hasOverseas) {
-      _infoMapR.setView([20, 15], 2);
-    } else if (hasEurope) {
-      _infoMapR.fitBounds([[34.5,-25.0],[71.5,50.0]]);
-    } else {
-      _infoMapR.fitBounds([[41.3,-5.2],[51.2,9.6]]);
-    }
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OSM'}).addTo(_infoMapR);
-    var stolColor = getComputedStyle(document.documentElement).getPropertyValue('--stol').trim() || '#0057FF';
-    var maxC = Math.max.apply(null, Object.values(regionCount).concat([1]));
+  // ── MAP : carte de France par région — SVG 100 % autonome (même carte que
+  //      « Sécurité des pratiques » → Statistiques : aucune tuile réseau,
+  //      donc aucune erreur 401/hors-ligne). Régions non-métropolitaines
+  //      (DOM-TOM, étranger, non identifiée) récapitulées en note sous la carte. ──
+  if (divR) {
+    var _nameToCode = {};
+    Object.keys(_FR_REGION_NAMES).forEach(function(code){ _nameToCode[_FR_REGION_NAMES[code]] = code; });
+    var regionStatsByCode = {}, offMapCount = 0, europeCounts = {};
     Object.keys(regionCount).forEach(function(reg){
-      var ll = REGION_LL[reg]; if(!ll) return;
-      var cnt = regionCount[reg];
-      var r = 12 + Math.round((cnt/maxC)*28);
-      var isCountry = _euCountries.indexOf(reg)>=0 || _worldCountries.indexOf(reg)>=0;
-      L.circleMarker(ll,{
-        radius:r, fillColor:isCountry?'#f59e0b':stolColor, color:'#fff', weight:2, fillOpacity:0.8
-      }).addTo(_infoMapR).bindTooltip('<b>'+reg+'</b><br>'+cnt+' compétiteur'+(cnt>1?'s':''),{permanent:false,direction:'top'});
+      var code = _nameToCode[reg];
+      if (code) { regionStatsByCode[code] = { n: regionCount[reg], labels: [] }; return; }
+      offMapCount += regionCount[reg];
+      if (_EU_COUNTRIES.indexOf(reg) !== -1 && REGION_LL[reg]) europeCounts[reg] = regionCount[reg];
     });
-    setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 120);
-    setTimeout(function(){ if(_infoMapR) _infoMapR.invalidateSize(); }, 400);
+    var maxC = Math.max.apply(null, Object.keys(regionStatsByCode).map(function(c){ return regionStatsByCode[c].n; }).concat([1]));
+    var stolColor = getComputedStyle(document.documentElement).getPropertyValue('--stol').trim() || '#0057FF';
+    var franceSvg = _frDeptChoroplethSVG(regionStatsByCode, {
+      bg: '#eef2f6', heightCss: '100%',
+      colorFn: function(st){ return { fill: stolColor, stroke: stolColor, op: Math.max(0.25, Math.min(1, st.n / maxC)) }; },
+      tipFn: function(st){ return ' — '+st.n+' compétiteur'+(st.n>1?'s':''); }
+    });
+    var hasEurope = Object.keys(europeCounts).length > 0;
+    var offNote = offMapCount > 0
+      ? '<div style="text-align:center;font-size:10px;color:var(--txt3);padding:6px 4px 0">+'+offMapCount+' hors métropole (DOM-TOM, étranger ou non identifiée) — voir liste ci-contre</div>'
+      : '';
+    divR.style.display = 'flex'; divR.style.flexDirection = 'column';
+    if (hasEurope) {
+      var europeSvg = _europeDotMapSVG(europeCounts, { bg:'#eef2f6', heightCss:'100%', color: stolColor });
+      var _mapBodyId = 'infos-map-body-' + Math.random().toString(36).slice(2, 8);
+      window._infosMapSvgs = window._infosMapSvgs || {};
+      window._infosMapSvgs[_mapBodyId] = { france: franceSvg, europe: europeSvg };
+      divR.innerHTML =
+          '<div style="display:flex;justify-content:center;gap:4px;padding:2px 0 4px;flex-shrink:0">'
+        + '<button onclick="_infosMapSwitch(\''+_mapBodyId+'\',\'france\',this)" data-map-tab="france" style="padding:3px 11px;border:1px solid var(--bdr);border-radius:20px;background:'+stolColor+';color:#fff;font-size:9px;font-weight:700;font-family:inherit;cursor:pointer">France</button>'
+        + '<button onclick="_infosMapSwitch(\''+_mapBodyId+'\',\'europe\',this)" data-map-tab="europe" style="padding:3px 11px;border:1px solid var(--bdr);border-radius:20px;background:transparent;color:var(--txt2);font-size:9px;font-weight:700;font-family:inherit;cursor:pointer">Europe</button>'
+        + '</div>'
+        + '<div id="'+_mapBodyId+'" style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center">'+franceSvg+'</div>'
+        + offNote;
+    } else {
+      divR.innerHTML = '<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center">'+franceSvg+'</div>'+offNote;
+    }
   }
 
   // ── Barres régions pleine largeur (toutes régions + Non identifiées) ──
@@ -17453,10 +17452,10 @@ function initInfosMaps(cp, enrolled) {
     var _isCountryBar = function(r){ return _COUNTRY_FLAGS[r] && r!=='Étranger' ? true : ['Guadeloupe','Guyane','La Réunion','Martinique','Mayotte'].indexOf(r)>=0 ? false : !!_COUNTRY_FLAGS[r]; };
     var nbForeigners = sortedKnown.filter(function(r){ return !!_COUNTRY_FLAGS[r]; }).length;
     var sectionTitle = nbForeigners > 0 ? 'Provenance — Régions &amp; Pays' : 'Provenance — Régions';
-    var title = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">'
+    var title = '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;flex-shrink:0">'
       + sectionTitle+' <span style="font-weight:400;opacity:.6;font-size:9px">('+sorted.length+' · '+regTotal+' pilotes)</span></div>';
 
-    var bars = '<div style="display:flex;flex-direction:column;gap:8px">';
+    var bars = '<div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0">';
     sorted.forEach(function(reg, i) {
       var cnt       = regionCount[reg];
       var pct       = Math.round(cnt / regTotal * 100);
@@ -17482,9 +17481,23 @@ function initInfosMaps(cp, enrolled) {
     });
     bars += '</div>';
 
-    divBars.innerHTML = '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;height:100%;box-sizing:border-box">'
+    divBars.innerHTML = '<div style="background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;min-height:0">'
       + title + bars + '</div>';
   }
+}
+
+// Bascule France / Europe sur la carte Provenance (voir initInfosMaps)
+function _infosMapSwitch(bodyId, which, btn) {
+  var body = document.getElementById(bodyId); if (!body) return;
+  var svgs = window._infosMapSvgs && window._infosMapSvgs[bodyId]; if (!svgs) return;
+  body.innerHTML = svgs[which];
+  var wrap = btn.parentElement; if (!wrap) return;
+  var stolColor = getComputedStyle(document.documentElement).getPropertyValue('--stol').trim() || '#0057FF';
+  Array.prototype.forEach.call(wrap.children, function(b){
+    var active = b.getAttribute('data-map-tab') === which;
+    b.style.background = active ? stolColor : 'transparent';
+    b.style.color = active ? '#fff' : 'var(--txt2)';
+  });
 }
 
 // ── Carte localisation mobile compétition ────────────────────────────────
@@ -17830,7 +17843,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // ═══════════════════════════════════════════════════════════════
     // ── Dashboard : html construit ici, renvoyé en fin de try ──
     console.log('[GestSTOL] infos-tab render: enrolled='+pilotCount+' pilots='+(S.pilots||[]).length+' ulms='+(S.ulms?Object.keys(S.ulms).length:0));
-    var html = '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px">';
+    var html = '<div style="display:flex;flex-direction:column;gap:8px;padding:10px 12px 10px">';
 
     // Calcul nb régions/pays distincts
     var _regSet2 = {};
@@ -17857,8 +17870,8 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (_champCount > 0) _kpi.push({val:''+_champCount, lbl:'Champions', col:'#f59e0b', sub:'Podium nº1 discipline', tab:'resultats'});
 
     // Styles
-    var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px';
-    var _tSt = 'font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:12px';
+    var _cSt = 'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:10px 13px';
+    var _tSt = 'font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:8px';
 
     var _donut = function(segs,cols,cx,cy,r,sw){
       var tot=segs.reduce(function(s,d){return s+d.v;},0); if(!tot)return'';
@@ -17869,12 +17882,32 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     };
     var _bRow = function(lbl,n,mx,tot,col){
       var w=mx>0?Math.round(n/mx*100):0, pct=tot>0?Math.round(n/tot*100):0;
-      return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="display:flex;align-items:center;gap:7px"><div style="width:3px;height:13px;border-radius:2px;background:'+col+'"></div><span style="font-size:12px;font-weight:600;color:var(--txt)">'+escH(lbl)+'</span></div><span style="font-size:13px;font-weight:800;color:'+col+'">'+n+'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:3px">'+pct+'%</span></span></div><div style="height:7px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:4px"></div></div></div>';
+      return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><div style="display:flex;align-items:center;gap:7px"><div style="width:3px;height:11px;border-radius:2px;background:'+col+'"></div><span style="font-size:11px;font-weight:600;color:var(--txt)">'+escH(lbl)+'</span></div><span style="font-size:12px;font-weight:800;color:'+col+'">'+n+'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:3px">'+pct+'%</span></span></div><div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div></div>';
     };
     var _leg = function(col,lbl,val,pct){
-      return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="display:flex;align-items:center;gap:7px"><div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div><span style="font-size:12px;color:var(--txt2)">'+lbl+'</span></div><b style="font-size:14px;color:'+col+'">'+val+'</b></div><div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div></div></div>';
+      return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:'+col+'"></div><span style="font-size:11px;color:var(--txt2)">'+lbl+'</span></div><b style="font-size:12px;color:'+col+'">'+val+'</b></div><div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:2px"></div></div></div>';
     };
     var _empty = function(ico,lbl,sub){ return '<div style="'+_cSt+';display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:108px;gap:5px;text-align:center"><div style="font-size:26px;opacity:.2">'+ico+'</div><div style="font-size:11px;font-weight:600;color:var(--txt3)">'+lbl+'</div>'+(sub?'<div style="font-size:10px;color:var(--txt3);opacity:.6">'+sub+'</div>':'')+'</div>'; };
+    // ── Liste classée à barre unique — remplace les mini-graphiques ApexCharts
+    //    pour les décomptes nominaux (marques, catégories, clubs...) : plus dense,
+    //    aucune grille/axe à faire tenir, une seule teinte par carte (identité du
+    //    groupe, pas de la valeur — cf. méthode dataviz : nominal = 1 couleur). ──
+    var _rankRows = function(counts, col, cap) {
+      var ks = Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; });
+      var tot = ks.reduce(function(s,k){ return s+counts[k]; }, 0);
+      var maxV = ks.length ? counts[ks[0]] : 0;
+      var shown = cap ? ks.slice(0, cap) : ks;
+      var html = shown.map(function(k){ return _bRow(k, counts[k], maxV, tot, col); }).join('');
+      if (cap && ks.length > cap) html += '<div style="font-size:10px;color:var(--txt3);margin-top:2px">+ '+(ks.length-cap)+' autre(s)</div>';
+      return html;
+    };
+    var _rankCard = function(title, counts, col, cap) {
+      return '<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">'+title+'</div>'+_rankRows(counts, col, cap)+'</div>';
+    };
+    var _rankMini = function(subtitle, counts, col, cap) {
+      if (!Object.keys(counts).length) return '';
+      return '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;margin:9px 0 5px">'+subtitle+'</div>'+_rankRows(counts, col, cap);
+    };
     // Séparateur de section avec titre — sans emoji, typographique
     var _sep = function(lbl) {
       return '<div style="display:flex;align-items:center;gap:10px;padding:2px 0">'
@@ -17904,16 +17937,16 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     if (_hasBgt && _bgtEng>0) _kpi.push({val:_fmtK(_bgtEng), lbl:'Dépenses', col:_bgtEng>35000?'#f43f5e':'#10b981', sub:_bgtEng>35000?'Budget élevé':'Budget maîtrisé', tab:'budget'});
 
     // ── 1. TUILES KPI — grille uniforme, budget inclus comme dernière tuile ──
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px">';
     _kpi.forEach(function(t){
       var _onclick = t.tab ? ' onclick="switchHomeDetailTab(\''+t.tab+'\')"' : '';
       var _cursor  = t.tab ? 'cursor:pointer;' : '';
-      html += '<div'+_onclick+' style="'+_cursor+'background:var(--navy3);border:1px solid var(--bdr);border-radius:12px;padding:13px 15px 11px;position:relative;overflow:hidden;transition:opacity .15s" '+(t.tab?'onmouseover="this.style.opacity=\'.8\'" onmouseout="this.style.opacity=\'1\'"':'')+' >';
-      html += '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+t.col+';border-radius:12px 12px 0 0;opacity:.7"></div>';
-      if (t.tab) html += '<div style="position:absolute;top:9px;right:9px;opacity:.3;font-size:10px;color:'+t.col+'">›</div>';
-      html += '<div style="font-size:26px;font-weight:900;color:'+t.col+';line-height:1;margin-bottom:5px;letter-spacing:-.5px">'+t.val+'</div>';
-      html += '<div style="font-size:9px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.9px;line-height:1.3;margin-bottom:2px">'+t.lbl+'</div>';
-      if (t.sub) html += '<div style="font-size:10px;color:var(--txt3);line-height:1.4">'+t.sub+'</div>';
+      html += '<div'+_onclick+' style="'+_cursor+'background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;padding:9px 11px 8px;position:relative;overflow:hidden;transition:opacity .15s" '+(t.tab?'onmouseover="this.style.opacity=\'.8\'" onmouseout="this.style.opacity=\'1\'"':'')+' >';
+      html += '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+t.col+';border-radius:10px 10px 0 0;opacity:.7"></div>';
+      if (t.tab) html += '<div style="position:absolute;top:7px;right:7px;opacity:.3;font-size:10px;color:'+t.col+'">›</div>';
+      html += '<div style="font-size:20px;font-weight:900;color:'+t.col+';line-height:1;margin-bottom:3px;letter-spacing:-.4px">'+t.val+'</div>';
+      html += '<div style="font-size:8px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px;line-height:1.25;margin-bottom:1px">'+t.lbl+'</div>';
+      if (t.sub) html += '<div style="font-size:9px;color:var(--txt3);line-height:1.3">'+t.sub+'</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -17921,12 +17954,12 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Barre classement — épurée
     if (classified > 0) {
       var _cpct = pilotCount>0 ? Math.round(classified/pilotCount*100) : 0;
-      html += '<div style="'+_cSt+';padding:11px 16px">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">';
+      html += '<div style="'+_cSt+';padding:8px 13px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">';
       html += '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px">Taux de classement</span>';
-      html += '<span style="font-size:18px;font-weight:900;color:#34d399;letter-spacing:-.3px">'+_cpct+'%<span style="font-size:10px;font-weight:500;color:var(--txt3);margin-left:6px;letter-spacing:0">'+classified+' / '+pilotCount+'</span></span>';
+      html += '<span style="font-size:15px;font-weight:900;color:#34d399;letter-spacing:-.3px">'+_cpct+'%<span style="font-size:10px;font-weight:500;color:var(--txt3);margin-left:6px;letter-spacing:0">'+classified+' / '+pilotCount+'</span></span>';
       html += '</div>';
-      html += '<div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden"><div style="width:'+_cpct+'%;height:100%;background:linear-gradient(90deg,#059669,#34d399);border-radius:3px"></div></div>';
+      html += '<div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden"><div style="width:'+_cpct+'%;height:100%;background:linear-gradient(90deg,#059669,#34d399);border-radius:3px"></div></div>';
       html += '</div>';
     }
 
@@ -18010,13 +18043,13 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
 
     // Helper conteneur ApexCharts
     var _aCard = function(id, title, h) {
-      return '<div style="'+_cSt+';padding:12px 14px 8px">'
+      return '<div style="'+_cSt+';padding:9px 12px 5px">'
         + '<div style="'+_tSt+'">'+title+'</div>'
-        + '<div id="'+id+'" style="min-height:'+(h||200)+'px"></div>'
+        + '<div id="'+id+'" style="min-height:'+(h||150)+'px"></div>'
         + '</div>';
     };
-    var _g2 = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr;gap:10px';
-    var _g3 = isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px';
+    var _g2 = isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:1fr 1fr;gap:8px';
+    var _g3 = isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
 
     // ── Diagnostic qualité données ──
     var _hasGenreAge = (nbH+nbF>0 || ageCount>0);
@@ -18046,14 +18079,14 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     var _compCards = [];
     // Carte Genre — donut SVG + légende
     if (nbH+nbF>0) {
-      var _gTot = nbH+nbF, _gCx=80, _gCy=80, _gR=58, _gSw=26;
-      var _gc = '<div style="'+_cSt+';padding:14px 16px 12px">';
+      var _gTot = nbH+nbF, _gCx=65, _gCy=65, _gR=47, _gSw=21;
+      var _gc = '<div style="'+_cSt+';padding:10px 13px 9px">';
       _gc += '<div style="'+_tSt+'">Répartition genre</div>';
-      _gc += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
-      _gc += '<svg width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0">';
+      _gc += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+      _gc += '<svg width="130" height="130" viewBox="0 0 130 130" style="flex-shrink:0">';
       _gc += _donut([{v:nbH},{v:nbF}],['#0891b2','#f43f5e'],_gCx,_gCy,_gR,_gSw);
-      _gc += '<text x="'+_gCx+'" y="'+(+_gCy-5)+'" text-anchor="middle" font-size="22" font-weight="900" fill="var(--txt)">'+_gTot+'</text>';
-      _gc += '<text x="'+_gCx+'" y="'+(_gCy+13)+'" text-anchor="middle" font-size="9" fill="var(--txt3)">PILOTES</text>';
+      _gc += '<text x="'+_gCx+'" y="'+(+_gCy-4)+'" text-anchor="middle" font-size="18" font-weight="900" fill="var(--txt)">'+_gTot+'</text>';
+      _gc += '<text x="'+_gCx+'" y="'+(_gCy+11)+'" text-anchor="middle" font-size="8" fill="var(--txt3)">PILOTES</text>';
       _gc += '</svg>';
       _gc += '<div style="flex:1;min-width:80px">';
       if (nbH>0) _gc += _leg('#0891b2','Hommes',nbH,Math.round(nbH/_gTot*100));
@@ -18064,79 +18097,97 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
     // Carte Âge — barres CSS
     if (ageCount>0) {
       var _aMx = Math.max.apply(null, ageBuckets.map(function(b){return b.n;}));
-      var _ac = '<div style="'+_cSt+';padding:14px 16px 12px">';
+      var _ac = '<div style="'+_cSt+';padding:10px 13px 9px">';
       _ac += '<div style="'+_tSt+'">Tranches d\'âge · moy. '+ageMoyen+' ans</div>';
       ageBuckets.forEach(function(b){ if(b.n>0) _ac += _bRow(b.lbl,b.n,_aMx,ageCount,'#0891b2'); });
       _ac += '</div>';
       _compCards.push(_ac);
     }
-    if (_compCards.length > 0) {
-      html += _sep('Compétiteurs');
-      var _gComp = isMobile ? 'display:flex;flex-direction:column;gap:10px' : 'display:grid;grid-template-columns:repeat('+_compCards.length+',1fr);gap:10px';
-      html += '<div style="'+_gComp+'">'+_compCards.join('')+'</div>';
-    }
-
-    // ── Classement & classes ──
-    var _clsCards = [];
-    if (hasCat)  _clsCards.push(_aCard('apex-cats', 'Catégories compétitives', Math.max(160, Object.keys(catPilCounts).length*34+40)));
-    if (hasCls)  _clsCards.push(_aCard('apex-cls',  'Classes ULM', Math.max(160, Object.keys(ulmClsCounts).length*34+40)));
+    // ── Classement & classes — cartes fusionnées avec Compétiteurs ci-dessus ──
+    if (hasCat)  _compCards.push(_rankCard('Catégories compétitives', catPilCounts, '#8b5cf6'));
+    if (hasCls)  _compCards.push(_rankCard('Classes ULM', ulmClsCounts, '#0891b2'));
     if (hasEqui) {
       // Équipages — donut SVG natif
       var _eTot=nbMono+nbBi;
-      var _eHtml='<div style="'+_cSt+';padding:14px 16px 12px"><div style="'+_tSt+'">Équipages</div>';
-      _eHtml+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
-      _eHtml+='<svg width="130" height="130" viewBox="0 0 130 130" style="flex-shrink:0">';
-      _eHtml+=_donut([{v:nbMono},{v:nbBi}],['#6366f1','#10b981'],65,65,48,22);
-      _eHtml+='<text x="65" y="61" text-anchor="middle" font-size="18" font-weight="900" fill="var(--txt)">'+_eTot+'</text>';
-      _eHtml+='<text x="65" y="74" text-anchor="middle" font-size="9" fill="var(--txt3)">TOTAL</text>';
+      var _eHtml='<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">Équipages</div>';
+      _eHtml+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+      _eHtml+='<svg width="104" height="104" viewBox="0 0 104 104" style="flex-shrink:0">';
+      _eHtml+=_donut([{v:nbMono},{v:nbBi}],['#6366f1','#10b981'],52,52,38,18);
+      _eHtml+='<text x="52" y="49" text-anchor="middle" font-size="15" font-weight="900" fill="var(--txt)">'+_eTot+'</text>';
+      _eHtml+='<text x="52" y="60" text-anchor="middle" font-size="8" fill="var(--txt3)">TOTAL</text>';
       _eHtml+='</svg><div style="flex:1;min-width:70px">';
       if(nbMono>0) _eHtml+=_leg('#6366f1','Monoplace',nbMono,Math.round(nbMono/_eTot*100));
       if(nbBi>0)   _eHtml+=_leg('#10b981','Biplace',  nbBi,  Math.round(nbBi/_eTot*100));
       _eHtml+='</div></div></div>';
-      _clsCards.push(_eHtml);
+      _compCards.push(_eHtml);
     }
-    if (_clsCards.length > 0) {
-      html += _sep('Classement & classes');
-      var _nCls = Math.min(_clsCards.length, 3);
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:repeat('+_nCls+',1fr);gap:10px')+'">'+_clsCards.join('')+'</div>';
+    // ── Compétiteurs & Classement — une seule ligne (Genre, Âge, Catégories,
+    //    Classes, Équipages selon ce qui existe pour cette compétition) ──
+    if (_compCards.length > 0) {
+      html += _sep('Compétiteurs & Classement');
+      var _gComp = isMobile ? 'display:flex;flex-direction:column;gap:8px' : 'display:grid;grid-template-columns:repeat('+_compCards.length+',1fr);gap:8px';
+      html += '<div style="'+_gComp+'">'+_compCards.join('')+'</div>';
     }
 
-    // ── Matériels ──
+    // ── Matériels — regroupé par pratique (2 cartes denses au lieu de 5 mini-
+    //    graphiques séparés) ; une seule teinte par sous-liste, listes classées ──
     var _icd = window._infosChartsData;
     var _hasMat = _icd.ailesML || _icd.moteurML || _icd.aileMP || _icd.moteurMP || _icd.heliceMP;
     if (_hasMat) {
       html += _sep('Matériels');
-      // Ligne 1 : Ailes (groupé ML+Pendulaire) | Moteurs Microlight
-      var _matL1 = [];
-      if (_icd.ailesML)  _matL1.push(_aCard('apex-ailes-ml',  'Ailes — Multiaxes & Pendulaire', Math.max(160,_icd.ailesML.labels.length*36+50)));
-      if (_icd.moteurML) _matL1.push(_aCard('apex-moteur-ml', 'Moteurs Microlight / Pendulaire', Math.max(140,_icd.moteurML.labels.length*32+40)));
-      if (_matL1.length===2) html += '<div style="'+_g2+'">'+_matL1.join('')+'</div>';
-      else if (_matL1.length===1) html += _matL1[0];
-      // Ligne 2 : Ailes PM | Moteurs PM | Hélices PM (strictement paramoteur)
-      var _matL2 = [];
-      if (_icd.aileMP)   _matL2.push(_aCard('apex-aile-pm',   'Ailes Paramoteur',   Math.max(140,_icd.aileMP.labels.length*32+40)));
-      if (_icd.moteurMP) _matL2.push(_aCard('apex-moteur-pm', 'Moteurs Paramoteur', Math.max(140,_icd.moteurMP.labels.length*32+40)));
-      if (_icd.heliceMP) _matL2.push(_aCard('apex-helice-pm', 'Hélices Paramoteur', Math.max(140,_icd.heliceMP.labels.length*32+40)));
-      if (_matL2.length===3) html += '<div style="'+_g3+'">'+_matL2.join('')+'</div>';
-      else if (_matL2.length===2) html += '<div style="'+_g2+'">'+_matL2.join('')+'</div>';
-      else if (_matL2.length===1) html += _matL2[0];
+      // Normalisation des variantes de marques (« ROTAX 912 » / « Rotax 912iS » →
+      // une seule ligne) — perdue si on lit les compteurs bruts directement.
+      var _aileMLNorm    = _normBrand(aileMLCounts);
+      var _ailePendNorm  = _normBrand(ailePendCounts);
+      var _moteurMLNorm  = _normBrand(moteurMLCounts);
+      var _ailePMNorm    = _normBrand(ailePMCounts);
+      var _moteurPMNorm  = _normBrand(moteurPMCounts);
+      var _helicePMNorm  = _normBrand(helicePMCounts);
+      var _matCap = 6;
+      var _matCards = [];
+      if (Object.keys(_aileMLNorm).length || Object.keys(_ailePendNorm).length || Object.keys(_moteurMLNorm).length) {
+        var _mc1 = '<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">Multiaxes & Pendulaire</div>'
+          + _rankMini('Ailes — Multiaxes / ML', _aileMLNorm, '#0891b2', _matCap)
+          + _rankMini('Ailes — Pendulaire',     _ailePendNorm, '#06b6d4', _matCap)
+          + _rankMini('Moteurs',                _moteurMLNorm, '#0d9488', _matCap)
+          + '</div>';
+        _matCards.push(_mc1);
+      }
+      if (Object.keys(_ailePMNorm).length || Object.keys(_moteurPMNorm).length || Object.keys(_helicePMNorm).length) {
+        var _mc2 = '<div style="'+_cSt+';padding:10px 13px 9px"><div style="'+_tSt+'">Paramoteur</div>'
+          + _rankMini('Ailes',   _ailePMNorm,   '#f59e0b', _matCap)
+          + _rankMini('Moteurs', _moteurPMNorm, '#ef4444', _matCap)
+          + _rankMini('Hélices', _helicePMNorm, '#8b5cf6', _matCap)
+          + '</div>';
+        _matCards.push(_mc2);
+      }
+      html += _matCards.length===2 ? '<div style="'+_g2+'">'+_matCards.join('')+'</div>' : _matCards.join('');
     }
 
-    // ── Clubs ──
-    if (_icd.clubs) {
-      html += _sep('Clubs');
-      html += _aCard('apex-clubs', 'Classement clubs', Math.max(180, _icd.clubs.labels.length*34+30));
-    }
-
-    // ── Provenance + Carte ──
-    if (pilotsWithRegion > 0) {
-      html += _sep('Provenance');
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:10px':'display:grid;grid-template-columns:1fr 2fr;gap:10px')+'">';
-      html += '<div id="infos-region-bars" style="display:flex;flex-direction:column"></div>';
-      html += '<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column">';
-      html += '<div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:12px 16px 8px;flex-shrink:0">Carte géographique</div>';
-      html += '<div id="infos-map-region" style="flex:1;min-height:'+(isMobile?'210':'220')+'px"></div>';
-      html += '</div>';
+    // ── Clubs & Provenance — une seule ligne (classement clubs, régions, carte) ;
+    //    hauteur fixe partagée, chaque liste défile en interne si trop longue ──
+    var _hasClubs = Object.keys(clubCounts).length > 0;
+    var _hasProv  = pilotsWithRegion > 0;
+    if (_hasClubs || _hasProv) {
+      html += _sep('Clubs & Provenance');
+      var _rowH = isMobile ? '200px' : '230px';
+      var _tpl = (_hasClubs?'1fr ':'') + (_hasProv?'1fr 1.5fr':'');
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:'+_tpl.trim()+';gap:8px;height:'+_rowH)+'">';
+      if (_hasClubs) {
+        html += '<div style="'+_cSt+';padding:10px 13px 9px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'">'
+          + '<div style="'+_tSt+';flex-shrink:0">Classement clubs</div>'
+          + '<div style="overflow-y:auto;min-height:0">'+_rankRows(clubCounts,'#6366f1')+'</div>'
+          + '</div>';
+      }
+      if (_hasProv) {
+        html += '<div id="infos-region-bars" style="display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"></div>';
+        html += '<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;'+(isMobile?'height:'+_rowH:'height:100%')+'">';
+        html += '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>';
+        html += '<div id="infos-map-region" style="flex:1;min-height:0"></div>';
+        html += '</div>';
+      } else {
+        html += '<div id="infos-region-bars"></div>';
+      }
       html += '</div>';
     } else {
       html += '<div id="infos-region-bars"></div>';
@@ -18148,31 +18199,31 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       var _bSoldeCol2 = _bSolde2 >= 0 ? '#10b981' : '#f43f5e';
       html += _sep('Budget détaillé');
       // Résumé solde (bande synthèse)
-      html += '<div style="'+_cSt+';padding:14px 18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">';
-      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid #f43f5e">';
+      html += '<div style="'+_cSt+';padding:10px 14px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #f43f5e">';
       html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dépenses'+(_bgtAv>0?' · dont '+_fmtE(_bgtAv)+' avancés':'')+' </div>';
-      html += '<div style="font-size:22px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>';
+      html += '<div style="font-size:18px;font-weight:900;color:#f43f5e;letter-spacing:-.4px">'+_fmtE(_bgtEng)+'</div>';
       html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid #10b981">';
+      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid #10b981">';
       html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Recettes</div>';
-      html += '<div style="font-size:22px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>';
+      html += '<div style="font-size:18px;font-weight:900;color:#10b981;letter-spacing:-.4px">'+_fmtE(_bgtRes)+'</div>';
       html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:3px solid '+_bSoldeCol2+'">';
+      html += '<div style="display:flex;flex-direction:column;gap:1px;padding-left:9px;border-left:3px solid '+_bSoldeCol2+'">';
       html += '<div style="font-size:9px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Solde</div>';
-      html += '<div style="font-size:22px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>';
+      html += '<div style="font-size:18px;font-weight:900;color:'+_bSoldeCol2+';letter-spacing:-.4px">'+(_bSolde2>=0?'+':'')+_fmtE(_bSolde2)+'</div>';
       html += '</div>';
       html += '</div>';
       // Donuts dépenses & recettes — même hauteur fixe, grille 1fr 1fr toujours
       var _hasBdep = _icd.budgetDep && _icd.budgetDep.series.length>0;
       var _hasBres = _icd.budgetRes && _icd.budgetRes.series.length>0;
       var _isMobBgt = window.innerWidth < 768;
-      var _BH = _isMobBgt ? 260 : 300; // hauteur réduite sur mobile
+      var _BH = _isMobBgt ? 200 : 220; // hauteur réduite sur mobile
       if (_hasBdep || _hasBres) {
         var _bCards2 = [];
         if (_hasBdep) _bCards2.push(_aCard('apex-budget-dep', 'Dépenses par domaine', _BH));
         if (_hasBres) _bCards2.push(_aCard('apex-budget-res', 'Recettes par domaine', _BH));
         var _bCols2 = (_isMobBgt || _bCards2.length===1) ? '1fr' : '1fr 1fr';
-        html += '<div style="display:grid;grid-template-columns:'+_bCols2+';gap:10px">'+_bCards2.join('')+'</div>';
+        html += '<div style="display:grid;grid-template-columns:'+_bCols2+';gap:8px">'+_bCards2.join('')+'</div>';
       }
     }
 
@@ -52517,6 +52568,16 @@ function _dtnRefreshStats() {
   if (typeof _dtnRenderTodo === 'function') _dtnRenderTodo();
 }
 
+// ── Accordéon « 30 jours » (ouvert par défaut) ──
+function _dtnToggle30j() {
+  var cont = document.getElementById('dtn-prochaines-section');
+  var chev = document.getElementById('dtn-30j-chevron');
+  if (!cont) return;
+  var willOpen = cont.style.display === 'none';
+  cont.style.display = willOpen ? 'block' : 'none';
+  if (chev) chev.style.transform = willOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
 // ── Accordéon « Au-delà » ──
 function _dtnToggleAudela() {
   var cont = document.getElementById('dtn-prochaines-audela');
@@ -52535,6 +52596,7 @@ function _dtnActionToggleAfaire(compId, taskId, checked) {
   t.done = checked; t._updatedAt = Date.now();
   saveState(); silentPush();
   if (typeof toast === 'function') toast(checked ? 'Tâche cochée ✓' : 'Tâche décochée', 'ok');
+  _dtnRenderToday();
   _dtnRenderProchaines();
 }
 
@@ -52587,24 +52649,30 @@ function _dtnRenderToday() {
     return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   };
 
-  var html = '';
-
-  // ── Ligne date + KPIs ──
-  html += '<div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:20px">';
-  // Date
-  html += '<div>';
-  html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Aujourd\'hui</div>';
-  html += '<div style="font-size:21px;font-weight:900;color:var(--txt);letter-spacing:-.5px;line-height:1">' + dayStr + '</div>';
-  html += '</div>';
-  // KPIs
-  html += '<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding-bottom:2px">';
-  html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:var(--stol);line-height:1">' + totalComps + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">compétitions</div></div>';
-  html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:#10b981;line-height:1">' + totalPilotes + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">inscriptions</div></div>';
-  if (overdueCount > 0) {
-    html += '<div style="text-align:right"><div style="font-size:20px;font-weight:900;color:#f43f5e;line-height:1">' + overdueCount + '</div><div style="font-size:10px;color:var(--txt3);margin-top:1px">en retard</div></div>';
+  // ── En-tête : date à gauche, compteurs à droite (même style « puce » que
+  //    les stats de la carte Prochaine compétition, pour une présentation cohérente) ──
+  var hCont = document.getElementById('dtn-header-today');
+  if (hCont) {
+    var _hChip = function(val,lbl,col){
+      return '<div style="text-align:center;min-width:50px"><div style="font-size:16px;font-weight:900;color:'+col+';line-height:1">'+val+'</div><div style="font-size:8px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;white-space:nowrap">'+lbl+'</div></div>';
+    };
+    var hHtml = '<div style="flex-shrink:0">';
+    hHtml += '<div style="font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Aujourd\'hui</div>';
+    hHtml += '<div style="font-size:20px;font-weight:900;color:var(--txt);letter-spacing:-.5px;line-height:1;white-space:nowrap">' + dayStr + '</div>';
+    hHtml += '</div>';
+    hHtml += '<div style="display:flex;align-items:center;gap:18px;flex-shrink:0;padding-left:18px;border-left:1px solid rgba(255,255,255,.12)">';
+    hHtml += _hChip(totalComps, 'Compétitions', 'var(--stol)');
+    hHtml += _hChip(totalPilotes, 'Inscriptions', '#10b981');
+    hHtml += _hChip(overdueCount, 'En retard', overdueCount > 0 ? '#f43f5e' : 'var(--txt3)');
+    hHtml += '</div>';
+    hCont.innerHTML = hHtml;
   }
-  html += '</div>';
-  html += '</div>';
+
+  // Mémorise la compétition déjà mise en avant ici, pour ne pas la
+  // dupliquer dans la liste « Prochaines actions » (30 jours / Au-delà)
+  window._dtnNextCompId = nextComp ? nextComp.id : null;
+
+  var html = '';
 
   // ── Prochaine compétition ──
   if (nextComp) {
@@ -52615,16 +52683,68 @@ function _dtnRenderToday() {
     var lieu       = [nextComp.lieu || nextComp.oaci, nextComp.region].filter(Boolean).join(' · ');
     var safeId     = (nextComp.id || '').replace(/'/g, "\\'");
 
+    // ── Stats de la compétition (zone bleue) ──
+    var _pilotesN = ((S.compEnroll || {})[nextComp.id] || []).length;
+    var _joursN = 1;
+    if (nextComp.dateFrom && nextComp.dateTo && nextComp.dateTo > nextComp.dateFrom) {
+      var _d1n = new Date(nextComp.dateFrom), _d2n = new Date(nextComp.dateTo);
+      if (!isNaN(_d1n) && !isNaN(_d2n)) _joursN = Math.round((_d2n - _d1n) / 86400000) + 1;
+    }
+    var _staffN = ((S.staff || {})[nextComp.id] || []).length;
+    var _matN   = ((S.materiel || {})[nextComp.id] || []).length;
+    var _bgtN   = (S.budgets || {})[nextComp.id] || {};
+    var _bgtCcN = function(l){ return (parseFloat(l.valeur)||0)*(parseFloat(l.nbjours)||1)*(parseFloat(l.qt)||1); };
+    var _bgtTotN = (_bgtN.engagement || []).reduce(function(s,l){ return s + _bgtCcN(l); }, 0);
+    var _fmtKN = function(v){ if(v>=1000000) return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M€'; if(v>=1000) return Math.round(v/1000)+'k€'; return Math.round(v)+'€'; };
+
+    var _chip = function(val,lbl,col){
+      return '<div style="text-align:center;min-width:50px"><div style="font-size:15px;font-weight:900;color:'+col+';line-height:1">'+val+'</div><div style="font-size:8px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;white-space:nowrap">'+lbl+'</div></div>';
+    };
+    var kpiHtml = '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;padding-left:14px;margin-left:2px;border-left:1px solid rgba(0,87,255,.15)">'
+      + _chip(_pilotesN, 'Pilotes', '#0891b2')
+      + _chip(_joursN, _joursN > 1 ? 'Jours' : 'Jour', '#6366f1')
+      + _chip(_staffN, 'Staff', '#8b5cf6')
+      + _chip(_matN, 'Matériel', '#f59e0b')
+      + _chip(_bgtTotN > 0 ? _fmtKN(_bgtTotN) : '0€', 'Budget', '#10b981')
+      + '</div>';
+
+    // ── Tâches à faire de cette compétition ──
+    var _todosN = (S.homeTodosByComp || {})[nextComp.id] || [];
+    var _domN = {};
+    _todosN.forEach(function(t){ if (t.type === 'domaine') _domN[t.id] = t.label; });
+    var _tasksN = _todosN.filter(function(t){ return t.type !== 'domaine' && !t.done; });
+
+    html += '<div style="border:1px solid rgba(0,87,255,.2);border-radius:12px;background:rgba(0,87,255,.06);overflow:hidden">';
     html += '<div onclick="showHomeCompDetail&&showHomeCompDetail(\'' + safeId + '\');"';
-    html += ' style="display:flex;align-items:center;gap:14px;padding:15px 18px;border:1px solid rgba(0,87,255,.2);border-left:4px solid #0057FF;border-radius:12px;background:rgba(0,87,255,.06);cursor:pointer;transition:background .15s"';
-    html += ' onmouseover="this.style.background=\'rgba(0,87,255,.1)\'" onmouseout="this.style.background=\'rgba(0,87,255,.06)\'">';
-    html += '<div style="flex:1;min-width:0">';
+    html += ' style="display:flex;align-items:center;gap:0;padding:15px 18px;border-left:4px solid #0057FF;cursor:pointer;transition:background .15s"';
+    html += ' onmouseover="this.style.background=\'rgba(0,87,255,.1)\'" onmouseout="this.style.background=\'\'">';
+    html += '<div style="flex:0 1 250px;min-width:0">';
     html += '<div style="font-size:10px;font-weight:700;color:#0057FF;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Prochaine compétition · ' + duLabel + '</div>';
     html += '<div style="font-size:16px;font-weight:800;color:var(--txt);letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (nextComp.name || nextComp.nom || '—') + '</div>';
     html += '<div style="font-size:12px;color:var(--txt3);margin-top:3px">' + dateRange + (lieu ? ' · ' + lieu : '') + '</div>';
     html += '</div>';
-    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:rgba(0,87,255,.45);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>';
+
+    // ── Tâches à faire — dans l'espace libre entre le titre et les stats ──
+    html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:0 16px;overflow:hidden">';
+    if (_tasksN.length) {
+      html += '<div style="font-size:8px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--txt3);margin-bottom:1px">Tâches à faire</div>';
+      _tasksN.slice(0, 3).forEach(function(t) {
+        var _tId = (t.id || '').replace(/'/g, "\\'");
+        var _dLabel = t.domaineId && _domN[t.domaineId] ? _domN[t.domaineId] : '';
+        html += '<div style="display:flex;align-items:center;gap:7px;min-width:0">';
+        html += '<input type="checkbox" onclick="event.stopPropagation()" onchange="_dtnActionToggleAfaire(\'' + safeId + '\',\'' + _tId + '\',this.checked)" style="width:12px;height:12px;cursor:pointer;accent-color:#10b981;flex-shrink:0" title="Marquer comme fait">';
+        if (_dLabel) html += '<span style="font-size:8px;font-weight:700;color:#0057FF;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;padding:1px 5px;background:rgba(0,87,255,.1);border-radius:3px">' + _dLabel + '</span>';
+        html += '<span style="font-size:11px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">' + (t.label || '') + '</span>';
+        html += '</div>';
+      });
+      if (_tasksN.length > 3) html += '<div style="font-size:9px;color:var(--txt3)">+ ' + (_tasksN.length - 3) + ' autre(s)…</div>';
+    }
     html += '</div>';
+
+    html += kpiHtml;
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:rgba(0,87,255,.45);flex-shrink:0;margin-left:14px"><polyline points="9 18 15 12 9 6"/></svg>';
+    html += '</div>'; // /ligne cliquable
+    html += '</div>'; // /carte
   } else {
     html += '<div style="padding:13px 16px;border:1px solid var(--bdr);border-radius:10px;font-size:12px;color:var(--txt3)">Aucune compétition dans les 30 prochains jours.</div>';
   }
@@ -52647,9 +52767,13 @@ function _dtnRenderProchaines() {
   var _push = function(item) { (item.date <= limitStr ? items30 : itemsBeyond).push(item); };
 
   // ── 1. Compétitions à venir (planning général) ──
+  // (la compétition déjà mise en avant dans « Prochaine compétition » n'est
+  //  pas répétée ici, cf. _dtnRenderToday)
+  var _nextCompId = window._dtnNextCompId || null;
   (S.comps || []).forEach(function(c) {
     if (!c.dateFrom) return;
     if (c.dateFrom < todayStr) return;
+    if (_nextCompId && c.id === _nextCompId) return;
     var typeLabel = {
       'comp-internationale': 'Compétition internationale',
       'cdf':                 'Compétition nationale',
@@ -52692,73 +52816,37 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── 3. Tâches Gantt à venir (planning général) — on mémorise aussi tous les
-  //      intitulés (toutes dates confondues) pour dédoublonner le volet À faire ──
-  var gantt = S.ganttTasks || {};
-  var ganttTitlesByComp = {};
-  Object.keys(gantt).forEach(function(compId) {
-    var comp  = (S.comps || []).find(function(c){ return c.id === compId; });
-    var compNom = comp ? (comp.name || comp.nom || compId) : compId;
-    var tasks = gantt[compId] || [];
-    var titles = ganttTitlesByComp[compId] || (ganttTitlesByComp[compId] = {});
-    tasks.forEach(function(task) {
-      if (task.titre) titles[task.titre.trim().toLowerCase()] = true;
-      // Tâche principale
-      if (task.dateDebut && task.dateDebut >= todayStr) {
-        _push({
-          date:    task.dateDebut,
-          dateFin: task.dateFin || task.dateDebut,
-          title:   task.titre || 'Tâche planning',
-          sub:     compNom + (task.responsableNom ? ' · ' + task.responsableNom : ''),
-          tag:     'Planning',
-          tagCol:  '#f59e0b',
-          ico:     '📋',
-          onClick: 'openGanttModal&&openGanttModal(\''+compId.replace(/'/g,"\\'")+'\')'
-        });
-      }
-      // Sous-tâches
-      (task.sousTaches || []).forEach(function(st) {
-        if (st.titre) titles[st.titre.trim().toLowerCase()] = true;
-        if (!st.dateDebut || st.dateDebut < todayStr) return;
-        _push({
-          date:    st.dateDebut,
-          dateFin: st.dateFin || st.dateDebut,
-          title:   st.titre || 'Sous-tâche',
-          sub:     compNom + ' · ' + (task.titre || '') + (st.piloteNom ? ' — ' + st.piloteNom : ''),
-          tag:     'Sous-tâche',
-          tagCol:  '#8b5cf6',
-          ico:     '📌',
-          onClick: 'openGanttModal&&openGanttModal(\''+compId.replace(/'/g,"\\'")+'\')'
-        });
-      });
-    });
-  });
-
-  // ── 4. Volet « À faire » des compétitions (non cochées) — évite les doublons
-  //      déjà couverts par le planning général (Gantt) de la même compétition ──
+  // ── 3. Volet « À faire » des compétitions (non cochées) — uniquement pour les
+  //      compétitions à venir ou en cours ; les événements déjà terminés ne
+  //      remontent pas ici (pas d'action rétroactive affichée). Le planning
+  //      général (Gantt) n'est volontairement pas repris dans cette liste,
+  //      pour ne pas la surcharger ──
   var todosByComp = S.homeTodosByComp || {};
   Object.keys(todosByComp).forEach(function(compId) {
+    if (_nextCompId && compId === _nextCompId) return; // déjà listées dans la carte « Prochaine compétition »
     var comp = (S.comps || []).find(function(c){ return c.id === compId; });
     if (!comp || !comp.dateFrom) return;
     var compEnd = comp.dateTo || comp.dateFrom;
-    if (compEnd < todayStr) return; // compétition déjà terminée : on ignore son À faire résiduel
+    if (compEnd < todayStr) return; // événement déjà passé : pas d'action affichée
     var arr = todosByComp[compId] || [];
     var domaines = {};
     arr.forEach(function(t){ if (t.type === 'domaine') domaines[t.id] = t.label; });
-    var titles = ganttTitlesByComp[compId] || {};
     var compNom = comp.name || comp.nom || 'Compétition';
     arr.forEach(function(t) {
       if (t.type === 'domaine' || t.done) return;
       var key = (t.label || '').trim().toLowerCase();
-      if (!key || titles[key]) return; // déjà présent dans le planning général de cette compétition
+      if (!key) return;
+      var domLbl = t.domaineId && domaines[t.domaineId] ? domaines[t.domaineId] : '';
       _push({
         date:    comp.dateFrom,
         dateFin: comp.dateTo || comp.dateFrom,
         title:   t.label || 'Tâche',
-        sub:     compNom + (t.domaineId && domaines[t.domaineId] ? ' · ' + domaines[t.domaineId] : ''),
+        domain:  domLbl,
+        sub:     compNom,
         tag:     'À faire',
         tagCol:  '#10b981',
         ico:     '✅',
+        overdue: comp.dateFrom < todayStr,
         checkable: { compId: compId, taskId: t.id },
         onClick: 'showHomeCompDetail&&showHomeCompDetail(\''+compId.replace(/'/g,"\\'")+'\');if(typeof _crpToggle===\'function\')_crpToggle(\'todo\')'
       });
@@ -52799,8 +52887,10 @@ function _dtnRenderProchaines() {
             + 'onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" '
             + 'onmouseout="this.style.background=\'\'">';
       html += cb;
-      html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+'</span>';
+      var dCol = item.overdue ? '#ef4444' : 'var(--txt3)';
+      html += '<span style="font-size:11px;color:'+dCol+';font-weight:'+(item.overdue?'700':'400')+';white-space:nowrap;flex-shrink:0;min-width:72px">'+_dateRange(item)+(item.overdue?' ⚠':'')+'</span>';
       html += '<span style="color:rgba(255,255,255,.12);flex-shrink:0">·</span>';
+      if (item.domain) html += '<span style="font-size:9px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;padding:1px 6px;background:rgba(16,185,129,.12);border-radius:4px">'+item.domain+'</span>';
       html += '<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+item.title+'</span>';
       if (item.sub) html += '<span style="font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;flex-shrink:0">'+item.sub+'</span>';
       html += '</div>';
@@ -52815,6 +52905,8 @@ function _dtnRenderProchaines() {
   _renderList(cont30,     items30,     'Aucune action dans les 30 prochains jours.', null);
   _renderList(contBeyond, itemsBeyond, 'Aucune action au-delà de 30 jours.', 60);
 
+  var count30 = document.getElementById('dtn-30j-count');
+  if (count30) count30.textContent = items30.length ? '('+items30.length+')' : '';
   var audelaCount = document.getElementById('dtn-audela-count');
   if (audelaCount) audelaCount.textContent = itemsBeyond.length ? '('+itemsBeyond.length+')' : '';
 }
@@ -54476,8 +54568,12 @@ function _dtnGoHome() {
     + '<div style="width:3px;height:13px;border-radius:2px;background:#f43f5e;flex-shrink:0"></div>'
     + '<div style="font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--txt3)">Prochaines actions</div>'
     + '</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start">'
-    + '<div><div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e;margin-bottom:8px">30 jours</div>'
-    + '<div id="dtn-prochaines-section"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>'
+    + '<div><button onclick="_dtnToggle30j()" id="dtn-30j-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:8px;padding:0 2px;border:none;background:transparent;cursor:pointer;font-family:inherit;text-align:left">'
+    + '<span id="dtn-30j-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(90deg)">▶</span>'
+    + '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f43f5e">30 jours</span>'
+    + '<span id="dtn-30j-count" style="font-size:10px;color:var(--txt3)"></span>'
+    + '</button>'
+    + '<div id="dtn-prochaines-section" style="display:block"><div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement…</div></div>'
     + '<button onclick="_dtnToggleAudela()" id="dtn-audela-toggle" style="display:flex;align-items:center;gap:6px;width:100%;margin-top:16px;padding:9px 2px;border:none;border-top:1px solid var(--bdr);background:transparent;cursor:pointer;font-family:inherit;text-align:left">'
     + '<span id="dtn-audela-chevron" style="display:inline-block;font-size:9px;color:var(--txt3);transition:transform .18s;transform:rotate(0deg)">▶</span>'
     + '<span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#f59e0b">Au-delà</span>'
@@ -55559,18 +55655,23 @@ function _frDeptChoroplethSVG(zoneStats, opts){
     var st = zoneStats[code];
     var fill='#e7edf3', stroke='#c3cedb', op=1;
     if (st && st.n > 0){
-      var isMort = st.mort > 0;
-      fill = isMort ? '#ef4444' : '#f59e0b';
-      stroke = isMort ? '#b91c1c' : '#c2760a';
-      op = Math.max(0.4, Math.min(1, 0.35 + 0.09*st.n));
+      if (opts.colorFn) {
+        var c = opts.colorFn(st, code) || {};
+        fill = c.fill || fill; stroke = c.stroke || stroke; op = (c.op != null) ? c.op : op;
+      } else {
+        var isMort = st.mort > 0;
+        fill = isMort ? '#ef4444' : '#f59e0b';
+        stroke = isMort ? '#b91c1c' : '#c2760a';
+        op = Math.max(0.4, Math.min(1, 0.35 + 0.09*st.n));
+      }
     }
     var name = ZN[code] || code;
     var tip = name;
     if (st && st.n > 0){
-      tip += ' — '+st.n+' événement'+(st.n>1?'s':'')
+      tip += opts.tipFn ? opts.tipFn(st, code) : (' — '+st.n+' événement'+(st.n>1?'s':'')
         + (st.mort ? ' · '+st.mort+' mortel'+(st.mort>1?'s':'') : '')
         + (st.corp ? ' · '+st.corp+' corporel'+(st.corp>1?'s':'') : '')
-        + (st.labels && st.labels.length ? ' ('+st.labels.slice(0,3).join(', ')+')' : '');
+        + (st.labels && st.labels.length ? ' ('+st.labels.slice(0,3).join(', ')+')' : ''));
     }
     svg += '<path d="'+ZP[code]+'" fill="'+fill+'" fill-opacity="'+op.toFixed(2)+'" stroke="'+stroke+'" stroke-width="'+(opts.strokeWidth||1)+'" fill-rule="evenodd"><title>'+esc(tip)+'</title></path>';
   });
@@ -55582,6 +55683,41 @@ function _frDeptChoroplethSVG(zoneStats, opts){
     var st = zoneStats[code]; if (!st || !st.n) return;
     var c = ZC[code]; if (!c) return;
     svg += '<text x="'+c[0]+'" y="'+c[1]+'" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="'+(opts.numFontSize||30)+'" font-weight="900" fill="#1e293b" stroke="rgba(255,255,255,.9)" stroke-width="4" paint-order="stroke fill" style="pointer-events:none">'+st.n+'</text>';
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// ── Carte Europe — pastilles aux capitales/centroïdes pays (lat/lon de
+//    REGION_LL), même logique « aucune tuile réseau » que _frDeptChoroplethSVG.
+//    Pas de tracé de frontières (pas de données de contour pays disponibles) :
+//    un repère « FR » en pointillés donne le contexte géographique. ──
+function _europeDotMapSVG(countryCounts, opts) {
+  opts = opts || {};
+  var esc = function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var W = 400, H = 340, pad = 10;
+  var lonMin=-11, lonMax=40, latMin=34, latMax=71;
+  var X = function(lon){ return pad+(lon-lonMin)/(lonMax-lonMin)*(W-2*pad); };
+  var Y = function(lat){ return pad+(latMax-lat)/(latMax-latMin)*(H-2*pad); };
+  var col = opts.color || '#0057FF';
+  var ks = Object.keys(countryCounts);
+  var maxC = Math.max.apply(null, ks.map(function(k){ return countryCounts[k]; }).concat([1]));
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="width:100%;height:'+(opts.heightCss||'100%')+';display:block;background:'+(opts.bg||'#eef2f6')+';border-radius:'+(opts.radius||'8px')+'">';
+  for (var lo=-10; lo<=40; lo+=10) svg += '<line x1="'+X(lo).toFixed(1)+'" y1="'+pad+'" x2="'+X(lo).toFixed(1)+'" y2="'+(H-pad)+'" stroke="#c3cedb" stroke-width="0.6"/>';
+  for (var la=35; la<=70; la+=10) svg += '<line x1="'+pad+'" y1="'+Y(la).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+Y(la).toFixed(1)+'" stroke="#c3cedb" stroke-width="0.6"/>';
+  // Repère France — ancrage géographique, pas une pastille de donnée
+  var frX = X(2.5).toFixed(1), frY = Y(46.6).toFixed(1);
+  svg += '<circle cx="'+frX+'" cy="'+frY+'" r="4" fill="none" stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="2,2"/>';
+  svg += '<text x="'+frX+'" y="'+(parseFloat(frY)-8).toFixed(1)+'" text-anchor="middle" font-size="8" font-weight="700" fill="#94a3b8" font-family="inherit">FR</text>';
+  ks.forEach(function(name){
+    var ll = REGION_LL[name]; if (!ll) return;
+    var cnt = countryCounts[name];
+    var r = 8 + Math.round((cnt/maxC)*13);
+    var cx = X(ll[1]).toFixed(1), cy = Y(ll[0]).toFixed(1);
+    var op = Math.max(0.4, Math.min(1, cnt/maxC));
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+col+'" fill-opacity="'+op.toFixed(2)+'" stroke="'+col+'" stroke-width="1.5"><title>'+esc(name)+' — '+cnt+' compétiteur'+(cnt>1?'s':'')+'</title></circle>';
+    svg += '<text x="'+cx+'" y="'+(parseFloat(cy)+3.5).toFixed(1)+'" text-anchor="middle" font-size="'+(r>=15?11:9)+'" font-weight="900" fill="#fff" style="pointer-events:none">'+cnt+'</text>';
+    svg += '<text x="'+cx+'" y="'+(parseFloat(cy)+r+10).toFixed(1)+'" text-anchor="middle" font-size="8" font-weight="700" fill="#64748b" font-family="inherit" style="pointer-events:none">'+esc(name)+'</text>';
   });
   svg += '</svg>';
   return svg;
