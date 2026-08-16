@@ -27665,8 +27665,19 @@ async function loadFromSupabaseFirst() {
           var idx = cloudArr.findIndex(function(x){ return x && x.id === et.id; });
           if (idx === -1) { cloudArr.push(et); }
           else {
-            var lTs = et._updatedAt || 0, cTs = (cloudArr[idx] && cloudArr[idx]._updatedAt) || 0;
-            if (lTs >= cTs) cloudArr[idx] = et; // local prioritaire à égalité
+            var cur = cloudArr[idx];
+            var lTs = et._updatedAt || 0, cTs = (cur && cur._updatedAt) || 0;
+            if (lTs > cTs) { cloudArr[idx] = et; }
+            else if (lTs === cTs) {
+              // Égalité (souvent 0/0 : anciennes étapes jamais horodatées) — ne pas
+              // écraser aveuglément par le local : si le cloud a des coordonnées GPS
+              // et pas le local, garder le cloud (sinon un géocodage réussi ailleurs
+              // est reperdu à chaque démarrage tant que ce navigateur garde un vieux
+              // LS_ETAPES local sans lat/lng).
+              var lHasGeo = et.lat != null && et.lng != null;
+              var cHasGeo = cur && cur.lat != null && cur.lng != null;
+              if (!(cHasGeo && !lHasGeo)) cloudArr[idx] = et;
+            }
           }
         });
       });
@@ -27755,6 +27766,12 @@ async function loadFromSupabaseFirst() {
         }
         _vus[k]=t; return true;
       }).filter(function(t){ return !!t; });
+      // Auto-guérison : les types anciens créés avant l'ajout de l'horodatage
+      // n'ont pas de _updatedAt (undefined→0), donc toute pierre tombale, même
+      // périmée ou erronée, les efface pour toujours (0 >= 0 est toujours vrai).
+      // On les horodate dès qu'ils survivent à ce cycle pour ne plus jamais
+      // retomber dans ce piège lors d'un prochain sync.
+      S.formTypes.forEach(function(t){ if (t && !t._updatedAt) t._updatedAt = Date.now(); });
     })();
     // ✅ FAQ DTN : union par id (le plus récent gagne) + pierre tombale par id
     // pour qu'une question supprimée ne revienne pas via la synchro d'un autre appareil.
