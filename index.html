@@ -17181,14 +17181,14 @@ function initInfosCharts() {
       style:{ fontSize:'11px', fontWeight:700, colors:['#ffffff'] },
       dropShadow:{ enabled:true, top:1, left:1, blur:3, opacity:.7 }
     };
-    // Légende à droite du donut (au lieu d'en dessous) → récupère de la
-    // hauteur pour agrandir le donut lui-même, plus lisible
+    // Légende en dessous, compacte — colonne étroite (1/5 de ligne) : la
+    // mettre à droite écraserait la largeur disponible pour le donut lui-même
     o.legend = {
-      position:'right', fontSize:'10px', fontFamily:_F,
-      width:115,
+      position:'bottom', fontSize:'10px', fontFamily:_F,
+      height:110,
       labels:{ colors:_legCol },
       markers:{ width:7, height:7, radius:4, offsetX:-2 },
-      itemMargin:{ horizontal:4, vertical:5 },
+      itemMargin:{ horizontal:6, vertical:2 },
       formatter:function(lbl, opts){
         var v=opts.w.globals.series[opts.seriesIndex];
         var pct=total>0?Math.round(v/total*100):0;
@@ -17362,19 +17362,7 @@ function initInfosCharts() {
     leg+='</div>';
     return '<div style="display:flex;flex-direction:column;align-items:center;padding:10px 4px 14px">'+out+leg+'</div>';
   };
-  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, window.innerWidth<768?130:220);
-  if (d.budgetRes) _donutChart('apex-budget-res', d.budgetRes, window.innerWidth<768?130:220);
-  // Filet : la grille environnante (Provenance/Carte sur 2 lignes) peut encore
-  // bouger juste après ce rendu initial — on force un recalcul propre une fois
-  // le DOM stabilisé, pour éviter un donut mesuré/figé trop petit au montage.
-  (function(){
-    var _budgetH = window.innerWidth<768?130:220;
-    setTimeout(function(){
-      _apexInfosInst.forEach(function(c){
-        try { c.updateOptions({ chart:{ height:_budgetH } }, true, false); } catch(e){}
-      });
-    }, 400);
-  })();
+  if (d.budgetDep) _donutChart('apex-budget-dep', d.budgetDep, window.innerWidth<768?165:270);
 }
 
 function initInfosMaps(cp, enrolled) {
@@ -18186,16 +18174,18 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       } else {
         _row2Cards.push('<div id="infos-region-bars"></div>');
       }
-      // ── Col 4 (1 ligne) : Carte géographique ──
+      // ── Col 4 (2 lignes) : Carte géographique ──
       if (_hasProv) {
-        _row2Cards.push('<div style="'+_cSt+';padding:0;overflow:hidden;display:flex;flex-direction:column;height:'+_rowH+'">'
+        _row2Cards.push('<div style="'+_cSt+';'+_spanStyle+'padding:0;overflow:hidden;display:flex;flex-direction:column;'+(isMobile?'height:'+_rowH:'height:100%')+'">'
           + '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.9px;padding:8px 13px 4px;flex-shrink:0">Carte géographique</div>'
           + '<div id="infos-map-region" style="flex:1;min-height:0"></div>'
           + '</div>');
       }
-      // ── Col 5 (1 ligne) : Dépenses par domaine — même taille que les donuts Genre/Équipages ──
-      if (_hasBdep) _row2Cards.push(_aCard('apex-budget-dep', 'Dépenses par domaine', 130));
-      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:repeat(5,1fr);gap:8px')+'">'+_row2Cards.join('')+'</div>';
+      // ── Col 5 (2 lignes) : Dépenses par domaine ──
+      if (_hasBdep) {
+        _row2Cards.push('<div style="'+_cSt+';'+_spanStyle+'padding:9px 12px 5px;box-sizing:border-box;display:flex;flex-direction:column;'+(isMobile?'':'height:100%;min-height:0')+'"><div style="'+_tSt+'">Dépenses par domaine</div><div id="apex-budget-dep" style="flex:1;min-height:130px"></div></div>');
+      }
+      html += '<div style="'+(isMobile?'display:flex;flex-direction:column;gap:8px':'display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(2,153px);gap:8px')+'">'+_row2Cards.join('')+'</div>';
     } else {
       html += '<div id="infos-region-bars"></div>';
     }
