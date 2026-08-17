@@ -29066,9 +29066,13 @@ async function _restoreAffichesFromIDB() {
     idbData.comps.forEach(function(ic) {
       if (!ic.affiche) return;
       var lc = (S.comps||[]).find(function(c){ return c.id === ic.id; });
-      if (lc) { lc.affiche = ic.affiche; restored++; }
+      // afficheV horodaté ici : sans ça, une affiche restaurée peut avoir la
+      // même valeur qu'avant l'incident et passer inaperçue de la signature
+      // anti-doublon du push, empêchant son ré-envoi réel vers le cloud.
+      if (lc) { lc.affiche = ic.affiche; lc.afficheV = Date.now(); restored++; }
     });
     if (restored > 0) {
+      if (typeof saveState === 'function') saveState();
       renderCompetitions();
       if (typeof renderHome === 'function') renderHome();
       toast('✅ ' + restored + ' affiche(s) restaurée(s) depuis IndexedDB', 'ok');
