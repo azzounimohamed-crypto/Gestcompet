@@ -56442,7 +56442,15 @@ function _renderSecuriteStats() {
     });
     var items=Object.keys(counts).filter(function(k){return counts[k]>0;}).sort(function(a,b){return counts[b]-counts[a];}).slice(0,10);
     var nBEA=evs.filter(function(e){return _beaRefsOf(e).length>0;}).length;
-    var footer='<div style="flex-shrink:0;font-size:9px;color:#6366f1;margin-top:8px;text-align:right">'+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
+    var _origInPrint = (typeof window._sevOrigInPrint === 'undefined') ? true : window._sevOrigInPrint;
+    var _origPrintToggle = '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:9px;color:var(--txt3);white-space:nowrap" title="Inclure ce graphique dans la page à imprimer">'
+      +'<input type="checkbox" '+(_origInPrint?'checked':'')+' onchange="window._sevOrigInPrint=this.checked" style="width:13px;height:13px;cursor:pointer;accent-color:#6366f1">'
+      +'Inclure à l\'impression'
+      +'</label>';
+    var footer='<div style="flex-shrink:0;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">'
+      +'<span style="font-size:9px;color:#6366f1">'+nBEA+' / '+evs.length+' événements classifiés BEA</span>'
+      +_origPrintToggle
+      +'</div>';
     if(!items.length){
       html+=_card('Origines','<div style="flex:1;display:flex;flex-direction:column;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucune référence BEA assignée.<br><span style="font-size:10px">Utilisez l\'onglet Références BEA.</span></div>'+footer,2);
       return;
@@ -56967,11 +56975,14 @@ function _sevPrintStats() {
     +'</div>'
     +'</div>'
 
-    // ── Row 4 : Origines détectées (barres 2 colonnes, pleine largeur) ──
-    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;margin-bottom:0">'
-    +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
-    +(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')
-    +'</div>'
+    // ── Row 4 : Origines détectées (barres 2 colonnes, pleine largeur) — case à
+    // cocher dans Stats (bas-droite de la carte Origines) pour l'inclure ou non.
+    + (window._sevOrigInPrint !== false
+        ? '<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;margin-bottom:0">'
+          +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
+          +(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')
+          +'</div>'
+        : '')
 
     +'</div></div>'
     +'<script>function doPrint(){ window.focus(); window.print(); }<\/script>'
