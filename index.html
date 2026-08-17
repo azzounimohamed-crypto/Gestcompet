@@ -30966,17 +30966,19 @@ function addCollectifMember() {
   var pratique   = _cfFilters.pratique   || '';
   var discipline = _cfFilters.discipline || '';
 
-  // Vérifier doublon (par pilotId si trouvé, par nom sinon)
-  var exists;
-  if (pilot) {
-    exists = S.collectif.find(function(m){ return m.pilotId === pilot.id && m.saison === saison; });
-  } else {
-    var vNorm = norm(val);
-    exists = S.collectif.find(function(m){
-      return !m.pilotId && m.saison === saison
-        && (norm((m.prenom||'')+' '+(m.nom||'')) === vNorm || norm((m.nom||'')+' '+(m.prenom||'')) === vNorm);
-    });
-  }
+  // Vérifier doublon — par pilotId, PUIS par n° licence (les entrées importées
+  // n'ont souvent pas de pilotId : sans ce test, réajouter manuellement une
+  // personne déjà présente créait une 2ᵉ fiche au lieu d'être bloqué), sinon
+  // par nom.
+  var licVal = lic || (pilot ? (pilot.licence||'') : '');
+  var vNorm = norm(val);
+  var exists = S.collectif.find(function(m){
+    if (m.saison !== saison) return false;
+    if (pilot && m.pilotId === pilot.id) return true;
+    if (licVal && m.licence && String(m.licence).trim() === String(licVal).trim()) return true;
+    if (!m.pilotId && (norm((m.prenom||'')+' '+(m.nom||'')) === vNorm || norm((m.nom||'')+' '+(m.prenom||'')) === vNorm)) return true;
+    return false;
+  });
   if (exists) { toast('Ce pilote est déjà dans le collectif pour cette saison', 'err'); return; }
 
   var entry = {
@@ -32716,6 +32718,48 @@ function _mergeCollectif(rows) {
   saveState();
   renderCollectifList();
   toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
+}
+
+// ── Clé de doublon Collectif France : n° licence (prioritaire) sinon nom
+// normalisé, toujours combiné à la saison — une même personne sur 2 saisons
+// reste 2 fiches distinctes (voulu), mais 2 fiches sur la MÊME saison avec la
+// même licence (ou même nom si pas de licence) sont fusionnées. ──
+function _collDedupKey(m){
+  var norm=function(s){ return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var lic=(m.licence||'').toString().trim();
+  var base=lic ? 'lic:'+norm(lic) : 'nom:'+norm((m.prenom||'')+' '+(m.nom||''));
+  return base+'|'+(m.saison||'');
+}
+// Fusionne les doublons Collectif France (même personne/saison saisie 2 fois,
+// souvent import + ajout manuel — voir addCollectifMember). Garde la 1ère
+// fiche, complète ses champs vides avec ceux du doublon (ex: statut SHN
+// renseigné sur l'une des deux seulement) avant de supprimer l'autre.
+function _collDeduplicate(){
+  if (!S.collectif || !S.collectif.length) { toast('Aucun membre au Collectif France', 'ok'); return; }
+  var byKey={}, kept=[], removed=0;
+  S.collectif.forEach(function(m){
+    var k=_collDedupKey(m);
+    if (!byKey[k]) { byKey[k]=m; kept.push(m); return; }
+    var keep=byKey[k];
+    ['statut_shn','equipe_france','efr1','efr2','discipline2','email','tel','club','photo','pilotId','licence','region','ligue','regionSportive'].forEach(function(f){
+      if (!keep[f] && m[f]) keep[f]=m[f];
+    });
+    removed++;
+  });
+  if (!removed) { toast('Aucun doublon détecté ✓', 'ok'); return; }
+  var btn = document.querySelector('[onclick="_collDeduplicate()"]');
+  if (btn && btn.dataset.confirm !== '1') {
+    btn.dataset.confirm='1';
+    btn.textContent = removed+' doublon'+(removed>1?'s':'')+' — Confirmer ?';
+    setTimeout(function(){ if(btn) btn.dataset.confirm=''; }, 4000);
+    return;
+  }
+  S.collectif = kept;
+  saveState();
+  if (typeof silentPush === 'function') silentPush(true);
+  renderCollectifList();
+  if (typeof _collectifRenderStats === 'function') _collectifRenderStats();
+  toast(removed+' doublon'+(removed>1?'s':'')+' fusionné'+(removed>1?'s':'')+' ✓', 'ok');
 }
 
 // Lecture générique d'un fichier (xlsx/json/csv/tsv) → lignes normalisées, puis callback.
@@ -53851,6 +53895,8 @@ function _collectifRenderCF() {
     + '<label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" id="cf-import-file" accept=".json,.csv,.xlsx,.xls" style="display:none" onchange="importCollectif(this);_cfActClose()"></label>'
     + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
     + '<button onclick="printCollectifList();_cfActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>Imprimer</span></button>'
+    + '<div style="height:1px;background:var(--bdr);margin:4px 0"></div>'
+    + '<button onclick="_collDeduplicate()" title="Fusionne les fiches en double (même licence ou nom, même saison) — ex : import + ajout manuel de la même personne" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:#f87171;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background=\'rgba(239,68,68,.08)\'" onmouseout="this.style.background=\'none\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg><span>Fusionner les doublons</span></button>'
     + '</div></div>'
     + '</div></div>'
     // Filtres
@@ -55678,6 +55724,82 @@ function openSecuriteEvents(volet) {
     + '</div>';
 
   if (volet === 'stats') setTimeout(_initSevLeafletMap, 80);
+}
+
+// Tente de déduire automatiquement le département d'un événement mortel/
+// corporel sans « Dept » renseigné, à partir du texte libre du champ Lieu :
+// 1) code postal à 5 chiffres présent dans le texte, 2) département entre
+// parenthèses (ex: « (18) »), 3) sinon géocodage du lieu via Nominatim
+// (throttle ~1,1s entre requêtes pour respecter leur politique d'usage).
+async function _sevAutoLocalize() {
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
+  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
+  var _validDept = function(d){ return !!(d && typeof _DEPT_COORDS !== 'undefined' && _DEPT_COORDS[d]); };
+  var targets = (S.securiteEvents||[]).filter(function(e){
+    if (!(_isMort(e)||_isCorp(e))) return false;
+    var raw=(e.dept||'').toString().trim();
+    return !_validDept(raw) && !_validDept(raw.replace(/^0+/,''));
+  });
+  if (!targets.length) { toast('Tous les événements mortels/corporels sont déjà localisés','ok'); return; }
+
+  var btn = document.getElementById('sev-autoloc-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Localisation… (0/'+targets.length+')'; }
+
+  var postToDept = function(pc){
+    pc = (pc||'').toString().trim();
+    if (!/^\d{5}$/.test(pc)) return null;
+    var d3 = pc.slice(0,3), d2 = pc.slice(0,2);
+    if (d3==='971'||d3==='972'||d3==='973'||d3==='974'||d3==='976') return d3;
+    return d2==='20' ? '20' : d2.replace(/^0/,'');
+  };
+
+  var resolved = 0, failed = [], geocodeCount = 0;
+  for (var i=0; i<targets.length; i++) {
+    var e = targets[i];
+    var lieu = (e.lieu||'').toString();
+    var found = null;
+
+    // Département explicite entre parenthèses (ex: « (30) ») — vérifié EN
+    // PREMIER : plus fiable qu'un code postal deviné dans le texte, qui peut
+    // confondre un fragment de coordonnées GPS (ex: « 43,73183°N ») avec un
+    // vrai code postal à 5 chiffres.
+    var mDept = lieu.match(/\((\d{2,3}|2[AB])\)/i);
+    if (mDept && _validDept(mDept[1].toUpperCase())) found = mDept[1].toUpperCase();
+
+    if (!found) {
+      // Code postal à 5 chiffres, en excluant tout ce qui suit une virgule
+      // décimale (notation GPS « lat,lon » très fréquente dans ce champ).
+      var mPc = lieu.replace(/\d+,\d+°?[NSEO]?/gi,'').match(/\b(\d{5})\b/);
+      if (mPc) found = postToDept(mPc[1]);
+    }
+
+    if (!found && lieu.trim()) {
+      try {
+        if (geocodeCount>0) await new Promise(function(r){ setTimeout(r, 1100); });
+        geocodeCount++;
+        var q = lieu + (lieu.toLowerCase().indexOf('france')===-1 ? ', France' : '');
+        var res = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&addressdetails=1&limit=1', {headers:{'Accept-Language':'fr-FR,fr'}});
+        var data = await res.json();
+        if (data && data[0] && data[0].address && data[0].address.postcode) {
+          found = postToDept(data[0].address.postcode);
+        }
+      } catch(err) { /* réseau indisponible : on continue */ }
+    }
+
+    if (found && _validDept(found)) {
+      e.dept = found; e._deptAuto = true; e._updatedAt = Date.now();
+      resolved++;
+    } else {
+      failed.push(lieu || e.id);
+    }
+    if (btn) btn.textContent = '⏳ Localisation… ('+(i+1)+'/'+targets.length+')';
+  }
+
+  if (resolved > 0) { saveState(); if (typeof silentPush==='function') silentPush(true); }
+  if (typeof openSecuriteEvents === 'function') openSecuriteEvents('stats');
+  var msg = resolved + ' événement'+(resolved>1?'s':'')+' localisé'+(resolved>1?'s':'')+' automatiquement';
+  if (failed.length) msg += ' · ' + failed.length + ' non résolu'+(failed.length>1?'s':'')+' (lieu à préciser manuellement)';
+  toast(msg, resolved>0 ? 'ok' : 'warn');
 }
 
 // Carte des événements — rendu SVG 100 % autonome (aucune tuile réseau, donc
