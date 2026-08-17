@@ -26717,7 +26717,14 @@ function _stolPushSignature() {
       (S.sitesSportifs||[]).length,
       (S.collectif||[]).length,
       (S.agendaEvents||[]).length,
-      (S.securiteEvents||[]).length
+      (S.securiteEvents||[]).length,
+      // ── Affiches/photos (upload vers stol_medias, exécuté par _pushMedias()
+      // en toute fin de pushToCloud) : sans ce signal, remplacer une affiche
+      // sans changer aucun compteur ci-dessus sautait aussi silencieusement
+      // l'upload → l'image restait locale et « disparaissait » pour les
+      // autres appareils/sessions. ──
+      (S.comps||[]).reduce(function(s,c){return s+(c.afficheV||0);},0)%1e9,
+      (S.pilots||[]).reduce(function(s,p){return s+((p.photo||'').length);},0)
     ].join(':');
     return sig;
   } catch(e) { return Date.now().toString(); }
