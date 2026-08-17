@@ -32736,7 +32736,7 @@ function _collDedupKey(m){
 // renseigné sur l'une des deux seulement) avant de supprimer l'autre.
 function _collDeduplicate(){
   if (!S.collectif || !S.collectif.length) { toast('Aucun membre au Collectif France', 'ok'); return; }
-  var byKey={}, kept=[], removed=0;
+  var byKey={}, kept=[], removed=0, removedIds=[];
   S.collectif.forEach(function(m){
     var k=_collDedupKey(m);
     if (!byKey[k]) { byKey[k]=m; kept.push(m); return; }
@@ -32744,6 +32744,7 @@ function _collDeduplicate(){
     ['statut_shn','equipe_france','efr1','efr2','discipline2','email','tel','club','photo','pilotId','licence','region','ligue','regionSportive'].forEach(function(f){
       if (!keep[f] && m[f]) keep[f]=m[f];
     });
+    if (m.id) removedIds.push(m.id);
     removed++;
   });
   if (!removed) { toast('Aucun doublon détecté ✓', 'ok'); return; }
@@ -32755,6 +32756,13 @@ function _collDeduplicate(){
     return;
   }
   S.collectif = kept;
+  // Pierres tombales : sans ça, un autre onglet/appareil resté ouvert avec
+  // l'ancien état en mémoire réinjecte les doublons au prochain envoi (fusion
+  // par id = union, jamais suppression sans tombstone explicite).
+  if (!S._deletedCollectif) S._deletedCollectif = [];
+  removedIds.forEach(function(id){
+    if (!S._deletedCollectif.find(function(x){ return x.id===id; })) S._deletedCollectif.push({id:id, deletedAt:Date.now()});
+  });
   saveState();
   if (typeof silentPush === 'function') silentPush(true);
   renderCollectifList();
