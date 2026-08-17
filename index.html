@@ -26805,6 +26805,21 @@ async function pushToCloud() {
         // Garde partenaires supprimée — trop de faux positifs lors de réinitialisations volontaires
       }
 
+      // ── Garde doublons Collectif France ──────────────────────────────────
+      // Un appareil resté ouvert avec une vieille copie en mémoire (avant un
+      // nettoyage de doublons) peut repousser cette copie et réintroduire des
+      // fiches en double — vécu concrètement le 2026-08-17 (doublons Golze/
+      // Tysebaert revenus 3 fois via un même onglet oublié). On bloque tout
+      // push qui contiendrait des doublons détectables : un état sain n'en a
+      // jamais, donc leur présence signale une copie locale périmée.
+      if (typeof _collDedupGroups === 'function' && S.collectif && S.collectif.length) {
+        var _collDupCount = _collDedupGroups(S.collectif).reduce(function(t,g){ return t+(g.length>1?g.length-1:0); }, 0);
+        if (_collDupCount > 0) {
+          console.error('[GestSTOL] 🚫 PUSH BLOQUÉ — '+_collDupCount+' doublon(s) détecté(s) dans Collectif France (copie locale périmée ?)');
+          throw new Error('PUSH_BLOCKED_COLLECTIF_DUP');
+        }
+      }
+
       // Mémoriser les compteurs actuels pour le prochain push
       localStorage.setItem(LS_LAST_COUNTS, JSON.stringify({
         staff: curStaff,
@@ -32720,15 +32735,25 @@ function _mergeCollectif(rows) {
   toast(added + ' ajouté(s), ' + updated + ' mis à jour', 'ok');
 }
 
-// ── Clé de doublon Collectif France : n° licence (prioritaire) sinon nom
-// normalisé, toujours combiné à la saison — une même personne sur 2 saisons
-// reste 2 fiches distinctes (voulu), mais 2 fiches sur la MÊME saison avec la
-// même licence (ou même nom si pas de licence) sont fusionnées. ──
-function _collDedupKey(m){
+// ── Détection de doublons Collectif France : deux fiches de la même saison
+// sont la même personne si leur nom normalisé OU leur n° de licence coïncide
+// (union des deux critères — capte aussi le cas d'une licence mal ressaisie
+// pour la même personne, ex: « Christophe Gloriant » avec 2 n° différents).
+function _collDedupGroups(list){
   var norm=function(s){ return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
-  var lic=(m.licence||'').toString().trim();
-  var base=lic ? 'lic:'+norm(lic) : 'nom:'+norm((m.prenom||'')+' '+(m.nom||''));
-  return base+'|'+(m.saison||'');
+  var keyMap={}, groups=[];
+  list.forEach(function(m){
+    var saison=m.saison||'';
+    var nameKey='nom:'+norm((m.prenom||'')+' '+(m.nom||''))+'|'+saison;
+    var lic=(m.licence||'').toString().trim();
+    var licKey=lic ? 'lic:'+norm(lic)+'|'+saison : null;
+    var gIdx = (nameKey in keyMap) ? keyMap[nameKey] : (licKey && licKey in keyMap ? keyMap[licKey] : null);
+    if (gIdx===null) { gIdx=groups.length; groups.push([]); }
+    keyMap[nameKey]=gIdx;
+    if (licKey) keyMap[licKey]=gIdx;
+    groups[gIdx].push(m);
+  });
+  return groups;
 }
 // Fusionne les doublons Collectif France (même personne/saison saisie 2 fois,
 // souvent import + ajout manuel — voir addCollectifMember). Garde la 1ère
@@ -32736,16 +32761,19 @@ function _collDedupKey(m){
 // renseigné sur l'une des deux seulement) avant de supprimer l'autre.
 function _collDeduplicate(){
   if (!S.collectif || !S.collectif.length) { toast('Aucun membre au Collectif France', 'ok'); return; }
-  var byKey={}, kept=[], removed=0, removedIds=[];
-  S.collectif.forEach(function(m){
-    var k=_collDedupKey(m);
-    if (!byKey[k]) { byKey[k]=m; kept.push(m); return; }
-    var keep=byKey[k];
-    ['statut_shn','equipe_france','efr1','efr2','discipline2','email','tel','club','photo','pilotId','licence','region','ligue','regionSportive'].forEach(function(f){
-      if (!keep[f] && m[f]) keep[f]=m[f];
-    });
-    if (m.id) removedIds.push(m.id);
-    removed++;
+  var groups=_collDedupGroups(S.collectif);
+  var kept=[], removed=0, removedIds=[];
+  groups.forEach(function(g){
+    var keep=g[0];
+    for (var i=1;i<g.length;i++){
+      var m=g[i];
+      ['statut_shn','equipe_france','efr1','efr2','discipline2','email','tel','club','photo','pilotId','licence','region','ligue','regionSportive'].forEach(function(f){
+        if (!keep[f] && m[f]) keep[f]=m[f];
+      });
+      if (m.id) removedIds.push(m.id);
+      removed++;
+    }
+    kept.push(keep);
   });
   if (!removed) { toast('Aucun doublon détecté ✓', 'ok'); return; }
   var btn = document.querySelector('[onclick="_collDeduplicate()"]');
