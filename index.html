@@ -55041,7 +55041,7 @@ async function _dtnTodoRemoteFetch(){
     var res = await sb.from('dtn_todos').select('*').eq('user_id', _dtnTodoUserKey()).order('created_at',{ascending:true});
     if(res.error) throw res.error;
     var mapped = (res.data||[]).map(function(r){
-      return { id:r.id, dateDu:r.date_du||'', thematique:r.thematique||'', action:r.action||'', contact:r.contact||'', done:!!r.done, _createdAt:r.created_at };
+      return { id:r.id, dateDu:r.date_du||'', thematique:r.thematique||'', action:r.action||'', contact:r.contact||'', infos:r.infos||'', done:!!r.done, _createdAt:r.created_at };
     });
     window._dtnTodoRemote[_dtnTodoUserKey()] = mapped;
     return mapped;
@@ -55218,20 +55218,21 @@ function _dtnTodoOpenForm(editId){
   var lab='font-size:11px;font-weight:700;color:var(--txt3);display:block;margin-bottom:5px';
   var esc = (typeof _todoEsc==='function') ? _todoEsc : function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
   var panel=document.createElement('div');
-  panel.style.cssText='background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:460px;overflow:hidden';
+  panel.style.cssText='background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:100%;max-width:620px;max-height:88vh;overflow-y:auto';
   panel.onclick=function(e){ e.stopPropagation(); };
-  panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--bdr)">'
-    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">'+(editing?'✏️ Modifier la tâche':'📝 Nouvelle tâche')+'</div>'
+  panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr)">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--txt)">'+(editing?'✏️ Modifier la tâche':'📝 Nouvelle tâche')+'</div>'
     +'<button onclick="document.getElementById(\'dtn-todo-ov\').remove()" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--txt3);font-size:19px;cursor:pointer">×</button>'
     +'</div>'
-    +'<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+    +'<div style="padding:20px;display:flex;flex-direction:column;gap:14px">'
       +'<input type="hidden" id="dtn-todo-edit-id" value="'+(editing?esc(editing.id):'')+'">'
       +'<div><label style="'+lab+'">DATE DU (échéance)</label><input id="dtn-todo-date" type="date" value="'+(editing?esc(editing.dateDu||''):'')+'" style="'+inp+'"></div>'
       +'<div><label style="'+lab+'">THÉMATIQUE</label><input id="dtn-todo-thematique" type="text" placeholder="Ex : Sécurité, Formation, Territoires…" value="'+(editing?esc(editing.thematique||''):'')+'" style="'+inp+'"></div>'
-      +'<div><label style="'+lab+'">ACTION</label><textarea id="dtn-todo-action" placeholder="Décrire l\'action à mener…" style="'+inp+';resize:vertical;min-height:72px">'+(editing?esc(editing.action||''):'')+'</textarea></div>'
+      +'<div><label style="'+lab+'">ACTION</label><textarea id="dtn-todo-action" placeholder="Décrire l\'action à mener…" style="'+inp+';resize:vertical;min-height:80px">'+(editing?esc(editing.action||''):'')+'</textarea></div>'
       +'<div><label style="'+lab+'">CONTACT</label><input id="dtn-todo-contact" type="text" placeholder="Nom / email / téléphone" value="'+(editing?esc(editing.contact||''):'')+'" style="'+inp+'"></div>'
+      +'<div><label style="'+lab+'">INFOS <span style="text-transform:none;font-weight:400;opacity:.75">(notes internes, non affichées dans la liste)</span></label><textarea id="dtn-todo-infos" placeholder="Détails, contexte, liens…" style="'+inp+';resize:vertical;min-height:100px">'+(editing?esc(editing.infos||''):'')+'</textarea></div>'
     +'</div>'
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding:0 16px 16px">'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding:0 20px 20px">'
       +'<button onclick="document.getElementById(\'dtn-todo-ov\').remove()" style="padding:9px 18px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
       +'<button onclick="_dtnTodoSubmit()" style="padding:9px 22px;border-radius:9px;border:none;background:#0891b2;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">'+(editing?'Enregistrer':'Ajouter')+'</button>'
     +'</div>';
@@ -55244,17 +55245,17 @@ async function _dtnTodoSubmit(){
   var thematique=g('dtn-todo-thematique').trim();
   var action=g('dtn-todo-action').trim();
   if(!thematique && !action){ if(typeof toast==='function') toast('Renseignez au moins la thématique ou l\'action','err'); return; }
-  var dateDu=g('dtn-todo-date'), contact=g('dtn-todo-contact').trim();
+  var dateDu=g('dtn-todo-date'), contact=g('dtn-todo-contact').trim(), infos=g('dtn-todo-infos').trim();
   var btn=document.querySelector('#dtn-todo-ov button[onclick="_dtnTodoSubmit()"]');
   if(_dtnTodoIsGuest()){
     if(editId){
       _dtnTodoMutateLS(function(arr){
         var t=arr.find(function(x){ return x.id===editId; });
-        if(t){ t.dateDu=dateDu; t.thematique=thematique; t.action=action; t.contact=contact; }
+        if(t){ t.dateDu=dateDu; t.thematique=thematique; t.action=action; t.contact=contact; t.infos=infos; }
         return arr;
       });
     } else {
-      var t={ id:'todo'+Date.now().toString(36), dateDu:dateDu, thematique:thematique, action:action, contact:contact, done:false, _createdAt:Date.now() };
+      var t={ id:'todo'+Date.now().toString(36), dateDu:dateDu, thematique:thematique, action:action, contact:contact, infos:infos, done:false, _createdAt:Date.now() };
       _dtnTodoMutateLS(function(arr){ arr.push(t); return arr; });
     }
     var ov=document.getElementById('dtn-todo-ov'); if(ov) ov.remove();
@@ -55267,8 +55268,8 @@ async function _dtnTodoSubmit(){
   if(btn){ btn.disabled=true; btn.textContent=editId?'Enregistrement…':'Ajout…'; }
   try {
     var r = editId
-      ? await sb.from('dtn_todos').update({ date_du:dateDu||null, thematique:thematique, action:action, contact:contact }).eq('id', editId)
-      : await sb.from('dtn_todos').insert({ user_id:_dtnTodoUserKey(), date_du:dateDu||null, thematique:thematique, action:action, contact:contact });
+      ? await sb.from('dtn_todos').update({ date_du:dateDu||null, thematique:thematique, action:action, contact:contact, infos:infos }).eq('id', editId)
+      : await sb.from('dtn_todos').insert({ user_id:_dtnTodoUserKey(), date_du:dateDu||null, thematique:thematique, action:action, contact:contact, infos:infos });
     if(r.error) throw r.error;
     delete window._dtnTodoRemote[_dtnTodoUserKey()];   // force le rechargement (id/created_at générés côté serveur)
     await _dtnTodoRemoteFetch();
