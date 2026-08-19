@@ -55896,6 +55896,29 @@ async function _sevAutoLocalize() {
   toast(msg, resolved>0 ? 'ok' : 'warn');
 }
 
+function _sevInlineClasse(id, val) {
+  var ev = (S.securiteEvents||[]).find(function(e){ return e.id===id; });
+  if (!ev) return;
+  ev.classeUlm = val || null;
+  saveState(); _hdpSaveNow();
+}
+
+function _sevAutoDetectAllClasses() {
+  var updated = 0;
+  (S.securiteEvents||[]).forEach(function(e){
+    if (e.classeUlm) return;
+    var guess = _sevGuessClasse(e.appareil||'');
+    if (guess) { e.classeUlm = guess; updated++; }
+  });
+  if (updated > 0) {
+    saveState(); _hdpSaveNow();
+    toast(updated+' classe'+(updated>1?'s ULM détectées':'  ULM détectée')+' — vérifiez et corrigez si besoin', 'ok');
+    openSecuriteEvents('registre');
+  } else {
+    toast('Aucune classe détectable automatiquement (toutes déjà renseignées ou appareil inconnu)', 'warn');
+  }
+}
+
 // Carte des événements — rendu SVG 100 % autonome (aucune tuile réseau, donc
 // aucune erreur 401/hors-ligne). La silhouette de la France est esquissée par
 // les centroïdes de tous les départements ; les événements sont des marqueurs
@@ -56069,6 +56092,9 @@ function _renderRegistreEvenement() {
     + '<button onclick="_sevDeduplicateRegistre()" title="Supprimer les doublons détectés (même date + mêmes premiers éléments)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid rgba(239,68,68,.3);border-radius:9px;background:rgba(239,68,68,.06);color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>'
     + 'Supprimer doublons</button>'
+    + '<button onclick="_sevAutoDetectAllClasses()" title="Détecter automatiquement la classe ULM depuis le champ Appareil, pour tous les événements sans classe renseignée" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid rgba(99,102,241,.35);border-radius:9px;background:rgba(99,102,241,.07);color:#818cf8;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+    + '🔍 Auto-détecter classes</button>'
     + '<label title="Importer un fichier Excel (.xlsx/.xls/.csv)" style="display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--bdr);border-radius:9px;background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
     + 'Importer Excel'
@@ -56110,8 +56136,21 @@ function _renderRegistreEvenement() {
     var _btnSt = 'width:26px;height:26px;border:1px solid var(--bdr);border-radius:6px;background:transparent;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center';
     html += '<tr style="'+bg+';border-bottom:1px solid var(--bdr);transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(i%2===0?'':'rgba(255,255,255,.02)')+'\'">'+
       '<td style="padding:8px 10px;color:var(--txt3);white-space:nowrap">'+d+'</td>'+
-      '<td style="padding:8px 10px;color:var(--txt2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.lieu||'—')+'</td>'+
-      '<td style="padding:8px 10px;color:var(--txt2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ev.appareil||'—')+'</td>'+
+      (function(){
+        var _isMortEv=ev.isMortel||parseInt(ev.nbTues||0)>0;
+        var _isCorpEv=!_isMortEv&&(ev.isCorporel||parseInt(ev.nbBlesses||0)>0);
+        var _isMatEv=!_isMortEv&&!_isCorpEv&&ev.type==='accident';
+        var _onMap=_isMortEv||_isCorpEv||_isMatEv;
+        var _notLoc=_onMap&&!ev.dept;
+        return '<td style="padding:8px 10px;color:var(--txt2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"'+(_notLoc?' title="Cet accident n\'est pas localisé sur la carte (département manquant)"':'')+'>'+(_notLoc?'<em style="color:#f59e0b;font-style:italic">':'')+(ev.lieu||'—')+(_notLoc?'</em>':'')+'</td>';
+      })()+
+      '<td style="padding:6px 10px;max-width:140px">'+
+        '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt2);font-size:12px" title="'+(ev.appareil||'')+'">'+escH(ev.appareil||'—')+'</div>'+
+        '<select onchange="_sevInlineClasse(\''+ev.id+'\',this.value)" style="margin-top:3px;font-size:10px;background:var(--navy3);border:1px solid var(--bdr);border-radius:4px;padding:1px 4px;cursor:pointer;max-width:130px;font-family:inherit;color:var(--txt3)">'+
+          '<option value="">— Classe —</option>'+
+          ['Paramoteur','Pendulaire','Multiaxes','Autogire','Ballon','Hélicoptère ULM','Autres'].map(function(c){ return '<option value="'+c+'"'+(ev.classeUlm===c?' selected':'')+'>'+c+'</option>'; }).join('')+
+        '</select>'+
+      '</td>'+
       '<td style="padding:8px 10px;color:var(--txt2);max-width:230px;white-space:nowrap" title="'+(ev.description||'').replace(/"/g,"&quot;")+'"><span style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle">'+descCourt+'</span>'+_flags+'</td>'+
       (function(){ var _r=_beaRefsOf(ev); return '<td style="padding:8px 10px;max-width:180px" title="'+_r.join(' · ').replace(/"/g,"&quot;")+'">'+(_r.length?_r.map(function(x){return '<span style="display:block;font-size:10px;color:#6366f1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x+'</span>';}).join(''):'<span style="color:var(--txt3);font-size:10px">—</span>')+'</td>'; })()+
       '<td style="padding:8px 10px"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+sc+'22;color:'+sc+'">'+statutLabel+'</span></td>'+
@@ -58003,7 +58042,7 @@ function importSecuriteEvents(input) {
           dept:           (dept||'').toString().replace(/^0+/,''),
           pilote:         piloteInfo,
           appareil:       appareil,
-          classeUlm:      _normClasse(typeUlm),
+          classeUlm:      (function(){ var nc=_normClasse(typeUlm); var valid=['Paramoteur','Pendulaire','Multiaxes','Autogire','Ballon','Hélicoptère ULM','Autres']; return valid.indexOf(nc)>=0 ? nc : (_sevGuessClasse(appareil)||null); })(),
           agePilote:      agePilNum,
           licence:        (licence||'').toString().trim(),
           ageInstructeur: hasInstrAge ? instrAge : null,
