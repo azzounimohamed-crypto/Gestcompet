@@ -55906,13 +55906,14 @@ function _initSevLeafletMap() {
 
   var esc = function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
-  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
+  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0); };
+  var _isMat  = function(e){ return !_isMort(e)&&!_isCorp(e)&&e.type==='accident'; };
 
   var _sevMapYear = window._sevStatYear || '';
   var _sevMapEvs = (_sevMapYear
     ? (S.securiteEvents||[]).filter(function(e){ return (e.date||'').slice(0,4) === _sevMapYear; })
     : (S.securiteEvents||[])
-  ).filter(function(e){ return _isMort(e) || _isCorp(e); });
+  ).filter(function(e){ return _isMort(e) || _isCorp(e) || _isMat(e); });
 
   var deptMap = {};
   _sevMapEvs.forEach(function(e){
@@ -55920,10 +55921,11 @@ function _initSevLeafletMap() {
     var d = _DEPT_COORDS[raw] ? raw : _DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null;
     if (!d) return;
     var coord = _DEPT_COORDS[d];
-    if (!deptMap[d]) deptMap[d] = { lat: coord[0], lon: coord[1], n: 0, mort: 0, corp: 0, labels: [] };
+    if (!deptMap[d]) deptMap[d] = { lat: coord[0], lon: coord[1], n: 0, mort: 0, corp: 0, mat: 0, labels: [] };
     deptMap[d].n++;
     if (_isMort(e)) deptMap[d].mort++;
     else if (_isCorp(e)) deptMap[d].corp++;
+    else deptMap[d].mat++;
     if (e.lieu) deptMap[d].labels.push(e.lieu);
   });
 
@@ -55936,18 +55938,35 @@ function _initSevLeafletMap() {
   var regionStats = {}, domtom = [];
   Object.keys(deptMap).forEach(function(d){
     var pt = deptMap[d];
-    var col = pt.mort>0 ? '#ef4444' : pt.corp>0 ? '#f59e0b' : '#64748b';
+    var col = pt.mort>0 ? '#ef4444' : pt.corp>0 ? '#f97316' : '#64748b';
     if (!inMetro(pt.lat,pt.lon)) { domtom.push({d:d,pt:pt,col:col}); return; }
     var deptCode = _DEPT_TO_REGION[d] ? d : (_DEPT_TO_REGION['0'+d] ? '0'+d : null);
     var region = deptCode ? _DEPT_TO_REGION[deptCode] : null;
     if (!region) return;
-    if (!regionStats[region]) regionStats[region] = { n:0, mort:0, corp:0, labels:[] };
+    if (!regionStats[region]) regionStats[region] = { n:0, mort:0, corp:0, mat:0, labels:[] };
     regionStats[region].n += pt.n;
     regionStats[region].mort += pt.mort;
     regionStats[region].corp += pt.corp;
+    regionStats[region].mat  += pt.mat;
     regionStats[region].labels = regionStats[region].labels.concat(pt.labels);
   });
-  var svg = _frDeptChoroplethSVG(regionStats, { bg:'#eef2f6' });
+  var svg = _frDeptChoroplethSVG(regionStats, {
+    bg: '#eef2f6',
+    colorFn: function(st){
+      var op = Math.max(0.35, Math.min(0.9, 0.3+0.12*st.n));
+      if (st.mort>0) return {fill:'#ef4444',stroke:'#b91c1c',op:op};
+      if (st.corp>0) return {fill:'#f97316',stroke:'#c2560a',op:op};
+      return {fill:'#94a3b8',stroke:'#64748b',op:op};
+    },
+    tipFn: function(st){
+      return ' — '+st.n+' événement'+(st.n>1?'s':'')
+        +(st.mort?' · '+st.mort+' mortel'+(st.mort>1?'s':''):'')
+        +(st.corp?' · '+st.corp+' corporel'+(st.corp>1?'s':''):'')
+        +(st.mat?' · '+st.mat+' matériel'+(st.mat>1?'s':''):'')
+        +(st.labels&&st.labels.length?' ('+st.labels.slice(0,3).join(', ')+')':'');
+    },
+    centroidFn: function(){ return ''; }
+  });
 
   // Légende + DOM-TOM éventuels — sur UNE seule ligne pour gagner de la place.
   var totMarq = Object.keys(deptMap).length;
@@ -55957,9 +55976,10 @@ function _initSevLeafletMap() {
   var totLocalises = Object.keys(deptMap).reduce(function(s,d){ return s+deptMap[d].n; }, 0);
   var nonLocalises = _sevMapEvs.length - totLocalises;
   var footer='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;padding:6px 4px 0;font-size:10px;color:var(--txt3)">'
-    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444"></span>Mortel</span>'
-    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b"></span>Corporel</span>'
-    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:50%;background:#64748b"></span>Matériel</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:50%;background:#ef4444"></span>Mortel</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:50%;background:#f97316"></span>Corporel</span>'
+    +''
+    +''
     + (domtom.length
         ? '<span style="width:1px;height:11px;background:var(--bdr)"></span>'
           + '<span style="font-weight:700">Outre-mer</span>'
@@ -55967,9 +55987,9 @@ function _initSevLeafletMap() {
         : '')
     +'</div>'
     + (nonLocalises>0
-        ? '<div style="display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:4px">'
-          +'<div style="text-align:center;font-size:9px;color:#f59e0b" title="Ces événements ont un statut mortel/corporel mais aucun département reconnu en fiche (« Dept » vide ou non reconnu)">⚠️ '+nonLocalises+' événement'+(nonLocalises>1?'s':'')+' non localisé'+(nonLocalises>1?'s':'')+' (département manquant), absent'+(nonLocalises>1?'s':'')+' de la carte</div>'
-          +'<button id="sev-autoloc-btn" onclick="_sevAutoLocalize()" style="font-size:9px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;cursor:pointer;font-family:inherit">🌍 Localiser automatiquement</button>'
+        ? '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:3px">'
+          +'<span style="font-size:9px;color:#f59e0b" title="Département manquant en fiche">⚠️ '+nonLocalises+' non localisé'+(nonLocalises>1?'s':'')+' (dept. manquant)</span>'
+          +'<button id="sev-autoloc-btn" onclick="_sevAutoLocalize()" style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;border:1px solid rgba(99,102,241,.35);background:rgba(99,102,241,.08);color:#818cf8;cursor:pointer;font-family:inherit;white-space:nowrap">🌍 Localiser</button>'
           +'</div>'
         : '');
 
@@ -55979,7 +55999,35 @@ function _initSevLeafletMap() {
     return;
   }
   el.style.display='flex'; el.style.flexDirection='column';
-  el.innerHTML = '<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center">'+svg+'</div>'+footer;
+  el.innerHTML = '<div id="sev-map-wrap" style="flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center">'+svg+'<div id="sev-map-badges" style="position:absolute;inset:0;pointer-events:none"></div></div>'+footer;
+
+  // Positionne des badges HTML lisibles par-dessus le SVG
+  requestAnimationFrame(function(){
+    var wrap = document.getElementById('sev-map-wrap');
+    var svgEl = wrap && wrap.querySelector('svg');
+    var badgesEl = document.getElementById('sev-map-badges');
+    if (!svgEl || !badgesEl) return;
+    var sr = svgEl.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    var W = _FR_DEPT_MAP_W, H = _FR_DEPT_MAP_H;
+    var scale = Math.min(sr.width/W, sr.height/H);
+    var ox = sr.left - wr.left + (sr.width  - W*scale)/2;
+    var oy = sr.top  - wr.top  + (sr.height - H*scale)/2;
+    var html='';
+    Object.keys(regionStats).forEach(function(code){
+      var st=regionStats[code]; if(!st||!st.n) return;
+      var c=_FR_REGION_CENTROIDS[code]; if(!c) return;
+      var px=(ox+c[0]*scale).toFixed(1), py=(oy+c[1]*scale).toFixed(1);
+      var badges=[];
+      if(st.mort) badges.push({n:st.mort,col:'#ef4444'});
+      if(st.corp) badges.push({n:st.corp,col:'#f97316'});
+      if(st.mat)  badges.push({n:st.mat, col:'#64748b'});
+      var inner=badges.map(function(b){
+        return '<span style="font-size:11px;font-weight:900;color:#111;line-height:1">'+b.n+'</span>';
+      }).join('');
+      html+='<div style="position:absolute;left:'+px+'px;top:'+py+'px;transform:translate(-50%,-50%);font-family:inherit">'+inner+'</div>';
+    });
+    badgesEl.innerHTML=html;
+  });
 }
 
 function _renderRegistreEvenement() {
@@ -56278,7 +56326,11 @@ function _frDeptChoroplethSVG(zoneStats, opts){
   Object.keys(zoneStats).forEach(function(code){
     var st = zoneStats[code]; if (!st || !st.n) return;
     var c = ZC[code]; if (!c) return;
-    svg += '<text x="'+c[0]+'" y="'+c[1]+'" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="'+(opts.numFontSize||30)+'" font-weight="900" fill="'+(opts.numColor||'#1e293b')+'" stroke="'+(opts.numStroke||'rgba(255,255,255,.9)')+'" stroke-width="4" paint-order="stroke fill" style="pointer-events:none">'+st.n+'</text>';
+    if (opts.centroidFn) {
+      svg += opts.centroidFn(st, code, c[0], c[1]);
+    } else {
+      svg += '<text x="'+c[0]+'" y="'+c[1]+'" text-anchor="middle" dominant-baseline="central" font-family="inherit" font-size="'+(opts.numFontSize||30)+'" font-weight="900" fill="'+(opts.numColor||'#1e293b')+'" stroke="'+(opts.numStroke||'rgba(255,255,255,.9)')+'" stroke-width="4" paint-order="stroke fill" style="pointer-events:none">'+st.n+'</text>';
+    }
   });
   svg += '</svg>';
   return svg;
@@ -56420,7 +56472,7 @@ function _renderSecuriteStats() {
   _allEvs.forEach(function(e){ var y=(e.date||'').slice(0,4); if(y.length===4) _allYrsSet[y]=1; });
   var _allYrsList = Object.keys(_allYrsSet).sort();
 
-  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0||(parseInt(e.gravite||0)>=4&&e.type==='accident'); };
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
   var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
 
   var _PAL = ['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#ec4899','#ef4444','#f97316'];
@@ -56632,24 +56684,15 @@ function _renderSecuriteStats() {
     var _subTitle = function(t){ return '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:11px;flex-shrink:0">'+t+'</div>'; };
     // Classes ULM (barres horizontales)
     var cC={};
-    evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';cC[c]=(cC[c]||0)+1;});
+    evs.forEach(function(e){var _rc=(e.classeUlm||e.typeUlm||'').trim();var c=_rc==='Parachute motorisé'?'Paramoteur':_rc==='Planeur ULM'||_rc==='Autre'?'Autres':_rc||'Non renseignée';cC[c]=(cC[c]||0)+1;});
     var iC=Object.keys(cC).sort(function(a,b){return cC[b]-cC[a];}).slice(0,8);
     var colsC=['#0891b2','#6366f1','#8b5cf6','#10b981','#f59e0b','#f43f5e','#0d9488','#a855f7'];
     var mxC=iC.length?cC[iC[0]]:1;
     var sC=iC.length
       ? iC.map(function(k,i){ return _bRow(k,cC[k],mxC,total,colsC[i%colsC.length]); }).join('')
       : '<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>';
-    // Type de vol (barres horizontales)
-    var cV={};
-    evs.forEach(function(e){var tv=(e.typeVol||'Non renseigné').trim()||'Non renseigné';cV[tv]=(cV[tv]||0)+1;});
-    var iV=Object.keys(cV).sort(function(a,b){return cV[b]-cV[a];});
-    var mxV=cV[iV[0]]||1, sV='';
-    iV.forEach(function(k,i){sV+=_bRow(k,cV[k],mxV,total,_PAL[i%_PAL.length]);});
-    if(!sV) sV='<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 0">—</div>';
-    html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:row;gap:14px;min-height:0">'
+    html+='<div style="'+_cSt+';padding:14px;display:flex;flex-direction:column;min-height:0">'
       +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('Classes ULM')+'<div style="flex:1;overflow:auto;min-height:0">'+sC+'</div></div>'
-      +'<div style="width:1px;background:var(--bdr);flex-shrink:0;align-self:stretch"></div>'
-      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'+_subTitle('Type de vol')+'<div style="flex:1;overflow:auto;min-height:0">'+sV+'</div></div>'
       +'</div>';
   })();
 
@@ -56685,10 +56728,10 @@ function _renderSecuriteStats() {
     var maxV=counts[items[0]]||1;
     var rows=items.map(function(k,i){
       var n=counts[k], col=PAL_O[i%PAL_O.length], dc=morts[k]||0, nt=tues[k]||0;
-      var w=Math.round(n/maxV*100), pct=nBEA>0?Math.round(n/nBEA*100):0;
+      var w=Math.round(n/maxV*100), pct=evs.length>0?Math.round(n/evs.length*100):0;
       var lblCol=dc>0?'#ef4444':'var(--txt)';
       var dcTitleTxt=dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+(nt>0?' · '+nt+' tué'+(nt>1?'s':''):'');
-      var dcTag=dc>0?'<span style="flex-shrink:0;font-size:9px;font-weight:800;color:#ef4444" title="'+dcTitleTxt+'">† '+(nt>0?nt:dc)+'</span>':'';
+      var dcTag=dc>0?'<span style="flex-shrink:0;font-size:9px;font-weight:800;color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px;padding:1px 5px" title="Cette cause est impliquée dans '+dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+'">⬤ mortel</span>':'';
       return '<div style="flex:1 1 0;min-height:20px;max-height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
           +'<div style="display:flex;align-items:center;gap:7px;min-width:0">'
@@ -56696,14 +56739,17 @@ function _renderSecuriteStats() {
             +'<span style="font-size:11px;font-weight:'+(dc>0?'700':'600')+';color:'+lblCol+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+_esc(k)+(dc>0?' — '+dcTitleTxt:'')+'">'+_esc(k)+'</span>'
             +dcTag
           +'</div>'
-          +'<span style="flex-shrink:0;font-size:12px;font-weight:800;color:'+col+'">'+n
-            +'<span style="font-size:9px;font-weight:400;color:var(--txt3);margin-left:4px">'+pct+'%</span></span>'
+          +'<span style="flex-shrink:0;font-size:12px;font-weight:800;color:var(--txt)">'+n+'</span>'
         +'</div>'
         +'<div style="height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">'
           +'<div style="width:'+w+'%;height:100%;background:'+col+';border-radius:3px"></div></div>'
       +'</div>';
     }).join('');
-    var body='<div style="flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:6px;min-height:0;overflow:auto">'+rows+'</div>'+footer;
+    var footer2='<div style="flex-shrink:0;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">'
+      +'<span style="font-size:9px;color:#6366f1">Nombre d\'accidents impliquant cette cause (multi-causes possible)</span>'
+      +_origPrintToggle
+      +'</div>';
+    var body='<div style="flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:6px;min-height:0;overflow:auto">'+rows+'</div>'+footer2;
     html+=_card('Origines',body,2);
   })();
 
@@ -56757,7 +56803,7 @@ function _sevPrintStats() {
   _allEvs.forEach(function(e){ var y=(e.date||'').slice(0,4); if(y.length===4) _allYrsSet[y]=1; });
   var _allYrsList = Object.keys(_allYrsSet).sort();
 
-  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0||(parseInt(e.gravite||0)>=4&&e.type==='accident'); };
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
   var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0||e.type==='accident'); };
 
   var total=evs.length, nMort=evs.filter(_isMort).length;
@@ -56878,7 +56924,7 @@ function _sevPrintStats() {
 
   // ── Barres horizontales Classes ULM ──
   var _svgD2 = (function(){
-    var counts={}; evs.forEach(function(e){var c=(e.classeUlm||e.typeUlm||'Inconnu').trim()||'Inconnu';counts[c]=(counts[c]||0)+1;});
+    var counts={}; evs.forEach(function(e){var _rc=(e.classeUlm||e.typeUlm||'').trim();var c=_rc==='Parachute motorisé'?'Paramoteur':_rc==='Planeur ULM'||_rc==='Autre'?'Autres':_rc||'Non renseignée';counts[c]=(counts[c]||0)+1;});
     var items=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7);
     var cols2=[C.p1,C.p2,C.p3,C.p4,C.p5,C.p6,C.p7];
     var mx=items.length?counts[items[0]]:1;
@@ -56946,17 +56992,13 @@ function _sevPrintStats() {
       return '<div style="margin-bottom:6px">'
         +'<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:2px;align-items:baseline">'
           +'<span style="min-width:0;flex:1;font-size:9px;color:'+(dc>0?C.mort:'#374151')+';font-weight:'+(dc>0?'700':'400')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(k)+'</span>'
-          +'<span style="flex-shrink:0;font-size:9px;font-weight:700;color:'+barCol+'">'+(dc>0?'† '+(nt>0?nt:dc)+' · ':'')+n+' <span style="font-weight:400;color:#94a3b8;font-size:8px">'+pct+'%</span></span>'
+          +'<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#1e293b">'+n+'</span>'
         +'</div>'
         +'<div style="height:5px;background:#e2e8f0;border-radius:3px"><div style="width:'+w+'%;height:100%;background:'+barCol+';border-radius:3px"></div></div>'
       +'</div>';
     };
-    var half=Math.ceil(items.length/2);
-    var colA=items.slice(0,half).map(function(k,i){return row(k,i);}).join('');
-    var colB=items.slice(half).map(function(k,i){return row(k,i+half);}).join('');
-    var legend='<div style="font-size:8px;color:#64748b;margin-top:5px;text-align:right"><span style="color:'+C.mort+';font-weight:700">†</span> origine avec accident mortel (nb de tués si connu) · '+nBEA+' / '+evs.length+' événements classifiés BEA</div>';
-    return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">'
-      +'<div style="min-width:0;overflow:hidden">'+colA+'</div><div style="min-width:0;overflow:hidden">'+colB+'</div></div>'+legend;
+    var legend='<div style="font-size:8px;color:#64748b;margin-top:5px;text-align:right">Nombre d\'accidents impliquant cette cause — <span style="color:#ef4444;font-weight:700">mortel</span> = cause présente dans un accident mortel</div>';
+    return '<div>'+items.map(function(k,i){return row(k,i);}).join('')+'</div>'+legend;
   })();
 
   // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
@@ -56988,7 +57030,7 @@ function _sevPrintStats() {
       regionStats[region].mort += p.mort;
       regionStats[region].corp += p.corp;
     });
-    return _frDeptChoroplethSVG(regionStats, { heightCss:'140px', bg:'#ffffff', radius:'0' });
+    return _frDeptChoroplethSVG(regionStats, { heightCss:'220px', bg:'#ffffff', radius:'0' });
   })();
 
   // Décompte outre-mer (DOM-TOM) — départements hors bornes métropolitaines,
@@ -57016,6 +57058,10 @@ function _sevPrintStats() {
           + _prtDomTomItems.map(function(o){ var col=o.p.mort>0?'#b91c1c':o.p.corp>0?'#d97706':'#475569'; return '<span title="dépt '+o.d+'" style="font-size:8px;font-weight:700;color:#fff;background:'+col+';border-radius:20px;padding:1px 7px">'+o.d+' · '+o.p.n+'</span>'; }).join('')
         : '')
     +'</div>';
+  var _prtNonLoc = (function(){
+    var tot=Object.keys(_printDeptMap).reduce(function(s,d){return s+_printDeptMap[d].n;},0);
+    var nl=(nMort+nCorp)-tot; return nl>0?'<div style="font-size:8px;color:#d97706;margin-top:4px;text-align:center">⚠️ '+nl+' non localisé'+(nl>1?'s':'')+' (dept. manquant)</div>':'';
+  })();
 
   // ── Carte Monde : événements hors Europe (dept non reconnu comme dept français) ──
   var _WORLD_COORDS = {
@@ -57132,8 +57178,9 @@ function _sevPrintStats() {
 
   var printDate = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   var logo = (typeof _getAppLogo === 'function' ? _getAppLogo() : '') || 'https://ffplum.fr/templates/ffplum/images/logo.png';
-  var titleLabel = filterYear ? 'RASU — Année '+filterYear : 'RECUEIL ACCIDENTOLOGIE ET SÉCURITÉ ULM - RASU';
-  var subLabel = filterYear ? total+' événements en '+filterYear+' · '+nYears+' mois couverts' : total+' événements · '+periodeStr+(nYears?' · '+nYears+' an'+(nYears>1?'s':''):'');
+  var titleLabel = filterYear ? 'RASU · Année '+filterYear : 'RECUEIL ACCIDENTOLOGIE ET SÉCURITÉ ULM - RASU';
+  var nMonths = (function(){ var m={}; evs.forEach(function(e){ var ym=(e.date||'').slice(0,7); if(ym.length===7) m[ym]=1; }); return Object.keys(m).length; })();
+  var subLabel = filterYear ? total+' événements en '+filterYear+(nMonths>1?' · '+nMonths+' mois':'') : total+' événements · '+periodeStr+(nYears?' · '+nYears+' an'+(nYears>1?'s':''):'');
 
   var w = window.open('','_blank','width=900,height=1200');
   if (!w) { alert('Veuillez autoriser les popups pour imprimer.'); return; }
@@ -57162,9 +57209,9 @@ function _sevPrintStats() {
 
     // ── Header ──
     +'<div class="hdr">'
-    +(logo?'<img src="'+logo+'" style="height:50px;width:auto;max-width:120px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
+    +(logo?'<img src="'+logo+'" style="height:70px;width:auto;max-width:150px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
     +'<div>'
-    +'<div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px">FFPLUM · Direction Technique Nationale</div>'
+    +'<div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px">Direction Technique Nationale</div>'
     +'<div style="font-size:20px;font-weight:900;color:#1e3a5f;letter-spacing:-.3px">'+titleLabel+'</div>'
     +'<div style="font-size:10px;color:#64748b;margin-top:3px">'+subLabel+'</div>'
     +'</div>'
@@ -57197,24 +57244,19 @@ function _sevPrintStats() {
         : _sec('Instructeur à bord', _svgD3))
     +'</div>'
 
-    // ── Row 3 : Type de vol + Carte France (le décompte outre-mer remplace la carte mondiale) ──
-    +'<div class="row row-2b" style="margin-bottom:10px'+_row3Style+'">'
-    + _sec('Type de vol', _barsVol || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">—</div>')
-    +'<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;height:100%;display:flex;flex-direction:column;justify-content:center">'
+    // ── Row 3 : Origines détectées (gauche) + Carte France agrandie (droite) ──
+    +'<div class="row row-2" style="flex:1;min-height:0;margin-bottom:0">'
+    +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;display:flex;flex-direction:column;height:100%">'
+    +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
+    +'<div style="flex:1;overflow:auto">'+(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')+'</div>'
+    +'</div>'
+    +'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#fff;height:100%;display:flex;flex-direction:column">'
     +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Carte des événements — France'+(_prtDomTomItems.length?' &amp; outre-mer':' métropolitaine')+'</div>'
-    +_prtFranceSVG
+    +'<div style="flex:1;display:flex;flex-direction:column;justify-content:center">'+_prtFranceSVG+'</div>'
     +_prtFranceLegend
+    +_prtNonLoc
     +'</div>'
     +'</div>'
-
-    // ── Row 4 : Origines détectées (barres 2 colonnes, pleine largeur) — case à
-    // cocher dans Stats (bas-droite de la carte Origines) pour l'inclure ou non.
-    + (window._sevOrigInPrint !== false
-        ? '<div style="break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;background:#fff;margin-bottom:0">'
-          +'<div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px">Origines détectées (réf. BEA)</div>'
-          +(_barsOrig || '<div style="color:#94a3b8;font-size:10px;text-align:center;padding:10px">Aucune référence BEA assignée</div>')
-          +'</div>'
-        : '')
 
     +'</div></div>'
     +'<script>function doPrint(){ window.focus(); window.print(); }<\/script>'
@@ -57459,7 +57501,15 @@ function openSecuriteEventForm(evId) {
           + '<div><label style="'+_lab+'">PILOTE</label><input id="sev-pilote" type="text" value="'+(ev?escH(ev.pilote||''):'')+'" placeholder="Nom et prénom" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
           + '<div><label style="'+_lab+'" title="Âge du pilote (2 chiffres)">ÂGE</label><input id="sev-age" type="number" min="14" max="110" value="'+(ev&&ev.agePilote?ev.agePilote:'')+'" placeholder="ans" style="'+_inp+';padding-left:6px;padding-right:2px;text-align:center" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
         + '</div>'
-        + '<div style="margin-top:10px"><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?escH(ev.appareil||''):'')+'" placeholder="Marque / immatriculation" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'"></div>'
+        + '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+          + '<div><label style="'+_lab+'">APPAREIL</label><input id="sev-appareil" type="text" value="'+(ev?escH(ev.appareil||''):'')+'" placeholder="Marque / immatriculation" style="'+_inp+'" onfocus="'+_foc+'" onblur="'+_blr+'" oninput="_sevAutoClasse()"></div>'
+          + '<div><label style="'+_lab+'">CLASSE ULM</label><select id="sev-classeulm" style="'+_sel+'" onfocus="'+_foc+'" onblur="'+_blr+'" onchange="_sevClasseManual()">'
+            + '<option value="">— Non renseignée —</option>'
+            + ['Paramoteur','Pendulaire','Multiaxes','Autogire','Ballon','Hélicoptère ULM','Autres'].map(function(c){ return '<option value="'+c+'"'+(ev&&(ev.classeUlm===c||(c==='Paramoteur'&&ev.classeUlm==='Parachute motorisé')||(c==='Autres'&&(ev.classeUlm==='Planeur ULM'||ev.classeUlm==='Autre')))?' selected':'')+'>'+c+'</option>'; }).join('')
+          + '</select>'
+          + '<div id="sev-classeulm-hint" style="font-size:9px;margin-top:3px;min-height:12px"></div>'
+          + '</div>'
+        + '</div>'
       + '</div>'
       + '<div>'
         + '<div style="'+_st+'">Bilan humain</div>'
@@ -57505,11 +57555,48 @@ function openSecuriteEventForm(evId) {
   ov.appendChild(panel);
   document.body.appendChild(ov);
   setTimeout(function(){ var el=document.getElementById('sev-date'); if(el) el.focus(); }, 80);
+  setTimeout(function(){
+    var sel=document.getElementById('sev-classeulm');
+    if(sel){ if(sel.value){ sel.dataset.manual='1'; } else { _sevAutoClasse(); } }
+  }, 100);
 }
 
 // Construit l'enregistrement depuis le formulaire, valide et le stocke (+saveState).
 // Retourne l'id stocké, ou null si la validation échoue. Ne ferme rien, n'affiche
 // pas de toast de succès — réutilisé par l'enregistrement ET par la navigation.
+// Détecte la classe ULM depuis le texte de l'appareil (marques + mots-clés).
+// Retourne la classe normalisée ou '' si non déterminable.
+function _sevGuessClasse(txt) {
+  if (!txt) return '';
+  var t = txt.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  // Mots-clés directs (ordre important : planeur avant para, paramoteur avant para)
+  if (/pendulaire|weightshift|aeros\b|fun2fly|cosmos\b|t-?max\b|tmax|air.?creation|air.?creat|alize|iTV\b|flexwing/i.test(t)) return 'Pendulaire';
+  if (/multiaxe|multi.?axe|3.?axes|trois.?axe|ulm.?class(ic|ique)?|pipistrel|savannah|skyranger|zenair|rans\b|kitfox|dyn.?aero|tecnam|bristell|fk.?9|ev.?97|eurostar|humbert\b|tetras|pulma|guepard|zlin\b|mcr\b|robin\b|dr.?40[0-9]|sting\b|tulak|jabiru|ulm.?aero|aeropro|evektor|sportcruiser|atec\b|skyfox|vans\b|rv.?[0-9]|cessna.?ulm|microlight|classic\b/i.test(t)) return 'Multiaxes';
+  if (/autogire|gyrocopter|gyro.?plane|gyro\b|mto.?sport|cavalon|calidus|auto.?gyro|magni\b|ela\b|rotordrive/i.test(t)) return 'Autogire';
+  if (/paramoteur|para.?moteur|paramotor|parachute|parachu|powered.?para|fresh.?breeze|dudek\b|ozone\b|niviuk|advance\b|sky.?country|mac.?para|apco\b|sup.?air|sol\b|gin\b|nova\b|skywalk|littlecloud|kortel|plume\b|vittorazi|polini|moster|atom.?80|nitro.?200|moster.?185/i.test(t)) return 'Paramoteur';
+  if (/ballon|montgolfi|aerostat|dirigeable|zeppelin|airship/i.test(t)) return 'Ballon';
+  if (/helico|helic|rotorway|mosquito|safari\b|dynali|innovator|cicare|cabri\b|guimbal/i.test(t)) return 'Hélicoptère ULM';
+  return '';
+}
+function _sevAutoClasse() {
+  var app = (document.getElementById('sev-appareil')||{}).value||'';
+  var sel = document.getElementById('sev-classeulm');
+  var hint = document.getElementById('sev-classeulm-hint');
+  if (!sel) return;
+  // Ne pas écraser une valeur saisie manuellement (indiquée par data-manual)
+  if (sel.dataset && sel.dataset.manual === '1') return;
+  var guess = _sevGuessClasse(app);
+  if (guess) {
+    sel.value = guess;
+    if (hint) { hint.textContent = '✓ Détecté automatiquement'; hint.style.color='#10b981'; }
+  } else {
+    if (hint) { hint.textContent = ''; }
+  }
+}
+function _sevClasseManual() {
+  var sel = document.getElementById('sev-classeulm');
+  if (sel) sel.dataset.manual = sel.value ? '1' : '0';
+}
 function _sevBuildAndStore(evId) {
   var date  = (document.getElementById('sev-date')||{}).value||'';
   var type  = (document.getElementById('sev-type')||{}).value||'';
@@ -57529,6 +57616,7 @@ function _sevBuildAndStore(evId) {
     licence:     ((document.getElementById('sev-licence')||{}).value||'').trim(),
     agePilote:   _ageVal,
     appareil:    ((document.getElementById('sev-appareil')||{}).value||'').trim(),
+    classeUlm:   ((document.getElementById('sev-classeulm')||{}).value||'').trim()||null,
     description: desc.trim(),
     mesures:     ((document.getElementById('sev-mesures')||{}).value||'').trim(),
     refBEA:      ((document.getElementById('sev-refbea')||{}).value||'').trim()||null,
@@ -57874,14 +57962,15 @@ function importSecuriteEvents(input) {
 
         // Normalisation classe ULM
         var _normClasse = function(t) {
-          if(!t) return 'Inconnu';
+          if(!t) return 'Non renseignée';
           var tl=t.toLowerCase();
           if(tl.indexOf('pendulaire')>=0||tl==='1') return 'Pendulaire';
           if(tl.indexOf('multiaxe')>=0||tl.indexOf('multi')>=0||tl==='2') return 'Multiaxes';
           if(tl.indexOf('autogire')>=0||tl==='3') return 'Autogire';
           if(tl.indexOf('paramoteur')>=0||tl==='4') return 'Paramoteur';
-          if(tl.indexOf('para')>=0||tl==='5') return 'Parachute motorisé';
-          if(tl.indexOf('planeur')>=0||tl.indexOf('ulmplaneur')>=0||tl==='6') return 'Planeur ULM';
+          if(tl.indexOf('para')>=0||tl==='5') return 'Paramoteur';
+          if(tl.indexOf('ballon')>=0||tl.indexOf('montgolfi')>=0) return 'Ballon';
+          if(tl.indexOf('planeur')>=0||tl.indexOf('ulmplaneur')>=0||tl==='6') return 'Autres';
           if(tl.indexOf('hélico')>=0||tl.indexOf('helico')>=0||tl==='7') return 'Hélicoptère ULM';
           return t;
         };
