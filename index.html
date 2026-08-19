@@ -5896,7 +5896,7 @@ function _parseCandidatureText(text, filename) {
     var fm;
     var _mmap = {janvier:'01',février:'02',fevrier:'02',mars:'03',avril:'04',mai:'05',juin:'06',juillet:'07',août:'08',aout:'08',septembre:'09',octobre:'10',novembre:'11',décembre:'12',decembre:'12'};
     while ((fm = re3.exec(text)) !== null) {
-      var mon = _mmap[(fm[2]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')];
+      var mon = _mmap[(fm[2]||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')];
       if (!mon) mon = _mmap[(fm[2]||'').toLowerCase()];
       if (mon) { foundDate = fm[3] + '-' + mon + '-' + String(parseInt(fm[1])).padStart(2,'0'); break; }
     }
@@ -22429,9 +22429,9 @@ function renderPilots() {
   }
   var list = S.pilots.filter(function(p){ return p.statut === 'pilote'; });
   if (_pilotsSearch) {
-    var q = _pilotsSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var q = _pilotsSearch.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
     list = list.filter(function(p){
-      var hay = [(p.prenom||''),(p.nom||''),(p.licence||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var hay = [(p.prenom||''),(p.nom||''),(p.licence||''),(p.club||''),(p.email||'')].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
       return hay.indexOf(q) !== -1;
     });
   }
@@ -22979,7 +22979,7 @@ function renderPilotDetailContent(pilotId, editMode) {
     // Helper : teste si deux noms correspondent (insensible à la casse, tolérant accents)
     var _nomMatch = function(a, b) {
       if (!a || !b) return false;
-      var _n = function(s){ return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+      var _n = function(s){ return s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
       return _n(a) === _n(b);
     };
     var _pilotPk = (p.nom||'').toUpperCase().trim() + '\x01' + (p.prenom||'').toUpperCase().trim();
@@ -27915,9 +27915,11 @@ async function loadFromSupabaseFirst() {
         if ((loc._updatedAt||0) >= (cloud._updatedAt||0)) {
           Object.assign(cloud, loc);                       // local plus récent → gagne
         } else {
-          if (!cloud.refBEA  && loc.refBEA)  cloud.refBEA  = loc.refBEA;   // ne pas perdre les réfs BEA locales
-          if (!cloud.refBEA2 && loc.refBEA2) cloud.refBEA2 = loc.refBEA2;
-          if (!cloud.refBEA3 && loc.refBEA3) cloud.refBEA3 = loc.refBEA3;
+          if (!cloud.refBEA    && loc.refBEA)    cloud.refBEA    = loc.refBEA;   // ne pas perdre les réfs BEA locales
+          if (!cloud.refBEA2   && loc.refBEA2)   cloud.refBEA2   = loc.refBEA2;
+          if (!cloud.refBEA3   && loc.refBEA3)   cloud.refBEA3   = loc.refBEA3;
+          if (!cloud.classeUlm && loc.classeUlm) cloud.classeUlm = loc.classeUlm; // ne pas perdre la classe ULM
+          if (!cloud.dept      && loc.dept)      { cloud.dept = loc.dept; cloud._deptAuto = loc._deptAuto; } // ne pas perdre le département localisé
         }
       });
       // Dédoublonnage AUTOMATIQUE après fusion : les doublons (mêmes date+éléments)
@@ -30762,7 +30764,7 @@ function fillPilotManualFromLicence() {
       if (!rec) { toast('Licence «'+licVal+'» non trouvée dans le fichier licences', 'err'); return; }
     } else {
       // Recherche par prénom + nom
-      var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+      var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
       var key  = norm(nom) + '|' + norm(prenom);
       rec = db[key] || db[norm(prenom) + '|' + norm(nom)];
       if (!rec) { toast('«'+prenom+' '+nom+'» non trouvé dans le fichier licences', 'err'); return; }
@@ -30779,7 +30781,7 @@ function fillPilotManualFromLicence() {
     force('pm-adresse', rec.adresse);
     // Région normalisée
     var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
-    var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
+    var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matched = frRegList.find(function(r){ return _nr(r)===_nr(rawReg); }) || '';
     if (!matched && rawReg) matched = frRegList.find(function(r){ return _nr(r).indexOf(_nr(rawReg))>=0 || _nr(rawReg).indexOf(_nr(r))>=0; }) || '';
@@ -30982,7 +30984,7 @@ function cfPilotAutocomplete() {
   var val = (inp ? inp.value : '').trim().toLowerCase();
   var dl  = document.getElementById('cf-pilot-list');
   if (!dl || !val) return;
-  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var nVal = norm(val);
   var matches = (S.pilots||[]).filter(function(p){
     return norm((p.prenom||'')+' '+(p.nom||'')).indexOf(nVal) >= 0
@@ -30998,7 +31000,7 @@ function cfSelectPilot() {
   var val = (inp ? inp.value : '').trim();
   if (!val) return;
   // Tenter de trouver le pilote correspondant
-  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var found = (S.pilots||[]).find(function(p){
     return norm(p.prenom+' '+p.nom) === norm(val) || norm(p.nom+' '+p.prenom) === norm(val);
   });
@@ -31014,7 +31016,7 @@ function addCollectifMember() {
   var lic   = (licEl ? licEl.value : '').trim();
   if (!val) { toast('Saisissez un nom de pilote', 'err'); return; }
 
-  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var pilot = (S.pilots||[]).find(function(p){
     return norm(p.prenom+' '+p.nom) === norm(val) || norm(p.nom+' '+p.prenom) === norm(val);
   });
@@ -32626,19 +32628,19 @@ function _normalizeCollectifRows(rows) {
   };
 
   var normKey = function(k) {
-    return (k||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    return (k||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
   };
   var normVal = function(v) {
     return (v === null || v === undefined) ? '' : String(v).trim();
   };
   var normPratique = function(v) {
-    var lv = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var lv = v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
     if (lv.indexOf('microlight') >= 0 || lv.indexOf('ulm') >= 0) return 'microlight';
     if (lv.indexOf('param') >= 0) return 'paramoteur';
     return v.toLowerCase();
   };
   var normDiscipline = function(v) {
-    var lv = v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var lv = v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
     if (lv.indexOf('classic') >= 0) return 'classic';
     if (lv.indexOf('slalom') >= 0) return 'slalom';
     if (lv.indexOf('stol') >= 0) return 'stol';
@@ -35122,7 +35124,7 @@ function fillPilotFromLicence(pilotId) {
   var pilot = (S.pilots||[]).find(function(p){ return p.id === pilotId; });
   if (!pilot) return;
   function _applyLicence(db) {
-    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
     var rec = null;
     // 1. Priorité : numéro de licence (champ saisie ou valeur stockée)
     var licField = document.getElementById('pd-licence');
@@ -35156,7 +35158,7 @@ function fillPilotFromLicence(pilotId) {
     force('pd-adresse',  rec.adresse);
     // Région : correspondance normalisée sur les valeurs exactes du <select>
     var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
-    var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
+    var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matchedReg = frRegList.find(function(r){ return _nr(r)===_nr(rawReg); }) || '';
     if (!matchedReg && rawReg) matchedReg = frRegList.find(function(r){ return _nr(r).indexOf(_nr(rawReg))>=0 || _nr(rawReg).indexOf(_nr(r))>=0; }) || '';
@@ -35184,7 +35186,7 @@ function fillStaffFromLicence() {
   var nom    = (document.getElementById('staff-nom')||{}).value||'';
   if (!prenom && !nom) { toast('Saisissez d\'abord le prénom et le nom','err'); return; }
   function _applyLicence(db) {
-    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
     var key = norm(nom) + '|' + norm(prenom);
     var rec = db[key] || db[norm(prenom) + '|' + norm(nom)];
     if (!rec) { toast('«'+prenom+' '+nom+'» non trouvé dans le fichier licences','err'); return; }
@@ -35546,7 +35548,7 @@ function showPilotDetailModal(pilotId, compId, editMode) {
     var _pdRepasHistory = [];
     var _pdHasAnyRepas = false;
     var _pdTYPE_COLOR = {'Petit déjeuner':'#f59e0b','Déjeuner':'#10b981','Dîner':'#6366f1'};
-    var _pdNomMatch = function(a,b){if(!a||!b)return false;var _n=function(s){return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');};return _n(a)===_n(b);};
+    var _pdNomMatch = function(a,b){if(!a||!b)return false;var _n=function(s){return s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');};return _n(a)===_n(b);};
     (S.comps||[]).forEach(function(cp){
       var rd=S.repas&&S.repas[cp.id];
       if(!rd||(!rd.rows&&!rd.checks&&!rd.participants))return;
@@ -41199,7 +41201,7 @@ function fillStaffDetailFromLicence() {
   var nom    = (document.getElementById('sdm-nom')||{}).value||'';
   if (!prenom && !nom) { toast('Saisissez d\'abord le prénom et le nom','err'); return; }
   function _apply(db) {
-    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+    var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
     var rec = db[norm(nom)+'|'+norm(prenom)] || db[norm(prenom)+'|'+norm(nom)];
     if (!rec) { toast('«'+prenom+' '+nom+'» non trouvé dans le fichier licences','err'); return; }
     var force = function(id, val){ var el=document.getElementById(id); if(el && val!=null) el.value=val; };
@@ -41215,7 +41217,7 @@ function fillStaffDetailFromLicence() {
     force('sdm-adresse', rec.adresse);
     // Région : normaliser pour matcher les valeurs exactes du <select>
     var frReg = _FR_REGIONS.concat(_PAYS_ETRANGERS);
-    var normStr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
+    var normStr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,''); };
     var rawReg = rec.region || '';
     var matchedReg = frReg.find(function(r){ return normStr(r) === normStr(rawReg); }) || '';
     // Si pas de correspondance exacte, essai partiel
@@ -42799,7 +42801,7 @@ function importLicenceFfplum(inp) {
       // Normaliser une chaîne pour la comparaison (sans accents, majuscules, trim)
       var norm = function(s) {
         return (s || '').toString().trim().toUpperCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          .normalize('NFD').replace(/[̀-ͯ]/g, '');
       };
 
       // ── Détection dynamique des colonnes via les en-têtes ──
@@ -42920,7 +42922,7 @@ function importLicenceFfplum(inp) {
 
       // Normaliser la région FFPLUM vers les valeurs canoniques françaises
       var _frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
-      var _nreg = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
+      var _nreg = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,''); };
       var matchRegion = function(raw) {
         if (!raw) return '';
         var exact   = _frRegList.find(function(r){ return _nreg(r) === _nreg(raw); });
@@ -43053,11 +43055,11 @@ function hdgRefreshFromLicence(compId) {
   var enrolled = (S.compEnroll||{})[compId] || [];
   if (!enrolled.length) { toast('Aucun compétiteur inscrit', ''); return; }
 
-  var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm = function(s){ return (s||'').toString().trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
 
   // Même logique de normalisation région que fillPilotFromLicence (individuel)
   var frRegList = _FR_REGIONS.concat(_PAYS_ETRANGERS);
-  var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,''); };
+  var _nr = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,''); };
   var matchRegion = function(raw) {
     if (!raw) return '';
     var exact = frRegList.find(function(r){ return _nr(r) === _nr(raw); });
@@ -43168,7 +43170,7 @@ function refreshAllFromLicenceDB() {
 
   var norm = function(s) {
     return (s || '').toString().trim().toUpperCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
   };
 
   var updated = 0, notFound = 0;
@@ -48429,7 +48431,7 @@ function printNoteAvance(compId) {
   // ── Lignes du tableau ──
   var rows = '';
   var totalRepas = 0, totalDivers = 0, totalKm = 0;
-  var _isRepas = function(s){ return s ? s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf('repas') >= 0 : false; };
+  var _isRepas = function(s){ return s ? s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').indexOf('repas') >= 0 : false; };
   var _fmtFR = function(s){
     if(!s) return '';
     var d = new Date(s+'T12:00:00');
@@ -50805,7 +50807,7 @@ function _ndfMobileLoadTesseract(cb) {
 function _ndfMobileApplyOCR(text) {
   var lines = (text||'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
   var full  = lines.join(' ');
-  var norm  = function(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm  = function(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var fullN = norm(full);
 
   // ── Corrections OCR fréquentes sur les chiffres ────────────────────────────────────────────
@@ -51342,7 +51344,7 @@ function _ndfProcessScan(file) {
 function _ndfParseScanResult(text, file) {
   var lines = text.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
   var full  = lines.join(' ');
-  var norm  = function(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var norm  = function(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var fullN = norm(full);
 
   // ── Date ──
@@ -52324,7 +52326,7 @@ function bdmExtractGeoQuery(addr) {
 // ─── Helper : chercher une personne dans licenceDB par nom complet ───
 function bdmLicenceLookup(fullName) {
   if (!S.licenceDB || !fullName) return null;
-  var normF = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var normF = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var parts = fullName.trim().split(/\s+/);
   for (var i = 1; i < parts.length; i++) {
     var prenom = parts.slice(0,i).join(' ');
@@ -52338,7 +52340,7 @@ function bdmLicenceLookup(fullName) {
 function bdmPersonSearch(val) {
   var drop = document.getElementById('bdm-person-drop');
   if (!drop) return;
-  var normF = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+  var normF = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var q = normF(val.trim());
   if (!q) { drop.style.display = 'none'; return; }
 
@@ -52396,7 +52398,7 @@ function bdmSelectPerson(name, adresse) {
   }
   // Ou chercher dans S.pilots
   if (!adresse) {
-    var normF2 = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+    var normF2 = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
     var pilot = (S.pilots||[]).find(function(p){ return normF2(((p.prenom||'')+' '+(p.nom||'')).trim()) === normF2(name); });
     if (pilot && pilot.adresse) adresse = pilot.adresse;
   }
@@ -52655,7 +52657,7 @@ function saveBudgetDetailModal() {
 
     // ── Gestion de la personne : créer/mettre à jour dans S.pilots + S.staff ──
     if (personne) {
-      var normP = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); };
+      var normP = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
       // Chercher dans S.pilots
       var matchPilot = (S.pilots||[]).find(function(p){
         return normP(((p.prenom||'')+' '+(p.nom||'')).trim()) === normP(personne);
@@ -55867,17 +55869,154 @@ async function _sevAutoLocalize() {
       if (mPc) found = postToDept(mPc[1]);
     }
 
-    if (!found && lieu.trim()) {
-      try {
-        if (geocodeCount>0) await new Promise(function(r){ setTimeout(r, 1100); });
-        geocodeCount++;
-        var q = lieu + (lieu.toLowerCase().indexOf('france')===-1 ? ', France' : '');
-        var res = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&addressdetails=1&limit=1', {headers:{'Accept-Language':'fr-FR,fr'}});
-        var data = await res.json();
-        if (data && data[0] && data[0].address && data[0].address.postcode) {
-          found = postToDept(data[0].address.postcode);
+    // ── Stratégie 2 : table locale garantie (tableau de paires, sans objet complexe) ──
+    if (!found) {
+      // Normalisation : minuscule, sans accents, sans tirets/apostrophes
+      var _normS = function(s){
+        return (s||'').toString().toLowerCase()
+          .replace(/[àâä]/g,'a').replace(/[éèêë]/g,'e').replace(/[îï]/g,'i')
+          .replace(/[ôö]/g,'o').replace(/[ùûü]/g,'u').replace(/ç/g,'c').replace(/ñ/g,'n')
+          .replace(/['\-–—\/]/g,' ').replace(/\s+/g,' ').trim();
+      };
+      var lN = _normS(lieu);
+      console.log('[AutoLoc] lieu:', JSON.stringify(lieu), '→ normalisé:', JSON.stringify(lN));
+      // Tableau [motif_normalisé, code_dept] — aucune clé dupliquée possible
+      var _pairs = [
+        // Noms de département
+        ['ain','1'],['aisne','2'],['allier','3'],['alpes de haute provence','4'],['hautes alpes','5'],
+        ['alpes maritimes','6'],['ardeche','7'],['ardennes','8'],['ariege','9'],['aube','10'],
+        ['aude','11'],['aveyron','12'],['bouches du rhone','13'],['calvados','14'],['cantal','15'],
+        ['charente maritime','17'],['charente','16'],['cher','18'],['correze','19'],
+        ['corse du sud','2a'],['haute corse','2b'],['cote d or','21'],['cotes d armor','22'],
+        ['creuse','23'],['dordogne','24'],['doubs','25'],['drome','26'],['eure et loir','28'],
+        ['eure','27'],['finistere','29'],['gard','30'],['haute garonne','31'],['gers','32'],
+        ['gironde','33'],['herault','34'],['ille et vilaine','35'],['indre et loire','37'],
+        ['indre','36'],['isere','38'],['jura','39'],['landes','40'],['loir et cher','41'],
+        ['loire atlantique','44'],['haute loire','43'],['loiret','45'],['loire','42'],
+        ['lot et garonne','47'],['lot','46'],['lozere','48'],['maine et loire','49'],
+        ['manche','50'],['haute marne','52'],['marne','51'],['mayenne','53'],
+        ['meurthe et moselle','54'],['meuse','55'],['morbihan','56'],['moselle','57'],
+        ['nievre','58'],['nord','59'],['oise','60'],['orne','61'],['pas de calais','62'],
+        ['puy de dome','63'],['pyrenees atlantiques','64'],['hautes pyrenees','65'],
+        ['pyrenees orientales','66'],['bas rhin','67'],['haut rhin','68'],['rhone','69'],
+        ['haute saone','70'],['saone et loire','71'],['sarthe','72'],['haute savoie','74'],
+        ['savoie','73'],['paris','75'],['seine maritime','76'],['seine et marne','77'],
+        ['yvelines','78'],['deux sevres','79'],['somme','80'],['tarn et garonne','82'],
+        ['tarn','81'],['var','83'],['vaucluse','84'],['vendee','85'],['haute vienne','87'],
+        ['vienne','86'],['vosges','88'],['yonne','89'],['territoire de belfort','90'],
+        ['essonne','91'],['hauts de seine','92'],['seine saint denis','93'],
+        ['val de marne','94'],['val d oise','95'],['guadeloupe','971'],
+        ['martinique','972'],['guyane','973'],['reunion','974'],['mayotte','976'],
+        // Préfectures et villes principales
+        ['bourg en bresse','1'],['laon','2'],['moulins','3'],['digne les bains','4'],
+        ['gap','5'],['nice','6'],['privas','7'],['charleville mezieres','8'],['sedan','8'],
+        ['foix','9'],['pamiers','9'],['troyes','10'],['carcassonne','11'],['narbonne','11'],
+        ['rodez','12'],['millau','12'],['marseille','13'],['aix en provence','13'],['arles','13'],
+        ['caen','14'],['aurillac','15'],['angouleme','16'],['cognac','16'],
+        ['la rochelle','17'],['saintes','17'],['rochefort','17'],['royan','17'],['le thou','17'],
+        ['bourges','18'],['tulle','19'],['brive la gaillarde','19'],
+        ['ajaccio','2a'],['bastia','2b'],
+        ['dijon','21'],['beaune','21'],['saint brieuc','22'],['gueret','23'],
+        ['perigueux','24'],['bergerac','24'],['sarlat','24'],['besancon','25'],['montbeliard','25'],
+        ['valence','26'],['romans sur isere','26'],['evreux','27'],['chartres','28'],
+        ['quimper','29'],['brest','29'],['nimes','30'],['ales','30'],['toulouse','31'],
+        ['auch','32'],['bordeaux','33'],['libourne','33'],['arcachon','33'],
+        ['montpellier','34'],['beziers','34'],['sete','34'],['rennes','35'],
+        ['chateauroux','36'],['tours','37'],['grenoble','38'],['vienne','38'],
+        ['lons le saunier','39'],['dole','39'],['mont de marsan','40'],['dax','40'],
+        ['blois','41'],['saint etienne','42'],['le puy en velay','43'],['nantes','44'],
+        ['saint nazaire','44'],['orleans','45'],['cahors','46'],['agen','47'],['marmande','47'],
+        ['mende','48'],['angers','49'],['saint lo','50'],['reims','51'],['epernay','51'],
+        ['chalons en champagne','51'],['chaumont','52'],['saint dizier','52'],['laval','53'],
+        ['nancy','54'],['luneville','54'],['bar le duc','55'],['verdun','55'],
+        ['vannes','56'],['lorient','56'],['metz','57'],['thionville','57'],['forbach','57'],
+        ['nevers','58'],['lille','59'],['roubaix','59'],['tourcoing','59'],['dunkerque','59'],
+        ['beauvais','60'],['alencon','61'],['arras','62'],['calais','62'],['boulogne sur mer','62'],
+        ['lens','62'],['clermont ferrand','63'],['pau','64'],['bayonne','64'],['biarritz','64'],
+        ['tarbes','65'],['lourdes','65'],['perpignan','66'],['strasbourg','67'],['haguenau','67'],
+        ['colmar','68'],['mulhouse','68'],['lyon','69'],['vesoul','70'],['macon','71'],
+        ['chalon sur saone','71'],['le mans','72'],['chambery','73'],['albertville','73'],
+        ['annecy','74'],['thonon les bains','74'],['paris','75'],['rouen','76'],['le havre','76'],
+        ['melun','77'],['versailles','78'],['niort','79'],['amiens','80'],['albi','81'],
+        ['castres','81'],['montauban','82'],['toulon','83'],['draguignan','83'],['frejus','83'],
+        ['avignon','84'],['la roche sur yon','85'],['poitiers','86'],['limoges','87'],
+        ['epinal','88'],['auxerre','89'],['sens','89'],['belfort','90'],['evry','91'],
+        ['nanterre','92'],['bobigny','93'],['creteil','94'],['pontoise','95'],
+        ['basse terre','971'],['fort de france','972'],['cayenne','973'],['mamoudzou','976']
+      ];
+      for (var pi=0; pi<_pairs.length && !found; pi++) {
+        var pk = _pairs[pi][0], pd = _pairs[pi][1];
+        if (lN === pk || lN.indexOf(pk) >= 0) {
+          found = pd;
+          console.log('[AutoLoc] MATCH local:', JSON.stringify(pk), '→', pd);
         }
-      } catch(err) { /* réseau indisponible : on continue */ }
+      }
+      if (found && !_validDept(found)) { console.warn('[AutoLoc] dept invalide:', found); found = null; }
+    }
+
+    // ── Stratégie 3 : Nominatim avec fallbacks successifs ───────────────────
+    if (!found && lieu.trim()) {
+      var _norm2 = _normS;
+      var _cleanLieu = function(s) {
+        var mIcao = s.match(/^LF[A-Z0-9]{4}\s*[-–—]\s*(.+)/i); if (mIcao) s = mIcao[1];
+        s = s.replace(/^(a[eé]rodrome|terrain|AD|piste|ULM)\s+(de\s+|du\s+|des\s+|d[''\s])?/i,'');
+        s = s.replace(/\d+[.,]\d+\s*°?\s*[NSEOnseo]/g,'').replace(/\s*[/|]\s*/g,' ');
+        s = s.replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
+        return s;
+      };
+      // Extrait le code dept depuis une réponse Nominatim
+      var _deptFromAddr = function(addr) {
+        if (!addr) return null;
+        // ISO3166-2-lvl6 ex: "FR-17"
+        var iso = (addr['ISO3166-2-lvl6']||'');
+        var mIso = iso.match(/^FR-(\d{2,3}|2[AB])$/i);
+        if (mIso && _validDept(mIso[1])) return mIso[1];
+        // postcode
+        if (addr.postcode) { var d=postToDept(addr.postcode); if (_validDept(d)) return d; }
+        // county → lookup via _pairs
+        var co = _norm2((addr.county||addr.state_district||'').replace(/^D[eé]partement\s+(du\s+|de\s+|des\s+|d['' ])?/i,''));
+        for (var _pi=0; _pi<_pairs.length; _pi++) { if (_pairs[_pi][0]===co && _validDept(_pairs[_pi][1])) return _pairs[_pi][1]; }
+        return null;
+      };
+      var _nominatim = async function(q) {
+        if (!q || q.trim().length < 2) return null;
+        if (q.toLowerCase().indexOf('france') === -1) q += ', France';
+        try {
+          var r = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&addressdetails=1&limit=3&countrycodes=fr',{headers:{'Accept-Language':'fr-FR,fr','User-Agent':'GestDTN/1.0'}});
+          var d = await r.json();
+          if (!d || !d.length) return null;
+          for (var ri=0; ri<d.length; ri++) { var dep=_deptFromAddr(d[ri].address||{}); if (dep) return dep; }
+        } catch(err){}
+        return null;
+      };
+
+      var qBase = _cleanLieu(lieu);
+
+      // Tentative 1 : lieu nettoyé complet
+      if (geocodeCount>0) await new Promise(function(r){ setTimeout(r, 1100); });
+      geocodeCount++;
+      found = await _nominatim(qBase);
+
+      // Tentative 2 : partie après la dernière virgule ou tiret (commune seule)
+      if (!found && qBase.match(/[,\-–—]/)) {
+        var parts2 = qBase.split(/[,\-–—]/);
+        var last2 = parts2[parts2.length-1].trim();
+        if (last2 && last2.length > 2 && last2 !== qBase) {
+          await new Promise(function(r){ setTimeout(r, 1100); });
+          geocodeCount++;
+          found = await _nominatim(last2);
+        }
+      }
+
+      // Tentative 3 : mots significatifs (> 3 lettres) en excluant chiffres
+      if (!found) {
+        var words3 = qBase.replace(/[,\-–—]/g,' ').split(/\s+/).filter(function(w){ return w.length > 3 && !/^\d+$/.test(w); });
+        if (words3.length && words3.join(' ') !== qBase.trim()) {
+          await new Promise(function(r){ setTimeout(r, 1100); });
+          geocodeCount++;
+          found = await _nominatim(words3.join(' '));
+        }
+      }
     }
 
     if (found && _validDept(found)) {
@@ -55892,23 +56031,83 @@ async function _sevAutoLocalize() {
   if (resolved > 0) { saveState(); if (typeof silentPush==='function') silentPush(true); }
   if (typeof openSecuriteEvents === 'function') openSecuriteEvents('stats');
   var msg = resolved + ' événement'+(resolved>1?'s':'')+' localisé'+(resolved>1?'s':'')+' automatiquement';
-  if (failed.length) msg += ' · ' + failed.length + ' non résolu'+(failed.length>1?'s':'')+' (lieu à préciser manuellement)';
+  if (failed.length) {
+    msg += ' · Non reconnus : ' + failed.map(function(f){ return '"'+f+'"'; }).join(', ');
+    // Afficher aussi dans la console pour diagnostic
+    console.warn('[AutoLoc] Lieux non résolus :', failed);
+  }
   toast(msg, resolved>0 ? 'ok' : 'warn');
+}
+
+function _sevShowOrigineDetail(ref) {
+  var _isMort = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
+  var _isCorp = function(e){ return !_isMort(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0); };
+  var filterYear = window._sevStatYear || '';
+  var pool = filterYear
+    ? (S.securiteEvents||[]).filter(function(e){ return (e.date||'').slice(0,4)===filterYear; })
+    : (S.securiteEvents||[]);
+  var matched = pool.filter(function(e){
+    return (_beaRefsOf(e)||[]).indexOf(ref) >= 0;
+  }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var escH = function(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+
+  var rows = matched.map(function(e){
+    var isMort=_isMort(e), isCorp=_isCorp(e);
+    var gravCol=isMort?'#ef4444':isCorp?'#f97316':'#64748b';
+    var gravLbl=isMort?'Mortel':isCorp?'Corporel':'Matériel';
+    var tues=parseInt(e.nbTues||0)||0, bles=parseInt(e.nbBlesses||0)||0;
+    var detail='';
+    if(tues>0) detail+=tues+' tué'+(tues>1?'s':'');
+    if(bles>0) detail+=(detail?', ':'')+bles+' blessé'+(bles>1?'s':'');
+    var desc=(e.description||e.premElementsAccident||'').toString().slice(0,200);
+    return '<div onclick="openSecuriteEventForm(\''+e.id+'\')" style="border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(99,102,241,.07)\'" onmouseleave="this.style.background=\'\'">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+        +'<span style="font-size:11px;font-weight:700;color:var(--txt2)">'+(e.date||'—')+'</span>'
+        +'<span style="font-size:10px;font-weight:800;color:'+gravCol+';background:'+gravCol+'22;border-radius:4px;padding:1px 7px">'+gravLbl+'</span>'
+        +(detail?'<span style="font-size:10px;color:'+gravCol+'">'+detail+'</span>':'')
+        +'<span style="margin-left:auto;font-size:10px;color:var(--txt3)">'+(e.classeUlm||e.typeUlm||'—')+'</span>'
+      +'</div>'
+      +(e.lieu?'<div style="font-size:11px;color:#6366f1;margin-bottom:4px">📍 '+escH(e.lieu)+(e.dept?' ('+e.dept+')':'')+'</div>':'')
+      +(e.appareil?'<div style="font-size:11px;color:var(--txt2);margin-bottom:4px">✈️ '+escH(e.appareil)+'</div>':'')
+      +(desc?'<div style="font-size:11px;color:var(--txt3);line-height:1.4">'+escH(desc)+(desc.length>=200?'…':'')+'</div>':'')
+    +'</div>';
+  }).join('');
+
+  var overlay = document.createElement('div');
+  overlay.id = 'sev-orig-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick = function(ev){ if(ev.target===overlay) overlay.remove(); };
+  overlay.innerHTML = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
+    +'<div style="padding:16px 20px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;flex-shrink:0">'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escH(ref)+'">'+escH(ref)+'</div>'
+        +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+matched.length+' accident'+(matched.length>1?'s':'')+' — cliquez pour ouvrir la fiche</div>'
+      +'</div>'
+      +'<button onclick="document.getElementById(\'sev-orig-modal\').remove()" style="flex-shrink:0;background:rgba(255,255,255,.07);border:1px solid var(--bdr);border-radius:7px;padding:6px 12px;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">✕ Fermer</button>'
+    +'</div>'
+    +'<div style="padding:16px 20px;overflow-y:auto;flex:1">'+(rows||'<div style="color:var(--txt3);text-align:center;padding:30px">Aucun événement trouvé</div>')+'</div>'
+  +'</div>';
+  var old = document.getElementById('sev-orig-modal');
+  if (old) old.remove();
+  document.body.appendChild(overlay);
 }
 
 function _sevInlineClasse(id, val) {
   var ev = (S.securiteEvents||[]).find(function(e){ return e.id===id; });
   if (!ev) return;
   ev.classeUlm = val || null;
+  ev._updatedAt = Date.now();
   saveState(); _hdpSaveNow();
 }
 
 function _sevAutoDetectAllClasses() {
   var updated = 0;
+  var now = Date.now();
   (S.securiteEvents||[]).forEach(function(e){
     if (e.classeUlm) return;
     var guess = _sevGuessClasse(e.appareil||'');
-    if (guess) { e.classeUlm = guess; updated++; }
+    if (guess) { e.classeUlm = guess; e._updatedAt = now; updated++; }
   });
   if (updated > 0) {
     saveState(); _hdpSaveNow();
@@ -56771,7 +56970,7 @@ function _renderSecuriteStats() {
       var lblCol=dc>0?'#ef4444':'var(--txt)';
       var dcTitleTxt=dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+(nt>0?' · '+nt+' tué'+(nt>1?'s':''):'');
       var dcTag=dc>0?'<span style="flex-shrink:0;font-size:9px;font-weight:800;color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px;padding:1px 5px" title="Cette cause est impliquée dans '+dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+'">⬤ mortel</span>':'';
-      return '<div style="flex:1 1 0;min-height:20px;max-height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px">'
+      return '<div onclick="_sevShowOrigineDetail(\''+_esc(k).replace(/'/g,"\\'")+'\')" style="flex:1 1 0;min-height:20px;max-height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;border-radius:6px;padding:2px 4px;transition:background .15s" onmouseenter="this.style.background=\'rgba(99,102,241,.09)\'" onmouseleave="this.style.background=\'\'">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
           +'<div style="display:flex;align-items:center;gap:7px;min-width:0">'
             +'<div style="width:3px;height:12px;border-radius:2px;background:'+col+';flex-shrink:0"></div>'
@@ -57036,8 +57235,7 @@ function _sevPrintStats() {
         +'<div style="height:5px;background:#e2e8f0;border-radius:3px"><div style="width:'+w+'%;height:100%;background:'+barCol+';border-radius:3px"></div></div>'
       +'</div>';
     };
-    var legend='<div style="font-size:8px;color:#64748b;margin-top:5px;text-align:right">Nombre d\'accidents impliquant cette cause — <span style="color:#ef4444;font-weight:700">mortel</span> = cause présente dans un accident mortel</div>';
-    return '<div>'+items.map(function(k,i){return row(k,i);}).join('')+'</div>'+legend;
+    return '<div>'+items.map(function(k,i){return row(k,i);}).join('')+'</div>';
   })();
 
   // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
@@ -57250,7 +57448,7 @@ function _sevPrintStats() {
     +'<div class="hdr">'
     +(logo?'<img src="'+logo+'" style="height:70px;width:auto;max-width:150px;object-fit:contain;margin-right:16px" onerror="this.style.display=\'none\'">':'')
     +'<div>'
-    +'<div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px">Direction Technique Nationale</div>'
+    +'<div style="font-size:11px;font-weight:900;color:#1e3a5f;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Recueil Accidentologie et Sécurité ULM</div>'
     +'<div style="font-size:20px;font-weight:900;color:#1e3a5f;letter-spacing:-.3px">'+titleLabel+'</div>'
     +'<div style="font-size:10px;color:#64748b;margin-top:3px">'+subLabel+'</div>'
     +'</div>'
