@@ -56172,6 +56172,7 @@ function _initSevLeafletMap() {
     regionStats[region].mat  += pt.mat;
     regionStats[region].labels = regionStats[region].labels.concat(pt.labels);
   });
+  window._sevLiveRegionStats = regionStats;
   var svg = _frDeptChoroplethSVG(regionStats, {
     bg: '#eef2f6',
     colorFn: function(st){
@@ -57238,36 +57239,73 @@ function _sevPrintStats() {
     return '<div>'+items.map(function(k,i){return row(k,i);}).join('')+'</div>';
   })();
 
-  // ── Carte : agréger par département pour Leaflet dans la fenêtre impression (mortels + corporels uniquement) ──
+  // ── Carte : logique identique au volet Statistiques ──
+  var _isMortP = function(e){ return e.isMortel||parseInt(e.nbTues||0)>0; };
+  var _isCorpP = function(e){ return !_isMortP(e)&&(e.isCorporel||parseInt(e.nbBlesses||0)>0); };
+  var _isMatP  = function(e){ return !_isMortP(e)&&!_isCorpP(e)&&e.type==='accident'; };
   var _printDeptMap = {};
-  evs.filter(function(e){ return _isMort(e) || _isCorp(e); }).forEach(function(e) {
+  evs.filter(function(e){ return _isMortP(e)||_isCorpP(e)||_isMatP(e); }).forEach(function(e){
     var raw = (e.dept||'').toString().trim();
     var d = _DEPT_COORDS[raw] ? raw : (_DEPT_COORDS[raw.replace(/^0+/,'')] ? raw.replace(/^0+/,'') : null);
     if (!d) return;
     var coord = _DEPT_COORDS[d];
-    if (!_printDeptMap[d]) _printDeptMap[d] = { lat:coord[0], lon:coord[1], n:0, mort:0, corp:0 };
+    if (!_printDeptMap[d]) _printDeptMap[d] = { lat:coord[0], lon:coord[1], n:0, mort:0, corp:0, mat:0, labels:[] };
     _printDeptMap[d].n++;
-    if (_isMort(e)) _printDeptMap[d].mort++;
-    else if (_isCorp(e)) _printDeptMap[d].corp++;
+    if (_isMortP(e)) _printDeptMap[d].mort++;
+    else if (_isCorpP(e)) _printDeptMap[d].corp++;
+    else _printDeptMap[d].mat++;
+    if (e.lieu) _printDeptMap[d].labels.push(e.lieu);
   });
-  var _deptMapJson = JSON.stringify(_printDeptMap);
 
-  // ── Carte France (choroplèthe départements, fond clair, aucune tuile réseau) ──
+  // ── Carte France : clone du SVG live + badges mort/corp/mat comme la carte live ──
   var _prtFranceSVG = (function(){
-    var latMin=41.2, latMax=51.3, lonMin=-5.3, lonMax=9.8;
-    var inM=function(lat,lon){ return lat>=latMin&&lat<=latMax&&lon>=lonMin&&lon<=lonMax; };
-    var regionStats = {};
-    Object.keys(_printDeptMap).forEach(function(d){
-      var p=_printDeptMap[d]; if(!inM(p.lat,p.lon)) return;
-      var deptCode = _DEPT_TO_REGION[d] ? d : (_DEPT_TO_REGION['0'+d] ? '0'+d : null);
-      var region = deptCode ? _DEPT_TO_REGION[deptCode] : null;
-      if (!region) return;
-      if (!regionStats[region]) regionStats[region] = { n:0, mort:0, corp:0 };
-      regionStats[region].n += p.n;
-      regionStats[region].mort += p.mort;
-      regionStats[region].corp += p.corp;
-    });
-    return _frDeptChoroplethSVG(regionStats, { heightCss:'220px', bg:'#ffffff', radius:'0' });
+    var mapEl = document.getElementById('sev-leaflet-map');
+    var svgEl = mapEl ? mapEl.querySelector('svg') : null;
+    var regionStats = window._sevLiveRegionStats || {};
+    var ns = 'http://www.w3.org/2000/svg';
+    var _addNums = function(svg){
+      Object.keys(regionStats).forEach(function(code){
+        var st=regionStats[code]; if(!st||!st.n) return;
+        var c=_FR_REGION_CENTROIDS[code]; if(!c) return;
+        var bdg=[];
+        if(st.mort) bdg.push(st.mort);
+        if(st.corp) bdg.push(st.corp);
+        if(st.mat)  bdg.push(st.mat);
+        bdg.forEach(function(n,i){
+          var x = c[0] + (i-(bdg.length-1)/2)*36;
+          var t=document.createElementNS(ns,'text');
+          t.setAttribute('x',x); t.setAttribute('y',c[1]);
+          t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','central');
+          t.setAttribute('font-size','44'); t.setAttribute('font-weight','900');
+          t.setAttribute('font-family','system-ui,sans-serif');
+          t.setAttribute('fill','#ffffff'); t.setAttribute('stroke','rgba(0,0,0,.7)');
+          t.setAttribute('stroke-width','5'); t.setAttribute('paint-order','stroke');
+          t.textContent=n;
+          svg.appendChild(t);
+        });
+      });
+    };
+    if (!svgEl) {
+      return _frDeptChoroplethSVG(regionStats, {
+        heightCss:'220px', bg:'#ffffff', radius:'0',
+        colorFn: function(st){
+          var op=Math.max(0.35,Math.min(0.9,0.3+0.12*st.n));
+          if(st.mort>0) return {fill:'#ef4444',stroke:'#b91c1c',op:op};
+          if(st.corp>0) return {fill:'#f97316',stroke:'#c2560a',op:op};
+          return {fill:'#94a3b8',stroke:'#64748b',op:op};
+        },
+        numFontSize:44, numColor:'#ffffff', numStroke:'rgba(0,0,0,.7)'
+      });
+    }
+    var clone=svgEl.cloneNode(true);
+    clone.setAttribute('style','width:100%;height:220px;display:block');
+    var bg=document.createElementNS(ns,'rect');
+    bg.setAttribute('x','0'); bg.setAttribute('y','0');
+    bg.setAttribute('width','100%'); bg.setAttribute('height','100%');
+    bg.setAttribute('fill','#ffffff');
+    clone.insertBefore(bg,clone.firstChild);
+    _addNums(clone);
+    return clone.outerHTML;
   })();
 
   // Décompte outre-mer (DOM-TOM) — départements hors bornes métropolitaines,
