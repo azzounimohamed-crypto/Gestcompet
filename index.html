@@ -3421,6 +3421,15 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <input class="cf-input" type="date" id="comp-date-report-to">
           </div>
         </div>
+        <div class="cf-divider"><span>Visibilité</span></div>
+        <div class="cf-row" style="align-items:center;gap:10px">
+          <label class="cf-label" style="margin-bottom:0;flex-shrink:0">Agenda fédéral</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="comp-agenda-fed-chk" style="width:15px;height:15px;cursor:pointer;accent-color:#ef4444">
+            <span style="font-size:12px;color:var(--txt2);font-weight:600">Masquer de l'agenda fédéral</span>
+          </label>
+          <span style="font-size:11px;color:var(--txt3)">(par défaut : affiché)</span>
+        </div>
       </div>
 
       <!-- ③ Lieu -->
@@ -5660,6 +5669,8 @@ function openAddComp() {
   document.getElementById('comp-objectifs').value = '';
   document.getElementById('comp-affiche-url').value = '';
   resetAfficheForm();
+  var _afChkN = document.getElementById('comp-agenda-fed-chk');
+  if (_afChkN) _afChkN.checked = false;
   var delBtn = document.getElementById('comp-delete-btn');
   if (delBtn) delBtn.style.display = 'none';
   _compTypeChanged();
@@ -6120,6 +6131,7 @@ function saveComp() {
       if (inp && inp._data) return Date.now();
       return undefined;
     })(),
+    hiddenFromAgenda: !!(document.getElementById('comp-agenda-fed-chk')||{}).checked,
     saison: (document.getElementById('comp-date-from').value || '').substring(0,4) || '2026',
     voletsConfig: (function(){
       var vc = {};
@@ -6294,6 +6306,7 @@ function renderCompetitions() {
     if (saison   !== 'all' && cpSaison     !== saison)   return false;
     if (pratique !== 'all' && cp.pratique  !== pratique) return false;
     if (discipl  !== 'all' && cp.discipline !== discipl) return false;
+    if (_agendaFedMode && cp.hiddenFromAgenda) return false;
     if (search && !(
       (cp.name   || '').toLowerCase().includes(search) ||
       (cp.lieu   || '').toLowerCase().includes(search) ||
@@ -8639,6 +8652,8 @@ function editComp(id) {
   document.getElementById('comp-discipline').value = cp.discipline || 'stol';
   document.getElementById('comp-desc').value = cp.desc || '';
   document.getElementById('comp-objectifs').value = cp.objectifs || '';
+  var _afChk = document.getElementById('comp-agenda-fed-chk');
+  if (_afChk) _afChk.checked = !!cp.hiddenFromAgenda;
   resetAfficheForm();
   var afficheVal = cp.affiche || '';
   var urlField = document.getElementById('comp-affiche-url');
@@ -54397,6 +54412,7 @@ var _compSidebarPages = ['page-competitions','page-comp-detail','page-base','pag
 
 var _dtnCompSubOpen = false;
 function _toggleDtnCompSub() {
+  _agendaFedMode = false;
   _dtnCompSubOpen = !_dtnCompSubOpen;
   var sub = document.getElementById('dtn-comp-sub');
   var chevron = document.getElementById('dtn-comp-chevron');
@@ -54409,12 +54425,14 @@ function _toggleDtnCompSub() {
 // Bouton « Agenda fédéral » : ouvre l'agenda des compétitions SANS déployer ni activer
 // le sous-menu « Détails » (qui reste replié). Corrige le fait que openDTNModule('competitions')
 // force l'ouverture/surlignage de « Détails ».
+var _agendaFedMode = false;
 function _openAgendaFederal() {
+  _agendaFedMode = true;
   openDTNModule('competitions');
   _dtnCompSubOpen = false;
   var sub = document.getElementById('dtn-comp-sub'); if (sub) sub.style.display = 'none';
   var chev = document.getElementById('dtn-comp-chevron'); if (chev) chev.style.transform = 'rotate(0deg)';
-  _dtnSetActiveNav('agenda-fed');   // surligne « Agenda fédéral », pas « Détails »
+  _dtnSetActiveNav('agenda-fed');
 }
 
 function _compShowSidebar() {
@@ -54837,6 +54855,7 @@ function _compSbSetActive(pageId) {
 }
 
 function _compSbNav(pageId) {
+  _agendaFedMode = false;
   closeBudget(); closeNDF(); closeEspacesPartages(); closeCollectifModule();
   ['page-securite','page-formations','page-acces','page-territoires'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -56058,7 +56077,7 @@ function _sevShowOrigineDetail(ref) {
     var gravLbl=isMort?'Mortel':isCorp?'Corporel':'Matériel';
     var tues=parseInt(e.nbTues||0)||0, bles=parseInt(e.nbBlesses||0)||0;
     var detail='';
-    if(tues>0) detail+=tues+' tué'+(tues>1?'s':'');
+    if(tues>0) detail+=tues+' DCD';
     if(bles>0) detail+=(detail?', ':'')+bles+' blessé'+(bles>1?'s':'');
     var desc=(e.description||e.premElementsAccident||'').toString().slice(0,200);
     return '<div onclick="openSecuriteEventForm(\''+e.id+'\')" style="border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(99,102,241,.07)\'" onmouseleave="this.style.background=\'\'">'
@@ -56809,7 +56828,7 @@ function _renderSecuriteStats() {
   var kpis=[
     {val:periodeStr||'—', lbl:'Période', col:'#334155', sub:nYears+' an'+(nYears>1?'s':'')},
     {val:total, lbl:'Événements',  col:'#0891b2', sub:'recensés'},
-    {val:nMort,  lbl:'Mortels',    col:'#ef4444',  sub:nTues+' tué'+(nTues!==1?'s':'')},
+    {val:nMort,  lbl:'Mortels',    col:'#ef4444',  sub:nTues+' DCD'},
     {val:nCorp,  lbl:'Corporels',  col:'#f59e0b',  sub:nBless+' blessé'+(nBless!==1?'s':'')},
     {val:nMat,   lbl:'Matériels',  col:'#64748b',  sub:'sans victime'},
   ];
@@ -56969,7 +56988,7 @@ function _renderSecuriteStats() {
       var n=counts[k], col=PAL_O[i%PAL_O.length], dc=morts[k]||0, nt=tues[k]||0;
       var w=Math.round(n/maxV*100), pct=evs.length>0?Math.round(n/evs.length*100):0;
       var lblCol=dc>0?'#ef4444':'var(--txt)';
-      var dcTitleTxt=dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+(nt>0?' · '+nt+' tué'+(nt>1?'s':''):'');
+      var dcTitleTxt=dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+(nt>0?' · '+nt+' DCD':'');
       var dcTag=dc>0?'<span style="flex-shrink:0;font-size:9px;font-weight:800;color:#ef4444;background:rgba(239,68,68,.1);border-radius:4px;padding:1px 5px" title="Cette cause est impliquée dans '+dc+' accident'+(dc>1?'s':'')+' mortel'+(dc>1?'s':'')+'">⬤ mortel</span>':'';
       return '<div onclick="_sevShowOrigineDetail(\''+_esc(k).replace(/'/g,"\\'")+'\')" style="flex:1 1 0;min-height:20px;max-height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;border-radius:6px;padding:2px 4px;transition:background .15s" onmouseenter="this.style.background=\'rgba(99,102,241,.09)\'" onmouseleave="this.style.background=\'\'">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">'
@@ -57421,7 +57440,7 @@ function _sevPrintStats() {
   var kpis2=[
     {val:periodeStr||'—',lbl:'Période',col:'#64748b'},
     {val:total,lbl:'Événements',col:'#0891b2'},
-    {val:nMort,lbl:'Mortels',col:C.mort,sub:nTues+' tué'+(nTues!==1?'s':'')},
+    {val:nMort,lbl:'Mortels',col:C.mort,sub:nTues+' DCD'},
     {val:nCorp,lbl:'Corporels',col:C.corp,sub:nBless+' blessé'+(nBless!==1?'s':'')},
     {val:nMat,lbl:'Matériels',col:'#64748b',sub:'sans victime'},
   ];
