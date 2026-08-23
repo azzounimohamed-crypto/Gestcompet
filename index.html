@@ -1353,6 +1353,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <button onclick="exportComps('json');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter JSON</span></button>
             <button onclick="exportComps('excel');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter Excel</span></button>
             <button onclick="exportComps('csv');_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exporter CSV</span></button>
+            <button onclick="_exportAllAffiches();_compsActClose()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px;text-align:left" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><span>Exporter les affiches</span></button>
             <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
             <label style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:8px" onmouseover="this.style.background='rgba(255,255,255,.07)'" onmouseout="this.style.background='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Importer…</span><input type="file" id="comps-import-file" accept=".json,.xlsx,.xls,.csv" style="display:none" onchange="importComps(this);_compsActClose()"></label>
             <div style="height:1px;background:var(--bdr);margin:4px 0"></div>
@@ -6501,6 +6502,45 @@ function exportComps(fmt) {
       toast('Compétitions exportées (Excel)', 'ok');
     }
   }
+}
+
+async function _exportAllAffiches() {
+  var comps = S.comps || [];
+  // Charger aussi depuis IDB pour avoir les affiches qui ne sont pas encore en mémoire
+  try {
+    var idbData = await loadFromIDB();
+    if (idbData && idbData.comps) {
+      var idbById = {};
+      idbData.comps.forEach(function(c) { if (c && c.id) idbById[c.id] = c; });
+      comps = comps.map(function(c) {
+        if (!c.affiche && idbById[c.id] && idbById[c.id].affiche) c = Object.assign({}, c, { affiche: idbById[c.id].affiche });
+        return c;
+      });
+    }
+  } catch(e) {}
+
+  var withAffiche = comps.filter(function(c) { return c && c.affiche && c.affiche.startsWith('data:'); });
+  if (!withAffiche.length) { toast('Aucune affiche trouvée dans vos compétitions', 'warn'); return; }
+
+  toast('⏳ Téléchargement de ' + withAffiche.length + ' affiche(s)…', 'ok');
+
+  function slugify(s) { return (s||'').replace(/[^a-zA-Z0-9À-ÿ\-_ ]/g,'').trim().replace(/\s+/g,'_').substring(0,40); }
+
+  withAffiche.forEach(function(c, i) {
+    setTimeout(function() {
+      var mime = c.affiche.split(';')[0].split(':')[1] || 'image/jpeg';
+      var ext = mime.split('/')[1] || 'jpg';
+      if (ext === 'jpeg') ext = 'jpg';
+      var name = 'affiche_' + slugify(c.nom || c.name || ('comp'+i)) + '_' + (c.date || '').substring(0,10) + '.' + ext;
+      var a = document.createElement('a');
+      a.href = c.affiche;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (i === withAffiche.length - 1) toast('✅ ' + withAffiche.length + ' affiche(s) téléchargée(s)', 'ok');
+    }, i * 500);
+  });
 }
 
 function importComps(input) {
