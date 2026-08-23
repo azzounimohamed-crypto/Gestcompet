@@ -5050,13 +5050,14 @@ function clearLocalStorageQuota() {
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
                'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES, LS_GANTT, LS_COLLECTIF, LS_SIG, LS_STAMP,
-               LS_ETAPES, 'dtn_projects', '_cr_anthropic_key', '_cr_known_people', '_gantt_zoom', '_dbdGanttScale'];
+               LS_ETAPES, 'dtn_projects', '_cr_anthropic_key', '_cr_known_people', '_gantt_zoom', '_dbdGanttScale',
+               'gestdtn_dtntodos'];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_AIDES && k !== 'dtn_projects' && k !== '_cr_anthropic_key' && k !== '_cr_known_people' && k !== '_gantt_zoom' && k !== '_dbdGanttScale') {
+      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_AIDES && k !== 'dtn_projects' && k !== '_cr_anthropic_key' && k !== '_cr_known_people' && k !== '_gantt_zoom' && k !== '_dbdGanttScale' && k !== 'gestdtn_dtntodos') {
         localStorage.removeItem(k);
       }
     });
@@ -57333,8 +57334,15 @@ async function _dtnTodoRemoteFetch(){
       var prev = _prevLocal.find(function(x){ return x.id===r.id; });
       return { id:r.id, dateDu:r.date_du||'', thematique:r.thematique||'', action:r.action||'', contact:r.contact||'', infos:r.infos||'', done:!!r.done, agendaEventId:r.agenda_event_id||(prev?prev.agendaEventId:'')||'', projectRef:r.project_ref||(prev?prev.projectRef:'')||'', _createdAt:r.created_at };
     });
-    window._dtnTodoRemote[_dtnTodoUserKey()] = mapped;
-    return mapped;
+    // Fusionner avec les tâches sauvegardées localement (importées) qui ne sont pas encore dans Supabase
+    var localAll = _dtnTodoLoadAllLS();
+    var localTasks = localAll[_dtnTodoUserKey()] || [];
+    var supaIds = {};
+    mapped.forEach(function(t){ supaIds[t.id] = true; });
+    var localOnly = localTasks.filter(function(t){ return t && t.id && !supaIds[t.id]; });
+    var merged = mapped.concat(localOnly);
+    window._dtnTodoRemote[_dtnTodoUserKey()] = merged;
+    return merged;
   } catch(e){ console.warn('[dtnTodo] fetch', e && e.message); return null; }
 }
 function _dtnTodoSort(arr){
@@ -57581,8 +57589,12 @@ function _dtnTodoImport(){
           'OK = Fusionner (ajouter les nouvelles, garder les existantes)\nAnnuler = Ne rien faire'
         );
         if (!choice) return;
+        // Sauvegarder en localStorage dans tous les cas (garde-fou contre les syncs cloud)
+        _dtnTodoMutateLS(function(arr){
+          var ids = {}; arr.forEach(function(t){ if(t&&t.id) ids[t.id]=true; });
+          return arr.concat(newTasks.filter(function(t){ return !ids[t.id]; }));
+        });
         if (_dtnTodoIsGuest()) {
-          _dtnTodoMutateLS(function(arr){ return arr.concat(newTasks); });
           _dtnRenderTodo();
         } else {
           var k = _dtnTodoUserKey();
@@ -57590,9 +57602,14 @@ function _dtnTodoImport(){
           _dtnRenderTodo();
           var sb = (typeof getSB === 'function') ? getSB() : null;
           if (sb && newTasks.length) {
-            var rows = newTasks.map(function(t){ return Object.assign({}, t, { user_id: k }); });
+            var _supaFields = ['id','label','done','dueDate','priority','category','note','compRef','todoRef','created_at'];
+            var rows = newTasks.map(function(t){
+              var row = { user_id: k };
+              _supaFields.forEach(function(f){ if (t[f] !== undefined) row[f] = t[f]; });
+              return row;
+            });
             sb.from('dtn_todos').insert(rows).then(function(r){
-              if (r && r.error) toast('Import local OK, sync cloud partielle', 'warn');
+              if (r && r.error) toast('Import local OK — sync cloud à vérifier', 'warn');
             });
           }
         }
