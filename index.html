@@ -55412,7 +55412,10 @@ function _dtnGoHome() {
       +'</div>'
       /* RIGHT : todo + alertes Gantt */
       +'<div class="dbd-col dbd-col-r">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes tâches personnelles</div><button onclick="_dtnTodoOpenForm()" title="Nouvelle tâche" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes tâches personnelles</div>'
+      +'<button onclick="_dtnTodoExport()" title="Exporter mes tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg></button>'
+      +'<button onclick="_dtnTodoImport()" title="Importer des tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V7M6 11l4-4 4 4"/><path d="M4 16h12"/></svg></button>'
+      +'<button onclick="_dtnTodoOpenForm()" title="Nouvelle tâche" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column"><div id="dtn-todo-zone" style="flex:1;min-height:0;overflow-y:auto;padding:0"></div></div>'
       +'</div>'
       +'</div>'
@@ -57543,6 +57546,64 @@ function _dtnRenderTodoNow(el){
     + projSection
     + '</div>';
 }
+function _dtnTodoExport(){
+  var tasks = _dtnTodoList();
+  if (!tasks || !tasks.length) { toast('Aucune tâche à exporter', 'warn'); return; }
+  var json = JSON.stringify({ version: 1, exported: new Date().toISOString(), taches: tasks }, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var d = new Date();
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'GestDTN_taches_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Export téléchargé (' + tasks.length + ' tâche' + (tasks.length > 1 ? 's' : '') + ')', 'ok');
+}
+
+function _dtnTodoImport(){
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = function(){
+    var file = inp.files && inp.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        var parsed = JSON.parse(e.target.result);
+        var imported = parsed.taches || parsed;
+        if (!Array.isArray(imported) || !imported.length) { toast('Fichier invalide ou vide', 'err'); return; }
+        var existing = _dtnTodoList();
+        var existingIds = {};
+        existing.forEach(function(t){ if (t && t.id) existingIds[t.id] = true; });
+        var newTasks = imported.filter(function(t){ return t && t.id && !existingIds[t.id]; });
+        var choice = confirm(
+          imported.length + ' tâche' + (imported.length > 1 ? 's' : '') + ' dans le fichier.\n' +
+          newTasks.length + ' nouvelle' + (newTasks.length > 1 ? 's' : '') + ' à ajouter.\n\n' +
+          'OK = Fusionner (ajouter les nouvelles, garder les existantes)\nAnnuler = Ne rien faire'
+        );
+        if (!choice) return;
+        if (_dtnTodoIsGuest()) {
+          _dtnTodoMutateLS(function(arr){ return arr.concat(newTasks); });
+          _dtnRenderTodo();
+        } else {
+          var k = _dtnTodoUserKey();
+          window._dtnTodoRemote[k] = (window._dtnTodoRemote[k] || []).concat(newTasks);
+          _dtnRenderTodo();
+          var sb = (typeof getSB === 'function') ? getSB() : null;
+          if (sb && newTasks.length) {
+            var rows = newTasks.map(function(t){ return Object.assign({}, t, { user_id: k }); });
+            sb.from('dtn_todos').insert(rows).then(function(r){
+              if (r && r.error) toast('Import local OK, sync cloud partielle', 'warn');
+            });
+          }
+        }
+        toast('Import terminé — ' + newTasks.length + ' tâche' + (newTasks.length > 1 ? 's' : '') + ' ajoutée' + (newTasks.length > 1 ? 's' : ''), 'ok');
+      } catch(ex){ toast('Erreur lecture fichier : ' + ex.message, 'err'); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
 function _dtnTodoOpenForm(editId){
   var existing=document.getElementById('dtn-todo-ov'); if(existing) existing.remove();
   var editing = editId ? _dtnTodoList().find(function(x){ return x.id===editId; }) : null;
