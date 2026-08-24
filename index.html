@@ -5262,18 +5262,30 @@ function openIDB() {
 async function saveToIDB(json) {
   try {
     var db = await openIDB(); if (!db) return;
-    // ── Protection base FFPLUM ──────────────────────────────────────────────
-    // La base licences (S.licenceDB) est volumineuse et vit dans cet état IndexedDB.
-    // Si l'état à écrire ne la contient pas (non encore chargée en mémoire au moment
-    // d'un save), ne JAMAIS écraser celle déjà stockée : sinon l'auto-complétion des
-    // licences « cesse de fonctionner » après un simple enregistrement.
     var obj = null; try { obj = JSON.parse(json); } catch(e) {}
-    if (obj && (!obj.licenceDB || !Object.keys(obj.licenceDB).length)) {
-      var existing = await loadFromIDB();
-      if (existing && existing.licenceDB && Object.keys(existing.licenceDB).length) {
-        obj.licenceDB = existing.licenceDB;
-        if (!S.licenceDB || !Object.keys(S.licenceDB).length) S.licenceDB = existing.licenceDB; // re-hydrate la mémoire
-        json = JSON.stringify(obj);
+    if (obj) {
+      // Vérifier si on a besoin de charger l'IDB existant pour protéger des données
+      var noLicence = !obj.licenceDB || !Object.keys(obj.licenceDB).length;
+      var noAffiches = !obj.comps || !obj.comps.some(function(c){ return c.affiche && c.affiche.startsWith('data:'); });
+      if (noLicence || noAffiches) {
+        var existing = await loadFromIDB();
+        if (existing) {
+          // ── Protection licenceDB : ne jamais écraser la base FFPLUM ──
+          if (noLicence && existing.licenceDB && Object.keys(existing.licenceDB).length) {
+            obj.licenceDB = existing.licenceDB;
+            if (!S.licenceDB || !Object.keys(S.licenceDB).length) S.licenceDB = existing.licenceDB;
+          }
+          // ── Protection affiches : les affiches ne vont jamais dans le cloud ──
+          // Si l'état à écrire n'a aucune affiche base64, réinjecter celles de l'IDB
+          if (noAffiches && existing.comps && obj.comps) {
+            var _idbAff = {};
+            existing.comps.forEach(function(ic){ if (ic.affiche && ic.affiche.startsWith('data:')) _idbAff[ic.id] = ic.affiche; });
+            if (Object.keys(_idbAff).length) {
+              obj.comps.forEach(function(oc){ if (_idbAff[oc.id] && !oc.affiche) oc.affiche = _idbAff[oc.id]; });
+            }
+          }
+          json = JSON.stringify(obj);
+        }
       }
     }
     var tx = db.transaction('data','readwrite');
@@ -23814,7 +23826,7 @@ function renderSettingsCompte() {
   html += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">';
   html += '<button onclick="diagCloud()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);cursor:pointer">🔍 Voir données dans le cloud</button>';
   html += '<button onclick="_emergencyStorageFree()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#f87171;cursor:pointer" title="Libère le localStorage saturé — IndexedDB conserve toutes les données">🗑 Libérer l\'espace local</button>';
-  html += '<button onclick="_restoreAffichesFromIDB()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(99,179,135,.3);background:rgba(99,179,135,.07);color:#68d391;cursor:pointer" title="Restaure les affiches des compétitions depuis IndexedDB si elles ont disparu">🖼 Restaurer les affiches</button>';
+  html += '<button onclick="_restoreAffichesAll()" style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(99,179,135,.3);background:rgba(99,179,135,.07);color:#68d391;cursor:pointer" title="Restaure les affiches depuis IndexedDB puis Supabase si IDB vide">🖼 Restaurer les affiches</button>';
   html += '</div>';
   html += '</div>';
 
@@ -29263,6 +29275,50 @@ async function _restoreAffichesFromIDB() {
     toast('Erreur restauration affiches : ' + e.message, 'err');
   }
 }
+
+// ── RESTAURATION AFFICHES : IDB d'abord, puis Supabase stol_medias en fallback ──
+window._restoreAffichesAll = async function() {
+  // Étape 1 : essayer depuis IDB
+  try {
+    var idbData = await loadFromIDB();
+    var restoredIDB = 0;
+    if (idbData && idbData.comps) {
+      idbData.comps.forEach(function(ic) {
+        if (!ic.affiche) return;
+        var lc = (S.comps||[]).find(function(c){ return c.id === ic.id; });
+        if (lc && !lc.affiche) { lc.affiche = ic.affiche; lc.afficheV = Date.now(); restoredIDB++; }
+      });
+    }
+    if (restoredIDB > 0) {
+      saveState(); renderCompetitions();
+      if (typeof renderHome === 'function') renderHome();
+      toast('✅ ' + restoredIDB + ' affiche(s) restaurée(s) depuis IndexedDB', 'ok');
+      return;
+    }
+  } catch(e) {}
+  // Étape 2 : IDB vide → essayer Supabase stol_medias
+  toast('IDB vide — tentative de restauration depuis Supabase…', '');
+  try {
+    var sb = getSB(); if (!sb) { toast('Supabase non disponible', 'err'); return; }
+    var needed = (S.comps||[]).filter(function(c){ return !c.affiche || !c.affiche.startsWith('data:'); }).map(function(c){ return 'affiche_'+c.id; });
+    if (!needed.length) { toast('Aucune affiche manquante', 'ok'); return; }
+    var res = await sb.from('stol_medias').select('id,data').in('id', needed);
+    if (res.error || !res.data || !res.data.length) { toast('Aucune affiche trouvée dans Supabase (stol_medias vide ?)', 'warn'); return; }
+    var restoredSB = 0;
+    res.data.forEach(function(row) {
+      if (!row.data) return;
+      var c = (S.comps||[]).find(function(x){ return 'affiche_'+x.id === row.id; });
+      if (c) { c.affiche = row.data; c.afficheV = Date.now(); restoredSB++; }
+    });
+    if (restoredSB > 0) {
+      saveState(); renderCompetitions();
+      if (typeof renderHome === 'function') renderHome();
+      toast('✅ ' + restoredSB + ' affiche(s) restaurée(s) depuis Supabase', 'ok');
+    } else {
+      toast('Aucune affiche à restaurer (IDB et Supabase vides)', 'warn');
+    }
+  } catch(e) { toast('Erreur restauration Supabase : ' + (e.message||e), 'err'); }
+};
 
 // ── DIAGNOSTIC cloud ──────────────────────────────────
 async function diagCloud() {
@@ -46183,7 +46239,27 @@ function renderEspacesPartages() {
 function _openEspaceURL(idx) {
   var esp = _getEspaces()[idx];
   if (!esp || !esp.url) return;
-  window.open(esp.url, '_blank', 'noopener');
+  var url = esp.url;
+  if (url.indexOf('file://') === 0) {
+    // Tenter d'ouvrir directement (fonctionne dans Safari en file://)
+    var w = window.open(url, '_blank');
+    // Si bloqué (localhost), copier le chemin + guider vers Finder
+    setTimeout(function(){
+      if (!w || w.closed || w.location.href === 'about:blank') {
+        var path = decodeURIComponent(url.replace(/^file:\/\//, ''));
+        try { navigator.clipboard.writeText(path); } catch(e) {
+          var ta = document.createElement('textarea');
+          ta.value = path; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch(e2) {}
+          ta.remove();
+        }
+        if (typeof toast === 'function') toast('Chemin copié → Finder ⌘⇧G puis Coller', 'ok', 4000);
+      }
+    }, 500);
+  } else {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 function addEspacePartage() {
@@ -46194,6 +46270,45 @@ function editEspacePartage(idx) {
   _openEspaceDialog(idx);
 }
 
+function _espUrlChanged(inp) {
+  var url = (inp.value || '').trim();
+  if (!url) return;
+  var nomEl = document.getElementById('_esp-nom');
+  if (!nomEl || nomEl.value.trim()) return; // ne pas écraser un nom déjà saisi
+  // Extraire le nom depuis un chemin file:// ou une URL
+  try {
+    var decoded = decodeURIComponent(url).replace(/\/$/, '');
+    var parts = decoded.split(/[/\\]/);
+    var name = parts[parts.length - 1];
+    if (name) nomEl.value = name;
+  } catch(e) {}
+}
+function _espPickFolder() {
+  var inp = document.getElementById('_esp-folder-input');
+  if (inp) inp.click();
+}
+function _espFolderChosen(inp) {
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0];
+  // Le nom du dossier = première partie du chemin relatif
+  var folderName = (f.webkitRelativePath || f.name || '').split('/')[0] || f.name;
+  // Remplir le nom si vide
+  var nomEl = document.getElementById('_esp-nom');
+  if (nomEl && !nomEl.value.trim() && folderName) nomEl.value = folderName;
+  // Construire le chemin file:// à partir du chemin relatif du premier fichier
+  // webkitRelativePath = "NomDossier/sous/fichier.ext" — on remonte à la racine
+  var urlEl = document.getElementById('_esp-url');
+  var hint = document.getElementById('_esp-folder-hint');
+  if (urlEl && !urlEl.value.trim()) {
+    // On ne peut pas obtenir le chemin absolu — on indique le nom et demande confirmation
+    urlEl.value = '';
+    urlEl.placeholder = 'file:///Users/…/' + folderName;
+    if (hint) { hint.innerHTML = '📂 Dossier "<b>'+folderName+'</b>" sélectionné — saisissez son chemin complet ci-dessus<br><small style="opacity:.7">Finder → ⌥ clic droit sur le dossier → "Copier en tant que nom de chemin"</small>'; hint.style.color='#f59e0b'; }
+  } else {
+    if (hint) { hint.innerHTML = '✓ Dossier "<b>'+folderName+'</b>" — nom rempli automatiquement'; hint.style.color='#22c55e'; }
+  }
+  inp.value = '';
+}
 function _espHandleDrop(ev) {
   ev.preventDefault();
   var dz = document.getElementById('_esp-dropzone');
@@ -46264,15 +46379,12 @@ function _openEspaceDialog(idx) {
     + '<input id="_esp-nom" type="text" value="'+(esp.nom||'').replace(/"/g,'&quot;')+'" placeholder="Ex : Documents équipe" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box"></div>'
     // URL
     + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Lien ou dossier *</label>'
-    + '<div id="_esp-dropzone"'
-    + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--stol)\';this.style.background=\'rgba(14,165,233,.10)\'"'
-    + ' ondragleave="this.style.borderColor=\'var(--bdr)\';this.style.background=\'var(--navy3)\'"'
-    + ' ondrop="_espHandleDrop(event)"'
-    + ' style="border:2px dashed var(--bdr);border-radius:10px;padding:18px 12px;text-align:center;background:var(--navy3);margin-bottom:8px;transition:border-color .15s,background .15s;cursor:default">'
-    + '<div style="font-size:30px;margin-bottom:6px">📂</div>'
-    + '<div class="_esp-dz-lbl" style="font-size:12px;color:var(--txt3);line-height:1.4">Glissez un dossier depuis le Finder ici<br><span style="font-size:11px;opacity:.6">Nom rempli automatiquement</span></div>'
+    + '<input id="_esp-url" type="text" value="'+(esp.url||'').replace(/"/g,'&quot;')+'" placeholder="Glissez un dossier ici (Safari) ou collez un lien OneDrive" oninput="_espUrlChanged(this)" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box">'
+    + '<div style="margin-top:6px;padding:10px 12px;background:var(--navy3);border-radius:8px;border:1px solid var(--bdr);font-size:11px;color:var(--txt3);line-height:1.6">'
+    + '<b style="color:var(--txt2)">Dossier Mac (Safari) :</b> glissez le dossier depuis le Finder directement sur le champ ci-dessus → le chemin se remplit tout seul<br>'
+    + '<b style="color:var(--txt2)">Lien OneDrive / SharePoint :</b> coller le lien de partage'
     + '</div>'
-    + '<input id="_esp-url" type="text" value="'+(esp.url||'').replace(/"/g,'&quot;')+'" placeholder="ou saisissez https://1drv.ms/... / file:///Users/..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    + '</div>'
     // Description
     + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Description (optionnel)</label>'
     + '<input id="_esp-desc" type="text" value="'+(esp.description||'').replace(/"/g,'&quot;')+'" placeholder="Courte description" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
@@ -46331,8 +46443,12 @@ function _saveEspaceDialog() {
     alert('Le chemin du dossier est manquant.\n\nPour le remplir :\n1. Dans le Finder, maintenez ⌥ Option et faites un clic droit sur le dossier\n2. "Copier \'…\' en tant que nom de chemin"\n3. Collez dans le champ ci-dessous en ajoutant file:// devant\n\nEx : file:///Users/azzouni/Documents/CALENDRIER');
     return;
   }
-  // Ajouter https:// si absent (sauf file://)
-  if (!/^(https?|file):\/\//i.test(url)) url = 'https://' + url;
+  // Normaliser l'URL
+  if (/^\//.test(url)) {
+    url = 'file://' + url; // chemin Mac absolu ex: /Users/...
+  } else if (!/^(https?|file):\/\//i.test(url)) {
+    url = 'https://' + url;
+  }
   var espace = { nom: nom, url: url, description: desc.trim(), icone: icone, couleur: couleur, niveau: niveau };
   var list = _getEspaces();
   if (idxStr !== '' && idxStr !== undefined && idxStr !== null) {
@@ -55748,12 +55864,12 @@ function _dbdOpenProjectForm(editId){
       +(showBtn?'<button onclick="_dbdProjAddTask(\'todo\')" style="width:22px;height:22px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0">+</button>':'')
     +'</div>';
   };
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;width:1150px;max-width:98vw;height:96vh;max-height:96vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6)">'
-    +'<div style="padding:16px 18px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;width:1150px;max-width:98vw;height:96vh;max-height:96vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;position:relative">'
+    +'<div id="dbdp-hdr" style="padding:16px 18px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
       +'<div style="font-size:15px;font-weight:800;color:var(--txt)">'+(isNew?'📁 Nouveau projet':'✏️ Modifier le projet')+'</div>'
       +'<button onclick="document.getElementById(\'dbd-proj-ov\').remove()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">×</button>'
     +'</div>'
-    +'<div id="dbdp-proj-grid" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">'
+    +'<div id="dbdp-proj-grid" style="display:flex;flex-direction:row;overflow:hidden;flex:1;min-height:0">'
       +'<div id="dbdp-proj-left" style="width:320px;flex-shrink:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:0;border-right:1px solid var(--bdr)">'
         // ── Section Projet ──
         +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">📁 Projet</div>'
@@ -55789,7 +55905,7 @@ function _dbdOpenProjectForm(editId){
         +'</div>'
         +'<datalist id="dbdp-people-dl">'+dlOpts+'</datalist>'
       +'</div>'
-      +'<div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden">'
         // ── Vue toggle ──
         +'<div style="padding:8px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:6px;flex-shrink:0;background:var(--navy2)">'
           +'<button id="dbdv-btn-kanban" onclick="_dbdSetView(\'kanban\')" style="padding:5px 16px;border-radius:7px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Tableau de tâches</button>'
@@ -55802,7 +55918,7 @@ function _dbdOpenProjectForm(editId){
           +'</div>'
         +'</div>'
         // ── Kanban view ──
-        +'<div id="dbdv-kanban-content" style="display:grid;grid-template-columns:1fr 1fr 1fr;flex:1;min-height:0;overflow:hidden">'
+        +'<div id="dbdv-kanban-content" style="display:grid;grid-template-columns:1fr 1fr 1fr;flex:1;height:0;min-height:0;overflow:hidden">'
           +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
             +colHdr('À faire','var(--txt3)','todo')
             +'<div id="dbdp-col-todo" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'todo\')"></div>'
@@ -56516,6 +56632,7 @@ window._dbdCRTogglePartMode=function(pi){
   var cur=_crPM(p);
   var next=_crPModes[(_crPModes.indexOf(cur)+1)%_crPModes.length];
   cr.participants[pi]={name:_crPN(p),mode:next,fonction:_crPF(p)};
+  _dbdCRAutoSave();
   _dbdRenderCR();
 };
 window._dbdCREditPartFonction=function(pi){
@@ -56525,6 +56642,7 @@ window._dbdCREditPartFonction=function(pi){
   var val=prompt('Fonction / statut de '+_crPN(p)+' :', cur);
   if(val===null) return; // annulé
   cr.participants[pi]={name:_crPN(p),mode:_crPM(p),fonction:val.trim()};
+  _dbdCRAutoSave();
   _dbdRenderCR();
 };
 
@@ -56604,7 +56722,8 @@ window._dbdRenderCR=function(){
     if(inv&&inv!==full) _crPeopleSet[inv.toLowerCase()]=inv;
   };
   var _addCRStr=function(s){
-    s=(s||'').trim(); if(!s) return;
+    if(s && typeof s==='object') s=_crPN(s);
+    s=(s==null?'':String(s)).trim(); if(!s) return;
     _crPeopleSet[s.toLowerCase()]=s;
     // Aussi ajouter l'ordre inverse si 2 mots
     var parts=s.split(/\s+/); if(parts.length===2){var inv=parts[1]+' '+parts[0];_crPeopleSet[inv.toLowerCase()]=inv;}
@@ -56641,7 +56760,7 @@ window._dbdRenderCR=function(){
   window._dbdCRPeopleList=_crPeopleList; // accessible par _dbdCRPartFilter
   var dlOpts=_crPeopleList.map(function(n){return'<option value="'+esc2(n)+'">'+esc2(n)+'</option>';}).join('');
 
-  // Participants pills — avatar + nom + fonction cliquable + mode cliquable + suppr
+  // Participants pills — avatar + nom + fonction cliquable + mode cliquable + suppr + drag
   var partPills=(editCR.participants||[]).map(function(p,pi){
     var name=_crPN(p); var mode=_crPM(p); var fonc=_crPF(p);
     var modeColor=_crPModeColor[mode]||'#10b981';
@@ -56650,7 +56769,14 @@ window._dbdRenderCR=function(){
     var foncHtml=fonc
       ?'<button onclick="_dbdCREditPartFonction('+pi+')" title="Modifier la fonction" style="font-size:9px;font-weight:600;padding:1px 6px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;font-family:inherit;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+esc2(fonc)+'</button>'
       :'<button onclick="_dbdCREditPartFonction('+pi+')" title="Ajouter une fonction" style="font-size:9px;padding:1px 5px;border-radius:8px;border:1px dashed var(--bdr);background:transparent;color:var(--txt3);cursor:pointer;font-family:inherit;white-space:nowrap;opacity:.6">+ statut</button>';
-    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:2px 8px 2px 6px;font-size:11px;font-weight:600;color:var(--txt)">'
+    return '<span draggable="true" data-pi="'+pi+'" '
+      +'ondragstart="window._crDragPi='+pi+';event.dataTransfer.effectAllowed=\'move\';event.currentTarget.style.opacity=\'.35\'" '
+      +'ondragend="event.currentTarget.style.opacity=\'1\'" '
+      +'ondragover="event.preventDefault();event.dataTransfer.dropEffect=\'move\';event.currentTarget.style.outline=\'2px solid #6366f1\';event.currentTarget.style.outlineOffset=\'2px\'" '
+      +'ondragleave="event.currentTarget.style.outline=\'\'" '
+      +'ondrop="event.preventDefault();event.currentTarget.style.outline=\'\';_dbdCRReorderPart('+pi+',window._crDragPi)" '
+      +'style="display:inline-flex;align-items:center;gap:4px;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px;font-weight:600;color:var(--txt);cursor:grab">'
+      +'<span title="Déplacer" style="color:var(--txt3);font-size:11px;cursor:grab;opacity:.5;flex-shrink:0;line-height:1">⠿</span>'
       +'<span style="width:22px;height:22px;border-radius:50%;background:#6366f1;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">'+initials+'</span>'
       +esc2(name)
       +foncHtml
@@ -56700,7 +56826,10 @@ window._dbdRenderCR=function(){
     +'</div>'
     // Participants
     +'<div style="margin-bottom:14px">'
-      +'<label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Participants présents</label>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+        +'<label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Participants présents</label>'
+        +'<button onclick="_dbdCRSortParts()" title="Trier par ordre alphabétique" style="padding:2px 9px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.5px">A→Z</button>'
+      +'</div>'
       +'<div style="display:flex;align-items:flex-start;gap:6px">'
         +'<div style="position:relative;flex:1">'
           +'<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:6px 8px;min-height:38px">'
@@ -56820,6 +56949,25 @@ window._dbdCRPartKeydown=function(ev){
 window._dbdCRRemovePart=function(pi){
   var cr=_dbdCRGetTemp();
   if(cr.participants) cr.participants.splice(pi,1);
+  _dbdRenderCR();
+};
+window._dbdCRSortParts=function(){
+  var cr=_dbdCRGetTemp();
+  if(!cr.participants||cr.participants.length<2) return;
+  var lastName=function(p){var w=_crPN(p).trim().split(/\s+/);return(w[w.length-1]||'').toLowerCase();};
+  cr.participants.sort(function(a,b){return lastName(a).localeCompare(lastName(b),'fr');});
+  _dbdCRAutoSave();
+  _dbdRenderCR();
+};
+window._dbdCRReorderPart=function(toIdx,fromIdx){
+  if(fromIdx===undefined||fromIdx===null||fromIdx===toIdx) return;
+  var cr=_dbdCRGetTemp();
+  var parts=cr.participants||[];
+  if(fromIdx<0||fromIdx>=parts.length||toIdx<0||toIdx>=parts.length) return;
+  var moved=parts.splice(fromIdx,1)[0];
+  parts.splice(toIdx,0,moved);
+  cr.participants=parts;
+  _dbdCRAutoSave();
   _dbdRenderCR();
 };
 window._dbdCRAddItem=function(){
