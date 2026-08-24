@@ -46280,6 +46280,7 @@ function openGlobalGantt() {
   _ganttState.filter     = '';
   _ganttState.globalMode = true;
   _ganttState.zoom       = 7;
+  window._ganttCollapsed = {}; // reset : tous repliés à l'ouverture
   // Fermer l'agenda s'il est ouvert
   var ag = document.getElementById('agenda-overlay');
   if (ag && ag.style.display !== 'none') {
@@ -46476,11 +46477,11 @@ function _renderGantt(keepScroll) {
   html += '<div id="gantt-left" style="flex:1;overflow-y:scroll;overflow-x:hidden;background:var(--navy)">';
 
   if (!window._ganttCollapsed) window._ganttCollapsed = {};
-  window._ganttToggleGroup = function(gid) { window._ganttCollapsed[gid]=!window._ganttCollapsed[gid]; _renderGantt(true); };
+  window._ganttToggleGroup = function(gid) { window._ganttCollapsed[gid]=(gid in window._ganttCollapsed)?!window._ganttCollapsed[gid]:false; _renderGantt(true); };
   groups.forEach(function(g) {
     if (_ganttState.globalMode && g.filteredTasks.length > 0) {
       var gid = g.cp.id;
-      var collapsed = !!window._ganttCollapsed[gid];
+      var collapsed = (gid in window._ganttCollapsed) ? window._ganttCollapsed[gid] : true;
       var arrow = collapsed ? '▶' : '▼';
       // Synthèse : plage et nb tâches
       var allDeb = g.filteredTasks.map(function(t){return t.dateDebut;}).filter(Boolean).sort();
@@ -46595,7 +46596,7 @@ function _renderGantt(keepScroll) {
   groups.forEach(function(g) {
     if (_ganttState.globalMode && g.filteredTasks.length > 0) {
       var gid = g.cp.id;
-      var collapsed = !!window._ganttCollapsed[gid];
+      var collapsed = (gid in window._ganttCollapsed) ? window._ganttCollapsed[gid] : true;
       // En-tête droit (clickable, même hauteur que gauche)
       html += '<div onclick="_ganttToggleGroup(\''+_gE2(gid)+'\')" style="height:30px;background:rgba(0,87,255,.06);border-bottom:1px solid var(--bdr);width:'+totalW+'px;position:relative;cursor:pointer">';
       if (collapsed) {
