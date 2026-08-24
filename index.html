@@ -57525,19 +57525,54 @@ function _dtnRenderTodoNow(el){
   var list = _dtnTodoList();
   var today = new Date().toISOString().slice(0,10);
   var esc = (typeof escH==='function') ? escH : function(s){ return (s||'').replace(/</g,'&lt;'); };
-  if(!list.length){
+  // Groupes : En retard / En cours / À venir / Non programmées / Terminées
+  var gRetard=[], gEnCours=[], gAvenir=[], gNonProg=[], gDone=[];
+  list.forEach(function(t){
+    if(t.done){ gDone.push(t); return; }
+    if(!t.dateDu){ gNonProg.push(t); return; }
+    if(t.dateDu < today){ gRetard.push(t); return; }
+    if(t.dateDu > today){ gAvenir.push(t); return; }
+    gEnCours.push(t);
+  });
+  // Ajouter les tâches de projets (sans lien todo) dans les mêmes groupes
+  var allProjs = typeof _dbdProjList==='function' ? (_dbdProjList()||[]) : [];
+  allProjs.forEach(function(p){
+    (p.taches||[]).filter(function(t){ return t && t.label && !t.todoRef; }).forEach(function(t){
+      var isDone = t.done || t.status==='done';
+      var dt = t.dateTo||null;
+      var item = { _isProj:true, _proj:p, _task:t, done:isDone, dateTo:dt };
+      if(isDone){ gDone.push(item); return; }
+      if(!dt){ gNonProg.push(item); return; }
+      if(dt < today){ gRetard.push(item); return; }
+      if(dt > today){ gAvenir.push(item); return; }
+      gEnCours.push(item);
+    });
+  });
+  if(!list.length && !gRetard.length && !gEnCours.length && !gAvenir.length && !gNonProg.length && !gDone.length){
     el.innerHTML = '<div style="padding:26px;text-align:center;color:var(--txt3);font-size:12px">Aucune tâche pour l\'instant.<br><span style="font-size:11px;opacity:.7">Liste privée — visible de vous seul.</span></div>';
     return;
   }
-  // Groupes : En retard / En cours / À venir / Terminées
-  var gRetard=[], gEnCours=[], gAvenir=[], gDone=[];
-  list.forEach(function(t){
-    if(t.done){ gDone.push(t); return; }
-    if(t.dateDu && t.dateDu < today){ gRetard.push(t); return; }
-    if(t.dateDu && t.dateDu > today){ gAvenir.push(t); return; }
-    gEnCours.push(t);
-  });
+  function makeProjRow(p, t){
+    var isDone = t.done || t.status==='done';
+    var overdue = !isDone && t.dateTo && t.dateTo < today;
+    var dTxtP = t.dateTo ? t.dateTo.split('-').reverse().join('/') : '—';
+    var dColP = overdue ? '#ef4444' : 'var(--txt3)';
+    var opP = isDone ? 'opacity:.45;' : '';
+    var stColP = {todo:'#ef4444',inprogress:'#f59e0b',done:'#10b981'};
+    var barColorP = stColP[t.status||(isDone?'done':(overdue?'todo':'inprogress'))]||'#f59e0b';
+    return '<div onclick="event.stopPropagation()" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;transition:border-color .15s;flex-shrink:0;'+opP+'cursor:default">'
+      +'<div style="width:4px;background:'+barColorP+';flex-shrink:0;align-self:stretch"></div>'
+      +'<div style="padding:9px 11px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'
+        +'<input type="checkbox"'+(isDone?' checked':'')+' onclick="event.stopPropagation();_dbdToggleProjTask(\''+p.id+'\',\''+t.id+'\')" style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:2px">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.titre||'Projet')+'</div>'
+          +'<div style="font-size:13px;color:var(--txt2);'+(isDone?'text-decoration:line-through;opacity:.6;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.label)+'</div>'
+          +(dTxtP!=='—'?'<div style="font-size:12px;font-weight:'+(overdue?'700':'400')+';color:'+dColP+';margin-top:2px">'+dTxtP+'</div>':'')
+        +'</div>'
+      +'</div></div>';
+  }
   function makeRow(t){
+    if(t._isProj) return makeProjRow(t._proj, t._task);
     var overdue = !t.done && t.dateDu && t.dateDu < today;
     var dTxt = t.dateDu ? t.dateDu.split('-').reverse().join('/') : '—';
     var dCol = overdue ? '#ef4444' : 'var(--txt3)';
@@ -57577,38 +57612,10 @@ function _dtnRenderTodoNow(el){
   var rows = makeSection('En retard','#ef4444',gRetard,true)
     + makeSection('En cours','#f59e0b',gEnCours,true)
     + makeSection('À venir','#22c55e',gAvenir,true)
+    + makeSection('Non programmées','#94a3b8',gNonProg,false)
     + makeSection('Terminées','#6b7280',gDone,false);
-  // Section sous-tâches de projets
-  var projTasks='';
-  var allProjs=typeof _dbdProjList==='function'?_dbdProjList():[];
-  allProjs.forEach(function(p){
-    var ptasks=(p.taches||[]).filter(function(t){ return t.label && !t.todoRef; });
-    if(!ptasks.length) return;
-    ptasks.forEach(function(t){
-      var isDone=t.todoRef?((_dtnTodoList().find(function(x){return x.id===t.todoRef;})||{}).done||t.done):t.done;
-      var dTxtP=t.dateTo?t.dateTo.split('-').reverse().join('/'):'';
-      var opP=isDone?'opacity:.45;':'';
-      var stColP={todo:'#ef4444',inprogress:'#f59e0b',done:'#10b981'};
-      var barColorP=stColP[t.status||(isDone?'done':'inprogress')]||'#f59e0b';
-      projTasks+='<div onclick="event.stopPropagation()" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;transition:border-color .15s;flex-shrink:0;'+opP+'cursor:default">'
-        +'<div style="width:4px;background:'+barColorP+';flex-shrink:0;align-self:stretch"></div>'
-        +'<div style="padding:9px 11px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'
-          +'<input type="checkbox"'+(isDone?' checked':'')+' onclick="event.stopPropagation();_dbdToggleProjTask(\''+p.id+'\',\''+t.id+'\')" style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:2px">'
-          +'<div style="flex:1;min-width:0">'
-            +'<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 '+esc(p.titre||'Projet')+'</div>'
-            +'<div style="font-size:13px;color:var(--txt2);'+(isDone?'text-decoration:line-through;opacity:.6;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.label)+'</div>'
-            +(dTxtP?'<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+dTxtP+'</div>':'')
-          +'</div>'
-        +'</div>'
-      +'</div>';
-    });
-  });
-  var projSection = projTasks
-    ? '<div style="border-top:1px solid rgba(255,255,255,.07);padding-top:8px;margin-top:2px">'+projTasks+'</div>'
-    : '';
   el.innerHTML = '<div style="flex:1;min-height:0;overflow-y:auto;padding:8px 8px 8px">'
     + rows
-    + projSection
     + '</div>';
 }
 function _dtnTodoExport(){
