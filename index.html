@@ -6459,20 +6459,10 @@ function renderCompetitions() {
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
-  // Scroll automatique : restaurer position utilisateur, ou aller au séparateur si premier affichage
-  setTimeout(function(){
-    if (_savedScrollTop > 0) {
-      c.scrollTop = _savedScrollTop;
-    } else {
-      var sep = document.getElementById('comp-list-separator');
-      if (sep && c) {
-        var sepRect = sep.getBoundingClientRect();
-        var cRect = c.getBoundingClientRect();
-        var offset = sepRect.top - cRect.top + c.scrollTop;
-        c.scrollTop = Math.max(0, offset - 8);
-      }
-    }
-  }, 80);
+  // Restaurer la position scroll de l'utilisateur (pas d'auto-scroll vers aujourd'hui)
+  if (_savedScrollTop > 0) {
+    setTimeout(function(){ c.scrollTop = _savedScrollTop; }, 30);
+  }
 }
 
 function exportComps(fmt) {
@@ -46368,8 +46358,9 @@ function _renderGantt(keepScroll) {
     // ── Projets DTN ──
     var _projList = (typeof _dbdProjList === 'function') ? (_dbdProjList() || []) : [];
     _projList.forEach(function(proj) {
-      if (!proj || !Array.isArray(proj.tasks)) return;
-      var projTasks = proj.tasks.filter(function(t){ return t && t.dateFrom; }).map(function(t){
+      if (!proj) return;
+      var _taches = Array.isArray(proj.taches) ? proj.taches : (Array.isArray(proj.tasks) ? proj.tasks : []);
+      var projTasks = _taches.filter(function(t){ return t && t.dateFrom; }).map(function(t){
         var respNom = t.responsable ? ((t.responsable.prenom||'')+' '+(t.responsable.nom||'')).trim() : '';
         return { id:t.id, titre:t.label||'(sans titre)', dateDebut:t.dateFrom, dateFin:t.dateTo||null, responsableNom:respNom, pilotId:null, coequipiers:[], _isProjectTask:true };
       });
@@ -55685,7 +55676,7 @@ function _dbdOpenProjectForm(editId){
         // ── Vue toggle ──
         +'<div style="padding:8px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:6px;flex-shrink:0;background:var(--navy2)">'
           +'<button id="dbdv-btn-kanban" onclick="_dbdSetView(\'kanban\')" style="padding:5px 16px;border-radius:7px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Tableau de tâches</button>'
-          +'<button id="dbdv-btn-gantt" onclick="_dbdSetView(\'gantt\')" style="padding:5px 16px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📅 Gantt</button>'
+          +'<button id="dbdv-btn-gantt" onclick="_dbdSetView(\'gantt\')" style="padding:5px 16px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📅 Planning</button>'
           +'<div id="dbdv-zoom-bar" style="display:none;margin-left:auto;display:none;align-items:center;gap:4px">'
             +'<span style="font-size:10px;color:var(--txt3);font-weight:600">Échelle :</span>'
             +'<button onclick="_dbdGanttZoom(-1)" title="Réduire" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;line-height:1">−</button>'
