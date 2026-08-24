@@ -46149,23 +46149,31 @@ function renderEspacesPartages() {
       + '</div>';
     return;
   }
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;max-width:1100px;margin:0 auto">';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:20px;max-width:1200px;margin:0 auto">';
   list.forEach(function(esp, idx){
     var ico = esp.icone || '📁';
     var col = esp.couleur || '#0ea5e9';
     var nom = (esp.nom || 'Espace').replace(/</g,'&lt;');
-    var url = esp.url || '';
-    html += '<div style="position:relative;background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;padding:18px 14px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;display:flex;flex-direction:column;align-items:center;gap:10px"'
-         + ' onmouseover="this.style.borderColor=\''+col+'\';this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 18px rgba(0,0,0,.18)\'"'
-         + ' onmouseout="this.style.borderColor=\'var(--bdr)\';this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\'"'
-         + ' onclick="_openEspaceURL('+idx+')">'
-      + '<div style="width:64px;height:64px;border-radius:14px;background:'+col+'1a;display:flex;align-items:center;justify-content:center;font-size:32px">'+ico+'</div>'
-      + '<div style="font-size:13px;font-weight:700;color:var(--txt);text-align:center;line-height:1.3">'+nom+'</div>'
-      + (esp.description ? '<div style="font-size:11px;color:var(--txt3);text-align:center;line-height:1.4">'+esp.description.replace(/</g,'&lt;')+'</div>' : '')
-      + '<div style="display:flex;gap:4px;margin-top:6px">'
-      + '<button onclick="event.stopPropagation();editEspacePartage('+idx+')" title="Modifier" style="width:26px;height:26px;border:1px solid var(--bdr);border-radius:7px;background:var(--navy3);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
-      + '<button onclick="event.stopPropagation();deleteEspacePartage('+idx+')" title="Supprimer" style="width:26px;height:26px;border:1px solid rgba(239,68,68,.3);border-radius:7px;background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
-      + '</div>'
+    var isPrivate = esp.niveau === 'owner';
+    html += '<div draggable="true"'
+      + ' data-esp-idx="'+idx+'"'
+      + ' ondragstart="window._espDragIdx='+idx+';window._espDragging=true;this.style.opacity=\'.45\';this.style.transform=\'scale(.97)\'"'
+      + ' ondragend="window._espDragging=false;this.style.opacity=\'1\';this.style.transform=\'translateY(0) scale(1)\';document.querySelectorAll(\'[data-esp-idx]\').forEach(function(c){c.style.borderColor=\'var(--bdr)\';})"'
+      + ' ondragover="event.preventDefault();if('+idx+'!==window._espDragIdx)this.style.borderColor=\''+col+'\'"'
+      + ' ondragleave="this.style.borderColor=\'var(--bdr)\'"'
+      + ' ondrop="event.preventDefault();this.style.borderColor=\'var(--bdr)\';if(window._espDragIdx!==undefined&&window._espDragIdx!=='+idx+'){var a=_getEspaces();var item=a.splice(window._espDragIdx,1)[0];a.splice('+idx+',0,item);saveState();if(typeof silentPush===\'function\')silentPush();renderEspacesPartages();}"'
+      + ' onclick="if(!window._espDragging)_openEspaceURL('+idx+')"'
+      + ' onmouseover="this.style.borderColor=\''+col+'\';this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,.22)\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'1\'"'
+      + ' onmouseout="this.style.borderColor=\'var(--bdr)\';this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'0\'"'
+      + ' style="position:relative;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;padding:24px 12px 18px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;display:flex;flex-direction:column;align-items:center;gap:0;user-select:none">'
+      // Bouton options (visible au survol)
+      + '<button class="_esp-edit" onclick="event.stopPropagation();editEspacePartage('+idx+')" title="Modifier / Supprimer" style="position:absolute;top:9px;right:9px;width:26px;height:26px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;font-size:15px;line-height:1">⋯</button>'
+      // Badge privé
+      + (isPrivate ? '<div style="position:absolute;top:9px;left:9px;font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:2px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="9" height="9"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>' : '')
+      // Icône grande
+      + '<div style="width:96px;height:96px;border-radius:20px;background:'+col+'20;display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:14px;transition:transform .18s">'+ico+'</div>'
+      // Titre
+      + '<div style="font-size:13px;font-weight:700;color:var(--txt);text-align:center;line-height:1.35;padding:0 4px">'+nom+'</div>'
       + '</div>';
   });
   html += '</div>';
@@ -46186,6 +46194,39 @@ function editEspacePartage(idx) {
   _openEspaceDialog(idx);
 }
 
+function _espHandleDrop(ev) {
+  ev.preventDefault();
+  var dz = document.getElementById('_esp-dropzone');
+  if (dz) { dz.style.borderColor = 'var(--bdr)'; dz.style.background = 'var(--navy3)'; }
+  var lbl = dz ? dz.querySelector('._esp-dz-lbl') : null;
+  var nomEl = document.getElementById('_esp-nom');
+  var urlEl = document.getElementById('_esp-url');
+  // Récupérer le nom du dossier via l'API FileSystem (fonctionne partout)
+  var entry = null;
+  if (ev.dataTransfer && ev.dataTransfer.items && ev.dataTransfer.items[0]) {
+    try { entry = ev.dataTransfer.items[0].webkitGetAsEntry(); } catch(e) {}
+  }
+  var folderName = entry ? entry.name : '';
+  // Essayer d'obtenir l'URI file:// (fonctionne sous Safari)
+  var uri = '';
+  try {
+    uri = (ev.dataTransfer.getData('text/uri-list') || ev.dataTransfer.getData('text/plain') || '').split(/[\r\n]+/)[0].trim();
+  } catch(e) {}
+  if (uri && uri.indexOf('file://') === 0) {
+    if (urlEl) urlEl.value = uri;
+    if (!folderName) {
+      try { folderName = decodeURIComponent(uri).replace(/\/$/, '').split('/').pop(); } catch(e) {}
+    }
+    if (nomEl && !nomEl.value.trim() && folderName) nomEl.value = folderName;
+    if (lbl) { lbl.textContent = '✓ ' + (folderName || 'Dossier associé'); lbl.style.color = '#22c55e'; }
+  } else if (folderName) {
+    // Nom récupéré mais pas l'URI (Chrome) — pré-remplir le nom, pas le chemin
+    if (nomEl && !nomEl.value.trim()) nomEl.value = folderName;
+    if (lbl) { lbl.innerHTML = '⚠ Nom détecté : <b>'+folderName+'</b><br><span style="font-size:11px;opacity:.8">Utilisez Safari pour le lien auto, ou saisissez le chemin</span>'; lbl.style.color = '#f59e0b'; }
+  } else {
+    if (lbl) { lbl.textContent = 'Aucun dossier reconnu — essayez Safari'; lbl.style.color = '#ef4444'; }
+  }
+}
 function deleteEspacePartage(idx) {
   var esp = _getEspaces()[idx];
   if (!esp) return;
@@ -46198,28 +46239,49 @@ function deleteEspacePartage(idx) {
 
 function _openEspaceDialog(idx) {
   var isEdit = (idx !== null && idx !== undefined);
-  var esp = isEdit ? _getEspaces()[idx] : {nom:'', url:'', icone:'📁', couleur:'#0ea5e9', description:''};
+  var esp = isEdit ? _getEspaces()[idx] : {nom:'', url:'', icone:'📁', couleur:'#0ea5e9', description:'', niveau:'all'};
   var icones = ['📁','📂','🗂️','📋','📊','📈','📉','📑','📚','📒','📕','📗','📘','📙','📔','🗃️','🗄️','💼','🏢','👥','🤝','🎯','🏆','✈️','🪂','🛬','🌍','🇫🇷','⚙️','🔧','🛠️','💡','🚀','⭐','❤️','🔔','📣','📢','📅','🗓️'];
   var couleurs = ['#0ea5e9','#0057FF','#7c3aed','#22c55e','#f59e0b','#ef4444','#ec4899','#6366f1','#06b6d4','#10b981'];
+  var niv = esp.niveau || 'all';
   var ov = document.createElement('div');
   ov.id = '_espace-dlg';
   ov.style.cssText = 'position:fixed;inset:0;z-index:2900;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  var selAll = niv==='all' ? 'background:var(--stol);color:#fff;border-color:var(--stol)' : 'background:var(--navy3);color:var(--txt2);border-color:var(--bdr)';
+  var selOwn = niv==='owner' ? 'background:var(--stol);color:#fff;border-color:var(--stol)' : 'background:var(--navy3);color:var(--txt2);border-color:var(--bdr)';
   var html = '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)" onclick="event.stopPropagation()">'
+    // Header
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr)">'
     + '<div style="font-size:15px;font-weight:800">'+(isEdit?'Modifier l\'espace':'Nouvel espace partagé')+'</div>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    + (isEdit && esp.url ? '<button onclick="window.open(\''+esp.url.replace(/'/g,"\\'")+'\',' + "'" + '_blank' + "'" + ',\'noopener\');event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--stol);background:transparent;color:var(--stol);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Ouvrir</button>' : '')
     + '<button onclick="document.getElementById(\'_espace-dlg\').remove()" style="width:30px;height:30px;border:none;border-radius:8px;background:var(--navy3);color:var(--txt2);font-size:18px;cursor:pointer;font-family:inherit">×</button>'
+    + '</div>'
     + '</div>'
     + '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">'
     // Nom
     + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Nom *</label>'
     + '<input id="_esp-nom" type="text" value="'+(esp.nom||'').replace(/"/g,'&quot;')+'" placeholder="Ex : Documents équipe" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:14px;outline:none;box-sizing:border-box"></div>'
     // URL
-    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Lien OneDrive *</label>'
-    + '<input id="_esp-url" type="url" value="'+(esp.url||'').replace(/"/g,'&quot;')+'" placeholder="https://1drv.ms/... ou https://onedrive.live.com/..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Lien ou dossier *</label>'
+    + '<div id="_esp-dropzone"'
+    + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--stol)\';this.style.background=\'rgba(14,165,233,.10)\'"'
+    + ' ondragleave="this.style.borderColor=\'var(--bdr)\';this.style.background=\'var(--navy3)\'"'
+    + ' ondrop="_espHandleDrop(event)"'
+    + ' style="border:2px dashed var(--bdr);border-radius:10px;padding:18px 12px;text-align:center;background:var(--navy3);margin-bottom:8px;transition:border-color .15s,background .15s;cursor:default">'
+    + '<div style="font-size:30px;margin-bottom:6px">📂</div>'
+    + '<div class="_esp-dz-lbl" style="font-size:12px;color:var(--txt3);line-height:1.4">Glissez un dossier depuis le Finder ici<br><span style="font-size:11px;opacity:.6">Nom rempli automatiquement</span></div>'
+    + '</div>'
+    + '<input id="_esp-url" type="text" value="'+(esp.url||'').replace(/"/g,'&quot;')+'" placeholder="ou saisissez https://1drv.ms/... / file:///Users/..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
     // Description
     + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Description (optionnel)</label>'
     + '<input id="_esp-desc" type="text" value="'+(esp.description||'').replace(/"/g,'&quot;')+'" placeholder="Courte description" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box"></div>'
+    // Niveau de partage
+    + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Niveau de partage</label>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<button type="button" id="_esp-niv-all" onclick="document.getElementById(\'_esp-niv-all\').style.cssText=\'padding:10px 8px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px\';document.getElementById(\'_esp-niv-own\').style.cssText=\'padding:10px 8px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px\';document.getElementById(\'_esp-dlg-data\').dataset.niveau=\'all\'" style="padding:10px 8px;border-radius:10px;border:1px solid '+(niv==='all'?'var(--stol)':'var(--bdr)')+';background:'+(niv==='all'?'var(--stol)':'var(--navy3)')+';color:'+(niv==='all'?'#fff':'var(--txt2)')+';font-size:12px;font-weight:'+(niv==='all'?'700':'600')+';cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">👥</span>Partagé par tous</button>'
+    + '<button type="button" id="_esp-niv-own" onclick="document.getElementById(\'_esp-niv-own\').style.cssText=\'padding:10px 8px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px\';document.getElementById(\'_esp-niv-all\').style.cssText=\'padding:10px 8px;border-radius:10px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px\';document.getElementById(\'_esp-dlg-data\').dataset.niveau=\'owner\'" style="padding:10px 8px;border-radius:10px;border:1px solid '+(niv==='owner'?'var(--stol)':'var(--bdr)')+';background:'+(niv==='owner'?'var(--stol)':'var(--navy3)')+';color:'+(niv==='owner'?'#fff':'var(--txt2)')+';font-size:12px;font-weight:'+(niv==='owner'?'700':'600')+';cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">🔒</span>Titulaire uniquement</button>'
+    + '</div></div>'
     // Icône
     + '<div><label style="display:block;font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Icône</label>'
     + '<div id="_esp-icones" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--navy3);border:1px solid var(--bdr);border-radius:10px;max-height:120px;overflow-y:auto">';
@@ -46236,11 +46298,16 @@ function _openEspaceDialog(idx) {
     html += '<button onclick="document.querySelectorAll(\'#_esp-couleurs button\').forEach(function(b){b.style.border=\'3px solid transparent\';b.style.boxShadow=\'none\'});this.style.border=\'3px solid var(--txt)\';this.style.boxShadow=\'0 0 0 2px '+c+'\';document.getElementById(\'_esp-dlg-data\').dataset.couleur=\''+c+'\'" type="button" style="width:30px;height:30px;border-radius:50%;background:'+c+';cursor:pointer;'+sel2+'"></button>';
   });
   html += '</div></div>'
-    + '<div id="_esp-dlg-data" data-icone="'+(esp.icone||'📁')+'" data-couleur="'+(esp.couleur||'#0ea5e9')+'" data-idx="'+(isEdit?idx:'')+'" style="display:none"></div>'
-    // Boutons
-    + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">'
-    + '<button onclick="document.getElementById(\'_espace-dlg\').remove()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
-    + '<button onclick="_saveEspaceDialog()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(isEdit?'Enregistrer':'Créer')+'</button>'
+    + '<div id="_esp-dlg-data" data-icone="'+(esp.icone||'📁')+'" data-couleur="'+(esp.couleur||'#0ea5e9')+'" data-niveau="'+(esp.niveau||'all')+'" data-idx="'+(isEdit?idx:'')+'" style="display:none"></div>'
+    // Ligne de boutons bas
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px;padding-top:12px;border-top:1px solid var(--bdr)">'
+    + (isEdit
+        ? '<button onclick="if(confirm(\'Supprimer cet espace ?\'))deleteEspacePartage('+idx+')" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#ef4444;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Supprimer</button>'
+        : '<div></div>')
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="document.getElementById(\'_espace-dlg\').remove()" style="padding:9px 16px;border-radius:10px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Annuler</button>'
+    + '<button onclick="_saveEspaceDialog()" style="padding:9px 18px;border-radius:10px;border:1px solid var(--stol);background:var(--stol);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(isEdit?'Enregistrer':'Créer')+'</button>'
+    + '</div>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -46256,12 +46323,17 @@ function _saveEspaceDialog() {
   var meta = document.getElementById('_esp-dlg-data');
   var icone = meta ? (meta.dataset.icone || '📁') : '📁';
   var couleur = meta ? (meta.dataset.couleur || '#0ea5e9') : '#0ea5e9';
+  var niveau = meta ? (meta.dataset.niveau || 'all') : 'all';
   var idxStr = meta ? meta.dataset.idx : '';
   nom = nom.trim(); url = url.trim();
-  if (!nom || !url) { alert('Le nom et le lien OneDrive sont obligatoires.'); return; }
-  // Ajouter https:// si absent
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  var espace = { nom: nom, url: url, description: desc.trim(), icone: icone, couleur: couleur };
+  if (!nom) { alert('Le nom est obligatoire.'); return; }
+  if (!url) {
+    alert('Le chemin du dossier est manquant.\n\nPour le remplir :\n1. Dans le Finder, maintenez ⌥ Option et faites un clic droit sur le dossier\n2. "Copier \'…\' en tant que nom de chemin"\n3. Collez dans le champ ci-dessous en ajoutant file:// devant\n\nEx : file:///Users/azzouni/Documents/CALENDRIER');
+    return;
+  }
+  // Ajouter https:// si absent (sauf file://)
+  if (!/^(https?|file):\/\//i.test(url)) url = 'https://' + url;
+  var espace = { nom: nom, url: url, description: desc.trim(), icone: icone, couleur: couleur, niveau: niveau };
   var list = _getEspaces();
   if (idxStr !== '' && idxStr !== undefined && idxStr !== null) {
     list[parseInt(idxStr,10)] = espace;
