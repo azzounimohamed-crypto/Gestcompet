@@ -57525,60 +57525,59 @@ function _dtnRenderTodoNow(el){
   var list = _dtnTodoList();
   var today = new Date().toISOString().slice(0,10);
   var esc = (typeof escH==='function') ? escH : function(s){ return (s||'').replace(/</g,'&lt;'); };
-  var open = list.filter(function(t){ return !t.done; }).length;
-  var head = '';
   if(!list.length){
-    el.innerHTML = head + '<div style="padding:26px;text-align:center;color:var(--txt3);font-size:12px">Aucune tâche pour l\'instant.<br><span style="font-size:11px;opacity:.7">Liste privée — visible de vous seul.</span></div>';
+    el.innerHTML = '<div style="padding:26px;text-align:center;color:var(--txt3);font-size:12px">Aucune tâche pour l\'instant.<br><span style="font-size:11px;opacity:.7">Liste privée — visible de vous seul.</span></div>';
     return;
   }
-  var rows = list.map(function(t){
+  // Groupes : En retard / En cours / À venir / Terminées
+  var gRetard=[], gEnCours=[], gAvenir=[], gDone=[];
+  list.forEach(function(t){
+    if(t.done){ gDone.push(t); return; }
+    if(t.dateDu && t.dateDu < today){ gRetard.push(t); return; }
+    if(t.dateDu && t.dateDu > today){ gAvenir.push(t); return; }
+    gEnCours.push(t);
+  });
+  function makeRow(t){
     var overdue = !t.done && t.dateDu && t.dateDu < today;
     var dTxt = t.dateDu ? t.dateDu.split('-').reverse().join('/') : '—';
-    var dCol = overdue ? 'var(--dbd-red,#ef4444)' : 'var(--txt3)';
+    var dCol = overdue ? '#ef4444' : 'var(--txt3)';
     var op = t.done ? 'opacity:.45;' : '';
-    // Icône identique aux sections gauche du dashboard (dbd-task-ico)
     var ico = '<input type="checkbox"'+(t.done?' checked':'')+' onclick="event.stopPropagation();_dtnTodoToggle(\''+t.id+'\')" style="width:16px;height:16px;accent-color:#10b981;cursor:pointer;flex-shrink:0;margin-top:2px">';
-    // Badge projet lié
     var projBadge = '';
-    if(t.projectRef){
-      var _proj=typeof _dbdProjList==='function'?(_dbdProjList().find(function(p){return p.id===t.projectRef;})):null;
-      if(_proj){
-        projBadge='<div style="display:flex;align-items:center;gap:4px;margin-top:2px">'
-          +'<span style="font-size:10px">📁</span>'
-          +'<span style="font-size:11px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+esc(_proj.titre||'')+'</span>'
-          +'</div>';
-      }
-    }
-    // Badge événement agenda si lié
+    if(t.projectRef){ var _proj=typeof _dbdProjList==='function'?(_dbdProjList().find(function(p){return p.id===t.projectRef;})):null; if(_proj){ projBadge='<div style="display:flex;align-items:center;gap:4px;margin-top:2px"><span style="font-size:10px">📁</span><span style="font-size:11px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+esc(_proj.titre||'')+'</span></div>'; } }
     var evBadge = '';
-    if(t.agendaEventId){
-      var _ev=(S.agendaEvents||[]).find(function(e){ return e.id===t.agendaEventId; });
-      if(_ev){
-        var _col=_ev.couleur||'#6366f1';
-        evBadge='<div style="display:flex;align-items:center;gap:4px;margin-top:2px">'
-          +'<span style="width:5px;height:5px;border-radius:50%;background:'+_col+';flex-shrink:0;display:inline-block"></span>'
-          +'<span style="font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+esc(_ev.titre)+'</span>'
-          +'</div>';
-      }
-    }
-    var barColor=t.done?'#10b981':(overdue?'#ef4444':'#f59e0b');
-    return '<div '
-      +'draggable="true" ondragstart="_dtnTodoDragStart(event,\''+t.id+'\')" ondragover="_dtnTodoDragOver(event)" ondragleave="_dtnTodoDragLeave(event)" ondrop="_dtnTodoDrop(event,\''+t.id+'\')" '
-      +'onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" '
-      +'onclick="_dtnTodoOpenForm(\''+t.id+'\')" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;cursor:pointer;transition:border-color .15s;flex-shrink:0;'+op+'">'
+    if(t.agendaEventId){ var _ev=(S.agendaEvents||[]).find(function(e){ return e.id===t.agendaEventId; }); if(_ev){ var _col=_ev.couleur||'#6366f1'; evBadge='<div style="display:flex;align-items:center;gap:4px;margin-top:2px"><span style="width:5px;height:5px;border-radius:50%;background:'+_col+';flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+esc(_ev.titre)+'</span></div>'; } }
+    var barColor=t.done?'#10b981':(overdue?'#ef4444':(t.dateDu&&t.dateDu>today?'#22c55e':'#f59e0b'));
+    return '<div draggable="true" ondragstart="_dtnTodoDragStart(event,\''+t.id+'\')" ondragover="_dtnTodoDragOver(event)" ondragleave="_dtnTodoDragLeave(event)" ondrop="_dtnTodoDrop(event,\''+t.id+'\')" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" onclick="_dtnTodoOpenForm(\''+t.id+'\')" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;cursor:pointer;transition:border-color .15s;flex-shrink:0;'+op+'">'
       +'<div style="width:4px;background:'+barColor+';flex-shrink:0;align-self:stretch"></div>'
-      +'<div style="padding:9px 11px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'
-        +ico
+      +'<div style="padding:9px 11px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'+ico
         +'<div style="flex:1;min-width:0">'
           +(t.thematique?'<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px">'+esc(t.thematique)+'</div>':'')
           +'<div style="font-size:13px;color:var(--txt2);'+(t.done?'text-decoration:line-through;opacity:.6;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.action||'—')+'</div>'
           +(dTxt!=='—'?'<div style="font-size:12px;font-weight:'+(overdue?'700':'400')+';color:'+dCol+';margin-top:2px">'+dTxt+'</div>':'')
-          +projBadge
-          +evBadge
+          +projBadge+evBadge
         +'</div>'
-      +'</div>'
-    +'</div>';
-  }).join('');
+      +'</div></div>';
+  }
+  function makeSection(label, color, tasks, defaultOpen){
+    if(!tasks.length) return '';
+    var sid='todo-sec-'+label.replace(/\s/g,'');
+    var isOpen = window._dtnTodoSec && (sid in window._dtnTodoSec) ? window._dtnTodoSec[sid] : defaultOpen;
+    var arrow = isOpen ? '▾' : '▸';
+    var s='<div style="margin-bottom:4px">';
+    s+='<div onclick="if(!window._dtnTodoSec)window._dtnTodoSec={};window._dtnTodoSec[\''+sid+'\']=!(window._dtnTodoSec[\''+sid+'\']===undefined?'+(defaultOpen?'true':'false')+':window._dtnTodoSec[\''+sid+'\']);_dtnRenderTodo()" style="display:flex;align-items:center;gap:6px;padding:4px 4px 4px 2px;cursor:pointer;user-select:none;border-radius:6px" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseleave="this.style.background=\'transparent\'">';
+    s+='<span style="font-size:10px;color:'+color+';width:10px;text-align:center">'+arrow+'</span>';
+    s+='<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:'+color+'">'+label+'</span>';
+    s+='<span style="font-size:10px;color:var(--txt3);background:var(--navy3);border-radius:10px;padding:1px 6px">'+tasks.length+'</span>';
+    s+='</div>';
+    if(isOpen) s+=tasks.map(makeRow).join('');
+    s+='</div>';
+    return s;
+  }
+  var rows = makeSection('En retard','#ef4444',gRetard,true)
+    + makeSection('En cours','#f59e0b',gEnCours,true)
+    + makeSection('À venir','#22c55e',gAvenir,true)
+    + makeSection('Terminées','#6b7280',gDone,false);
   // Section sous-tâches de projets
   var projTasks='';
   var allProjs=typeof _dbdProjList==='function'?_dbdProjList():[];
