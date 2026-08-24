@@ -6315,6 +6315,7 @@ function _debRender() { clearTimeout(_debRenderT); _debRenderT = setTimeout(rend
 
 function renderCompetitions() {
   var c = document.getElementById('comp-list'); if (!c) return;
+  var _savedScrollTop = c.scrollTop;
   updateSeasonFilter();
   var saison   = document.getElementById('comp-season-filter').value;
   var pratique = (document.getElementById('comp-pratique-filter') || {}).value || 'all';
@@ -6458,15 +6459,18 @@ function renderCompetitions() {
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
-  // Scroll automatique pour afficher le séparateur en haut + les actives en dessous
+  // Scroll automatique : restaurer position utilisateur, ou aller au séparateur si premier affichage
   setTimeout(function(){
-    var sep = document.getElementById('comp-list-separator');
-    if (sep && c) {
-      // Calculer la position relative au conteneur scrollable c
-      var sepRect = sep.getBoundingClientRect();
-      var cRect = c.getBoundingClientRect();
-      var offset = sepRect.top - cRect.top + c.scrollTop;
-      c.scrollTop = Math.max(0, offset - 8);
+    if (_savedScrollTop > 0) {
+      c.scrollTop = _savedScrollTop;
+    } else {
+      var sep = document.getElementById('comp-list-separator');
+      if (sep && c) {
+        var sepRect = sep.getBoundingClientRect();
+        var cRect = c.getBoundingClientRect();
+        var offset = sepRect.top - cRect.top + c.scrollTop;
+        c.scrollTop = Math.max(0, offset - 8);
+      }
     }
   }, 80);
 }
@@ -46361,6 +46365,16 @@ function _renderGantt(keepScroll) {
     (S.comps||[]).filter(function(c){ return !saison||saison==='all'||(c.saison||c.dateFrom||'').toString().startsWith(saison); })
       .sort(function(a,b){ return (a.dateFrom||'').localeCompare(b.dateFrom||''); })
       .forEach(function(c){ groups.push({ cp:c, tasks:(S.ganttTasks[c.id]||[]) }); });
+    // ── Projets DTN ──
+    var _projList = (typeof _dbdProjList === 'function') ? (_dbdProjList() || []) : [];
+    _projList.forEach(function(proj) {
+      if (!proj || !Array.isArray(proj.tasks)) return;
+      var projTasks = proj.tasks.filter(function(t){ return t && t.dateFrom; }).map(function(t){
+        var respNom = t.responsable ? ((t.responsable.prenom||'')+' '+(t.responsable.nom||'')).trim() : '';
+        return { id:t.id, titre:t.label||'(sans titre)', dateDebut:t.dateFrom, dateFin:t.dateTo||null, responsableNom:respNom, pilotId:null, coequipiers:[], _isProjectTask:true };
+      });
+      if (projTasks.length) groups.push({ cp:{ id:'proj_'+proj.id, name:'📁 '+proj.titre, _isProject:true }, tasks:projTasks });
+    });
   } else {
     var cp = (S.comps||[]).find(function(c){return c.id===_ganttState.compId;}) || {id:_ganttState.compId,name:'?'};
     groups.push({ cp:cp, tasks:(S.ganttTasks[_ganttState.compId]||[]) });
@@ -46673,6 +46687,11 @@ function _ganttDrop(e, taskId, cid) {
 
 // ── Dialog création / édition d'une tâche ────────────────────────
 function openGanttTaskDialog(compId, taskId) {
+  if (typeof compId === 'string' && compId.indexOf('proj_') === 0) {
+    var _pId = compId.slice(5);
+    if (typeof _dbdOpenProjectForm === 'function') _dbdOpenProjectForm(_pId);
+    return;
+  }
   if (!S.ganttTasks) S.ganttTasks = {};
   if (!S.ganttTasks[compId]) S.ganttTasks[compId] = [];
   var isNew = !taskId;
