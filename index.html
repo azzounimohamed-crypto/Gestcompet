@@ -6459,10 +6459,20 @@ function renderCompetitions() {
   var canEdit = (typeof canEditComp === 'function') ? !!canEditComp() : (canModify());
   var btn = document.getElementById('btn-add-comp');
   if (btn) btn.style.display = canEdit ? '' : 'none';
-  // Restaurer la position scroll de l'utilisateur (pas d'auto-scroll vers aujourd'hui)
-  if (_savedScrollTop > 0) {
-    setTimeout(function(){ c.scrollTop = _savedScrollTop; }, 30);
-  }
+  // Scroll : à l'ouverture → aller au séparateur aujourd'hui ; sinon restaurer position
+  setTimeout(function(){
+    if (_compListScrollToToday) {
+      _compListScrollToToday = false;
+      var sep = document.getElementById('comp-list-separator');
+      if (sep && c) {
+        var sepRect = sep.getBoundingClientRect();
+        var cRect = c.getBoundingClientRect();
+        c.scrollTop = Math.max(0, sepRect.top - cRect.top + c.scrollTop - 8);
+      }
+    } else if (_savedScrollTop > 0) {
+      c.scrollTop = _savedScrollTop;
+    }
+  }, 80);
 }
 
 function exportComps(fmt) {
@@ -46465,9 +46475,24 @@ function _renderGantt(keepScroll) {
   html += '</div>';
   html += '<div id="gantt-left" style="flex:1;overflow-y:scroll;overflow-x:hidden;background:var(--navy)">';
 
+  if (!window._ganttCollapsed) window._ganttCollapsed = {};
+  window._ganttToggleGroup = function(gid) { window._ganttCollapsed[gid]=!window._ganttCollapsed[gid]; _renderGantt(true); };
   groups.forEach(function(g) {
     if (_ganttState.globalMode && g.filteredTasks.length > 0) {
-      html += '<div style="padding:6px 12px 4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--stol);background:rgba(0,87,255,.06);border-bottom:1px solid var(--bdr)">'+_gEsc(g.cp.name||g.cp.id)+'</div>';
+      var gid = g.cp.id;
+      var collapsed = !!window._ganttCollapsed[gid];
+      var arrow = collapsed ? '▶' : '▼';
+      // Synthèse : plage et nb tâches
+      var allDeb = g.filteredTasks.map(function(t){return t.dateDebut;}).filter(Boolean).sort();
+      var allFin = g.filteredTasks.map(function(t){return t.dateFin||t.dateDebut;}).filter(Boolean).sort();
+      var synthStr = g.filteredTasks.length+' tâche'+(g.filteredTasks.length>1?'s':'');
+      if (allDeb.length) { var dF=new Date(allDeb[0]+'T12:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); var dT=allFin.length?new Date(allFin[allFin.length-1]+'T12:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'?'; synthStr+=' · '+dF+' → '+dT; }
+      html += '<div onclick="_ganttToggleGroup(\''+_gE2(gid)+'\')" style="padding:6px 12px 4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--stol);background:rgba(0,87,255,.06);border-bottom:1px solid var(--bdr);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none" onmouseenter="this.style.background=\'rgba(0,87,255,.12)\'" onmouseleave="this.style.background=\'rgba(0,87,255,.06)\'">';
+      html += '<span style="font-size:9px;opacity:.7">'+arrow+'</span>';
+      html += '<span>'+_gEsc(g.cp.name||g.cp.id)+'</span>';
+      html += '<span style="font-weight:500;font-size:9px;opacity:.6;text-transform:none;letter-spacing:0">'+synthStr+'</span>';
+      html += '</div>';
+      if (collapsed) return; // skip individual rows
     }
     g.filteredTasks.forEach(function(t) {
       var color = _ganttTaskColor(t);
@@ -46569,7 +46594,24 @@ function _renderGantt(keepScroll) {
   // Barres des tâches
   groups.forEach(function(g) {
     if (_ganttState.globalMode && g.filteredTasks.length > 0) {
-      html += '<div style="height:24px;background:rgba(0,87,255,.06);border-bottom:1px solid var(--bdr);width:'+totalW+'px"></div>';
+      var gid = g.cp.id;
+      var collapsed = !!window._ganttCollapsed[gid];
+      // En-tête droit (clickable, même hauteur que gauche)
+      html += '<div onclick="_ganttToggleGroup(\''+_gE2(gid)+'\')" style="height:30px;background:rgba(0,87,255,.06);border-bottom:1px solid var(--bdr);width:'+totalW+'px;position:relative;cursor:pointer">';
+      if (collapsed) {
+        // Barre de synthèse : plage complète du groupe
+        var allDeb2=g.filteredTasks.map(function(t){return t.dateDebut;}).filter(Boolean).sort();
+        var allFin2=g.filteredTasks.map(function(t){return t.dateFin||t.dateDebut;}).filter(Boolean).sort();
+        if (allDeb2.length) {
+          var si2=days.indexOf(allDeb2[0]); var ei2=days.indexOf(allFin2[allFin2.length-1]);
+          if(si2<0)si2=0; if(ei2<0)ei2=days.length-1;
+          if(si2<=ei2){ var bW2=Math.max((ei2-si2+1)*DAY_W-4,DAY_W/2);
+            html+='<div style="position:absolute;left:'+(si2*DAY_W+2)+'px;top:5px;height:20px;width:'+bW2+'px;background:var(--stol);border-radius:4px;opacity:.7;display:flex;align-items:center;padding:0 8px;font-size:10px;font-weight:700;color:#fff;overflow:hidden;white-space:nowrap">'+_gEsc(g.filteredTasks.length+' tâche'+(g.filteredTasks.length>1?'s':''))+'</div>';
+          }
+        }
+      }
+      html += '</div>';
+      if (collapsed) return;
     }
     g.filteredTasks.forEach(function(t) {
       html += '<div style="height:'+ROW_H+'px;position:relative;border-bottom:1px solid var(--bdr)">';
@@ -54804,8 +54846,10 @@ function _toggleDtnCompSub() {
 // le sous-menu « Détails » (qui reste replié). Corrige le fait que openDTNModule('competitions')
 // force l'ouverture/surlignage de « Détails ».
 var _agendaFedMode = false;
+var _compListScrollToToday = false;
 function _openAgendaFederal() {
   _agendaFedMode = true;
+  _compListScrollToToday = true;
   openDTNModule('competitions');
   _dtnCompSubOpen = false;
   var sub = document.getElementById('dtn-comp-sub'); if (sub) sub.style.display = 'none';
