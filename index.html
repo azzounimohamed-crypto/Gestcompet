@@ -5050,14 +5050,14 @@ function clearLocalStorageQuota() {
                'geststol_autobackup', LS_BACKUP_TS,
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
                'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES, LS_GANTT, LS_COLLECTIF, LS_SIG, LS_STAMP,
-               LS_ETAPES, 'dtn_projects', 'dtn_proj_order', '_cr_anthropic_key', '_cr_known_people', '_gantt_zoom', '_dbdGanttScale',
+               LS_ETAPES, 'dtn_projects', 'dtn_proj_order', 'dtn_proj_pos', '_cr_anthropic_key', '_cr_known_people', '_gantt_zoom', '_dbdGanttScale',
                'gestdtn_dtntodos'];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
     var keys = Object.keys(localStorage);
     keys.forEach(function(k) {
-      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_AIDES && k !== 'dtn_projects' && k !== 'dtn_proj_order' && k !== '_cr_anthropic_key' && k !== '_cr_known_people' && k !== '_gantt_zoom' && k !== '_dbdGanttScale' && k !== 'gestdtn_dtntodos') {
+      if (_KEEP.indexOf(k) === -1 && k !== LS && k !== LS_ENROLL && k !== LS_ENROLL_META && k !== LS_BUDGETS && k !== LS_TODOS && k !== LS_AIDES && k !== 'dtn_projects' && k !== 'dtn_proj_order' && k !== 'dtn_proj_pos' && k !== '_cr_anthropic_key' && k !== '_cr_known_people' && k !== '_gantt_zoom' && k !== '_dbdGanttScale' && k !== 'gestdtn_dtntodos') {
         localStorage.removeItem(k);
       }
     });
@@ -10680,7 +10680,7 @@ function _agendaRenderWeek() {
     ev.title = _evLbl2;
     ev.onmouseover = function(){ this.style.filter='brightness(1.2)'; };
     ev.onmouseout  = function(){ this.style.filter=''; };
-    (function(c){ ev.onclick = function(ev2){
+    (function(c, evEl){ evEl.onclick = function(ev2){
       ev2.stopPropagation();
       if (c._customEvent) { _agendaOpenEventForm(c.dateFrom, c.id); return; }
       if (c._ganttSt && c._compId) {
@@ -10693,11 +10693,68 @@ function _agendaRenderWeek() {
         openCompDetail(c.id);
       }
     };
-    ev.ondblclick = function(ev2){
+    evEl.ondblclick = function(ev2){
       ev2.stopPropagation();
       if (c._customEvent) { _agendaOpenEventForm(c.dateFrom, c.id); return; }
       if (!c._ganttSt && canEditComp()) { _compFromAgenda=true; closeAgenda(); editComp(c.id); }
-    }; })(e);
+    };
+    if (c._customEvent) {
+      evEl.style.cursor='grab';
+      evEl.addEventListener('mousedown', function(md){
+        if(md.button!==0) return;
+        md.stopPropagation();
+        // Capturer les bornes des colonnes AU MOMENT du drag (DOM rendu)
+        var adR=adRow.getBoundingClientRect();
+        var avail=adR.width-TW, cw=avail/7;
+        var sx=md.clientX, moved=false, ghost=null, targetIdx=colS, clickBlocked=false;
+        function onMove(e2){
+          var dx=e2.clientX-sx;
+          if(!moved&&Math.abs(dx)<8) return;
+          if(!moved){
+            moved=true; clickBlocked=true;
+            ghost=document.createElement('div');
+            ghost.style.cssText='position:fixed;pointer-events:none;z-index:9999;opacity:0.85;'
+              +'background:'+color+';border-radius:6px;padding:4px 10px;'
+              +'font-size:11px;font-weight:800;color:#fff;white-space:nowrap;'
+              +'box-shadow:0 4px 16px rgba(0,0,0,.5)';
+            ghost.textContent=c.name||c.titre||'Événement';
+            document.body.appendChild(ghost);
+            evEl.style.opacity='0.4';
+          }
+          if(ghost){ghost.style.left=(e2.clientX+14)+'px';ghost.style.top=(e2.clientY-22)+'px';}
+          var xInGrid=e2.clientX-adR.left-TW;
+          var fi=cw>0?Math.max(0,Math.min(6,Math.floor(xInGrid/cw))):-1;
+          if(xInGrid>=0&&fi>=0){
+            dayColEls.forEach(function(c3,i){c3.style.background=i===fi?'rgba(0,87,255,.15)':(days[i].isToday?'rgba(251,191,36,.05)':days[i].isWend?'rgba(255,255,255,.03)':'');});
+            targetIdx=fi;
+          }
+        }
+        function onUp(){
+          document.removeEventListener('mousemove',onMove,true);
+          document.removeEventListener('mouseup',onUp,true);
+          if(ghost&&ghost.parentNode){ghost.parentNode.removeChild(ghost);ghost=null;}
+          evEl.style.opacity='';
+          dayColEls.forEach(function(c3,i){c3.style.background=days[i].isToday?'rgba(251,191,36,.05)':days[i].isWend?'rgba(255,255,255,.03)':'';});
+          if(!moved)return;
+          var newDate=days[targetIdx].date;
+          if(newDate===c.dateFrom)return;
+          var evArr=S.agendaEvents||[];
+          var evIdx=-1; evArr.forEach(function(a,i){if(a.id===c.id)evIdx=i;});
+          if(evIdx<0)return;
+          var delta=Math.round((new Date(newDate+'T00:00:00')-new Date(evArr[evIdx].dateFrom+'T00:00:00'))/86400000);
+          var oldFrom=evArr[evIdx].dateFrom,oldTo=evArr[evIdx].dateTo;
+          evArr[evIdx].dateFrom=newDate;
+          if(oldTo&&oldTo!==oldFrom){var nt=new Date(oldTo+'T00:00:00');nt.setDate(nt.getDate()+delta);evArr[evIdx].dateTo=_agendaFmtDate(nt);}
+          else{evArr[evIdx].dateTo=newDate;}
+          setTimeout(function(){clickBlocked=false;},300);
+          saveState(); _agendaRenderWeek(); toast('Événement déplacé ✓','ok');
+        }
+        document.addEventListener('mousemove',onMove,true);
+        document.addEventListener('mouseup',onUp,true);
+        evEl.addEventListener('click',function blkClick(e3){if(clickBlocked){e3.stopImmediatePropagation();evEl.removeEventListener('click',blkClick,true);}},true);
+      });
+    }
+    })(e, ev);
     adRow.appendChild(ev);
   });
   if (!wEvts.length) {
@@ -10841,11 +10898,95 @@ function _agendaRenderWeek() {
     blk.title = _wBlkNm+' · '+c.heureDebut+(c.heureFin?' – '+c.heureFin:'');
     blk.onmouseover = function(){ this.style.filter='brightness(1.12)'; };
     blk.onmouseout  = function(){ this.style.filter=''; };
-    (function(ev){ blk.onclick = function(e2){
+    (function(ev, blkEl, srcDayIdx){ blkEl.onclick = function(e2){
       e2.stopPropagation();
       if (ev._customEvent) { _agendaOpenEventForm(ev.dateFrom, ev.id); return; }
       if (ev._compId){ openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
-    }; })(c);
+    };
+    if (ev._customEvent) {
+      blkEl.title = (blkEl.title||'')+'\n(Glisser : gauche/droite = jour · haut/bas = heure)';
+      blkEl.style.cursor='grab';
+      blkEl.addEventListener('mousedown', function(e){
+        if (e.button!==0) return;
+        e.stopPropagation();
+        // Capturer les positions au mousedown (DOM stabilisé)
+        var colBounds=dayColEls.map(function(c3){return c3.getBoundingClientRect();});
+        var scrollR=scroll.getBoundingClientRect();
+        // Durée originale en minutes
+        var origDurMin=0;
+        if(ev.heureDebut&&ev.heureFin){
+          var p1=ev.heureDebut.split(':'),p2=ev.heureFin.split(':');
+          origDurMin=(parseInt(p2[0])-parseInt(p1[0]))*60+(parseInt(p2[1]||0)-parseInt(p1[1]||0));
+          if(origDurMin<0)origDurMin=0;
+        }
+        function snapHM(frac){
+          var hf=_winStart+Math.max(0,Math.min(1,frac))*(_winEnd-_winStart);
+          var h=Math.min(23,Math.max(0,Math.floor(hf)));
+          var m=Math.round((hf-Math.floor(hf))*60/15)*15;
+          if(m>=60){h=Math.min(23,h+1);m=0;}
+          return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+        }
+        var sx=e.clientX,sy=e.clientY,moved=false,ghost=null;
+        var targetIdx=srcDayIdx,targetTime=ev.heureDebut||'';
+        function onMove(e2){
+          var dx=e2.clientX-sx,dy=e2.clientY-sy;
+          if(!moved&&Math.abs(dx)+Math.abs(dy)<8) return;
+          if(!moved){
+            moved=true;
+            ghost=document.createElement('div');
+            ghost.style.cssText='position:fixed;pointer-events:none;z-index:9999;opacity:0.9;'
+              +'background:'+_agendaColor(ev)+';border-radius:6px;padding:5px 12px;'
+              +'font-size:11px;font-weight:800;color:#fff;white-space:nowrap;'
+              +'box-shadow:0 4px 16px rgba(0,0,0,.5)';
+            document.body.appendChild(ghost);
+            blkEl.style.opacity='0.3';
+          }
+          if(ghost){ghost.style.left=(e2.clientX+16)+'px';ghost.style.top=(e2.clientY-24)+'px';}
+          // X → colonne jour
+          for(var ci=0;ci<colBounds.length;ci++){
+            if(e2.clientX>=colBounds[ci].left&&e2.clientX<colBounds[ci].right){
+              dayColEls.forEach(function(c3,i){c3.style.background=i===ci?'rgba(0,87,255,.15)':(days[i].isToday?'rgba(251,191,36,.05)':days[i].isWend?'rgba(255,255,255,.03)':'');});
+              targetIdx=ci; break;
+            }
+          }
+          // Y → heure (dans la grille horaire visible)
+          var yFrac=(e2.clientY-scrollR.top)/scrollR.height;
+          targetTime=snapHM(yFrac);
+          // Ghost : nom + heure + jour
+          if(ghost) ghost.textContent=(ev.name||'Événement')+' · '+targetTime+' · '+days[targetIdx].label+' '+days[targetIdx].day;
+        }
+        function onUp(){
+          document.removeEventListener('mousemove',onMove,true);
+          document.removeEventListener('mouseup',onUp,true);
+          if(ghost&&ghost.parentNode){ghost.parentNode.removeChild(ghost);ghost=null;}
+          blkEl.style.opacity='';
+          dayColEls.forEach(function(c3,i){c3.style.background=days[i].isToday?'rgba(251,191,36,.05)':days[i].isWend?'rgba(255,255,255,.03)':'';});
+          if(!moved)return;
+          var newDate=days[targetIdx].date;
+          var evArr=S.agendaEvents||[];
+          var evIdx=-1;
+          evArr.forEach(function(a,i){if(a.id===ev.id)evIdx=i;});
+          if(evIdx<0)return;
+          var delta=Math.round((new Date(newDate+'T00:00:00')-new Date(evArr[evIdx].dateFrom+'T00:00:00'))/86400000);
+          var oldFrom=evArr[evIdx].dateFrom,oldTo=evArr[evIdx].dateTo;
+          evArr[evIdx].dateFrom=newDate;
+          if(oldTo&&oldTo!==oldFrom){var nt=new Date(oldTo+'T00:00:00');nt.setDate(nt.getDate()+delta);evArr[evIdx].dateTo=_agendaFmtDate(nt);}
+          else{evArr[evIdx].dateTo=newDate;}
+          // Mettre à jour l'heure
+          evArr[evIdx].heureDebut=targetTime;
+          if(origDurMin>0){
+            var tp=targetTime.split(':');
+            var endMin=parseInt(tp[0])*60+parseInt(tp[1]||0)+origDurMin;
+            var eh=Math.min(23,Math.floor(endMin/60)),em=endMin%60;
+            evArr[evIdx].heureFin=(eh<10?'0':'')+eh+':'+(em<10?'0':'')+em;
+          }
+          saveState(); _agendaRenderWeek(); toast('Événement déplacé ✓','ok');
+        }
+        document.addEventListener('mousemove',onMove,true);
+        document.addEventListener('mouseup',onUp,true);
+      });
+    }
+    })(c, blk, dayIdx);
     col2.appendChild(blk);
   });
 
@@ -10890,7 +11031,7 @@ function _agendaRenderDay() {
     + '<div><div style="font-size:13px;font-weight:700;color:var(--txt)">'+JOURS_L[d.getDay()]+'</div>'
     + '<div style="font-size:11px;color:var(--txt3)">'+MOIS_S[d.getMonth()]+' '+d.getFullYear()
     + (isToday ? ' <span style="color:var(--stol);font-weight:800">· Aujourd\'hui</span>' : '') + '</div></div>'
-    + '<div style="margin-left:auto;font-size:11px;color:var(--txt3)">'+dayEvts.length+' compétition'+(dayEvts.length!==1?'s':'')+' ce jour</div>';
+    + '<div style="margin-left:auto;font-size:11px;color:var(--txt3)">'+dayEvts.length+' événement'+(dayEvts.length!==1?'s':'')+' ce jour</div>';
   main.appendChild(hdrEl);
 
   // ── Grille horaire ──
@@ -11369,6 +11510,7 @@ function _agendaSaveEvent(dateStr, evId, btn) {
   saveState();
   document.getElementById('ag-event-form').remove();
   _agendaRender();
+  if (typeof _dbdRenderDayCal === 'function' && document.getElementById('dbd-ag-dayview')) _dbdRenderDayCal();
   toast('Événement enregistré ✓','ok');
 }
 
@@ -53408,13 +53550,7 @@ function _dtnHomeBoot() {
     (c.dateFrom<=limStr?grps30:grpsAu).push(obj);
   });
 
-  (S.agendaEvents||[]).forEach(function(ev){
-    if(!ev.dateFrom)return;
-    if(ev.privateUserId&&ev.privateUserId!==_uid)return;
-    var end=ev.dateTo||ev.dateFrom;if(end<todayStr)return;
-    var obj={compId:null,date:ev.dateFrom,title:ev.titre||'Événement',sub:ev.desc?ev.desc.slice(0,60):'',tag:'Agenda',tagCol:ev.couleur||'#06b6d4',hidden:false,tasks:[]};
-    (ev.dateFrom<=limStr?grps30:grpsAu).push(obj);
-  });
+  // agendaEvents exclus : seules les compétitions s'affichent ici.
 
   var c30el=document.getElementById('dbd-c30');if(c30el)c30el.textContent=grps30.length||'–';
   var cauEl=document.getElementById('dbd-cau');if(cauEl)cauEl.textContent=grpsAu.length||'–';
@@ -53722,63 +53858,9 @@ function _dtnRenderProchaines() {
     });
   });
 
-  // ── 2. Événements du calendrier général à venir (planning général) ──
-  var _uid = S.user && S.user.id;
-  (S.agendaEvents || []).forEach(function(ev) {
-    if (!ev.dateFrom) return;
-    if (ev.privateUserId && ev.privateUserId !== _uid) return;
-    var evEnd = ev.dateTo || ev.dateFrom;
-    // Inclure si l'événement commence à l'avenir OU est en cours (commencé avant mais pas encore terminé)
-    if (evEnd < todayStr) return;
-    var timeLabel = ev.heureDebut ? ' · ' + ev.heureDebut + (ev.heureFin ? '–' + ev.heureFin : '') : '';
-    _push({
-      date:    ev.dateFrom,
-      dateFin: ev.dateTo || ev.dateFrom,
-      title:   ev.titre || 'Événement',
-      sub:     (ev.desc ? ev.desc.slice(0,40) + (ev.desc.length > 40 ? '…' : '') : '') + timeLabel,
-      tag:     'Agenda',
-      tagCol:  ev.couleur || '#06b6d4',
-      ico:     '📅',
-      onClick: 'openAgenda()'
-    });
-  });
+  // Section 2 (événements agenda personnels) supprimée : seules les compétitions sont affichées.
 
-  // ── 3. Volet « À faire » des compétitions (non cochées) — uniquement pour les
-  //      compétitions à venir ou en cours ; les événements déjà terminés ne
-  //      remontent pas ici (pas d'action rétroactive affichée). Le planning
-  //      général (Gantt) n'est volontairement pas repris dans cette liste,
-  //      pour ne pas la surcharger ──
-  var todosByComp = S.homeTodosByComp || {};
-  Object.keys(todosByComp).forEach(function(compId) {
-    if (_nextCompId && compId === _nextCompId) return; // déjà listées dans la carte « Prochaine compétition »
-    var comp = (S.comps || []).find(function(c){ return c.id === compId; });
-    if (!comp || !comp.dateFrom) return;
-    var compEnd = comp.dateTo || comp.dateFrom;
-    if (compEnd < todayStr) return; // événement déjà passé : pas d'action affichée
-    var arr = todosByComp[compId] || [];
-    var domaines = {};
-    arr.forEach(function(t){ if (t.type === 'domaine') domaines[t.id] = t.label; });
-    var compNom = comp.name || comp.nom || 'Compétition';
-    arr.forEach(function(t) {
-      if (t.type === 'domaine' || t.done) return;
-      var key = (t.label || '').trim().toLowerCase();
-      if (!key) return;
-      var domLbl = t.domaineId && domaines[t.domaineId] ? domaines[t.domaineId] : '';
-      _push({
-        date:    comp.dateFrom,
-        dateFin: comp.dateTo || comp.dateFrom,
-        title:   t.label || 'Tâche',
-        domain:  domLbl,
-        sub:     compNom,
-        tag:     'À faire',
-        tagCol:  '#10b981',
-        ico:     '✅',
-        overdue: comp.dateFrom < todayStr,
-        checkable: { compId: compId, taskId: t.id },
-        onClick: 'showHomeCompDetail&&showHomeCompDetail(\''+compId.replace(/'/g,"\\'")+'\');if(typeof _crpToggle===\'function\')_crpToggle(\'todo\')'
-      });
-    });
-  });
+  // Section 3 (tâches à faire) supprimée : seuls événements et compétitions sont affichés.
 
   // ── Formatage date court ──
   var _fmtD = function(str) {
@@ -55636,7 +55718,7 @@ function _dtnGoHome() {
       +'<div class="dbd-grid2">'
       /* LEFT */
       +'<div class="dbd-col">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Prochaine compétition</div><button onclick="openAddComp()" title="Nouvelle compétition" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Prochain Événement</div><button onclick="openAddComp()" title="Nouvelle compétition" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div class="dbd-card dbd-nc" id="dbd-nc" onclick="_dbdOpenComp(window._dtnNextCompId)" title="Ouvrir la fiche compétition">'
       +'<div class="dbd-ncbody">'
       +'<div class="dbd-ncbar l" id="dbd-ncbar"></div>'
@@ -55652,19 +55734,26 @@ function _dtnGoHome() {
       +'</div>'
       /* CENTER : projets */
       +'<div class="dbd-col dbd-col-m" style="gap:10px">'
-      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes projets</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Les projets</div>'
       +'<button onclick="_dbdExportProjects()" title="Exporter tous les projets (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dbdImportProjects()" title="Importer des projets (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V7M6 11l4-4 4 4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dbdOpenProjectForm(null)" title="Nouveau projet" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div class="dbd-sc" style="padding:6px 4px;flex:1;min-height:0;overflow-y:auto"><div id="dbd-proj-list"></div></div>'
       +'</div>'
-      /* RIGHT : todo + alertes Gantt */
-      +'<div class="dbd-col dbd-col-r">'
-      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes tâches personnelles</div>'
+      /* RIGHT : todo + calendrier jour (panneau optionnel) */
+      +'<div id="dbd-r-wrap" style="overflow:hidden;display:flex;flex-direction:row">'
+      +'<div class="dbd-col dbd-col-r" id="dbd-tasks-col" style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes tâches</div>'
+      +'<button id="dbd-cal-btn" onclick="_dbdToggleCal()" title="Afficher/Masquer l\'agenda du jour" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>'
       +'<button onclick="_dtnTodoExport()" title="Exporter mes tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dtnTodoImport()" title="Importer des tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V7M6 11l4-4 4 4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dtnTodoOpenForm()" title="Nouvelle tâche" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column"><div id="dtn-todo-zone" style="flex:1;min-height:0;overflow-y:auto;padding:0"></div></div>'
+      +'</div>'
+      /* Panneau calendrier du jour (masqué par défaut) */
+      +'<div id="dbd-cal-col" style="display:none;flex:1;min-width:0;flex-direction:column;overflow:hidden;border-left:1px solid var(--bdr)">'
+      +'<div id="dbd-ag-dayview" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden"></div>'
+      +'</div>'
       +'</div>'
       +'</div>'
       +'</div>';
@@ -55676,6 +55765,36 @@ function _dtnGoHome() {
   _dtnPresenceInit();
   _dtnRenderPresence();
 }
+
+// ── Calendrier jour intégré au tableau de bord ──────────────────────────
+window._dbdToggleCal = function() {
+  var cal = document.getElementById('dbd-cal-col');
+  var btn = document.getElementById('dbd-cal-btn');
+  if (!cal) return;
+  var isOpen = cal.style.display === 'flex';
+  if (isOpen) {
+    cal.style.display = 'none';
+    if (btn) { btn.style.background='transparent'; btn.style.color='var(--txt2)'; btn.style.border='1px solid var(--bdr)'; }
+  } else {
+    cal.style.display = 'flex';
+    if (btn) { btn.style.background='#2563eb'; btn.style.color='#fff'; btn.style.border='none'; }
+    _dbdRenderDayCal();
+  }
+};
+
+window._dbdRenderDayCal = function() {
+  var panel = document.getElementById('dbd-ag-dayview');
+  if (!panel) return;
+  // Pointer _agendaDayDate sur aujourd'hui
+  _agendaDayDate = new Date().toISOString().slice(0,10);
+  // Échange temporaire d'id : le panneau devient ag-main le temps du rendu
+  var realMain = document.getElementById('ag-main');
+  if (realMain) realMain.removeAttribute('id');
+  panel.id = 'ag-main';
+  if (typeof _agendaRenderDay === 'function') _agendaRenderDay();
+  panel.id = 'dbd-ag-dayview';
+  if (realMain) realMain.id = 'ag-main';
+};
 
 // ══ Projets DTN ════════════════════════════════════════════════════════════
 var LS_PROJECTS = 'dtn_projects';
@@ -55705,8 +55824,9 @@ function _dbdProjList(){
 function _dbdProjId(){ return 'pr_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
 function _dbdProjTkId(){ return 'tk_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
 function _dbdProjSave(){
-  S.dtnProjects=_dbdProjList();
-  try{ localStorage.setItem('dtn_projects', JSON.stringify(S.dtnProjects)); }catch(e){}
+  // Sauvegarder S.dtnProjects DIRECTEMENT sans rappeler _dbdProjList()
+  // (sinon _dbdProjLoad re-merge depuis localStorage et annule les suppressions)
+  try{ localStorage.setItem('dtn_projects', JSON.stringify(S.dtnProjects||[])); }catch(e){}
   if(typeof saveState==='function') saveState();
 }
 
@@ -55767,29 +55887,66 @@ window._dbdImportProjects=function(){
   inp.click();
 };
 
-function _dbdProjGetOrder(list){
-  try{
-    var saved=JSON.parse(localStorage.getItem('dtn_proj_order')||'[]');
-    if(!Array.isArray(saved)||!saved.length) throw 0;
-    var idxMap={}; saved.forEach(function(id,i){idxMap[id]=i;});
-    return list.slice().sort(function(a,b){
-      var ai=idxMap[a.id]!==undefined?idxMap[a.id]:9999;
-      var bi=idxMap[b.id]!==undefined?idxMap[b.id]:9999;
-      return ai!==bi?ai-bi:(a.dateFrom||'').localeCompare(b.dateFrom||'');
-    });
-  }catch(e){return list.slice().sort(function(a,b){return (a.dateFrom||'').localeCompare(b.dateFrom||'');});}
+// ── Positions libres des cartes projet (canvas snap-to-grid) ───────────────
+function _dbdProjPosGet(){try{return JSON.parse(localStorage.getItem('dtn_proj_pos')||'{}')}catch(e){return{};}}
+function _dbdProjPosSave(map){try{localStorage.setItem('dtn_proj_pos',JSON.stringify(map));}catch(e){}}
+var _CARD_W=160, _CARD_H=118, _CARD_GAP=8, _SNAP=8;
+function _dbdProjSnap(v){return Math.round(v/_SNAP)*_SNAP;}
+function _dbdProjDefaultPos(idx){
+  var col=idx%2, row=Math.floor(idx/2);
+  return{x:col*(_CARD_W+_CARD_GAP), y:row*(_CARD_H+_CARD_GAP)};
 }
-window._dbdProjSaveOrder=function(ids){try{localStorage.setItem('dtn_proj_order',JSON.stringify(ids));}catch(e){}};
-window._dbdProjDropCard=function(toId,fromId){
-  if(!fromId||fromId===toId) return;
-  var listEl=document.getElementById('dbd-proj-list'); if(!listEl) return;
-  var ids=Array.from(listEl.querySelectorAll('[data-proj-id]')).map(function(el){return el.dataset.projId;});
-  var fi=ids.indexOf(fromId); var ti=ids.indexOf(toId);
-  if(fi<0||ti<0) return;
-  ids.splice(fi,1); ids.splice(ti,0,fromId);
-  _dbdProjSaveOrder(ids);
-  _dbdRenderProjects();
+function _dbdFindFreePos(posMap){
+  var taken=Object.values(posMap);
+  for(var row=0;row<200;row++){
+    for(var col=0;col<2;col++){
+      var x=col*(_CARD_W+_CARD_GAP), y=row*(_CARD_H+_CARD_GAP);
+      var free=taken.every(function(p){return Math.abs(p.x-x)>=_CARD_W||Math.abs(p.y-y)>=_CARD_H;});
+      if(free) return{x:x,y:y};
+    }
+  }
+  return{x:0,y:0};
+}
+
+// Drag classique : closure par drag, listeners document ajoutés/retirés dynamiquement
+window._dbdProjStartDrag=function(e,projId){
+  if(e.button!==0) return;
+  var tag=(e.target||{}).tagName||'';
+  if(tag==='INPUT'||tag==='BUTTON'||tag==='TEXTAREA'||tag==='SELECT') return;
+  var card=document.querySelector('[data-proj-id="'+projId+'"]'); if(!card) return;
+  e.preventDefault(); e.stopPropagation();
+  var sx=e.clientX, sy=e.clientY;
+  var ox=parseInt(card.style.left)||0, oy=parseInt(card.style.top)||0;
+  var moved=false;
+  card.style.zIndex='999'; card.style.cursor='grabbing';
+  function onMove(ev){
+    var dx=ev.clientX-sx, dy=ev.clientY-sy;
+    if(!moved&&Math.abs(dx)+Math.abs(dy)<5) return;
+    moved=true;
+    var li=document.getElementById('dbd-proj-list');
+    var maxX=li?Math.max(0,li.clientWidth-_CARD_W-_CARD_GAP):9999;
+    var nx=Math.min(maxX,Math.max(0,ox+dx));
+    var ny=Math.max(0,oy+dy);
+    card.style.left=nx+'px';
+    card.style.top=ny+'px';
+    if(li&&ny+_CARD_H+20>parseInt(li.style.minHeight)||0) li.style.minHeight=(ny+_CARD_H+20)+'px';
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove,true);
+    document.removeEventListener('mouseup',onUp,true);
+    card.style.zIndex=''; card.style.cursor='grab';
+    if(!moved) return;
+    var x=Math.round((parseInt(card.style.left)||0)/_SNAP)*_SNAP;
+    var y=Math.round((parseInt(card.style.top)||0)/_SNAP)*_SNAP;
+    card.style.left=x+'px'; card.style.top=y+'px';
+    var pm=_dbdProjPosGet(); pm[projId]={x:x,y:y}; _dbdProjPosSave(pm);
+    window._dbdProjJustDragged=true;
+    setTimeout(function(){window._dbdProjJustDragged=false;},250);
+  }
+  document.addEventListener('mousemove',onMove,true);
+  document.addEventListener('mouseup',onUp,true);
 };
+
 function _dbdRenderProjects(){
   _dbdProjLoad();
   var list=_dbdProjList();
@@ -55797,17 +55954,30 @@ function _dbdRenderProjects(){
   var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
   var listEl=document.getElementById('dbd-proj-list');
   if(!listEl) return;
-  listEl.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start';
-  var sorted=_dbdProjGetOrder(list);
+  var sorted=list.slice().sort(function(a,b){return (a.dateFrom||'').localeCompare(b.dateFrom||'');});
   if(!sorted.length){
     listEl.style.cssText='';
     listEl.innerHTML='<div style="padding:30px 16px;text-align:center;color:var(--txt3);font-size:12px">Aucun projet.<br><span style="font-size:11px;opacity:.7">Cliquez + pour en créer un.</span></div>';
     return;
   }
+  var posMap=_dbdProjPosGet();
   var todos=typeof _dtnTodoList==='function'?_dtnTodoList():[];
   if(!window._dbdProjOpen) window._dbdProjOpen={};
+  // Calculer la taille minimale du canvas
+  var maxX=0,maxY=0;
+  sorted.forEach(function(p,i){
+    var pos=posMap[p.id]||_dbdProjDefaultPos(i);
+    maxX=Math.max(maxX,pos.x+_CARD_W+_CARD_GAP);
+    maxY=Math.max(maxY,pos.y+_CARD_H+_CARD_GAP);
+  });
+  var canH=Math.max(maxY+60,400);
+  listEl.style.cssText='position:relative;min-height:'+canH+'px;width:100%;'
+    +'background-image:radial-gradient(circle,rgba(255,255,255,.08) 1px,transparent 1px);'
+    +'background-size:'+_SNAP+'px '+_SNAP+'px;background-position:0 0;';
+  if(listEl.parentElement){listEl.parentElement.style.overflowX='hidden';listEl.parentElement.style.overflowY='auto';}
   var html='';
-  sorted.forEach(function(p){
+  sorted.forEach(function(p,i){
+    var pos=posMap[p.id]||_dbdProjDefaultPos(i);
     var tasks=(p.taches||[]).filter(function(t){return t.label||t.todoRef;});
     var effectiveDone=tasks.filter(function(t){
       if(t.todoRef){var td=todos.find(function(x){return x.id===t.todoRef;});return td?td.done:t.done;}
@@ -55817,10 +55987,9 @@ function _dbdRenderProjects(){
     var d1=p.dateFrom?p.dateFrom.split('-').reverse().join('/'):'';
     var d2=p.dateTo&&p.dateTo!==p.dateFrom?' → '+p.dateTo.split('-').reverse().join('/'):'';
     var isOpen=!!window._dbdProjOpen[p.id];
-    // Couleur personnalisée ou statut progression
-    var projColor=p.couleur||(pct>=100?'#10b981':pct>0?'#6366f1':'var(--bdr)');
-    var barColor=projColor;
-    // Tâches urgentes (en retard)
+    var projColor=p.couleur||(pct>=100?'#10b981':pct>0?'#6366f1':null);
+    var barColor=projColor||'var(--bdr)';
+    var bgStyle=p.couleur?'background:'+window._dbdHex2rgba(p.couleur,0.18)+';border-color:'+window._dbdHex2rgba(p.couleur,0.5)+';':'';
     var overdueCount=tasks.filter(function(t){return !t.done&&t.status!=='done'&&t.dateTo&&t.dateTo<today;}).length;
     var taskRows=tasks.map(function(t){
       var td=t.todoRef?todos.find(function(x){return x.id===t.todoRef;}):null;
@@ -55832,43 +56001,46 @@ function _dbdRenderProjects(){
         +(t.dateTo&&!isDone&&t.dateTo<today?'<span style="font-size:9px;color:#ef4444;flex-shrink:0;font-weight:700">!</span>':'')
       +'</div>';
     }).join('');
-    html+='<div class="dbd-proj-card" data-proj-id="'+p.id+'" draggable="true" '
-      +'ondragstart="window._dbdProjDragId=\''+p.id+'\';event.dataTransfer.effectAllowed=\'move\';event.currentTarget.style.opacity=\'.35\'" '
-      +'ondragend="event.currentTarget.style.opacity=\'1\'" '
-      +'ondragover="event.preventDefault();event.dataTransfer.dropEffect=\'move\';event.currentTarget.style.outline=\'2px solid #6366f1\';event.currentTarget.style.outlineOffset=\'2px\'" '
-      +'ondragleave="event.currentTarget.style.outline=\'\'" '
-      +'ondrop="event.preventDefault();event.currentTarget.style.outline=\'\';_dbdProjDropCard(\''+p.id+'\',window._dbdProjDragId)" '
-      +'style="display:flex;flex-direction:row;min-height:110px;position:relative;overflow:hidden;cursor:grab;'+(p.couleur?'background:'+window._dbdHex2rgba(p.couleur,0.18)+';border-color:'+window._dbdHex2rgba(p.couleur,0.5)+';':'')+'">'
-      // Barre latérale colorée
+    html+='<div class="dbd-proj-card" data-proj-id="'+p.id+'" '
+      +'onmousedown="_dbdProjStartDrag(event,\''+p.id+'\')" '
+      +'style="position:absolute;left:'+pos.x+'px;top:'+pos.y+'px;width:'+_CARD_W+'px;min-height:'+_CARD_H+'px;'
+        +'display:flex;flex-direction:row;overflow:hidden;cursor:grab;user-select:none;padding:0;'+bgStyle+'">'
       +'<div style="width:4px;flex-shrink:0;background:'+barColor+';border-radius:var(--dbd-r) 0 0 var(--dbd-r)"></div>'
-      // Corps de la carte
-      +'<div onclick="_dbdOpenProjectForm(\''+p.id+'\')" style="flex:1;min-width:0;padding:10px 10px 8px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer">'
-        // En-tête : domaines + titre + counter tâches
+      +'<div onclick="if(window._dbdProjJustDragged)return;_dbdOpenProjectForm(\''+p.id+'\')" style="flex:1;min-width:0;padding:9px 9px 7px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer">'
         +'<div>'
-          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:3px">'
-            +(p.domaines&&p.domaines.length?'<div style="font-size:9px;color:var(--txt3);letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+esc(p.domaines.join(' · '))+'</div>':'<div style="flex:1"></div>')
-            +(tasks.length?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:'+(overdueCount?'rgba(239,68,68,.15)':'rgba(99,102,241,.12)')+';color:'+(overdueCount?'#ef4444':'#818cf8')+';flex-shrink:0;white-space:nowrap">'+effectiveDone+'/'+tasks.length+'</span>':'')
+          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px;margin-bottom:3px">'
+            +(p.domaines&&p.domaines.length?'<div style="font-size:9px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+esc(p.domaines.join(' · '))+'</div>':'<div style="flex:1"></div>')
+            +(tasks.length?'<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;background:'+(overdueCount?'rgba(239,68,68,.15)':'rgba(99,102,241,.12)')+';color:'+(overdueCount?'#ef4444':'#818cf8')+';flex-shrink:0">'+effectiveDone+'/'+tasks.length+'</span>':'')
           +'</div>'
-          +'<div style="font-size:12px;font-weight:700;color:var(--txt);line-height:1.3;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(p.titre||'Sans titre')+'</div>'
+          +'<div style="font-size:12px;font-weight:700;color:var(--txt);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(p.titre||'Sans titre')+'</div>'
         +'</div>'
-        // Bas : date + toggle tâches
         +'<div>'
-          +(d1?'<div style="font-size:10px;color:var(--txt3);margin-bottom:5px">🗓 '+d1+d2+'</div>':'')
-          // Barre de progression
+          +(d1?'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">🗓 '+d1+d2+'</div>':'')
           +(tasks.length?'<div class="dbd-proj-bar"><div class="dbd-proj-bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div>':'')
-          // Toggle accordéon si tâches
-          +(tasks.length?'<div onclick="event.stopPropagation();_dbdToggleProjOpen(\''+p.id+'\')" style="margin-top:5px;font-size:9px;font-weight:700;color:var(--txt3);cursor:pointer;display:flex;align-items:center;gap:3px">'
-            +'<span style="transition:transform .15s;display:inline-block;transform:rotate('+(isOpen?'90':'0')+'deg);font-size:8px">▶</span>'
+          +(tasks.length?'<div onclick="event.stopPropagation();_dbdToggleProjOpen(\''+p.id+'\')" style="margin-top:4px;font-size:9px;font-weight:700;color:var(--txt3);cursor:pointer;display:flex;align-items:center;gap:3px">'
+            +'<span style="display:inline-block;transform:rotate('+(isOpen?'90':'0')+'deg);font-size:8px">▶</span>'
             +(overdueCount?'<span style="color:#ef4444">'+overdueCount+' en retard</span>':'<span>'+tasks.length+' tâche'+(tasks.length>1?'s':'')+'</span>')
           +'</div>':'')
         +'</div>'
       +'</div>'
-      // Accordéon tâches
-      +(tasks.length&&isOpen?'<div onclick="event.stopPropagation()" style="position:absolute;top:0;left:0;right:0;bottom:0;background:var(--navy2);border-radius:var(--dbd-r);border:1px solid #6366f1;padding:8px 10px;overflow-y:auto;z-index:2">'+taskRows+'</div>':'')
+      +(tasks.length&&isOpen?'<div onclick="event.stopPropagation()" style="position:absolute;top:0;left:0;right:0;bottom:0;background:var(--navy2);border-radius:var(--dbd-r);border:1px solid #6366f1;padding:8px 9px;overflow-y:auto;z-index:2">'+taskRows+'</div>':'')
     +'</div>';
   });
   listEl.innerHTML=html;
 }
+window._dbdToggleProjLeft = function(){
+  var left = document.getElementById('dbdp-proj-left');
+  if (!left) return;
+  var hidden = left.style.display === 'none';
+  left.style.display = hidden ? '' : 'none';
+  left.style.borderRight = hidden ? '1px solid var(--bdr)' : 'none';
+  // Mise à jour visuelle du bouton sidebar
+  var btn = document.getElementById('dbdp-toggle-left-btn');
+  if (btn) {
+    btn.style.background = hidden ? 'rgba(255,255,255,.15)' : 'transparent';
+    btn.style.color = hidden ? '#fff' : '#888';
+  }
+};
 function _dbdOpenProjectForm(editId){
   var existing=document.getElementById('dbd-proj-ov'); if(existing) existing.remove();
   var list=_dbdProjList();
@@ -55902,17 +56074,56 @@ function _dbdOpenProjectForm(editId){
   var piloteProj=proj?(proj.piloteProjet||null):null;
   var gpInit=proj?(proj.groupePilotage||[]):[];
   var expInit=proj?(proj.experts||[]):[];
+  // Icônes SVG stroke style identiques à l'exemple (inbox, crayon, refresh, checkmark-cercle)
+  var _colMeta={
+    todo:{bg:'#3b82f6',
+      icon:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'},
+    inprogress:{bg:'#a855f7',
+      icon:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>'},
+    validate:{bg:'#06b6d4',
+      icon:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>'},
+    done:{bg:'#22c55e',
+      icon:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'}
+  };
   var colHdr=function(lbl,col,st){
-    var showBtn=st==='todo';
-    return '<div style="padding:10px 14px 8px;flex-shrink:0;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">'
-      +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:'+col+'">'+lbl+'</div>'
-      +(showBtn?'<button onclick="_dbdProjAddTask(\'todo\')" style="width:22px;height:22px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0">+</button>':'')
+    var meta=_colMeta[st]||{bg:col,icon:''};
+    var addBtn=st==='todo'
+      ?'<button onclick="_dbdProjAddTask(\'todo\')" title="Ajouter une tâche" style="width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.25);color:#fff;font-size:16px;font-weight:400;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0" onmouseover="this.style.background=\'rgba(255,255,255,.45)\'" onmouseout="this.style.background=\'rgba(255,255,255,.25)\'">+</button>'
+      :'<div style="width:22px;height:22px"></div>';
+    return '<div style="background:'+meta.bg+';padding:11px 14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">'
+      +'<div style="display:flex;align-items:center;gap:7px;color:#fff">'
+        +meta.icon
+        +'<span style="font-size:12px;font-weight:700;letter-spacing:.3px;color:#fff">'+lbl+'</span>'
+      +'</div>'
+      +addBtn
     +'</div>';
   };
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;width:1150px;max-width:98vw;height:96vh;max-height:96vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;position:relative">'
-    +'<div id="dbdp-hdr" style="padding:16px 18px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
-      +'<div style="font-size:15px;font-weight:800;color:var(--txt)">'+(isNew?'📁 Nouveau projet':'✏️ Modifier le projet')+'</div>'
-      +'<button onclick="document.getElementById(\'dbd-proj-ov\').remove()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">×</button>'
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:14px;width:1150px;max-width:98vw;height:96vh;max-height:96vh;display:flex;flex-direction:row;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;position:relative">'
+    // ── Sidebar noire pleine hauteur ──
+    +'<div style="width:52px;flex-shrink:0;background:#111827;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:0;border-right:1px solid #000;overflow-y:auto">'
+      // Bouton toggle + label Projet
+      +(!isNew?'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:6px"><button id="dbdp-toggle-left-btn" onclick="_dbdToggleProjLeft()" title="Volet projet" style="width:36px;height:36px;border-radius:8px;border:none;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button><span style="font-size:7px;color:#888;letter-spacing:.4px;text-transform:uppercase">Projet</span></div>':'')
+      // Séparateur
+      +'<div style="width:32px;height:1px;background:#2d2d2d;flex-shrink:0;margin-bottom:6px"></div>'
+      // Label CR
+      +'<span style="font-size:7px;color:#888;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px">CR</span>'
+      // Bouton "nouveau CR"
+      +'<button onclick="window._dbdProjCRIdx=null;window._dbdCRTemp=null;_dbdSetView(\'cr\')" title="Nouveau compte rendu" style="width:28px;height:28px;border-radius:50%;border:1px dashed #444;background:transparent;color:#666;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:4px">+</button>'
+      // Container CR buttons (dynamic)
+      +'<div id="dbdp-sidebar-crs" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:0 6px;box-sizing:border-box"></div>'
+      // Séparateur + bouton retour (vue combined)
+      +'<div style="flex:1"></div>'
+      +'<button id="dbdv-btn-combined" onclick="_dbdSetView(\'combined\')" title="Planning & Tâches" style="display:none;width:36px;height:36px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></button>'
+    +'</div>'
+    // ── Contenu principal (header + grid) ──
+    +'<div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">'
+    +'<div id="dbdp-hdr" style="padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--txt);flex-shrink:0">'+(isNew?'📁 Nouveau projet':'✏️ Modifier le projet')+(proj&&proj.titre?' <span style="font-size:12px;font-weight:500;color:var(--txt3)">— '+esc(proj.titre)+'</span>':'')+'</div>'
+      +'<div style="flex:1"></div>'
+      +(!isNew?'<button onclick="_dbdDeleteProject(\''+editId+'\')" style="padding:5px 12px;border-radius:7px;border:1px solid rgba(239,68,68,.35);background:transparent;color:#ef4444;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'')
+      +'<button onclick="_dbdPrintProject()" title="Imprimer" style="padding:5px 10px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="14" width="12" height="5" rx="1"/><path d="M4 9V2h12v7"/><rect x="4" y="9" width="12" height="6" rx="1"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/></svg>Imprimer</button>'
+      +'<button onclick="_dbdSaveProject()" style="padding:5px 16px;border-radius:7px;border:none;background:#2563eb;color:#fff;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer">'+(isNew?'Créer':'Enregistrer')+'</button>'
+      +'<button onclick="document.getElementById(\'dbd-proj-ov\').remove()" style="width:26px;height:26px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt3);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>'
     +'</div>'
     +'<div id="dbdp-proj-grid" style="display:flex;flex-direction:row;overflow:hidden;flex:1;min-height:0">'
       +'<div id="dbdp-proj-left" style="width:320px;flex-shrink:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:0;border-right:1px solid var(--bdr)">'
@@ -55954,58 +56165,46 @@ function _dbdOpenProjectForm(editId){
         +'<div>'
           +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
             +'<label style="'+lab+';margin:0">Experts / Support</label>'
-            +'<button onclick="_dbdProjAddExp()" style="padding:3px 10px;border-radius:6px;border:none;background:#2563eb;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter</button>'
+            +'<button onclick="_dbdProjAddExp()" style="padding:3px 10px;border-radius:6px;border:none;background:#059669;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter</button>'
           +'</div>'
           +'<div id="dbdp-exp-list"></div>'
+          +'<input id="dbdp-exp-inp" list="dbdp-people-dl" placeholder="Prénom NOM… puis cliquer +" style="'+inp+';font-size:11px;margin-top:5px">'
         +'</div>'
         +'<datalist id="dbdp-people-dl">'+dlOpts+'</datalist>'
       +'</div>'
       +'<div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden">'
-        // ── Vue toggle ──
-        +'<div style="padding:8px 12px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:6px;flex-shrink:0;background:var(--navy2)">'
-          +'<button id="dbdv-btn-kanban" onclick="_dbdSetView(\'kanban\')" style="padding:5px 16px;border-radius:7px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Tableau de tâches</button>'
-          +'<button id="dbdv-btn-gantt" onclick="_dbdSetView(\'gantt\')" style="padding:5px 16px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📅 Planning</button>'
-          +'<div id="dbdv-zoom-bar" style="display:none;margin-left:auto;display:none;align-items:center;gap:4px">'
-            +'<span style="font-size:10px;color:var(--txt3);font-weight:600">Échelle :</span>'
-            +'<button onclick="_dbdGanttZoom(-1)" title="Réduire" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;line-height:1">−</button>'
-            +'<span id="dbdv-zoom-lbl" style="font-size:11px;font-weight:700;color:var(--txt3);min-width:32px;text-align:center">×1</span>'
-            +'<button onclick="_dbdGanttZoom(1)" title="Agrandir" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;line-height:1">+</button>'
+        // ── Vue combinée : Planning (haut) + Tableau de tâches (bas) ──
+        +'<div id="dbdv-combined-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">'
+          +'<div id="dbdv-gantt-content" style="flex:0 0 50%;min-height:0;overflow:hidden;min-width:0;border-bottom:2px solid var(--bdr)">'
+            +'<div id="dbdp-gantt-wrap" style="height:100%;overflow:auto;width:100%;min-width:0;box-sizing:border-box"></div>'
+          +'</div>'
+          +'<div id="dbdv-kanban-content" style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;min-height:0;overflow:hidden">'
+            +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
+              +colHdr('À faire','var(--txt3)','todo')
+              +'<div id="dbdp-col-todo" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'todo\')"></div>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
+              +colHdr('En cours','#f59e0b','inprogress')
+              +'<div id="dbdp-col-inprogress" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'inprogress\')"></div>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
+              +colHdr('À valider','#8b5cf6','validate')
+              +'<div id="dbdp-col-validate" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'validate\')"></div>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;overflow:hidden">'
+              +colHdr('Terminé','#10b981','done')
+              +'<div id="dbdp-col-done" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'done\')"></div>'
+            +'</div>'
           +'</div>'
         +'</div>'
-        // ── Kanban view ──
-        +'<div id="dbdv-kanban-content" style="display:grid;grid-template-columns:1fr 1fr 1fr;flex:1;height:0;min-height:0;overflow:hidden">'
-          +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
-            +colHdr('À faire','var(--txt3)','todo')
-            +'<div id="dbdp-col-todo" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'todo\')"></div>'
-          +'</div>'
-          +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
-            +colHdr('En cours','#f59e0b','inprogress')
-            +'<div id="dbdp-col-inprogress" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'inprogress\')"></div>'
-          +'</div>'
-          +'<div style="display:flex;flex-direction:column;overflow:hidden">'
-            +colHdr('Terminé','#10b981','done')
-            +'<div id="dbdp-col-done" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'done\')"></div>'
-          +'</div>'
-        +'</div>'
-        // ── Gantt view ──
-        +'<div id="dbdv-gantt-content" style="display:none;flex:1;min-height:0;overflow:hidden;min-width:0">'
-          +'<div id="dbdp-gantt-wrap" style="height:100%;overflow:auto;width:100%;min-width:0;box-sizing:border-box"></div>'
-        +'</div>'
-        // ── CR view ──
+        // ── CR view (masqué par défaut) ──
         +'<div id="dbdv-cr-content" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column">'
           +'<div id="dbdp-cr-wrap" style="flex:1;overflow-y:auto;height:100%"></div>'
         +'</div>'
       +'</div>'
-    +'</div>'
-    +'<div style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:space-between;flex-shrink:0">'
-      +(!isNew?'<button onclick="_dbdDeleteProject(\''+editId+'\')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:transparent;color:#ef4444;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Supprimer</button>':'<div></div>')
-      +'<div style="display:flex;gap:8px;align-items:center">'
-        +'<button onclick="_dbdPrintProject()" title="Imprimer le dossier projet en A4" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="14" width="12" height="5" rx="1"/><path d="M4 9V2h12v7"/><rect x="4" y="9" width="12" height="6" rx="1"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/></svg>Imprimer</button>'
-        +'<button onclick="document.getElementById(\'dbd-proj-ov\').remove()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">Annuler</button>'
-        +'<button onclick="_dbdSaveProject()" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer">'+(isNew?'Créer':'Enregistrer')+'</button>'
-      +'</div>'
-    +'</div>'
-  +'</div>';
+    +'</div>'  // close #dbdp-proj-grid
+  +'</div>'    // close main-section wrapper
++'</div>';
   window._dbdCurrentProjId = proj ? proj.id : _dbdProjId();
   window._dbdCurrentProjTitle = proj ? (proj.titre||'') : '';
   window._dbdProjTasks = JSON.parse(JSON.stringify(tasks));
@@ -56017,6 +56216,8 @@ function _dbdOpenProjectForm(editId){
   _dbdRenderGP();
   _dbdRenderExp();
   _dbdSetView('kanban');
+  // Panneau projet fermé par défaut
+  if(typeof _dbdToggleProjLeft==='function') _dbdToggleProjLeft();
   // Sécurité file:// : re-render si le kanban est encore vide après 150ms
   setTimeout(function(){
     var el=document.getElementById('dbdp-col-todo');
@@ -56028,11 +56229,13 @@ window._dbdProjAddTask=function(status){
   status=status||'todo';
   window._dbdProjTasks.push({id:_dbdProjTkId(),label:'',dateFrom:'',dateTo:'',commentaire:'',done:status==='done',status:status,todoRef:null});
   _dbdRenderKanban();
+  _dbdRenderGantt();
   _dbdAutoSaveProjNow();
 };
 window._dbdRemoveProjTask=function(idx){
   window._dbdProjTasks.splice(idx,1);
   _dbdRenderKanban();
+  _dbdRenderGantt();
   _dbdAutoSaveProjNow();
 };
 window._dbdKanbanEditing=null;
@@ -56041,7 +56244,7 @@ window._dbdKanbanDropInfo=null;
 window._dbdKanbanEdit=function(taskId){
   window._dbdKanbanEditing=taskId;
   _dbdRenderKanban();
-  if(!taskId) _dbdAutoSaveProjNow(); // fermeture d'une carte = auto-save
+  if(!taskId){ _dbdRenderGantt(); _dbdAutoSaveProjNow(); } // fermeture d'une carte = maj gantt + auto-save
 };
 
 window._dbdKanbanDragStart=function(event,taskId){
@@ -56058,41 +56261,62 @@ window._dbdKanbanDragEnd=function(){
 };
 
 // ── Vue toggle Kanban / Gantt ──────────────────────────────────────────────
-var _dbdGanttScales=[0.3,0.5,0.7,1,1.5,2,3,4];
-var _dbdGanttScaleIdx=(function(){var s=parseInt(localStorage.getItem('_dbdGanttScale'));return(!isNaN(s)&&s>=0&&s<8)?s:3;})();
+var _dbdGanttScales=[0.3,0.4,0.5,0.7,1,1.5,2,3,4];
+var _dbdGanttScaleIdx=(function(){var s=parseInt(localStorage.getItem('_dbdGanttScale'));return(!isNaN(s)&&s>=0&&s<9)?s:4;})();
 window._dbdGanttZoom=function(dir){
   _dbdGanttScaleIdx=Math.max(0,Math.min(_dbdGanttScales.length-1,_dbdGanttScaleIdx+dir));
   try{localStorage.setItem('_dbdGanttScale',_dbdGanttScaleIdx);}catch(e){}
   var lbl=document.getElementById('dbdv-zoom-lbl');
   if(lbl) lbl.textContent='×'+_dbdGanttScales[_dbdGanttScaleIdx];
-  if(window._dbdCurrentView==='gantt') _dbdRenderGantt();
+  if(window._dbdCurrentView==='gantt'||window._dbdCurrentView==='combined') _dbdRenderGantt();
 };
+window._dbdRenderSidebarCRs=function(){
+  var container=document.getElementById('dbdp-sidebar-crs'); if(!container) return;
+  var crs=window._dbdProjCRs||[];
+  if(!crs.length){ container.innerHTML=''; return; }
+  container.innerHTML=crs.map(function(cr,i){
+    var active=(window._dbdProjCRIdx===i&&window._dbdCurrentView==='cr');
+    var short='CR'+(i+1);
+    return '<button onclick="window._dbdProjCRIdx='+i+';window._dbdCRTemp=null;_dbdSetView(\'cr\')" '
+      +'title="'+(cr.titre||short)+'" '
+      +'style="width:36px;min-height:22px;border-radius:5px;border:none;background:'+(active?'#2563eb':'rgba(255,255,255,.12)')+';color:#fff;font-size:8px;font-weight:800;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px;font-family:inherit">'
+      +short
+      +'</button>';
+  }).join('');
+};
+
 window._dbdSetView=function(view){
+  // 'kanban' et 'gantt' sont maintenant une seule vue combinée
+  if(view==='kanban'||view==='gantt') view='combined';
   window._dbdCurrentView=view;
-  var btnK=document.getElementById('dbdv-btn-kanban');
-  var btnG=document.getElementById('dbdv-btn-gantt');
-  var btnCR=document.getElementById('dbdv-btn-cr');
-  var cK=document.getElementById('dbdv-kanban-content');
-  var cG=document.getElementById('dbdv-gantt-content');
+  var cCombined=document.getElementById('dbdv-combined-content');
   var cCR=document.getElementById('dbdv-cr-content');
-  var zBar=document.getElementById('dbdv-zoom-bar');
+  var btnBack=document.getElementById('dbdv-btn-combined');
   var leftCol=document.getElementById('dbdp-proj-left');
-  var grid=document.getElementById('dbdp-proj-grid');
-  var on='padding:5px 16px;border-radius:7px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit';
-  var off='padding:5px 16px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit';
-  if(btnK) btnK.style.cssText=view==='kanban'?on:off;
-  if(btnG) btnG.style.cssText=view==='gantt'?on:off;
-  if(btnCR) btnCR.style.cssText=view==='cr'?on:off;
-  if(cK) cK.style.display=view==='kanban'?'grid':'none';
-  if(cG) cG.style.display=view==='gantt'?'flex':'none';
-  if(cCR){cCR.style.display=view==='cr'?'flex':'none';}
-  // Colonne gauche : visible en Kanban seulement
-  var hideLeft=view==='gantt'||view==='cr';
-  if(leftCol){leftCol.style.display=hideLeft?'none':'flex';leftCol.style.width=hideLeft?'0':'320px';}
-  // flexbox layout — pas besoin de changer gridTemplateColumns
-  if(zBar) zBar.style.cssText=view==='gantt'?'margin-left:auto;display:flex;align-items:center;gap:4px':'display:none';
-  if(view==='gantt') _dbdRenderGantt();
-  if(view==='cr') _dbdRenderCR();
+  if(view==='cr'){
+    if(cCombined) cCombined.style.display='none';
+    if(cCR) cCR.style.display='flex';
+    if(btnBack){ btnBack.style.display='flex'; btnBack.style.background='#2563eb'; }
+    // Masquer la colonne gauche en mode CR
+    if(leftCol&&leftCol.style.display!=='none'){
+      leftCol._wasVisible=true;
+      leftCol.style.display='none';
+      leftCol.style.width='0';
+    }
+    _dbdRenderCR();
+  } else {
+    if(cCombined) cCombined.style.display='flex';
+    if(cCR) cCR.style.display='none';
+    if(btnBack) btnBack.style.display='none';
+    // Restaurer la colonne gauche si elle était visible
+    if(leftCol&&leftCol._wasVisible){
+      leftCol._wasVisible=false;
+      leftCol.style.display='';
+      leftCol.style.width='320px';
+    }
+    _dbdRenderGantt();
+  }
+  _dbdRenderSidebarCRs();
 };
 
 // ── Gantt ──────────────────────────────────────────────────────────────────
@@ -56159,33 +56383,20 @@ window._dbdRenderGantt=function(){
   }
   hHtml+='</div>';
 
-  // Task rows (Kanban order: todo → inprogress → done)
-  var colColor={todo:'#ef4444',inprogress:'#f59e0b',done:'#10b981'};
-  var statusLabel={todo:'À faire',inprogress:'En cours',done:'Terminé'};
-  var ordered=tasks.filter(function(t){return t.status==='todo';})
+  // Task rows (inversé : done en premier → validate → inprogress → todo)
+  var colColor={todo:'#3b82f6',inprogress:'#a855f7',validate:'#06b6d4',done:'#22c55e'};
+  var ordered=tasks.filter(function(t){return t.status==='done';})
+    .concat(tasks.filter(function(t){return t.status==='validate';}))
     .concat(tasks.filter(function(t){return t.status==='inprogress';}))
-    .concat(tasks.filter(function(t){return t.status==='done';}));
+    .concat(tasks.filter(function(t){return t.status==='todo';}));
 
   var rowsHtml='';
-  var lastStatus='';
   ordered.forEach(function(t){
     var i=tasks.indexOf(t);
     var color=colColor[t.status]||'#6366f1';
     var resp=t.responsable||null;
     var respVal=resp?((resp.prenom||'')+' '+(resp.nom||'')).trim():'';
     var avatar=_dbdAvatarHtml(resp);
-
-    // Status group separator
-    if(t.status!==lastStatus){
-      lastStatus=t.status;
-      rowsHtml+='<div style="display:flex;height:22px;background:rgba('+
-        (t.status==='todo'?'239,68,68':t.status==='inprogress'?'245,158,11':'16,185,129')+',.06);border-bottom:1px solid var(--bdr)">'
-        +'<div style="width:'+LW+'px;min-width:'+LW+'px;position:sticky;left:0;z-index:2;background:rgba('+(t.status==='todo'?'239,68,68':t.status==='inprogress'?'245,158,11':'16,185,129')+',.06);padding:3px 8px;display:flex;align-items:center;border-right:1px solid var(--bdr)">'
-          +'<span style="font-size:9px;font-weight:700;text-transform:uppercase;color:'+color+';letter-spacing:.5px">'+statusLabel[t.status]+'</span>'
-        +'</div>'
-        +'<div style="flex:1;width:'+totalW+'px"></div>'
-      +'</div>';
-    }
 
     // Grid lines for this row
     var gridHtml='';
@@ -56202,14 +56413,22 @@ window._dbdRenderGantt=function(){
     var bL=d2px(t.dateFrom); var bR=t.dateTo?d2px(t.dateTo)+ppd:-1;
     var bW=(bL>=0&&bR>bL)?bR-bL:0;
     var barHtml='';
+    var AV=22; // hauteur = diamètre des extrémités
     if(bL>=0&&bW>0){
-      barHtml='<div data-gantt-bar="'+i+'" style="position:absolute;left:'+bL+'px;top:8px;width:'+bW+'px;height:28px;background:'+color+';border-radius:5px;display:flex;align-items:center;opacity:.88;user-select:none;box-sizing:border-box;overflow:hidden" '
+      var ini=resp?(((resp.prenom||'')[0]||'').toUpperCase()+((resp.nom||'')[0]||'').toUpperCase()||'?'):'';
+      // Une seule div pill : border-radius = AV/2, overflow:hidden → pas de rupture aux extrémités
+      var AV2=AV-4; // diamètre du cercle avatar intérieur
+      barHtml='<div data-gantt-bar="'+i+'" style="position:absolute;left:'+bL+'px;top:'+(Math.floor(ROW/2)-AV/2)+'px;width:'+bW+'px;height:'+AV+'px;background:'+color+';border-radius:'+(AV/2)+'px;display:flex;align-items:center;overflow:hidden;user-select:none;cursor:grab;box-sizing:border-box" '
         +'onmousedown="_dbdGanttBarDown(event,'+i+',\'move\')" title="'+esc2(t.label||'')+(respVal?' — '+esc2(respVal):'')+'">'
-        +(avatar?'<div style="margin-left:3px;flex-shrink:0">'+avatar+'</div>':'')
-        +'<span style="font-size:11px;font-weight:600;color:#fff;padding:0 4px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:grab">'+esc2(t.label||'…')+'</span>'
-        +'<div style="width:10px;height:100%;flex-shrink:0;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;cursor:ew-resize" '
-          +'onmousedown="_dbdGanttBarDown(event,'+i+',\'resize\');event.stopPropagation()">'
-          +'<span style="color:rgba(255,255,255,.7);font-size:9px;writing-mode:vertical-lr">⠿</span>'
+        // Extrémité gauche : cercle avatar bleu centré dans la hauteur
+        +'<div style="width:'+AV+'px;height:'+AV+'px;flex-shrink:0;display:flex;align-items:center;justify-content:center">'
+          +'<div style="width:'+AV2+'px;height:'+AV2+'px;border-radius:50%;background:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;letter-spacing:0;line-height:1">'+(ini||'●')+'</div>'
+        +'</div>'
+        // Label central
+        +'<span style="flex:1;font-size:10px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;text-shadow:0 1px 2px rgba(0,0,0,.3)">'+esc2(t.label||'…')+'</span>'
+        // Extrémité droite : handle resize sobre
+        +'<div onmousedown="_dbdGanttBarDown(event,'+i+',\'resize\');event.stopPropagation()" style="width:'+AV+'px;height:'+AV+'px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:ew-resize;opacity:.7" title="Redimensionner">'
+          +'<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="2" x2="3" y2="8"/><line x1="7" y1="2" x2="7" y2="8"/></svg>'
         +'</div>'
       +'</div>';
     } else {
@@ -56244,10 +56463,14 @@ window._dbdRenderGantt=function(){
     rowsHtml='<div style="padding:40px;text-align:center;color:var(--txt3);font-size:12px">Aucune tâche — ajouter des tâches dans le tableau de tâches.</div>';
   }
 
+  var zoomLbl='×'+(_dbdGanttScales[_dbdGanttScaleIdx]||1);
   wrap.innerHTML='<div style="min-width:'+(LW+totalW)+'px;min-height:100%">'
     +'<div style="display:flex;position:sticky;top:0;z-index:3;background:var(--navy2);border-bottom:2px solid var(--bdr)">'
-      +'<div style="width:'+LW+'px;min-width:'+LW+'px;flex-shrink:0;position:sticky;left:0;z-index:4;background:var(--navy2);padding:5px 8px;border-right:1px solid var(--bdr);display:flex;align-items:center">'
-        +'<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px">Tâche</span>'
+      +'<div style="width:'+LW+'px;min-width:'+LW+'px;flex-shrink:0;position:sticky;left:0;z-index:4;background:var(--navy2);padding:4px 8px;border-right:1px solid var(--bdr);display:flex;align-items:center;gap:5px;box-sizing:border-box">'
+        +'<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px;flex:1">Tâche</span>'
+        +'<button onclick="_dbdGanttZoom(-1)" title="Réduire" style="width:20px;height:20px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0">−</button>'
+        +'<span id="dbdv-zoom-lbl" style="font-size:9px;font-weight:700;color:var(--txt3);min-width:22px;text-align:center;flex-shrink:0">'+zoomLbl+'</span>'
+        +'<button onclick="_dbdGanttZoom(1)" title="Agrandir" style="width:20px;height:20px;border-radius:5px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0">+</button>'
       +'</div>'
       +'<div style="position:relative;width:'+totalW+'px;flex-shrink:0">'+hHtml+'</div>'
     +'</div>'
@@ -56700,6 +56923,91 @@ window._dbdCREditPartFonction=function(pi){
   _dbdCRAutoSave();
   _dbdRenderCR();
 };
+window._dbdOpenCRPartFiche=function(pi){
+  var cr=_dbdCRGetTemp(); if(!cr) return;
+  var p=cr.participants[pi]; if(p===undefined) return;
+  var fullName=_crPN(p);
+  var parts=_dbdParseProjName(fullName);
+  var mode=_crPM(p); var fonc=_crPF(p);
+  // Enrichissement depuis S.pilots + GP list
+  var enriched=_dbdFicheEnrich(parts.prenom,parts.nom);
+  var licence=(p.licence||enriched.licence||'');
+  var email=(p.email||enriched.email||'');
+  var tel=(p.tel||enriched.tel||'');
+  var gpMatch=(window._dbdProjGP||[]).find(function(g){return _dbdFicheNorm((g.prenom||'')+' '+(g.nom||''))===_dbdFicheNorm(fullName);});
+  if(gpMatch){if(!licence)licence=gpMatch.licence||'';if(!email)email=gpMatch.email||'';if(!tel)tel=gpMatch.tel||'';}
+  var esc=function(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');};
+  var ini=(function(){var w=fullName.trim().split(/\s+/);return w.length>=2?(w[0][0]+w[w.length-1][0]).toUpperCase():(fullName[0]||'?').toUpperCase();})();
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;box-sizing:border-box';
+  var lbl='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px';
+  var nin="_dbdFicheNameInput('dbdp-crpart-prenom','dbdp-crpart-nom','dbdp-crpart-licence','dbdp-crpart-email','dbdp-crpart-tel')";
+  var lin="_dbdFicheLicenceInput('dbdp-crpart-licence','dbdp-crpart-prenom','dbdp-crpart-nom','dbdp-crpart-email','dbdp-crpart-tel')";
+  var old=document.getElementById('dbdp-crpart-fiche-ov');if(old)old.remove();
+  var ov=document.createElement('div');
+  ov.id='dbdp-crpart-fiche-ov';
+  ov.dataset.crMode=mode;
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:20px;width:340px;max-width:92vw;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+      +'<div style="width:44px;height:44px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Fiche participant</div><div style="font-size:11px;color:var(--txt2)">Compte Rendu</div></div>'
+      +'<button onclick="document.getElementById(\'dbdp-crpart-fiche-ov\').remove()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<div style="flex:1"><label style="'+lbl+'">Prénom</label><input id="dbdp-crpart-prenom" value="'+esc(parts.prenom)+'" oninput="'+nin+'" style="'+inp+'" placeholder="Prénom"></div>'
+      +'<div style="flex:1"><label style="'+lbl+'">Nom</label><input id="dbdp-crpart-nom" value="'+esc(parts.nom)+'" oninput="'+nin+'" style="'+inp+'" placeholder="NOM"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Fonction / Rôle</label><input id="dbdp-crpart-fonction" value="'+esc(fonc)+'" style="'+inp+'" placeholder="Ex: Directeur technique…"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">N° Licence</label><input id="dbdp-crpart-licence" value="'+esc(licence)+'" oninput="'+lin+'" style="'+inp+'" placeholder="N° de licence"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Email</label><input id="dbdp-crpart-email" type="email" value="'+esc(email)+'" style="'+inp+'" placeholder="email@exemple.com"></div>'
+    +'<div style="margin-bottom:16px"><label style="'+lbl+'">Téléphone</label><input id="dbdp-crpart-tel" type="tel" value="'+esc(tel)+'" style="'+inp+'" placeholder="06 …"></div>'
+    +'<div style="margin-bottom:16px"><label style="'+lbl+'">Mode de présence</label>'
+      +'<div style="display:flex;gap:6px">'
+        +_crPModes.map(function(m){var active=m===mode;return'<button onclick="_dbdCRPartFicheSetMode(\''+m+'\')" id="dbdp-crpart-mode-'+m+'" style="flex:1;padding:5px 0;border-radius:8px;border:2px solid '+(active?_crPModeColor[m]:'var(--bdr)')+';background:'+(active?_crPModeColor[m]+'22':'transparent')+';color:'+(active?_crPModeColor[m]:'var(--txt3)')+';font-size:10px;font-weight:800;cursor:pointer;font-family:inherit">'+_crPModeLabel[m]+'</button>';}).join('')
+      +'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+      +'<button onclick="_dbdSaveCRPartFiche('+pi+')" style="flex:1;padding:8px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>'
+      +'<button onclick="document.getElementById(\'dbdp-crpart-fiche-ov\').remove()" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+};
+window._dbdCRPartFicheSetMode=function(mode){
+  _crPModes.forEach(function(m){
+    var btn=document.getElementById('dbdp-crpart-mode-'+m);if(!btn)return;
+    var active=m===mode;
+    btn.style.borderColor=active?_crPModeColor[m]:'var(--bdr)';
+    btn.style.background=active?_crPModeColor[m]+'22':'transparent';
+    btn.style.color=active?_crPModeColor[m]:'var(--txt3)';
+  });
+  var ov=document.getElementById('dbdp-crpart-fiche-ov');if(ov)ov.dataset.crMode=mode;
+};
+window._dbdSaveCRPartFiche=function(pi){
+  var cr=_dbdCRGetTemp();if(!cr)return;
+  var ov=document.getElementById('dbdp-crpart-fiche-ov');
+  var prenom=(document.getElementById('dbdp-crpart-prenom').value||'').trim();
+  var nom=(document.getElementById('dbdp-crpart-nom').value||'').trim();
+  var fullName=((prenom+' '+nom).trim())||_crPN(cr.participants[pi]);
+  var mode=ov&&ov.dataset.crMode?ov.dataset.crMode:_crPM(cr.participants[pi]);
+  cr.participants[pi]={
+    name:fullName,
+    mode:mode,
+    fonction:(document.getElementById('dbdp-crpart-fonction').value||'').trim(),
+    licence:(document.getElementById('dbdp-crpart-licence').value||'').trim(),
+    email:(document.getElementById('dbdp-crpart-email').value||'').trim(),
+    tel:(document.getElementById('dbdp-crpart-tel').value||'').trim()
+  };
+  var saved=cr.participants[pi];
+  // Sync vers S.pilots et GP si même personne
+  _dbdFicheSyncToPilot(prenom,nom,saved.licence,saved.email,saved.tel);
+  var gpMatch=(window._dbdProjGP||[]).find(function(g){return _dbdFicheNorm((g.prenom||'')+' '+(g.nom||''))===_dbdFicheNorm(fullName);});
+  if(gpMatch){if(saved.licence)gpMatch.licence=saved.licence;if(saved.email)gpMatch.email=saved.email;if(saved.tel)gpMatch.tel=saved.tel;}
+  if(ov)ov.remove();
+  _dbdCRAutoSave();
+  _dbdRenderCR();
+};
 
 // ── Auto-save silencieux (debounce 600ms) ─────────────────────────────────────
 var _dbdCRAutoSaveT=null;
@@ -56721,11 +57029,15 @@ window._dbdCRAutoSave=function(){
     else{
       var ei=crs.findIndex(function(c){return c.id&&c.id===cr.id;});
       if(ei>=0){crs[ei]=cr;window._dbdProjCRIdx=ei;}
-      else{crs.push(cr);window._dbdProjCRIdx=crs.length-1;}
+      // Ne créer un nouveau CR que s'il a du contenu (pas de CR vide automatique)
+      else if(cr.titre||cr.thematique||(cr.participants||[]).length||(cr.items||[]).some(function(it){return it.titre||it.commentaire;})){
+        crs.push(cr);window._dbdProjCRIdx=crs.length-1;
+      }
     }
     window._dbdProjCRs=crs;
     window._dbdCRTemp=null;
     if(typeof _dbdAutoSaveProjNow==='function') _dbdAutoSaveProjNow();
+    if(typeof _dbdRenderSidebarCRs==='function') _dbdRenderSidebarCRs();
     // Mettre à jour l'option dans le select sans re-rendre tout le formulaire
     var selEl=document.querySelector('#dbdp-cr-wrap select');
     if(selEl&&window._dbdProjCRIdx!==null){
@@ -56763,6 +57075,7 @@ window._dbdRenderCR=function(){
     })():'')
     +(cr?'<button onclick="_dbdCRPrint()" title="Imprimer" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="14" width="12" height="5" rx="1"/><path d="M4 9V2h12v7"/><rect x="4" y="9" width="12" height="6" rx="1"/></svg>Imp CR</button>':'')
     +'<button onclick="_dbdCRSendEmail()" style="padding:4px 10px;border-radius:6px;border:none;background:#059669;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="M2 7l8 5 8-5"/></svg>Email CR</button>'
+    +'<button onclick="_dbdSetView(\'combined\')" title="Retour Planning & Tâches" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt2);font-size:16px;font-weight:400;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1">×</button>'
   +'</div>';
 
   // ── Formulaire édition — toujours depuis _dbdCRTemp pour refléter les modifs en cours ──
@@ -56833,7 +57146,7 @@ window._dbdRenderCR=function(){
       +'style="display:inline-flex;align-items:center;gap:4px;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px;font-weight:600;color:var(--txt);cursor:grab">'
       +'<span title="Déplacer" style="color:var(--txt3);font-size:11px;cursor:grab;opacity:.5;flex-shrink:0;line-height:1">⠿</span>'
       +'<span style="width:22px;height:22px;border-radius:50%;background:#6366f1;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">'+initials+'</span>'
-      +esc2(name)
+      +'<span onclick="_dbdOpenCRPartFiche('+pi+')" title="Modifier la fiche" style="cursor:pointer">'+esc2(name)+'</span>'
       +foncHtml
       +'<button onclick="_dbdCRTogglePartMode('+pi+')" title="Changer le mode" style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;border:none;background:'+modeColor+';color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap;margin-left:2px">'+modeLabel+'</button>'
       +'<button onclick="_dbdCRRemovePart('+pi+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px">×</button>'
@@ -56882,7 +57195,7 @@ window._dbdRenderCR=function(){
     // Participants
     +'<div style="margin-bottom:14px">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-        +'<label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Participants présents</label>'
+        +'<label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Participants</label>'
         +'<button onclick="_dbdCRSortParts()" title="Trier par ordre alphabétique" style="padding:2px 9px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.5px">A→Z</button>'
       +'</div>'
       +'<div style="display:flex;align-items:flex-start;gap:6px">'
@@ -57153,6 +57466,7 @@ window._dbdCRSaveCurrent=function(){
   window._dbdCRTemp=null;
   _dbdAutoSaveProjNow();
   _dbdRenderCR();
+  if(typeof _dbdRenderSidebarCRs==='function') _dbdRenderSidebarCRs();
   if(typeof _toast==='function') _toast('Compte rendu enregistré ✓');
 };
 window._dbdCRDelete=function(){
@@ -57165,6 +57479,7 @@ window._dbdCRDelete=function(){
   window._dbdCRTemp=null;
   _dbdAutoSaveProjNow();
   _dbdRenderCR();
+  if(typeof _dbdRenderSidebarCRs==='function') _dbdRenderSidebarCRs();
 };
 
 // ── Correction IA ────────────────────────────────────────────────────────────
@@ -57356,7 +57671,7 @@ window._dbdCRPrint=function(){
       +'<div class="meta-item"><div class="meta-lbl">Points à l\'ordre du jour</div><div class="meta-val">'+(cr.items||[]).length+'</div></div>'
     +'</div>'
     +'<div class="body">'
-    +'<div class="sec-hd">Participants présents</div>'
+    +'<div class="sec-hd">Participants</div>'
     +'<div class="part-list" style="display:flex;flex-wrap:wrap;gap:2px">'+partAvatarsHtml+'</div>'
     +'<div class="sec-hd">Ordre du jour &amp; décisions</div>'
     +itemsHtml
@@ -57390,7 +57705,7 @@ window._dbdKanbanDrop=function(event,toStatus){
   var t=window._dbdProjTasks.find(function(x){return x.id===taskId;}); if(!t) return;
   // Remove from array
   window._dbdProjTasks=window._dbdProjTasks.filter(function(x){return x.id!==taskId;});
-  t.status=toStatus; t.done=(toStatus==='done');
+  t.status=toStatus; t.done=(toStatus==='done'||toStatus==='validate');
   var info=window._dbdKanbanDropInfo; window._dbdKanbanDropInfo=null;
   if(info&&info.taskId&&info.taskId!==taskId){
     var ti=window._dbdProjTasks.findIndex(function(x){return x.id===info.taskId;});
@@ -57402,6 +57717,7 @@ window._dbdKanbanDrop=function(event,toStatus){
     window._dbdProjTasks.splice(li>=0?li+1:window._dbdProjTasks.length,0,t);
   }
   _dbdRenderKanban();
+  _dbdRenderGantt();
   _dbdAutoSaveProjNow(); // auto-save après déplacement de carte
 };
 
@@ -57416,22 +57732,21 @@ window._dbdProjTaskResponsable=function(i,val){
 function _dbdAvatarHtml(p){
   if(!p||(!(p.nom||'').trim()&&!(p.prenom||'').trim())) return '';
   var ini=(((p.prenom||'')[0]||'').toUpperCase()+(( p.nom||'')[0]||'').toUpperCase())||'?';
-  var cols=['#6366f1','#3b82f6','#f59e0b','#10b981','#ec4899','#8b5cf6','#0891b2'];
-  var bg=cols[(ini.charCodeAt(0)||0)%cols.length];
   var full=((p.prenom||'')+' '+(p.nom||'')).trim().replace(/"/g,'&quot;');
-  return '<div title="'+full+'" style="width:22px;height:22px;border-radius:50%;background:'+bg+';display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:.3px;border:1.5px solid var(--navy2)">'+ini+'</div>';
+  return '<div title="'+full+'" style="width:22px;height:22px;border-radius:50%;background:#2563eb;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;flex-shrink:0;letter-spacing:0;line-height:1">'+ini+'</div>';
 }
 
 window._dbdRenderKanban=function(){
   var esc2=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
   var inp='background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;box-sizing:border-box;width:100%';
-  var colColor={todo:'#ef4444',inprogress:'#f59e0b',done:'#10b981'};
-  ['todo','inprogress','done'].forEach(function(status){
+  var colColor={todo:'#3b82f6',inprogress:'#a855f7',validate:'#06b6d4',done:'#22c55e'};
+  var colRgb={todo:'59,130,246',inprogress:'168,85,247',validate:'6,182,212',done:'34,197,94'};
+  ['todo','inprogress','validate','done'].forEach(function(status){
     var el=document.getElementById('dbdp-col-'+status); if(!el) return;
     var color=colColor[status];
     var colTasks=window._dbdProjTasks.filter(function(t){return t.status===status;});
     if(!colTasks.length){
-      el.innerHTML='<div style="color:var(--txt3);font-size:11px;text-align:center;padding:20px 8px;border:1px dashed rgba('+(status==='todo'?'239,68,68':status==='inprogress'?'245,158,11':'16,185,129')+',.3);border-radius:8px">Glisser ici</div>';
+      el.innerHTML='<div style="color:var(--txt3);font-size:11px;text-align:center;padding:14px 6px;border:1px dashed rgba('+colRgb[status]+',.3);border-radius:7px">Glisser ici</div>';
       return;
     }
     el.innerHTML=colTasks.map(function(t){
@@ -57443,41 +57758,49 @@ window._dbdRenderKanban=function(){
       var resp=t.responsable||null;
       var respVal=resp?((resp.prenom||'')+' '+(resp.nom||'')).trim():'';
       if(isEditing){
-        return '<div data-ktask="'+t.id+'" style="background:var(--navy2);border:1px solid '+color+';border-radius:8px;overflow:hidden;display:flex;flex-shrink:0">'
-          +'<div style="width:4px;background:'+color+';flex-shrink:0"></div>'
-          +'<div style="padding:9px 10px;flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">'
-            +'<input type="text" placeholder="Libellé de la tâche…" value="'+((t.label||'').replace(/"/g,'&quot;'))+'" oninput="_dbdProjTasks['+i+'].label=this.value" style="'+inp+';font-size:13px;font-weight:600">'
+        return '<div data-ktask="'+t.id+'" style="background:var(--navy2);border:1px solid '+color+';border-radius:7px;overflow:hidden;display:flex;flex-shrink:0">'
+          +'<div style="width:3px;background:'+color+';flex-shrink:0"></div>'
+          +'<div style="padding:7px 8px;flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">'
+            +'<input type="text" placeholder="Libellé de la tâche…" value="'+((t.label||'').replace(/"/g,'&quot;'))+'" oninput="_dbdProjTasks['+i+'].label=this.value" style="'+inp+';font-size:12px;font-weight:600">'
             +'<div style="display:flex;gap:4px">'
-              +'<input type="date" value="'+(t.dateFrom||'')+'" title="Du" oninput="_dbdProjTasks['+i+'].dateFrom=this.value" style="flex:1;'+inp+';font-size:11px;padding:3px 6px">'
-              +'<input type="date" value="'+(t.dateTo||'')+'" title="Au" oninput="_dbdProjTasks['+i+'].dateTo=this.value" style="flex:1;'+inp+';font-size:11px;padding:3px 6px">'
+              +'<input type="date" value="'+(t.dateFrom||'')+'" title="Du" oninput="_dbdProjTasks['+i+'].dateFrom=this.value" style="flex:1;'+inp+';font-size:10px;padding:3px 5px">'
+              +'<input type="date" value="'+(t.dateTo||'')+'" title="Au" oninput="_dbdProjTasks['+i+'].dateTo=this.value" style="flex:1;'+inp+';font-size:10px;padding:3px 5px">'
             +'</div>'
-            +'<input list="dbdp-people-dl" placeholder="Responsable (Prénom NOM)…" value="'+(respVal.replace(/"/g,'&quot;'))+'" oninput="_dbdProjTaskResponsable('+i+',this.value)" style="'+inp+';font-size:11px;padding:4px 8px">'
-            +'<input type="text" placeholder="Commentaire…" value="'+((t.commentaire||'').replace(/"/g,'&quot;'))+'" oninput="_dbdProjTasks['+i+'].commentaire=this.value" style="'+inp+';font-size:11px;padding:4px 8px">'
-            +'<div style="display:flex;justify-content:space-between;align-items:center">'
-              +'<button onclick="_dbdRemoveProjTask('+i+')" style="font-size:11px;color:#ef4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:0">Supprimer</button>'
-              +'<button onclick="_dbdKanbanEdit(null)" style="padding:4px 12px;border-radius:6px;border:none;background:'+color+';color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ Fermer</button>'
+            +'<input list="dbdp-people-dl" placeholder="Responsable…" value="'+(respVal.replace(/"/g,'&quot;'))+'" oninput="_dbdProjTaskResponsable('+i+',this.value)" style="'+inp+';font-size:10px;padding:3px 7px">'
+            +'<input type="text" placeholder="Commentaire…" value="'+((t.commentaire||'').replace(/"/g,'&quot;'))+'" oninput="_dbdProjTasks['+i+'].commentaire=this.value" style="'+inp+';font-size:10px;padding:3px 7px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:center;gap:4px">'
+              +'<button onclick="_dbdRemoveProjTask('+i+')" style="font-size:10px;color:#ef4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:0">Supprimer</button>'
+              +'<button onclick="_dbdProjOpenCRForTask(\''+t.id+'\')" title="Créer/ouvrir un CR lié à cette tâche" style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:5px;border:1px solid #2563eb;background:transparent;color:#2563eb;cursor:pointer;font-family:inherit">+ CR</button>'
+              +'<button onclick="_dbdKanbanEdit(null)" style="padding:3px 10px;border-radius:5px;border:none;background:'+color+';color:#fff;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">✓ Fermer</button>'
             +'</div>'
           +'</div>'
         +'</div>';
       } else {
+        var linkedCRs=(window._dbdProjCRs||[]).filter(function(c){return c.taskRef===t.id;});
+        var crChips=linkedCRs.length
+          ?'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">'
+            +linkedCRs.map(function(c){
+              var idx=(window._dbdProjCRs||[]).indexOf(c);
+              return '<button onclick="event.stopPropagation();window._dbdProjCRIdx='+idx+';window._dbdCRTemp=null;_dbdSetView(\'cr\')" '
+                +'style="font-size:8px;font-weight:800;padding:2px 6px;border-radius:4px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-family:inherit;line-height:1.2">CR'+(idx+1)+'</button>';
+            }).join('')
+            +'</div>'
+          :'';
         return '<div draggable="true" data-ktask="'+t.id+'" '
           +'ondragstart="_dbdKanbanDragStart(event,\''+t.id+'\')" '
           +'ondragend="_dbdKanbanDragEnd()" '
           +'onclick="_dbdKanbanEdit(\''+t.id+'\')" '
           +'onmouseover="this.style.borderColor=\''+color+'\'" '
           +'onmouseout="this.style.borderColor=\'var(--bdr)\'" '
-          +'style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;overflow:hidden;cursor:pointer;display:flex;flex-shrink:0;transition:border-color .15s;box-sizing:border-box">'
-          +'<div style="width:4px;background:'+color+';flex-shrink:0;border-radius:4px 0 0 4px"></div>'
-          +'<div style="padding:9px 10px;flex:1;min-width:0">'
+          +'style="background:var(--navy2);border:1px solid var(--bdr);border-radius:7px;overflow:hidden;cursor:pointer;display:flex;flex-shrink:0;transition:border-color .15s;box-sizing:border-box">'
+          +'<div style="width:3px;background:'+color+';flex-shrink:0;border-radius:3px 0 0 3px"></div>'
+          +'<div style="padding:5px 7px;flex:1;min-width:0">'
             +(t.label
-              ?'<div style="font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc2(t.label)+'</div>'
-              :'<div style="font-size:12px;color:var(--txt3);font-style:italic">Cliquer pour saisir…</div>')
-            +(dateStr?'<div style="font-size:11px;color:var(--txt3);margin-top:3px">📅 '+dateStr+'</div>':'')
-            +(t.commentaire?'<div style="font-size:11px;color:var(--txt2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc2(t.commentaire)+'</div>':'')
-            +(resp?'<div style="margin-top:5px;display:flex;align-items:center;gap:5px">'+_dbdAvatarHtml(resp)+'<span style="font-size:10px;color:var(--txt3)">'+esc2(respVal)+'</span></div>':'')
-          +'</div>'
-          +'<div style="display:flex;align-items:flex-start;padding:6px 5px 0 0;flex-shrink:0;opacity:.4">'
-            +'<span style="font-size:14px;color:var(--txt3);cursor:grab;padding:3px 2px;user-select:none" title="Glisser pour déplacer / réordonner">⠿</span>'
+              ?'<div style="font-size:11px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc2(t.label)+'</div>'
+              :'<div style="font-size:10px;color:var(--txt3);font-style:italic">Cliquer pour saisir…</div>')
+            +(dateStr?'<div style="font-size:9px;color:var(--txt3);margin-top:1px">📅 '+dateStr+'</div>':'')
+            +(resp?'<div style="margin-top:3px;display:flex;align-items:center;gap:4px">'+_dbdAvatarHtml(resp)+'</div>':'')
+            +crChips
           +'</div>'
         +'</div>';
       }
@@ -57521,6 +57844,7 @@ function _dbdDoSaveProjData(){
   var idx=list.findIndex(function(p){return p.id===id;});
   if(idx>=0){ list[idx]=record; } else { list.push(record); }
   _dbdProjSave();
+  if(typeof _dbdRenderSidebarCRs==='function') _dbdRenderSidebarCRs();
 }
 // Auto-save appelée après chaque changement (Kanban drag, Gantt drag, ajout tâche…)
 window._dbdAutoSaveProjNow=function(){
@@ -57541,8 +57865,17 @@ window._dbdPickProjColor=function(c){
   if(target){target.style.outline='2px solid #fff';target.style.outlineOffset='2px';}
 };
 window._dbdSaveProject=function(){
+  var isNew=!window._dbdCurrentProjId;
   _dbdDoSaveProjData();
-  document.getElementById('dbd-proj-ov').remove();
+  // Nouveau projet : lui assigner une position libre dans le canvas
+  if(isNew && window._dbdCurrentProjId){
+    var pm=_dbdProjPosGet();
+    if(!pm[window._dbdCurrentProjId]){
+      pm[window._dbdCurrentProjId]=_dbdFindFreePos(pm);
+      _dbdProjPosSave(pm);
+    }
+  }
+  var ov=document.getElementById('dbd-proj-ov'); if(ov) ov.remove();
   _dbdRenderProjects();
   if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
 };
@@ -57564,54 +57897,250 @@ function _dbdFindOrCreateProjPerson(val,tel,email){
   all.push({id:newP.id,nom:newP.nom,prenom:newP.prenom,tel:newP.tel,email:newP.email});
   return{id:newP.id,nom:newP.nom,prenom:newP.prenom};
 }
+// ── Helpers partagés pour les fiches GP & participants CR ──────────────────
+var _dbdFicheNorm=function(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();};
+window._dbdFicheEnrich=function(prenom,nom){
+  // Retourne {licence,email,tel} depuis S.pilots, S.staff, S.partenaires ou S.licenceDB
+  var r={licence:'',email:'',tel:''};
+  var target=_dbdFicheNorm(((prenom||'')+' '+(nom||'')).trim());
+  if(!target) return r;
+  var matchName=function(p){
+    return _dbdFicheNorm((p.nom||'')+' '+(p.prenom||''))===target
+        || _dbdFicheNorm((p.prenom||'')+' '+(p.nom||''))===target;
+  };
+  // 1. S.pilots
+  var pilot=(S.pilots||[]).find(matchName);
+  if(pilot){if(pilot.licence)r.licence=pilot.licence;if(pilot.email)r.email=pilot.email;if(pilot.tel)r.tel=pilot.tel;return r;}
+  // 2. S.staff (toutes compétitions)
+  var staffAll=[];
+  if(S.staff){if(Array.isArray(S.staff)){staffAll=S.staff;}else{Object.values(S.staff).forEach(function(a){if(Array.isArray(a))staffAll=staffAll.concat(a);});}}
+  var sm=staffAll.find(matchName);
+  if(sm){if(sm.licence)r.licence=sm.licence;if(sm.email)r.email=sm.email;if(sm.tel)r.tel=sm.tel;return r;}
+  // 3. S.partenaires (champ representant = "Prénom Nom")
+  if(S.partenaires){
+    var partAll=[];
+    Object.values(S.partenaires).forEach(function(a){if(Array.isArray(a))partAll=partAll.concat(a);});
+    var pm=partAll.find(function(p){return _dbdFicheNorm(p.representant||'')===target;});
+    if(pm){if(pm.email)r.email=pm.email;if(pm.telephone)r.tel=pm.telephone;return r;}
+  }
+  // 4. S.licenceDB
+  if(S.licenceDB){
+    var k1=_normStr(nom)+'|'+_normStr(prenom); var k2=_normStr(prenom)+'|'+_normStr(nom);
+    var ldb=S.licenceDB[k1]||S.licenceDB[k2]||null;
+    if(ldb&&ldb.licence) r.licence=ldb.licence;
+  }
+  return r;
+};
+window._dbdFicheEnrichByLicence=function(licNum){
+  var r={prenom:'',nom:'',email:'',tel:''};
+  if(!licNum) return r;
+  var pilot=(S.pilots||[]).find(function(p){return (p.licence||'').trim()===licNum.trim();});
+  if(pilot){r.prenom=pilot.prenom||'';r.nom=pilot.nom||'';r.email=pilot.email||'';r.tel=pilot.tel||'';return r;}
+  if(S.licenceDB){var ldb=S.licenceDB['_lic_'+licNum.trim()];if(ldb){r.prenom=ldb.prenom||'';r.nom=ldb.nom||'';}}
+  return r;
+};
+window._dbdFicheSyncToPilot=function(prenom,nom,licence,email,tel){
+  // Écrit dans S.pilots, S.staff et S.partenaires — écrase les valeurs non vides
+  var target=_dbdFicheNorm(((prenom||'')+' '+(nom||'')).trim());
+  var matchName=function(p){return _dbdFicheNorm((p.nom||'')+' '+(p.prenom||''))===target||_dbdFicheNorm((p.prenom||'')+' '+(p.nom||''))===target;};
+  var pilot=null;
+  if(licence){pilot=(S.pilots||[]).find(function(p){return(p.licence||'').trim()===licence.trim();});}
+  if(!pilot&&target){pilot=(S.pilots||[]).find(matchName);}
+  var ow=function(obj,f,v){if(v)obj[f]=v;};
+  if(pilot){ow(pilot,'licence',licence);ow(pilot,'email',email);ow(pilot,'tel',tel);}
+  // S.staff
+  var staffAll=[];
+  if(S.staff){if(Array.isArray(S.staff)){staffAll=S.staff;}else{Object.values(S.staff).forEach(function(a){if(Array.isArray(a))staffAll=staffAll.concat(a);});}}
+  var sm=staffAll.find(matchName);
+  if(sm){ow(sm,'licence',licence);ow(sm,'email',email);ow(sm,'tel',tel);}
+  // S.partenaires (champ "telephone")
+  var pm=null;
+  if(S.partenaires&&target){
+    var partAll=[];
+    Object.values(S.partenaires).forEach(function(a){if(Array.isArray(a))partAll=partAll.concat(a);});
+    pm=partAll.find(function(p){return _dbdFicheNorm(p.representant||'')===target;});
+    if(pm){ow(pm,'email',email);ow(pm,'telephone',tel);}
+  }
+  if((pilot||sm||pm)&&typeof saveState==='function'){saveState();if(typeof silentPush==='function')silentPush();}
+};
+window._dbdFicheNameInput=function(prenomId,nomId,licId,emailId,telId){
+  var prenom=(document.getElementById(prenomId)||{value:''}).value.trim();
+  var nom=(document.getElementById(nomId)||{value:''}).value.trim();
+  if(!prenom&&!nom) return;
+  var d=_dbdFicheEnrich(prenom,nom);
+  var setIfEmpty=function(id,val){var el=document.getElementById(id);if(el&&!el.value.trim()&&val)el.value=val;};
+  setIfEmpty(licId,d.licence);setIfEmpty(emailId,d.email);setIfEmpty(telId,d.tel);
+};
+window._dbdFicheLicenceInput=function(licId,prenomId,nomId,emailId,telId){
+  var lic=(document.getElementById(licId)||{value:''}).value.trim();
+  if(!lic) return;
+  var d=_dbdFicheEnrichByLicence(lic);
+  var setIfEmpty=function(id,val){var el=document.getElementById(id);if(el&&!el.value.trim()&&val)el.value=val;};
+  setIfEmpty(prenomId,d.prenom);setIfEmpty(nomId,d.nom);setIfEmpty(emailId,d.email);setIfEmpty(telId,d.tel);
+};
+// ── Fin helpers fiches ─────────────────────────────────────────────────────
+var _gpModes=['presentiel','visio','absent'];
+var _gpModeLabel={presentiel:'Présentiel',visio:'Visio',absent:'Absent'};
+var _gpModeColor={presentiel:'#10b981',visio:'#2563eb',absent:'#6b7280'};
 window._dbdRenderGP=function(){
   var el=document.getElementById('dbdp-gp-list');if(!el)return;
-  var _ev=function(s){return(s||'').replace(/"/g,'&quot;');};
-  var s2='background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;box-sizing:border-box;flex:1';
   if(!(window._dbdProjGP||[]).length){el.innerHTML='';return;}
   el.innerHTML=(window._dbdProjGP).map(function(p,i){
-    return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">'
-      +'<input list="dbdp-people-dl" value="'+_ev(((p.prenom||'')+' '+(p.nom||'')).trim())+'" placeholder="Prénom NOM…" oninput="_dbdProjGPName('+i+',this.value)" style="'+s2+'">'
-      +'<button onclick="_dbdProjRemoveGP('+i+')" style="width:22px;height:22px;border-radius:50%;border:none;background:#ef4444;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0;padding:0" title="Retirer">×</button>'
-    +'</div>';
+    var mode=p.mode||'presentiel';
+    var modeColor=_gpModeColor[mode]||'#10b981';
+    var modeTitle=_gpModeLabel[mode]||mode;
+    var name=((p.prenom||'')+' '+(p.nom||'')).trim()||'—';
+    var ini=(((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase())||'?';
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px;font-weight:600;color:var(--txt);margin-bottom:4px;margin-right:4px">'
+      +'<span style="width:22px;height:22px;border-radius:50%;background:#2563eb;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</span>'
+      +'<span onclick="_dbdOpenGPFiche('+i+')" title="Modifier la fiche" style="cursor:pointer">'+name+'</span>'
+      +'<button onclick="_dbdProjGPModeToggle('+i+')" title="'+modeTitle+'" style="width:10px;height:10px;border-radius:50%;border:none;background:'+modeColor+';cursor:pointer;padding:0;flex-shrink:0;margin-left:2px"></button>'
+      +'<button onclick="_dbdProjRemoveGP('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px" title="Retirer">×</button>'
+    +'</span>';
   }).join('');
+};
+window._dbdProjGPModeToggle=function(i){
+  var p=window._dbdProjGP[i]; if(!p) return;
+  var cur=p.mode||'presentiel';
+  p.mode=_gpModes[(_gpModes.indexOf(cur)+1)%_gpModes.length];
+  _dbdRenderGP();
+};
+window._dbdOpenGPFiche=function(i){
+  var p=window._dbdProjGP[i]; if(!p) return;
+  // Toujours refresher depuis S.pilots/S.staff (source de vérité)
+  var enriched=_dbdFicheEnrich(p.prenom,p.nom);
+  var licence=enriched.licence||p.licence||'';
+  var email=enriched.email||p.email||'';
+  var tel=enriched.tel||p.tel||'';
+  var esc=function(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');};
+  var ini=(((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase())||'?';
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;box-sizing:border-box';
+  var lbl='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px';
+  var nin="_dbdFicheNameInput('dbdp-gp-fiche-prenom','dbdp-gp-fiche-nom','dbdp-gp-fiche-licence','dbdp-gp-fiche-email','dbdp-gp-fiche-tel')";
+  var lin="_dbdFicheLicenceInput('dbdp-gp-fiche-licence','dbdp-gp-fiche-prenom','dbdp-gp-fiche-nom','dbdp-gp-fiche-email','dbdp-gp-fiche-tel')";
+  var old=document.getElementById('dbdp-gp-fiche-overlay');if(old)old.remove();
+  var ov=document.createElement('div');
+  ov.id='dbdp-gp-fiche-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:20px;width:340px;max-width:92vw;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+      +'<div style="width:44px;height:44px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Fiche membre</div><div style="font-size:11px;color:var(--txt2)">Groupe de Pilotage</div></div>'
+      +'<button onclick="document.getElementById(\'dbdp-gp-fiche-overlay\').remove()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<div style="flex:1"><label style="'+lbl+'">Prénom</label><input id="dbdp-gp-fiche-prenom" value="'+esc(p.prenom)+'" oninput="'+nin+'" style="'+inp+'" placeholder="Prénom"></div>'
+      +'<div style="flex:1"><label style="'+lbl+'">Nom</label><input id="dbdp-gp-fiche-nom" value="'+esc(p.nom)+'" oninput="'+nin+'" style="'+inp+'" placeholder="NOM"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Fonction / Rôle</label><input id="dbdp-gp-fiche-fonction" value="'+esc(p.fonction||'')+'" style="'+inp+'" placeholder="Ex: Président, DTN…"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">N° Licence</label><input id="dbdp-gp-fiche-licence" value="'+esc(licence)+'" oninput="'+lin+'" style="'+inp+'" placeholder="N° de licence"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Email</label><input id="dbdp-gp-fiche-email" type="email" value="'+esc(email)+'" style="'+inp+'" placeholder="email@exemple.com"></div>'
+    +'<div style="margin-bottom:20px"><label style="'+lbl+'">Téléphone</label><input id="dbdp-gp-fiche-tel" type="tel" value="'+esc(tel)+'" style="'+inp+'" placeholder="06 …"></div>'
+    +'<div style="display:flex;gap:8px">'
+      +'<button onclick="_dbdSaveGPFiche('+i+')" style="flex:1;padding:8px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>'
+      +'<button onclick="document.getElementById(\'dbdp-gp-fiche-overlay\').remove()" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+};
+window._dbdSaveGPFiche=function(i){
+  var p=window._dbdProjGP[i];if(!p)return;
+  var ov=document.getElementById('dbdp-gp-fiche-overlay');
+  p.prenom=(document.getElementById('dbdp-gp-fiche-prenom').value||'').trim();
+  p.nom=(document.getElementById('dbdp-gp-fiche-nom').value||'').trim();
+  p.fonction=(document.getElementById('dbdp-gp-fiche-fonction').value||'').trim();
+  p.licence=(document.getElementById('dbdp-gp-fiche-licence').value||'').trim();
+  p.email=(document.getElementById('dbdp-gp-fiche-email').value||'').trim();
+  p.tel=(document.getElementById('dbdp-gp-fiche-tel').value||'').trim();
+  if(ov)ov.remove();
+  _dbdFicheSyncToPilot(p.prenom,p.nom,p.licence,p.email,p.tel);
+  _dbdRenderGP();
 };
 window._dbdRenderExp=function(){
   var el=document.getElementById('dbdp-exp-list');if(!el)return;
-  var _ev=function(s){return(s||'').replace(/"/g,'&quot;');};
-  var s2='background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;color:var(--txt);font-family:inherit;font-size:11px;outline:none;box-sizing:border-box;width:100%';
   if(!(window._dbdProjExp||[]).length){el.innerHTML='';return;}
   el.innerHTML=(window._dbdProjExp).map(function(p,i){
-    return '<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:5px;margin-bottom:6px">'
-      +'<div style="display:flex;align-items:center;gap:5px">'
-        +'<input list="dbdp-people-dl" value="'+_ev(((p.prenom||'')+' '+(p.nom||'')).trim())+'" placeholder="Prénom NOM…" oninput="_dbdProjExpName('+i+',this.value)" style="flex:1;'+s2+'">'
-        +'<button onclick="_dbdProjRemoveExp('+i+')" style="width:17px;height:17px;border-radius:50%;border:none;background:#ef4444;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:11px;line-height:1;flex-shrink:0;padding:0">×</button>'
-      +'</div>'
-      +'<input type="tel" value="'+_ev(p.tel||'')+'" placeholder="Téléphone" oninput="_dbdProjExpField('+i+',\'tel\',this.value)" style="'+s2+'">'
-      +'<input type="email" value="'+_ev(p.email||'')+'" placeholder="Email" oninput="_dbdProjExpField('+i+',\'email\',this.value)" style="'+s2+'">'
-    +'</div>';
+    var name=((p.prenom||'')+' '+(p.nom||'')).trim()||'—';
+    var ini=(((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase())||'?';
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--navy3);border:1px solid var(--bdr);border-radius:20px;padding:2px 8px 2px 4px;font-size:11px;font-weight:600;color:var(--txt);margin-bottom:4px;margin-right:4px">'
+      +'<span style="width:22px;height:22px;border-radius:50%;background:#059669;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</span>'
+      +'<span onclick="_dbdOpenExpFiche('+i+')" title="Modifier la fiche" style="cursor:pointer">'+name+'</span>'
+      +'<button onclick="_dbdProjRemoveExp('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px" title="Retirer">×</button>'
+    +'</span>';
   }).join('');
+};
+window._dbdOpenExpFiche=function(i){
+  var p=window._dbdProjExp[i]; if(!p) return;
+  var enriched=_dbdFicheEnrich(p.prenom,p.nom);
+  var licence=enriched.licence||p.licence||'';
+  var email=enriched.email||p.email||'';
+  var tel=enriched.tel||p.tel||'';
+  var esc=function(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');};
+  var ini=(((p.prenom||'')[0]||'').toUpperCase()+((p.nom||'')[0]||'').toUpperCase())||'?';
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;color:var(--txt);font-family:inherit;font-size:12px;outline:none;box-sizing:border-box';
+  var lbl='font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px';
+  var nin="_dbdFicheNameInput('dbdp-exp-fiche-prenom','dbdp-exp-fiche-nom','dbdp-exp-fiche-licence','dbdp-exp-fiche-email','dbdp-exp-fiche-tel')";
+  var lin="_dbdFicheLicenceInput('dbdp-exp-fiche-licence','dbdp-exp-fiche-prenom','dbdp-exp-fiche-nom','dbdp-exp-fiche-email','dbdp-exp-fiche-tel')";
+  var old=document.getElementById('dbdp-exp-fiche-overlay');if(old)old.remove();
+  var ov=document.createElement('div');
+  ov.id='dbdp-exp-fiche-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)';
+  ov.innerHTML='<div style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:20px;width:340px;max-width:92vw;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+      +'<div style="width:44px;height:44px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+ini+'</div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Fiche expert / support</div><div style="font-size:11px;color:var(--txt2)">Équipe projet</div></div>'
+      +'<button onclick="document.getElementById(\'dbdp-exp-fiche-overlay\').remove()" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<div style="flex:1"><label style="'+lbl+'">Prénom</label><input id="dbdp-exp-fiche-prenom" value="'+esc(p.prenom||'')+'" oninput="'+nin+'" style="'+inp+'" placeholder="Prénom"></div>'
+      +'<div style="flex:1"><label style="'+lbl+'">Nom</label><input id="dbdp-exp-fiche-nom" value="'+esc(p.nom||'')+'" oninput="'+nin+'" style="'+inp+'" placeholder="NOM"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Fonction / Rôle</label><input id="dbdp-exp-fiche-fonction" value="'+esc(p.fonction||'')+'" style="'+inp+'" placeholder="Ex: Expert technique, Logistique…"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">N° Licence</label><input id="dbdp-exp-fiche-licence" value="'+esc(licence)+'" oninput="'+lin+'" style="'+inp+'" placeholder="N° de licence"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lbl+'">Email</label><input id="dbdp-exp-fiche-email" type="email" value="'+esc(email)+'" style="'+inp+'" placeholder="email@exemple.com"></div>'
+    +'<div style="margin-bottom:20px"><label style="'+lbl+'">Téléphone</label><input id="dbdp-exp-fiche-tel" type="tel" value="'+esc(tel)+'" style="'+inp+'" placeholder="06 …"></div>'
+    +'<div style="display:flex;gap:8px">'
+      +'<button onclick="_dbdSaveExpFiche('+i+')" style="flex:1;padding:8px;border-radius:8px;border:none;background:#059669;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>'
+      +'<button onclick="document.getElementById(\'dbdp-exp-fiche-overlay\').remove()" style="padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+};
+window._dbdSaveExpFiche=function(i){
+  var p=window._dbdProjExp[i];if(!p)return;
+  var ov=document.getElementById('dbdp-exp-fiche-overlay');
+  p.prenom=(document.getElementById('dbdp-exp-fiche-prenom').value||'').trim();
+  p.nom=(document.getElementById('dbdp-exp-fiche-nom').value||'').trim();
+  p.fonction=(document.getElementById('dbdp-exp-fiche-fonction').value||'').trim();
+  p.licence=(document.getElementById('dbdp-exp-fiche-licence').value||'').trim();
+  p.email=(document.getElementById('dbdp-exp-fiche-email').value||'').trim();
+  p.tel=(document.getElementById('dbdp-exp-fiche-tel').value||'').trim();
+  if(ov)ov.remove();
+  _dbdFicheSyncToPilot(p.prenom,p.nom,p.licence,p.email,p.tel);
+  _dbdRenderExp();
 };
 window._dbdProjAddGP=function(){
   var inp=document.getElementById('dbdp-gp-inp');if(!inp)return;
   var val=(inp.value||'').trim();if(!val)return;
   var parts=_dbdParseProjName(val);
-  window._dbdProjGP.push({nom:parts.nom,prenom:parts.prenom});
+  window._dbdProjGP.push({nom:parts.nom,prenom:parts.prenom,mode:'presentiel'});
   inp.value='';
   _dbdRenderGP();
 };
 window._dbdProjRemoveGP=function(i){window._dbdProjGP.splice(i,1);_dbdRenderGP();};
-window._dbdProjGPName=function(i,val){var p=_dbdParseProjName(val);if(window._dbdProjGP[i]){window._dbdProjGP[i].prenom=p.prenom;window._dbdProjGP[i].nom=p.nom;}};
 window._dbdProjAddExp=function(){
-  window._dbdProjExp.push({nom:'',prenom:'',tel:'',email:''});
+  var inp=document.getElementById('dbdp-exp-inp');
+  var val=(inp&&inp.value||'').trim();
+  var parts=val?_dbdParseProjName(val):{nom:'',prenom:''};
+  var idx=(window._dbdProjExp||[]).length;
+  window._dbdProjExp.push({nom:parts.nom,prenom:parts.prenom,tel:'',email:'',licence:'',fonction:''});
+  if(inp)inp.value='';
   _dbdRenderExp();
+  _dbdOpenExpFiche(idx);
 };
 window._dbdProjRemoveExp=function(i){window._dbdProjExp.splice(i,1);_dbdRenderExp();};
-window._dbdProjExpName=function(i,val){
-  var p=_dbdParseProjName(val);
-  if(window._dbdProjExp[i]){window._dbdProjExp[i].prenom=p.prenom;window._dbdProjExp[i].nom=p.nom;}
-};
-window._dbdProjExpField=function(i,field,val){if(window._dbdProjExp[i])window._dbdProjExp[i][field]=val;};
 // --- End project team helpers ---
 window._dbdToggleProjOpen=function(projId){
   if(!window._dbdProjOpen) window._dbdProjOpen={};
@@ -57621,8 +58150,10 @@ window._dbdToggleProjOpen=function(projId){
 window._dbdDeleteProject=function(projId){
   if(!confirm('Supprimer ce projet ?')) return;
   S.dtnProjects=(S.dtnProjects||[]).filter(function(p){return p.id!==projId;});
+  // Nettoyer la position sauvegardée
+  var pm=_dbdProjPosGet(); delete pm[projId]; _dbdProjPosSave(pm);
   _dbdProjSave();
-  document.getElementById('dbd-proj-ov').remove();
+  var ov=document.getElementById('dbd-proj-ov'); if(ov) ov.remove();
   _dbdRenderProjects();
   if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
 };
