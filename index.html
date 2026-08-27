@@ -31298,13 +31298,16 @@ function cfUpdateFilters() {
   renderCollectifList();
 }
 
+function _cfStripHonorific(s){
+  return (s||'').trim().replace(/^(M\.|Mme\.?|Mlle\.?|Dr\.?|Me\.?|Pr\.?|Mgr\.?)\s+/i,'').trim();
+}
 function cfPilotAutocomplete() {
   var inp = document.getElementById('cf-pilot-input');
   var val = (inp ? inp.value : '').trim().toLowerCase();
   var dl  = document.getElementById('cf-pilot-list');
   if (!dl || !val) return;
   var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
-  var nVal = norm(val);
+  var nVal = norm(_cfStripHonorific(val));
   var matches = (S.pilots||[]).filter(function(p){
     return norm((p.prenom||'')+' '+(p.nom||'')).indexOf(nVal) >= 0
         || norm((p.nom||'')+' '+(p.prenom||'')).indexOf(nVal) >= 0;
@@ -31320,8 +31323,9 @@ function cfSelectPilot() {
   if (!val) return;
   // Tenter de trouver le pilote correspondant
   var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
+  var valClean = _cfStripHonorific(val);
   var found = (S.pilots||[]).find(function(p){
-    return norm(p.prenom+' '+p.nom) === norm(val) || norm(p.nom+' '+p.prenom) === norm(val);
+    return norm(p.prenom+' '+p.nom) === norm(valClean) || norm(p.nom+' '+p.prenom) === norm(valClean);
   });
   var licEl = document.getElementById('cf-licence-input');
   if (found && licEl && !licEl.value) licEl.value = found.licence || '';
@@ -31334,10 +31338,11 @@ function addCollectifMember() {
   var val   = (inp ? inp.value : '').trim();
   var lic   = (licEl ? licEl.value : '').trim();
   if (!val) { toast('Saisissez un nom de pilote', 'err'); return; }
+  var valClean = _cfStripHonorific(val);
 
   var norm = function(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); };
   var pilot = (S.pilots||[]).find(function(p){
-    return norm(p.prenom+' '+p.nom) === norm(val) || norm(p.nom+' '+p.prenom) === norm(val);
+    return norm(p.prenom+' '+p.nom) === norm(valClean) || norm(p.nom+' '+p.prenom) === norm(valClean);
   });
 
   var saison     = (_cfFilters.saison||new Date().getFullYear().toString());
@@ -31349,7 +31354,7 @@ function addCollectifMember() {
   // personne déjà présente créait une 2ᵉ fiche au lieu d'être bloqué), sinon
   // par nom.
   var licVal = lic || (pilot ? (pilot.licence||'') : '');
-  var vNorm = norm(val);
+  var vNorm = norm(valClean);
   var exists = S.collectif.find(function(m){
     if (m.saison !== saison) return false;
     if (pilot && m.pilotId === pilot.id) return true;
@@ -31359,11 +31364,12 @@ function addCollectifMember() {
   });
   if (exists) { toast('Ce pilote est déjà dans le collectif pour cette saison', 'err'); return; }
 
+  var nameParts = valClean.split(/\s+/);
   var entry = {
     id: 'cf_' + Date.now(),
     pilotId:    pilot ? pilot.id    : null,
-    nom:        pilot ? pilot.nom   : val.split(' ').slice(-1)[0],
-    prenom:     pilot ? pilot.prenom: val.split(' ').slice(0,-1).join(' '),
+    nom:        pilot ? pilot.nom   : nameParts.slice(-1)[0],
+    prenom:     pilot ? pilot.prenom: nameParts.slice(0,-1).join(' '),
     licence:    lic || (pilot ? (pilot.licence||'') : ''),
     club:       pilot ? (pilot.club||'') : '',
     pratique:   pratique,
