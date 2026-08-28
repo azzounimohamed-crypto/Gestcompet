@@ -32899,7 +32899,13 @@ function exportCollectifFmt(fmt) {
   var dateStr = new Date().toISOString().substring(0,10);
   var sais = _cfFilters.saison || new Date().getFullYear();
   if (fmt === 'json') {
-    var blob = new Blob([JSON.stringify({collectif: list}, null, 2)], {type:'application/json'});
+    var normalized = list.map(function(m){
+      var o = _collExportNormalize(m, 'cf');
+      var clean = {id: m.id||''};
+      _COLL_EXPORT_COLS.forEach(function(c){ clean[c[0]] = (o[c[0]] !== undefined && o[c[0]] !== null) ? o[c[0]] : ''; });
+      return clean;
+    });
+    var blob = new Blob([JSON.stringify({_type:'collectif',exportDate:new Date().toISOString(),saison:String(sais),collectif:normalized}, null, 2)], {type:'application/json'});
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'collectif_france_'+sais+'_'+dateStr+'.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
@@ -49343,7 +49349,13 @@ function exportSHNFmt(fmt) {
   var _aoa = _collExportAOA(list, 'shn');
   var headers = _aoa.headers, rows = _aoa.rows;
   if (fmt==='json') {
-    var blob=new Blob([JSON.stringify({shn:list},null,2)],{type:'application/json'});
+    var normalizedSHN = list.map(function(m){
+      var o = _collExportNormalize(m, 'shn');
+      var clean = {id: m.id||''};
+      _COLL_EXPORT_COLS.forEach(function(c){ clean[c[0]] = (o[c[0]] !== undefined && o[c[0]] !== null) ? o[c[0]] : ''; });
+      return clean;
+    });
+    var blob=new Blob([JSON.stringify({_type:'shn',exportDate:new Date().toISOString(),shn:normalizedSHN},null,2)],{type:'application/json'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='shn_'+dateStr+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
     toast('Export JSON ('+list.length+' sportifs)','ok');
