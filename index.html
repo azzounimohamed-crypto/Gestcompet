@@ -32076,8 +32076,8 @@ function cfSaveMemberModal() {
   m.licence       = get('cfe2-licence');
   m.club          = get('cfe2-club');
   m.pratique      = get('cfe2-pratique');
-  m.discipline    = get('cfe2-discipline');
-  m.discipline2   = get('cfe2-discipline2');
+  m.discipline    = get('cfe2-discipline').toLowerCase();
+  m.discipline2   = get('cfe2-discipline2').toLowerCase();
   m.saison        = get('cfe2-saison');
   if (_cfePhotoData !== undefined) m.photo = _cfePhotoData;
   saveState();
@@ -49326,8 +49326,9 @@ function printEFList() {
 }
 
 function printSHNList() {
+  var discLbl = {classic:'Classic',slalom:'Slalom',stol:'STOL',cross:'Cross',precision:'Précision'};
   var cfList = (S.collectif||[]).filter(function(m){ return m.statut_shn; })
-    .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',saison:m.saison||'',statut:m.statut_shn}; });
+    .map(function(m){ return {nom:(m.prenom||'')+' '+(m.nom||''),licence:m.licence||'',pratique:m.pratique||'',discipline:m.discipline||'',discipline2:m.discipline2||'',saison:m.saison||'',statut:m.statut_shn}; });
   var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
   var manualList = (S.shn||[]).filter(function(m){ return !m.licence||cfLicences.indexOf((m.licence||'').trim())===-1; }).map(function(m){ return Object.assign({},m,{_source:'shn'}); });
   var list = cfList.concat(manualList);
@@ -49335,12 +49336,13 @@ function printSHNList() {
   if (!list.length) { toast('Aucun sportif à imprimer','warn'); return; }
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
   var rows = list.map(function(m){
-    return '<tr><td>'+esc(m.nom)+'</td><td>'+esc(m.licence||'—')+'</td><td>'+esc(m.pratique||'—')+'</td><td>'+esc(m.discipline||'—')+'</td><td>'+esc(m.saison||'—')+'</td><td>'+esc(m.statut||'—')+'</td></tr>';
+    var discs=[m.discipline,m.discipline2].filter(Boolean).map(function(d){return discLbl[d]||d;}).join(', ')||'—';
+    return '<tr><td>'+esc(m.nom)+'</td><td>'+esc(m.licence||'—')+'</td><td>'+esc(m.pratique||'—')+'</td><td>'+esc(discs)+'</td><td>'+esc(m.saison||'—')+'</td><td>'+esc(m.statut||'—')+'</td></tr>';
   }).join('');
   var w = window.open('','_blank','width=900,height=700');
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>SHN</title><style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th{background:#1a3a8f;color:#fff;padding:8px 10px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #e2e8f0}tr:nth-child(even)td{background:#f8fafc}@media print{button{display:none}}</style></head><body>');
   w.document.write('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0">Sportifs de Haut Niveau'+(_shnFilter?' — '+_shnFilterLabel():'')+'</h2><button onclick="window.print()" style="padding:6px 14px;background:#1a3a8f;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Imprimer</button></div>');
-  w.document.write('<table><thead><tr><th>Nom</th><th>N° Licence</th><th>Pratique</th><th>Discipline</th><th>Saison</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  w.document.write('<table><thead><tr><th>Nom</th><th>N° Licence</th><th>Pratique</th><th>Discipline(s)</th><th>Saison</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table>');
   w.document.write('</body></html>'); w.document.close();
 }
 
@@ -54957,8 +54959,9 @@ function renderSHNList() {
     .filter(function(m){ return m.statut_shn; })
     .map(function(m){ return {
       id: 'cf-'+m.id, nom: (m.prenom||'')+' '+(m.nom||''), licence: m.licence||'',
-      pratique: m.pratique||'', discipline: m.discipline||'',
+      pratique: m.pratique||'', discipline: m.discipline||'', discipline2: m.discipline2||'',
       club: m.club||'', region: m.region||'', email: m.email||'', tel: m.tel||'',
+      efr1: m.efr1||'', efr2: m.efr2||'', equipe_france: m.equipe_france||false,
       statut: m.statut_shn, aideP: m.aideP||'', smr: m.smr||'', _source:'cf'
     }; });
   var cfLicences = cfList.map(function(m){ return (m.licence||'').trim(); }).filter(Boolean);
@@ -54969,7 +54972,7 @@ function renderSHNList() {
   var _lowF = function(s){ return (s||'').toString().toLowerCase(); };
   list = list.filter(function(m){ return _shnStatutMatch(m.statut); });
   if (_shnFilterPrat) list = list.filter(function(m){ return _lowF(m.pratique) === _lowF(_shnFilterPrat); });
-  if (_shnFilterDisc) list = list.filter(function(m){ return _lowF(m.discipline) === _lowF(_shnFilterDisc); });
+  if (_shnFilterDisc) list = list.filter(function(m){ return _lowF(m.discipline) === _lowF(_shnFilterDisc) || _lowF(m.discipline2) === _lowF(_shnFilterDisc); });
 
   var _shnCnt = document.getElementById('shn-counter');
   if (_shnCnt) _shnCnt.textContent = list.length + ' sportif' + (list.length>1?'s':'');
@@ -55002,9 +55005,10 @@ function renderSHNList() {
         ? '<img src="'+_mph+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--bdr);flex-shrink:0">'
         : '<div style="width:34px;height:34px;border-radius:50%;background:var(--stol);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">'+esc(_mini)+'</div>';
       var _meta = [];
-      if (m.pratique)   _meta.push(m.pratique);
-      if (m.discipline) _meta.push(m.discipline);
-      if (m.aideP)      _meta.push('Aide '+esc(String(m.aideP))+'€');
+      if (m.pratique)    _meta.push(m.pratique);
+      if (m.discipline)  _meta.push(m.discipline);
+      if (m.discipline2) _meta.push(m.discipline2);
+      if (m.aideP)       _meta.push('Aide '+esc(String(m.aideP))+'€');
       if (m.smr)        _meta.push('SMR '+esc(m.smr));
       return '<div data-src="'+esc(m._source)+'" data-id="'+esc(m.id)+'" onclick="shnOpenEdit(this.dataset.src,this.dataset.id)" style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--bdr);cursor:pointer">'
         + _mav
@@ -55055,7 +55059,7 @@ function renderSHNList() {
         +'<span style="font-size:13px;font-weight:600;color:var(--txt)">'+esc(m.nom)+sourceBadge+'</span></div></td>'
       +'<td style="'+cellSt+';font-family:monospace">'+(esc(m.licence)||'—')+'</td>'
       +'<td style="'+cellSt+'">'+(esc(m.pratique)||'—')+'</td>'
-      +'<td style="'+cellSt+'">'+(esc(m.discipline)||'—')+'</td>'
+      +'<td style="'+cellSt+'">'+(([m.discipline,m.discipline2].filter(Boolean).join(' / '))||'—')+'</td>'
       +'<td style="'+cellSt+'">'+(esc(club)||'—')+'</td>'
       +'<td style="'+cellSt+'">'+(esc(region)||'—')+'</td>'
       +'<td style="'+cellSt+'"><a href="mailto:'+esc(email)+'" style="color:var(--txt2);text-decoration:none">'+(esc(email)||'—')+'</a></td>'
