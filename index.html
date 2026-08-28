@@ -32889,10 +32889,11 @@ function _collExportAOA(list, source){
 }
 
 function exportCollectifFmt(fmt) {
+  var _low = function(s){ return (s||'').toLowerCase(); };
   var list = (S.collectif||[]).filter(function(m){
-    if (_cfFilters.saison     && m.saison     !== _cfFilters.saison)     return false;
-    if (_cfFilters.pratique   && m.pratique   !== _cfFilters.pratique)   return false;
-    if (_cfFilters.discipline && m.discipline !== _cfFilters.discipline && m.discipline2 !== _cfFilters.discipline) return false;
+    if (_cfFilters.saison     && m.saison     !== _cfFilters.saison)                                             return false;
+    if (_cfFilters.pratique   && _low(m.pratique)   !== _low(_cfFilters.pratique))                              return false;
+    if (_cfFilters.discipline && _low(m.discipline) !== _low(_cfFilters.discipline) && _low(m.discipline2) !== _low(_cfFilters.discipline)) return false;
     return true;
   });
   if (!list.length) { toast('Aucun membre à exporter', 'err'); return; }
@@ -49274,7 +49275,13 @@ function exportEFFmt(fmt) {
   var headers = _aoa.headers, rows = _aoa.rows;
   var sais = _efFilters.saison || new Date().getFullYear();
   if (fmt==='json') {
-    var blob=new Blob([JSON.stringify({equipes_france:list},null,2)],{type:'application/json'});
+    var normalizedEF = list.map(function(m){
+      var o = _collExportNormalize(m, 'ef');
+      var clean = {id: m.id||''};
+      _COLL_EXPORT_COLS.forEach(function(c){ clean[c[0]] = (o[c[0]] !== undefined && o[c[0]] !== null) ? o[c[0]] : ''; });
+      return clean;
+    });
+    var blob=new Blob([JSON.stringify({_type:'equipes_france',exportDate:new Date().toISOString(),saison:String(sais),equipes_france:normalizedEF},null,2)],{type:'application/json'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='equipes_france_'+sais+'_'+dateStr+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
     toast('Export JSON ('+list.length+' membres)','ok');
