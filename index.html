@@ -169,7 +169,8 @@ body.theme-light .mob-sec-lnk{color:var(--stol);background:rgba(0,87,255,.07);bo
 /* ── Formulaire compétition : layout nav+panel ── */
 .cf-body{flex:1;display:flex;overflow:hidden}
 .cf-sidenav{width:132px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.07);padding:6px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto;background:#000}
-.cf-nav-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;cursor:pointer;font-size:11.5px;font-weight:500;color:rgba(255,255,255,.5);background:#000;border-left:2px solid transparent;transition:color .14s,background .14s,border-color .14s;line-height:1.3;user-select:none;white-space:nowrap}
+.cf-nav-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;cursor:pointer;font-size:11.5px;font-weight:500;color:rgba(255,255,255,.5);background:#000;border-left:2px solid transparent;transition:color .14s,background .14s,border-color .14s;line-height:1.25;user-select:none}
+.cf-nav-num{align-self:flex-start;margin-top:1px}
 .cf-nav-item:hover{color:#fff;background:#161616}
 .cf-nav-item.cf-nav-active{color:#fff;font-weight:700;border-left-color:var(--stol);background:#1c1c1c}
 .cf-nav-num{font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:0}
@@ -3317,7 +3318,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
         <span class="cf-nav-num">1</span>Information
       </div>
       <div class="cf-nav-item cf-nav-active" id="cfn-planning" onclick="_cfTab('planning')">
-        <span class="cf-nav-num">2</span>Planning
+        <span class="cf-nav-num">2</span>Planning &amp; tâches
       </div>
       <div class="cf-nav-item" id="cfn-org" onclick="_cfTab('org')">
         <span class="cf-nav-num">3</span>Organisation
@@ -5719,7 +5720,7 @@ function openAddComp() {
   var delBtn = document.getElementById('comp-delete-btn');
   if (delBtn) delBtn.style.display = 'none';
   _compTypeChanged();
-  _cfTab('planning');
+  _cfTab('ident');
   openSheet('sheet-comp');
 }
 
@@ -9600,6 +9601,7 @@ var _agendaView       = 'month';   // 'month' | 'week' | 'day' | 'list'
 var _agendaTypeFilter = [];        // [] = tous les types
 var _agendaWeekStart  = null;      // ISO date du lundi courant (vue semaine)
 var _agendaDayDate    = null;      // ISO date courante (vue jour)
+var _agendaCompactHdr = false;     // true = rendu compact (mini-colonne Agenda du tableau de bord)
 
 var _agendaTypeColor = {
   'cdf':'#0057FF','comp-internationale':'#7c3aed',
@@ -9635,6 +9637,62 @@ function _agendaColor(comp){
   if (comp && comp._ganttSt) return '#7c3aed';
   if (comp && comp._customEvent) return comp._couleur || '#f59e0b';
   return _agendaTypeColor[(comp||{}).type] || '#6b7280';
+}
+
+// ── Redimensionnement d'un événement horodaté par glisser sur le bord bas ──
+// (vues Jour et Semaine) : agrandir = tirer vers le bas, réduire = tirer vers le haut.
+function _agendaHFloatToStr(hf) {
+  var h = Math.floor(hf), m = Math.round((hf - h) * 60);
+  if (m >= 60) { h++; m = 0; }
+  h = Math.min(23, Math.max(0, h));
+  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+}
+
+function _agendaPersistCustomEventResize(ev, newEndH) {
+  var e2 = (S.agendaEvents||[]).find(function(x){ return x.id === ev.id; });
+  if (!e2) return;
+  e2.heureFin = _agendaHFloatToStr(newEndH);
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  toast('Durée mise à jour ✓', 'ok');
+  _agendaRender();
+}
+
+// blk : bloc DOM (position:absolute, top/height déjà posés) ; ev : item _customEvent ;
+// geomEl : élément dont la bounding box donne 0%→100% de la fenêtre horaire ;
+// winSt/span : bornes horaires (heures décimales) de la fenêtre visible.
+function _agendaAttachResizeHandle(blk, ev, geomEl, winSt, span) {
+  if (!ev || !ev._customEvent) return;
+  var handle = document.createElement('div');
+  handle.title = 'Glisser pour agrandir / réduire';
+  handle.style.cssText = 'position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize;z-index:5;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px';
+  handle.innerHTML = '<div style="width:22px;height:3px;border-radius:2px;background:rgba(255,255,255,.55)"></div>';
+  handle.onmouseover = function(){ handle.style.background = 'rgba(255,255,255,.12)'; };
+  handle.onmouseout  = function(){ handle.style.background = ''; };
+  handle.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    e.stopPropagation(); e.preventDefault();
+    var rect = geomEl.getBoundingClientRect();
+    var newEndH = ev._endH;
+    document.body.style.cursor = 'ns-resize';
+    function onMove(e2) {
+      var frac = Math.max(0, Math.min(1, (e2.clientY - rect.top) / rect.height));
+      var hourF = winSt + frac * span;
+      var snapped = Math.round(hourF * 4) / 4; // pas de 15 min
+      snapped = Math.max(ev._startH + 0.25, Math.min(winSt + span, snapped));
+      newEndH = snapped;
+      blk.style.height = (((newEndH - ev._startH) / span) * 100).toFixed(4) + '%';
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      if (Math.abs(newEndH - ev._endH) > 0.01) _agendaPersistCustomEventResize(ev, newEndH);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  blk.appendChild(handle);
 }
 
 var _agendaTypeLabel = {
@@ -9846,12 +9904,12 @@ function openAgenda() {
     _agendaSelDate   = null;
     _agendaWeekStart = _agendaGetWeekMonday(todayStr);
     _agendaDayDate   = todayStr;
-    _agendaView      = 'month';
+    _agendaView      = 'week';
     _agendaTypeFilter = [];
     _agendaLoadColors();
     _agendaLoadDayWindow();
     if (fromDTN && typeof _dtnSetActiveNav === 'function') _dtnSetActiveNav('agenda');
-    _agendaSetView('month', true);
+    _agendaSetView('week', true);
     _agendaRender();
     _agendaRenderLegend();
     _agendaFillWindowSelects();
@@ -10257,7 +10315,7 @@ function _agendaBuildTimeLayout(colCount) {
   adRow.style.cssText = 'display:flex;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.09);min-height:32px';
   var adCorner = document.createElement('div');
   adCorner.style.cssText = 'width:'+TIME_W+'px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:flex-end;padding:0 8px';
-  adCorner.innerHTML = '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Tout le jour</span>';
+  adCorner.innerHTML = _agendaCompactHdr ? '' : '<span style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Tout le jour</span>';
   adRow.appendChild(adCorner);
   var adArea = document.createElement('div');
   adArea.style.cssText = 'flex:1;position:relative;min-height:28px;padding:3px 0';
@@ -10273,7 +10331,7 @@ function _agendaBuildTimeLayout(colCount) {
   timeCol.style.cssText = 'width:'+TIME_W+'px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.09);position:relative;height:100%';
   for (var _th = _winSt; _th <= _winEd; _th++) {
     var lbl = document.createElement('div');
-    lbl.style.cssText = 'position:absolute;right:8px;font-size:10px;font-weight:600;color:var(--txt3);line-height:1;top:'+_hP(_th)+';transform:translateY(-50%)';
+    lbl.style.cssText = 'position:absolute;right:8px;font-size:'+(_agendaCompactHdr?'8px':'10px')+';font-weight:600;color:var(--txt3);line-height:1;top:'+_hP(_th)+';transform:translateY(-50%)';
     if (_th > _winSt && _th <= _winEd) lbl.textContent = (_th < 10 ? '0' : '') + _th + 'h';
     timeCol.appendChild(lbl);
   }
@@ -11003,6 +11061,7 @@ function _agendaRenderWeek() {
       });
     }
     })(c, blk, dayIdx);
+    _agendaAttachResizeHandle(blk, c, col2, _winStart, _span);
     col2.appendChild(blk);
   });
 
@@ -11040,14 +11099,18 @@ function _agendaRenderDay() {
   var esc = function(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
 
   // ── En-tête fixe ──
+  var _cpt = _agendaCompactHdr;
+  var _circleSz = _cpt ? 30 : 44, _circleFs = _cpt ? 14 : 20;
   var hdrEl = document.createElement('div');
-  hdrEl.style.cssText = 'display:flex;align-items:center;gap:14px;padding:10px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.09)';
-  hdrEl.innerHTML = '<div style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0;'
+  hdrEl.style.cssText = 'display:flex;align-items:center;gap:'+(_cpt?'8px':'14px')+';padding:'+(_cpt?'8px 10px':'10px 16px')+';flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.09)';
+  hdrEl.innerHTML = '<div style="width:'+_circleSz+'px;height:'+_circleSz+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:'+_circleFs+'px;font-weight:900;flex-shrink:0;'
     + (isToday ? 'background:var(--stol);color:#fff;box-shadow:0 2px 10px rgba(0,87,255,.4)' : 'background:rgba(255,255,255,.07);color:var(--txt)')+'">'+d.getDate()+'</div>'
-    + '<div><div style="font-size:13px;font-weight:700;color:var(--txt)">'+JOURS_L[d.getDay()]+'</div>'
-    + '<div style="font-size:11px;color:var(--txt3)">'+MOIS_S[d.getMonth()]+' '+d.getFullYear()
-    + (isToday ? ' <span style="color:var(--stol);font-weight:800">· Aujourd\'hui</span>' : '') + '</div></div>'
-    + '<div style="margin-left:auto;font-size:11px;color:var(--txt3)">'+dayEvts.length+' événement'+(dayEvts.length!==1?'s':'')+' ce jour</div>';
+    + '<div style="min-width:0;flex:1;overflow:hidden">'
+    + '<div style="font-size:'+(_cpt?'12px':'13px')+';font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+    + JOURS_L[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS_S[d.getMonth()] + ' ' + d.getFullYear()
+    + (isToday ? ' <span style="color:var(--stol);font-weight:800">· Aujourd\'hui</span>' : '') + '</div>'
+    + '</div>'
+    + '<div style="margin-left:auto;flex-shrink:0;font-size:'+(_cpt?'10px':'11px')+';color:var(--txt3);white-space:nowrap">'+dayEvts.length+' événement'+(dayEvts.length!==1?'s':'')+' ce jour</div>';
   main.appendChild(hdrEl);
 
   // ── Grille horaire ──
@@ -11142,6 +11205,7 @@ function _agendaRenderDay() {
       if (ev._customEvent) { _agendaOpenEventForm(ev.dateFrom, ev.id); return; }
       if (ev._compId) { openGanttModal(ev._compId); _ganttState.fromAgenda=true; if(ev._taskId) openGanttTaskDialog(ev._compId,ev._taskId); }
     }; })(c);
+    _agendaAttachResizeHandle(blk, c, tl.evArea, tl.winSt, tl.winEd - tl.winSt);
     tl.evArea.appendChild(blk);
   });
 
@@ -56066,7 +56130,7 @@ function _dtnGoHome() {
     }
     var _oldCss=document.getElementById('dbd-css');if(_oldCss)_oldCss.remove();
     var _st=document.createElement('style');_st.id='dbd-css';
-      _st.textContent='#dtn-workspace-body:has(#dbd-shell){overflow:hidden!important}#dbd-shell{height:100%;display:flex;flex-direction:column;overflow:hidden;--dbd-r:9px;--dbd-red:#ef4444;--dbd-grn:#10b981;--dbd-amb:#f59e0b;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px}#dbd-shell *{box-sizing:border-box;font-family:inherit}#dbd-shell table{font-family:inherit;font-size:inherit}.dbd-tb{height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--bdr);gap:12px}.dbd-kpis{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.dbd-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:50px;border:1px solid var(--bdr);background:var(--navy2)}.dbd-chip .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}.dbd-chip .num{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;color:var(--txt)}.dbd-chip .lbl{font-size:10px;color:var(--txt2)}.dbd-chip.dbd-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.22)}.dbd-chip.dbd-danger .num,.dbd-chip.dbd-danger .lbl{color:var(--dbd-red)}.dbd-grid2{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;overflow:hidden}.dbd-col{display:flex;flex-direction:column;overflow:hidden;padding:12px 8px 12px 16px;gap:10px}.dbd-col-m{padding:12px 8px}.dbd-col-r{padding:12px 16px 12px 8px}.dbd-proj-card{background:var(--navy2);border:1px solid var(--bdr);border-radius:var(--dbd-r);padding:10px 12px;flex-shrink:0;cursor:pointer;transition:border-color .15s}.dbd-proj-card:hover{border-color:var(--bdr2,#384060)}.dbd-proj-row{display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer}.dbd-proj-row:last-child{border-bottom:none}.dbd-proj-row:hover{background:rgba(255,255,255,.04)}.dbd-proj-bar{height:4px;border-radius:2px;background:var(--bdr);overflow:hidden;margin-top:5px}.dbd-proj-bar-fill{height:100%;background:#6366f1;border-radius:2px;transition:width .3s}.dbd-slbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt3);display:flex;align-items:center;gap:8px;flex-shrink:0}.dbd-slbl::after{content:"";flex:1;height:1px;background:var(--bdr)}.dbd-card{background:var(--navy2);border:1px solid var(--bdr);border-radius:var(--dbd-r);overflow:hidden;flex-shrink:0}.dbd-card.dbd-grow{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}.dbd-chd{display:flex;align-items:center;justify-content:space-between;padding:8px 13px 6px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0}.dbd-ctit{font-family:"Sora",sans-serif;font-size:11px;font-weight:600;color:var(--txt)}.dbd-bcnt{font-family:"JetBrains Mono",monospace;font-size:10px;padding:2px 6px;border-radius:50px;background:var(--navy3);border:1px solid var(--bdr);color:var(--txt3)}.dbd-nc{cursor:pointer;transition:border-color .15s}.dbd-nc:hover{border-color:var(--bdr2,#384060)}.dbd-ncbody{display:flex;align-items:stretch}.dbd-ncbar{flex-shrink:0;width:4px}.dbd-ncbar.u{background:linear-gradient(180deg,#ef4444,#f97316);animation:dbd-pulse 2s ease-in-out infinite}.dbd-ncbar.s{background:linear-gradient(180deg,#2563eb,#6366f1)}.dbd-ncbar.l{background:var(--bdr)}@keyframes dbd-pulse{0%,100%{opacity:1}50%{opacity:.3}}.dbd-ncinfo{flex:1;padding:9px 12px;min-width:0}.dbd-nceye{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--stol,#2563eb);margin-bottom:3px}.dbd-ncnm{font-family:"Sora",sans-serif;font-size:13px;font-weight:700;color:var(--txt);line-height:1.2;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ncmt{display:flex;flex-direction:column;gap:2px}.dbd-ncmr{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt2)}.dbd-ncright{display:flex;border-left:1px solid var(--bdr);flex-shrink:0}.dbd-nccd{text-align:center;padding:7px 12px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;align-items:center;justify-content:center}.dbd-ncdy{font-family:"Sora",sans-serif;font-size:22px;font-weight:800;line-height:1;letter-spacing:-1px;color:var(--txt)}.dbd-ncdy.u{color:var(--dbd-red)}.dbd-ncdy.s{color:var(--stol,#2563eb)}.dbd-ncdl{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--txt3);margin-top:2px}.dbd-ncst{display:flex}.dbd-ns{flex:1;text-align:center;padding:7px 10px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;align-items:center;justify-content:center}.dbd-ns:last-child{border-right:none}.dbd-ns .v{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;color:var(--txt)}.dbd-ns .l{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--txt3);margin-top:2px}.dbd-nctasks{border-top:1px solid var(--bdr);padding:6px 12px 8px;display:flex;flex-direction:column;gap:2px}.dbd-task-r{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--txt2);padding:3px 0;cursor:pointer;border-radius:4px}.dbd-task-r:hover{background:rgba(255,255,255,.04);margin:0 -4px;padding:3px 4px}.dbd-task-r.ov{color:var(--dbd-red);font-weight:500}.dbd-task-r.dn{opacity:.4}.dbd-task-ico{width:14px;text-align:center;flex-shrink:0;font-size:12px}.dbd-tabs{display:flex;gap:2px;padding:5px 10px 0;border-bottom:1px solid var(--bdr);flex-shrink:0}.dbd-tab{padding:4px 10px;font-size:11px;font-weight:600;color:var(--txt3);border-radius:6px 6px 0 0;cursor:pointer;border:1px solid transparent;border-bottom:none;position:relative;top:1px;display:flex;align-items:center;gap:5px}.dbd-tab:hover{color:var(--txt)}.dbd-tab.on{background:var(--navy2);color:var(--stol,#2563eb);border-color:var(--bdr);border-bottom-color:var(--navy2)}.dbd-sc{flex:1;min-height:0;overflow-y:auto}.dbd-sc::-webkit-scrollbar{width:3px}.dbd-sc::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}.dbd-dlbl{padding:6px 13px 1px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--txt3)}.dbd-cg{border-bottom:1px solid rgba(255,255,255,.04)}.dbd-cg:last-child{border-bottom:none}.dbd-cgh{display:flex;align-items:center;gap:9px;padding:7px 13px}.dbd-cg:not(.evt) .dbd-cgh{cursor:pointer}.dbd-cg:not(.evt):hover .dbd-cgh{background:rgba(255,255,255,.04)}.dbd-cg.evt .dbd-cgh{cursor:default;opacity:.45}.dbd-tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}.dbd-tmn{flex:1;min-width:0}.dbd-tt{font-size:13px;font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ts{font-size:11px;color:var(--txt3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ttag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0}.dbd-tasks{padding:0 13px 7px 29px;display:flex;flex-direction:column;gap:2px}.dbd-todo-wrap{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bdr);border-radius:var(--dbd-r);background:var(--navy2)}.dbd-alrt-list{flex:1;min-height:0;overflow-y:auto}.dbd-alrt-list::-webkit-scrollbar{width:3px}.dbd-alrt-list::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}.dbd-ar{display:flex;align-items:flex-start;gap:8px;padding:6px 13px;border-bottom:1px solid rgba(255,255,255,.04)}.dbd-ar:last-child{border-bottom:none}.dbd-ar-ico{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:2px;border:1.5px solid var(--dbd-red);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--dbd-red)}.dbd-ar-mn{flex:1;min-width:0}.dbd-ar-lbl{font-size:11px;font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ar-meta{display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}.dbd-ar-ret{font-size:9px;font-weight:600;color:var(--dbd-red)}.dbd-ar-comp{font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(37,99,235,.1);color:#2563eb}.dbd-empty{text-align:center;padding:20px;color:var(--txt3);font-size:12px}@media(prefers-reduced-motion:reduce){#dbd-shell *{animation:none!important;transition:none!important}}';
+      _st.textContent='#dtn-workspace-body:has(#dbd-shell){overflow:hidden!important}#dbd-shell{height:100%;display:flex;flex-direction:column;overflow:hidden;--dbd-r:9px;--dbd-red:#ef4444;--dbd-grn:#10b981;--dbd-amb:#f59e0b;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px}#dbd-shell *{box-sizing:border-box;font-family:inherit}#dbd-shell table{font-family:inherit;font-size:inherit}.dbd-tb{height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--bdr);gap:12px}.dbd-kpis{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.dbd-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:50px;border:1px solid var(--bdr);background:var(--navy2)}.dbd-chip .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}.dbd-chip .num{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;color:var(--txt)}.dbd-chip .lbl{font-size:10px;color:var(--txt2)}.dbd-chip.dbd-danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.22)}.dbd-chip.dbd-danger .num,.dbd-chip.dbd-danger .lbl{color:var(--dbd-red)}.dbd-grid2{flex:1;min-height:0;display:grid;grid-template-columns:0.92fr 0.92fr 1.16fr;overflow:hidden}.dbd-col{display:flex;flex-direction:column;overflow:hidden;padding:12px 8px 12px 16px;gap:10px}.dbd-col-m{padding:12px 8px}.dbd-col-r{padding:12px 16px 12px 8px}.dbd-proj-card{background:var(--navy2);border:1px solid var(--bdr);border-radius:var(--dbd-r);padding:10px 12px;flex-shrink:0;cursor:pointer;transition:border-color .15s}.dbd-proj-card:hover{border-color:var(--bdr2,#384060)}.dbd-proj-row{display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer}.dbd-proj-row:last-child{border-bottom:none}.dbd-proj-row:hover{background:rgba(255,255,255,.04)}.dbd-proj-bar{height:4px;border-radius:2px;background:var(--bdr);overflow:hidden;margin-top:5px}.dbd-proj-bar-fill{height:100%;background:#6366f1;border-radius:2px;transition:width .3s}.dbd-slbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt3);display:flex;align-items:center;gap:8px;flex-shrink:0}.dbd-slbl::after{content:"";flex:1;height:1px;background:var(--bdr)}.dbd-card{background:var(--navy2);border:1px solid var(--bdr);border-radius:var(--dbd-r);overflow:hidden;flex-shrink:0}.dbd-card.dbd-grow{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}.dbd-chd{display:flex;align-items:center;justify-content:space-between;padding:8px 13px 6px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0}.dbd-ctit{font-family:"Sora",sans-serif;font-size:11px;font-weight:600;color:var(--txt)}.dbd-bcnt{font-family:"JetBrains Mono",monospace;font-size:10px;padding:2px 6px;border-radius:50px;background:var(--navy3);border:1px solid var(--bdr);color:var(--txt3)}.dbd-nc{cursor:pointer;transition:border-color .15s}.dbd-nc:hover{border-color:var(--bdr2,#384060)}.dbd-ncbody{display:flex;align-items:stretch}.dbd-ncbar{flex-shrink:0;width:4px}.dbd-ncbar.u{background:linear-gradient(180deg,#ef4444,#f97316);animation:dbd-pulse 2s ease-in-out infinite}.dbd-ncbar.s{background:linear-gradient(180deg,#2563eb,#6366f1)}.dbd-ncbar.l{background:var(--bdr)}@keyframes dbd-pulse{0%,100%{opacity:1}50%{opacity:.3}}.dbd-ncinfo{flex:1;padding:9px 12px;min-width:0}.dbd-nceye{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--stol,#2563eb);margin-bottom:3px}.dbd-ncnm{font-family:"Sora",sans-serif;font-size:13px;font-weight:700;color:var(--txt);line-height:1.2;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ncmt{display:flex;flex-direction:column;gap:2px}.dbd-ncmr{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt2)}.dbd-ncright{display:flex;border-left:1px solid var(--bdr);flex-shrink:0}.dbd-nccd{text-align:center;padding:7px 12px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;align-items:center;justify-content:center}.dbd-ncdy{font-family:"Sora",sans-serif;font-size:22px;font-weight:800;line-height:1;letter-spacing:-1px;color:var(--txt)}.dbd-ncdy.u{color:var(--dbd-red)}.dbd-ncdy.s{color:var(--stol,#2563eb)}.dbd-ncdl{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--txt3);margin-top:2px}.dbd-ncst{display:flex}.dbd-ns{flex:1;text-align:center;padding:7px 10px;border-right:1px solid var(--bdr);display:flex;flex-direction:column;align-items:center;justify-content:center}.dbd-ns:last-child{border-right:none}.dbd-ns .v{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;color:var(--txt)}.dbd-ns .l{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--txt3);margin-top:2px}.dbd-nctasks{border-top:1px solid var(--bdr);padding:6px 12px 8px;display:flex;flex-direction:column;gap:2px}.dbd-task-r{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--txt2);padding:3px 0;cursor:pointer;border-radius:4px}.dbd-task-r:hover{background:rgba(255,255,255,.04);margin:0 -4px;padding:3px 4px}.dbd-task-r.ov{color:var(--dbd-red);font-weight:500}.dbd-task-r.dn{opacity:.4}.dbd-task-ico{width:14px;text-align:center;flex-shrink:0;font-size:12px}.dbd-tabs{display:flex;gap:2px;padding:5px 10px 0;border-bottom:1px solid var(--bdr);flex-shrink:0}.dbd-tab{padding:4px 10px;font-size:11px;font-weight:600;color:var(--txt3);border-radius:6px 6px 0 0;cursor:pointer;border:1px solid transparent;border-bottom:none;position:relative;top:1px;display:flex;align-items:center;gap:5px}.dbd-tab:hover{color:var(--txt)}.dbd-tab.on{background:var(--navy2);color:var(--stol,#2563eb);border-color:var(--bdr);border-bottom-color:var(--navy2)}.dbd-sc{flex:1;min-height:0;overflow-y:auto}.dbd-sc::-webkit-scrollbar{width:3px}.dbd-sc::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}.dbd-dlbl{padding:6px 13px 1px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--txt3)}.dbd-cg{border-bottom:1px solid rgba(255,255,255,.04)}.dbd-cg:last-child{border-bottom:none}.dbd-cgh{display:flex;align-items:center;gap:9px;padding:7px 13px}.dbd-cg:not(.evt) .dbd-cgh{cursor:pointer}.dbd-cg:not(.evt):hover .dbd-cgh{background:rgba(255,255,255,.04)}.dbd-cg.evt .dbd-cgh{cursor:default;opacity:.45}.dbd-tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}.dbd-tmn{flex:1;min-width:0}.dbd-tt{font-size:13px;font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ts{font-size:11px;color:var(--txt3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ttag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0}.dbd-tasks{padding:0 13px 7px 29px;display:flex;flex-direction:column;gap:2px}.dbd-todo-wrap{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bdr);border-radius:var(--dbd-r);background:var(--navy2)}.dbd-alrt-list{flex:1;min-height:0;overflow-y:auto}.dbd-alrt-list::-webkit-scrollbar{width:3px}.dbd-alrt-list::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}.dbd-ar{display:flex;align-items:flex-start;gap:8px;padding:6px 13px;border-bottom:1px solid rgba(255,255,255,.04)}.dbd-ar:last-child{border-bottom:none}.dbd-ar-ico{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:2px;border:1.5px solid var(--dbd-red);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--dbd-red)}.dbd-ar-mn{flex:1;min-width:0}.dbd-ar-lbl{font-size:11px;font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dbd-ar-meta{display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}.dbd-ar-ret{font-size:9px;font-weight:600;color:var(--dbd-red)}.dbd-ar-comp{font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(37,99,235,.1);color:#2563eb}.dbd-empty{text-align:center;padding:20px;color:var(--txt3);font-size:12px}@media(prefers-reduced-motion:reduce){#dbd-shell *{animation:none!important;transition:none!important}}';
       document.head.appendChild(_st);
     wb.innerHTML = '<div id="dbd-shell">'
       /* ── Grille 2 col : left=comp+timeline / right=todo+alertes ── */
@@ -56107,6 +56171,11 @@ function _dtnGoHome() {
       +'</div>'
       /* Panneau calendrier du jour (masqué par défaut) */
       +'<div id="dbd-cal-col" style="display:none;flex:1;min-width:0;flex-direction:column;overflow:hidden;border-left:1px solid var(--bdr)">'
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
+      +'<button onclick="_dbdCalNavDay(-1)" title="Jour précédent" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit">‹</button>'
+      +'<button onclick="_dbdCalGoToday()" title="Aujourd\'hui" style="padding:3px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Aujourd\'hui</button>'
+      +'<button onclick="_dbdCalNavDay(1)" title="Jour suivant" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit">›</button>'
+      +'</div>'
       +'<div id="dbd-ag-dayview" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden"></div>'
       +'</div>'
       +'</div>'
@@ -56133,20 +56202,35 @@ window._dbdToggleCal = function() {
   } else {
     cal.style.display = 'flex';
     if (btn) { btn.style.background='#2563eb'; btn.style.color='#fff'; btn.style.border='none'; }
+    // Repointer sur aujourd'hui uniquement à l'ouverture du volet
+    _agendaDayDate = new Date().toISOString().slice(0,10);
     _dbdRenderDayCal();
   }
+};
+
+// Change de jour dans le mini-calendrier du tableau de bord sans réinitialiser sur aujourd'hui
+window._dbdCalNavDay = function(dir) {
+  if (!_agendaDayDate) _agendaDayDate = new Date().toISOString().slice(0,10);
+  _agendaDayDate = _agendaDateAdd(_agendaDayDate, dir);
+  _dbdRenderDayCal();
+};
+
+window._dbdCalGoToday = function() {
+  _agendaDayDate = new Date().toISOString().slice(0,10);
+  _dbdRenderDayCal();
 };
 
 window._dbdRenderDayCal = function() {
   var panel = document.getElementById('dbd-ag-dayview');
   if (!panel) return;
-  // Pointer _agendaDayDate sur aujourd'hui
-  _agendaDayDate = new Date().toISOString().slice(0,10);
+  if (!_agendaDayDate) _agendaDayDate = new Date().toISOString().slice(0,10);
   // Échange temporaire d'id : le panneau devient ag-main le temps du rendu
   var realMain = document.getElementById('ag-main');
   if (realMain) realMain.removeAttribute('id');
   panel.id = 'ag-main';
+  _agendaCompactHdr = true;
   if (typeof _agendaRenderDay === 'function') _agendaRenderDay();
+  _agendaCompactHdr = false;
   panel.id = 'dbd-ag-dayview';
   if (realMain) realMain.id = 'ag-main';
 };
