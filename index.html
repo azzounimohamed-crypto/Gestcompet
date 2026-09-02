@@ -28156,12 +28156,15 @@ async function loadFromSupabaseFirst() {
     var cloudMat      = _countMaterielNamed(cloudData);
     var localPilots   = (S.pilots||[]).filter(function(p){ return !String(p.id||'').startsWith('tp-'); }).length;
     var cloudPilots   = ((cloudData.pilots||[])).filter(function(p){ return !String(p.id||'').startsWith('tp-'); }).length;
+    var localEspaces  = (S.espacesPartages||[]).length;
+    var cloudEspaces  = (cloudData.espacesPartages||[]).length;
 
     // Sauvegarder les champs locaux si le cloud en a moins (perte détectée)
     var keepLocalStaff      = (localStaff > 0 && cloudStaff < localStaff);
     var keepLocalPilots     = localPilots > 0 && cloudPilots < localPilots;
     var keepLocalPart       = (localPart  > 0 && cloudPart  < localPart);
     var keepLocalMat        = (localMat   > 0 && cloudMat   < localMat);
+    var keepLocalEspaces    = (localEspaces > 0 && cloudEspaces < localEspaces);
     var keepLocalBudgets    = false;
     var keepLocalTodos      = false;
 
@@ -28224,12 +28227,14 @@ async function loadFromSupabaseFirst() {
     if (keepLocalBudgets) console.warn('[GestSTOL] ⚠️ GARDE: budgets local ('+localBudgetLines+') > cloud ('+cloudBudgetLines+') — local conservé');
     if (keepLocalTodos)   console.warn('[GestSTOL] ⚠️ GARDE: todos local ('+localTodoCount+') > cloud ('+cloudTodoCount+') — local conservé');
     if (keepLocalPilots)  console.warn('[GestSTOL] ⚠️ GARDE pilots: local('+localPilots+') > cloud('+cloudPilots+') — pilotes locaux conservés');
+    if (keepLocalEspaces) console.warn('[GestSTOL] ⚠️ GARDE: espaces partagés local ('+localEspaces+') > cloud ('+cloudEspaces+') — local conservé');
     if (Object.keys(_savedEnrollByComp).length) console.warn('[GestSTOL] ⚠️ FUSION compEnroll: équipages locaux conservés et fusionnés avec cloud pour', Object.keys(_savedEnrollByComp).join(', '));
 
     var savedStaff   = keepLocalStaff   ? S.staff            : null;
     var savedPart    = keepLocalPart    ? S.partenaires      : null;
     var savedMat     = keepLocalMat     ? S.materiel         : null;
     var savedBudgets = keepLocalBudgets ? S.budgets          : null;
+    var savedEspaces = keepLocalEspaces ? (S.espacesPartages||[]).slice() : null;
     var savedTodos   = S.homeTodosByComp ? JSON.parse(JSON.stringify(S.homeTodosByComp)) : null;
     var savedPilots  = keepLocalPilots  ? (S.pilots||[]).slice() : null;
 
@@ -28314,6 +28319,7 @@ async function loadFromSupabaseFirst() {
     if (savedPart)    S.partenaires     = savedPart;
     if (savedMat)     S.materiel        = savedMat;
     if (savedBudgets) S.budgets         = savedBudgets;
+    if (savedEspaces) S.espacesPartages = savedEspaces;
     if (savedTodos)   S.homeTodosByComp = _mergeObjOfArrays(savedTodos, S.homeTodosByComp || {});
     if (savedDtnProjects && savedDtnProjects.length) {
       var cloudProj = Array.isArray(S.dtnProjects) ? S.dtnProjects : [];
