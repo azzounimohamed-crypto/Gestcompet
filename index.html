@@ -46710,6 +46710,13 @@ function _getEspaces() {
   return S.espacesPartages;
 }
 
+// ── Positions libres des tuiles espace (canvas snap-to-grid, même système que Projets) ──
+var _ESP_CARD_W=170, _ESP_CARD_H=190, _ESP_CARD_GAP=20, _ESP_SNAP=10;
+function _espSnap(v){return Math.round(v/_ESP_SNAP)*_ESP_SNAP;}
+function _espDefaultPos(idx,cols){
+  var col=idx%cols, row=Math.floor(idx/cols);
+  return{x:col*(_ESP_CARD_W+_ESP_CARD_GAP), y:row*(_ESP_CARD_H+_ESP_CARD_GAP)};
+}
 function renderEspacesPartages() {
   var grid = document.getElementById('espaces-grid');
   if (!grid) return;
@@ -46723,29 +46730,34 @@ function renderEspacesPartages() {
       + '</div>';
     return;
   }
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:20px;max-width:1200px;margin:0 auto">';
+  var cols = Math.max(1, Math.floor((grid.clientWidth + _ESP_CARD_GAP) / (_ESP_CARD_W + _ESP_CARD_GAP)));
+  var maxX=0, maxY=0;
+  var positions = list.map(function(esp, idx){
+    var pos = (esp.posX!=null && esp.posY!=null) ? {x:esp.posX,y:esp.posY} : _espDefaultPos(idx, cols);
+    maxX = Math.max(maxX, pos.x + _ESP_CARD_W);
+    maxY = Math.max(maxY, pos.y + _ESP_CARD_H);
+    return pos;
+  });
+  var html = '<div id="espaces-canvas" style="position:relative;min-height:'+Math.max(maxY+40,300)+'px;width:100%">';
   list.forEach(function(esp, idx){
     var ico = esp.icone || '📁';
     var col = esp.couleur || '#0ea5e9';
     var nom = (esp.nom || 'Espace').replace(/</g,'&lt;');
     var isPrivate = esp.niveau === 'owner';
-    html += '<div draggable="true"'
+    var pos = positions[idx];
+    html += '<div'
       + ' data-esp-idx="'+idx+'"'
-      + ' ondragstart="window._espDragIdx='+idx+';window._espDragging=true;this.style.opacity=\'.45\';this.style.transform=\'scale(.97)\'"'
-      + ' ondragend="window._espDragging=false;this.style.opacity=\'1\';this.style.transform=\'translateY(0) scale(1)\';document.querySelectorAll(\'[data-esp-idx]\').forEach(function(c){c.style.borderColor=\'var(--bdr)\';})"'
-      + ' ondragover="event.preventDefault();if('+idx+'!==window._espDragIdx)this.style.borderColor=\''+col+'\'"'
-      + ' ondragleave="this.style.borderColor=\'var(--bdr)\'"'
-      + ' ondrop="event.preventDefault();this.style.borderColor=\'var(--bdr)\';if(window._espDragIdx!==undefined&&window._espDragIdx!=='+idx+'){var a=_getEspaces();var item=a.splice(window._espDragIdx,1)[0];a.splice('+idx+',0,item);saveState();if(typeof silentPush===\'function\')silentPush();renderEspacesPartages();}"'
-      + ' onclick="if(!window._espDragging)_openEspaceURL('+idx+')"'
-      + ' onmouseover="this.style.borderColor=\''+col+'\';this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,.22)\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'1\'"'
-      + ' onmouseout="this.style.borderColor=\'var(--bdr)\';this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'0\'"'
-      + ' style="position:relative;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;padding:24px 12px 18px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;display:flex;flex-direction:column;align-items:center;gap:0;user-select:none">'
+      + ' onmousedown="_espStartDrag(event,'+idx+')"'
+      + ' onclick="if(!window._espJustDragged)_openEspaceURL('+idx+')"'
+      + ' onmouseover="this.style.borderColor=\''+col+'\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,.22)\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'1\'"'
+      + ' onmouseout="this.style.borderColor=\'var(--bdr)\';this.style.boxShadow=\'none\';var b=this.querySelector(\'._esp-edit\');if(b)b.style.opacity=\'0\'"'
+      + ' style="position:absolute;left:'+pos.x+'px;top:'+pos.y+'px;width:'+_ESP_CARD_W+'px;min-height:'+_ESP_CARD_H+'px;background:var(--navy2);border:1.5px solid var(--bdr);border-radius:18px;padding:24px 12px 18px;cursor:grab;transition:border-color .18s,box-shadow .18s;display:flex;flex-direction:column;align-items:center;gap:0;user-select:none">'
       // Bouton options (visible au survol)
       + '<button class="_esp-edit" onclick="event.stopPropagation();editEspacePartage('+idx+')" title="Modifier / Supprimer" style="position:absolute;top:9px;right:9px;width:26px;height:26px;border:1px solid var(--bdr);border-radius:8px;background:var(--navy3);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;font-size:15px;line-height:1">⋯</button>'
       // Badge privé
       + (isPrivate ? '<div style="position:absolute;top:9px;left:9px;font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:2px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="9" height="9"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>' : '')
       // Icône grande
-      + '<div style="width:96px;height:96px;border-radius:20px;background:'+col+'20;display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:14px;transition:transform .18s">'+ico+'</div>'
+      + '<div style="width:96px;height:96px;display:flex;align-items:center;justify-content:center;font-size:72px;margin-bottom:14px;transition:transform .18s">'+ico+'</div>'
       // Titre
       + '<div style="font-size:13px;font-weight:700;color:var(--txt);text-align:center;line-height:1.35;padding:0 4px">'+nom+'</div>'
       + (esp.type==='localdir-native' ? '<div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin-top:4px;opacity:.7">🖥️ Dossier local</div>' : '')
@@ -46754,6 +46766,45 @@ function renderEspacesPartages() {
   html += '</div>';
   grid.innerHTML = html;
 }
+// Drag classique par souris (identique au système des cartes Projets) : plus fiable que le drag HTML5 natif (Firefox, Safari…)
+window._espStartDrag = function(e, idx){
+  if (e.button !== 0) return;
+  var tag = (e.target||{}).tagName || '';
+  if (tag==='INPUT'||tag==='BUTTON'||tag==='TEXTAREA'||tag==='SELECT') return;
+  var card = document.querySelector('#espaces-canvas [data-esp-idx="'+idx+'"]'); if (!card) return;
+  e.preventDefault(); e.stopPropagation();
+  var sx=e.clientX, sy=e.clientY;
+  var ox=parseInt(card.style.left)||0, oy=parseInt(card.style.top)||0;
+  var moved=false;
+  card.style.zIndex='999'; card.style.cursor='grabbing';
+  function onMove(ev){
+    var dx=ev.clientX-sx, dy=ev.clientY-sy;
+    if (!moved && Math.abs(dx)+Math.abs(dy)<5) return;
+    moved=true;
+    var canvas=document.getElementById('espaces-canvas');
+    var maxX=canvas?Math.max(0,canvas.clientWidth-_ESP_CARD_W):9999;
+    var nx=Math.min(maxX,Math.max(0,ox+dx));
+    var ny=Math.max(0,oy+dy);
+    card.style.left=nx+'px';
+    card.style.top=ny+'px';
+    if (canvas && ny+_ESP_CARD_H+40>parseInt(canvas.style.minHeight)) canvas.style.minHeight=(ny+_ESP_CARD_H+40)+'px';
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove,true);
+    document.removeEventListener('mouseup',onUp,true);
+    card.style.zIndex=''; card.style.cursor='grab';
+    if (!moved) return;
+    var x=_espSnap(parseInt(card.style.left)||0);
+    var y=_espSnap(parseInt(card.style.top)||0);
+    card.style.left=x+'px'; card.style.top=y+'px';
+    var list=_getEspaces();
+    if (list[idx]) { list[idx].posX=x; list[idx].posY=y; saveState(); if (typeof silentPush==='function') silentPush(); }
+    window._espJustDragged=true;
+    setTimeout(function(){window._espJustDragged=false;},250);
+  }
+  document.addEventListener('mousemove',onMove,true);
+  document.addEventListener('mouseup',onUp,true);
+};
 
 function _openEspaceURL(idx) {
   var esp = _getEspaces()[idx];
