@@ -31363,104 +31363,114 @@ function _pmFillHistorique() {
   if (!body) return;
   var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var fmtDate = function(d){ if (!d) return ''; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; };
+  var fmtEuro = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
   var podL = {'1':'🥇 1er','2':'🥈 2ème','3':'🥉 3ème'};
-  var compList = [];
-  if (pilotId) {
-    (S.comps||[]).forEach(function(cp) {
-      if (((S.compEnroll||{})[cp.id]||[]).indexOf(pilotId) >= 0) {
-        var meta = ((S.enrollMeta||{})[cp.id]||{})[pilotId] || {};
-        compList.push({
-          saison:   cp.saison   || '—',
-          nom:      cp.nom      || cp.name || '—',
-          lieu:     cp.lieu     || '',
-          dateFrom: cp.dateFrom || '',
-          dateTo:   cp.dateTo   || '',
-          pratique: cp.pratique || '',
-          podium:   meta.podium || '',
-          niveau:   meta.niveau || ''
-        });
-      }
+  var pratL = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi',paramotor:'Paramoteur'};
+  // Une seule chronologie mêlant compétitions, formations et aides, pour un
+  // historique fidèle au parcours du compétiteur (pas des blocs séparés par type).
+  var entries = [];
+
+  (S.comps||[]).forEach(function(cp) {
+    if (!pilotId || ((S.compEnroll||{})[cp.id]||[]).indexOf(pilotId) < 0) return;
+    var meta = ((S.enrollMeta||{})[cp.id]||{})[pilotId] || {};
+    var saison = cp.saison || '—';
+    var dateFrom = cp.dateFrom || '';
+    var dates = dateFrom ? (fmtDate(dateFrom) + (cp.dateTo && cp.dateTo!==dateFrom ? ' → '+fmtDate(cp.dateTo) : '')) : '';
+    var podStr = podL[String(meta.podium||'')] || '';
+    entries.push({
+      type: 'comp', sortKey: String(saison)+(dateFrom||'0000-00-00'),
+      badgeYear: saison, badgeColor: 'var(--stol)', catLabel: 'Compétition',
+      badgeSub: cp.pratique ? esc(pratL[cp.pratique]||cp.pratique) : '🏆',
+      title: esc(cp.nom || cp.name || '—'),
+      subLine: (cp.lieu ? '📍 '+esc(cp.lieu) : '') + (cp.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : ''),
+      rightHtml: podStr
+        ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>'
+        : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>'
     });
-    compList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
-  }
-  // ── Sessions de formation suivies par ce compétiteur ──
-  // Rattachées par pilotId, ou à défaut par numéro de licence (saisie libre).
-  var formList = [];
-  if (pilotId) {
-    var _pil = (S.pilots||[]).find(function(z){ return z.id===pilotId; }) || {};
-    var _lic = (_pil.licence||'').toString().trim();
-    var _STL = {inscrit:'Inscrit',confirme:'Confirmé',present:'Présent',absent:'Absent',annule:'Annulé'};
-    (S.formInscriptions||[]).forEach(function(insc){
-      var match = (insc.pilotId && insc.pilotId===pilotId) || (_lic && insc.licence && insc.licence.toString().trim()===_lic);
-      if (!match) return;
-      var sess = (typeof _formSessionById==='function') ? _formSessionById(insc.sessionId) : null;
-      var tn = sess ? ((sess.typeName)|| ((typeof _formTypeById==='function'&&_formTypeById(sess.typeId)||{}).nom) || 'Formation') : 'Formation';
-      var df = sess ? (sess.dateFrom||'') : '';
-      formList.push({
-        saison: (df && df.slice(0,4)) || '—',
-        nom: tn,
-        ref: sess ? (sess.ref||'') : '',
-        lieu: sess ? (sess.mode==='distance' ? 'À distance' : (sess.lieu||'')) : '',
-        dateFrom: df, dateTo: sess ? (sess.dateTo||'') : '',
-        statut: _STL[insc.statut] || insc.statut || 'Inscrit'
-      });
+  });
+
+  // ── Sessions de formation suivies ── rattachées par pilotId, ou à défaut par
+  // numéro de licence (saisie libre).
+  var _pil = (S.pilots||[]).find(function(z){ return z.id===pilotId; }) || {};
+  var _lic = (_pil.licence||'').toString().trim();
+  var _STL = {inscrit:'Inscrit',confirme:'Confirmé',present:'Présent',absent:'Absent',annule:'Annulé'};
+  var _stColor = {'Présent':'#22c55e','Confirmé':'#10b981','Inscrit':'#3b82f6','Absent':'#f59e0b','Annulé':'#ef4444'};
+  (S.formInscriptions||[]).forEach(function(insc){
+    var match = pilotId && ((insc.pilotId && insc.pilotId===pilotId) || (_lic && insc.licence && insc.licence.toString().trim()===_lic));
+    if (!match) return;
+    var sess = (typeof _formSessionById==='function') ? _formSessionById(insc.sessionId) : null;
+    var tn = sess ? ((sess.typeName)|| ((typeof _formTypeById==='function'&&_formTypeById(sess.typeId)||{}).nom) || 'Formation') : 'Formation';
+    var df = sess ? (sess.dateFrom||'') : '';
+    var saison = (df && df.slice(0,4)) || '—';
+    var dates = df ? (fmtDate(df) + (sess.dateTo && sess.dateTo!==df ? ' → '+fmtDate(sess.dateTo) : '')) : '';
+    var lieu = sess ? (sess.mode==='distance' ? 'À distance' : (sess.lieu||'')) : '';
+    var statutLabel = _STL[insc.statut] || insc.statut || 'Inscrit';
+    entries.push({
+      type: 'form', sortKey: String(saison)+(df||'0000-00-00'),
+      badgeYear: saison, badgeColor: '#8b5cf6', catLabel: 'Formation', badgeSub: '🎓',
+      title: esc(tn) + (sess && sess.ref ? ' <span style="font-weight:400;color:var(--txt3);font-size:11px">'+esc(sess.ref)+'</span>' : ''),
+      subLine: (lieu ? '📍 '+esc(lieu) : '') + (lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : ''),
+      rightHtml: '<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+(_stColor[statutLabel]||'var(--txt3)')+'">'+esc(statutLabel)+'</div>'
     });
-    formList.sort(function(a,b){ return (b.saison+b.dateFrom).localeCompare(a.saison+a.dateFrom); });
-  }
+  });
+
+  // ── Aides fédérales octroyées ── rattachées par piloteId, ou à défaut par
+  // numéro de licence (aides saisies avant la création de la fiche pilote).
+  (S.aides||[]).forEach(function(a){
+    var match = pilotId && ((a.piloteId && a.piloteId===pilotId) || (_lic && a.licence && a.licence.toString().trim()===_lic));
+    if (!match) return;
+    var disp = a.dispositif==='Autre' ? (a.autreDispositif||'Autre') : (a.dispositif||'Aide');
+    var titre = a.projet || a.campagne || disp;
+    var sousInfos = [];
+    if (a.campagne && a.campagne!==titre) sousInfos.push(esc(a.campagne));
+    if (a.dateDemande) sousInfos.push('📅 '+esc(fmtDate(a.dateDemande)));
+    var statutInfo = _AIDE_STATUTS[_aideStatutOf(a)] || _AIDE_STATUTS[''];
+    var montant = parseFloat(a.aideOctroye)||0;
+    var rightHtml = a.paye
+      ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#34d399">'+fmtEuro(montant)+'</div>'
+      : (montant>0
+          ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:'+statutInfo.color+'">'+fmtEuro(montant)+'</div>'
+          : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">'+esc(statutInfo.label||'En cours')+'</div>');
+    entries.push({
+      type: 'aide', sortKey: String(a.annee||'—')+(a.dateDemande||'0000-00-00'),
+      badgeYear: a.annee||'—', badgeColor: '#f59e0b', catLabel: 'Aide fédérale', badgeSub: '💶',
+      title: esc(titre),
+      subLine: sousInfos.join(' · '),
+      rightHtml: rightHtml
+    });
+  });
+
   if (cnt) {
+    var nComp = entries.filter(function(e){return e.type==='comp';}).length;
+    var nForm = entries.filter(function(e){return e.type==='form';}).length;
+    var nAide = entries.filter(function(e){return e.type==='aide';}).length;
     var parts=[];
-    if (compList.length) parts.push(compList.length+' compétition'+(compList.length>1?'s':''));
-    if (formList.length) parts.push(formList.length+' formation'+(formList.length>1?'s':''));
+    if (nComp) parts.push(nComp+' compétition'+(nComp>1?'s':''));
+    if (nForm) parts.push(nForm+' formation'+(nForm>1?'s':''));
+    if (nAide) parts.push(nAide+' aide'+(nAide>1?'s':''));
     cnt.textContent = parts.join(' · ');
   }
-  if (!compList.length && !formList.length) {
-    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition ni formation enregistrée</div>';
+  if (!entries.length) {
+    body.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--txt3);font-size:13px">Aucune compétition, formation ou aide enregistrée</div>';
     return;
   }
-  var pratL = {microlight:'Microlight',paramoteur:'Paramoteur',multi:'Multi',paramotor:'Paramoteur'};
-  var _sousTitre = function(t){ return '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);margin:4px 2px 2px">'+t+'</div>'; };
+  entries.sort(function(a,b){ return b.sortKey.localeCompare(a.sortKey); });
+
   var html = '<div style="display:flex;flex-direction:column;gap:8px">';
-  if (compList.length) {
-    if (formList.length) html += _sousTitre('🏆 Compétitions');
-    compList.forEach(function(c) {
-      var podStr = podL[String(c.podium)] || '';
-      var dates = c.dateFrom ? (fmtDate(c.dateFrom) + (c.dateTo && c.dateTo!==c.dateFrom ? ' → '+fmtDate(c.dateTo) : '')) : '';
-      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
-        + '<div style="flex-shrink:0;width:44px;text-align:center">'
-        +   '<div style="font-size:16px;font-weight:800;color:var(--stol);line-height:1">' + esc(c.saison) + '</div>'
-        +   (c.pratique ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + esc(pratL[c.pratique]||c.pratique) + '</div>' : '')
-        + '</div>'
-        + '<div style="flex:1;min-width:0">'
-        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.nom) + '</div>'
-        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
-        +     (c.lieu ? '📍 '+esc(c.lieu) : '') + (c.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
-        +   '</div>'
-        + '</div>'
-        + (podStr ? '<div style="flex-shrink:0;font-size:13px;font-weight:700;color:#f59e0b">'+esc(podStr)+'</div>' : '<div style="flex-shrink:0;font-size:11px;color:var(--txt3)">Participat.</div>')
-        + '</div>';
-    });
-  }
-  if (formList.length) {
-    var _stColor = {'Présent':'#22c55e','Confirmé':'#10b981','Inscrit':'#3b82f6','Absent':'#f59e0b','Annulé':'#ef4444'};
-    if (compList.length) html += _sousTitre('🎓 Formations');
-    formList.forEach(function(f) {
-      var dates = f.dateFrom ? (fmtDate(f.dateFrom) + (f.dateTo && f.dateTo!==f.dateFrom ? ' → '+fmtDate(f.dateTo) : '')) : '';
-      var col = _stColor[f.statut] || 'var(--txt3)';
-      html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
-        + '<div style="flex-shrink:0;width:44px;text-align:center">'
-        +   '<div style="font-size:16px;font-weight:800;color:#8b5cf6;line-height:1">' + esc(f.saison) + '</div>'
-        +   '<div style="font-size:9px;color:var(--txt3);margin-top:2px">🎓</div>'
-        + '</div>'
-        + '<div style="flex:1;min-width:0">'
-        +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.nom) + (f.ref?' <span style="font-weight:400;color:var(--txt3);font-size:11px">'+esc(f.ref)+'</span>':'') + '</div>'
-        +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">'
-        +     (f.lieu ? '📍 '+esc(f.lieu) : '') + (f.lieu && dates ? ' · ' : '') + (dates ? '📅 '+esc(dates) : '')
-        +   '</div>'
-        + '</div>'
-        + '<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+col+'">'+esc(f.statut)+'</div>'
-        + '</div>';
-    });
-  }
+  entries.forEach(function(e){
+    html += '<div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">'
+      + '<div style="flex-shrink:0;width:44px;text-align:center">'
+      +   '<div style="font-size:16px;font-weight:800;color:'+e.badgeColor+';line-height:1">' + esc(e.badgeYear) + '</div>'
+      +   (e.badgeSub ? '<div style="font-size:9px;color:var(--txt3);margin-top:2px">' + e.badgeSub + '</div>' : '')
+      + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:'+e.badgeColor+'">' + e.catLabel + '</div>'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.title + '</div>'
+      +   '<div style="font-size:11px;color:var(--txt3);margin-top:2px">' + e.subLine + '</div>'
+      + '</div>'
+      + e.rightHtml
+      + '</div>';
+  });
   html += '</div>';
   body.innerHTML = html;
 }
@@ -54581,6 +54591,8 @@ function _dtnHomeBoot() {
     if(nctype)nctype.textContent='';
     if(ncname)ncname.textContent='Aucune compétition dans les 30 jours';
     if(ncdays)ncdays.textContent='—';
+    var _ncTasksElNone=document.getElementById('dbd-nctasks');
+    if(_ncTasksElNone){_ncTasksElNone.innerHTML='';_ncTasksElNone.style.display='none';}
   }else{
     var d=_dy(nc.dateFrom);
     if(ncbar)ncbar.className='dbd-ncbar '+(d<=7?'u':d<=20?'s':'l');
@@ -54588,7 +54600,7 @@ function _dtnHomeBoot() {
     if(ncname)ncname.textContent=nc.name||nc.nom||'—';
     var dr=_fD(nc.dateFrom);if(nc.dateTo&&nc.dateTo!==nc.dateFrom)dr+=' – '+_fD(nc.dateTo);
     var lieu=[nc.lieu||nc.oaci,nc.region].filter(Boolean).join(' · ');
-    if(ncmeta)ncmeta.innerHTML='<div class="dbd-ncmr"><span>📅</span><span>'+_e(dr)+'</span></div>'+(lieu?'<div class="dbd-ncmr"><span>📍</span><span>'+_e(lieu)+'</span></div>':'');
+    if(ncmeta)ncmeta.innerHTML='<div class="dbd-ncmr">'+_e(dr)+'</div>'+(lieu?'<div class="dbd-ncmr">'+_e(lieu)+'</div>':'');
     if(ncdays){ncdays.textContent=d===0?'Auj.':d;ncdays.className='dbd-ncdy '+(d<=7?'u':d<=20?'s':'');}
     var _d1=new Date(nc.dateFrom),_d2=new Date(nc.dateTo||nc.dateFrom);
     var jrs2=(!isNaN(_d1)&&!isNaN(_d2))?Math.round((_d2-_d1)/86400000)+1:1;
@@ -54601,8 +54613,8 @@ function _dtnHomeBoot() {
     var _ncTasks=((S.homeTodosByComp||{})[nc.id]||[]).filter(function(t){return t.type!=='domaine';});
     var _ncTasksEl=document.getElementById('dbd-nctasks');
     if(_ncTasksEl){
-      if(!_ncTasks.length){_ncTasksEl.innerHTML='<span style="font-size:12px;color:var(--txt3)">Aucune tâche liée</span>';}
-      else{var _nth='<div style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;margin-bottom:4px">Tâches</div>';_ncTasks.forEach(function(t){var _ovt=!t.done&&nc.dateFrom<todayStr;var _cid=nc.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");var _tid=t.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");_nth+='<div class="dbd-task-r'+(t.done?' dn':_ovt?' ov':'')+'" onclick="_dbdToggleTask(\''+_cid+'\',\''+_tid+'\','+(t.done?'false':'true')+');event.stopPropagation()" style="cursor:pointer">';_nth+='<input type="checkbox"'+(t.done?' checked':'')+' onclick="event.stopPropagation();_dbdToggleTask(\''+_cid+'\',\''+_tid+'\','+(t.done?'false':'true')+')" style="width:14px;height:14px;accent-color:#10b981;cursor:pointer;flex-shrink:0" /><span>'+_e(t.label)+'</span></div>';});_ncTasksEl.innerHTML=_nth;}
+      if(!_ncTasks.length){_ncTasksEl.innerHTML='';_ncTasksEl.style.display='none';}
+      else{_ncTasksEl.style.display='flex';var _nth='<div style="font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;margin-bottom:4px">Tâches</div>';_ncTasks.forEach(function(t){var _ovt=!t.done&&nc.dateFrom<todayStr;var _cid=nc.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");var _tid=t.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");_nth+='<div class="dbd-task-r'+(t.done?' dn':_ovt?' ov':'')+'" onclick="_dbdToggleTask(\''+_cid+'\',\''+_tid+'\','+(t.done?'false':'true')+');event.stopPropagation()" style="cursor:pointer">';_nth+='<input type="checkbox"'+(t.done?' checked':'')+' onclick="event.stopPropagation();_dbdToggleTask(\''+_cid+'\',\''+_tid+'\','+(t.done?'false':'true')+')" style="width:14px;height:14px;accent-color:#10b981;cursor:pointer;flex-shrink:0" /><span>'+_e(t.label)+'</span></div>';});_ncTasksEl.innerHTML=_nth;}
     }
   }
 
@@ -56980,66 +56992,6 @@ window._dbdImportProjects=function(){
   inp.click();
 };
 
-// ── Positions libres des cartes projet (canvas snap-to-grid) ───────────────
-function _dbdProjPosGet(){try{return JSON.parse(localStorage.getItem('dtn_proj_pos')||'{}')}catch(e){return{};}}
-function _dbdProjPosSave(map){try{localStorage.setItem('dtn_proj_pos',JSON.stringify(map));}catch(e){}}
-var _CARD_W=160, _CARD_H=118, _CARD_GAP=8, _SNAP=8;
-function _dbdProjSnap(v){return Math.round(v/_SNAP)*_SNAP;}
-function _dbdProjDefaultPos(idx){
-  var col=idx%2, row=Math.floor(idx/2);
-  return{x:col*(_CARD_W+_CARD_GAP), y:row*(_CARD_H+_CARD_GAP)};
-}
-function _dbdFindFreePos(posMap){
-  var taken=Object.values(posMap);
-  for(var row=0;row<200;row++){
-    for(var col=0;col<2;col++){
-      var x=col*(_CARD_W+_CARD_GAP), y=row*(_CARD_H+_CARD_GAP);
-      var free=taken.every(function(p){return Math.abs(p.x-x)>=_CARD_W||Math.abs(p.y-y)>=_CARD_H;});
-      if(free) return{x:x,y:y};
-    }
-  }
-  return{x:0,y:0};
-}
-
-// Drag classique : closure par drag, listeners document ajoutés/retirés dynamiquement
-window._dbdProjStartDrag=function(e,projId){
-  if(e.button!==0) return;
-  var tag=(e.target||{}).tagName||'';
-  if(tag==='INPUT'||tag==='BUTTON'||tag==='TEXTAREA'||tag==='SELECT') return;
-  var card=document.querySelector('[data-proj-id="'+projId+'"]'); if(!card) return;
-  e.preventDefault(); e.stopPropagation();
-  var sx=e.clientX, sy=e.clientY;
-  var ox=parseInt(card.style.left)||0, oy=parseInt(card.style.top)||0;
-  var moved=false;
-  card.style.zIndex='999'; card.style.cursor='grabbing';
-  function onMove(ev){
-    var dx=ev.clientX-sx, dy=ev.clientY-sy;
-    if(!moved&&Math.abs(dx)+Math.abs(dy)<5) return;
-    moved=true;
-    var li=document.getElementById('dbd-proj-list');
-    var maxX=li?Math.max(0,li.clientWidth-_CARD_W-_CARD_GAP):9999;
-    var nx=Math.min(maxX,Math.max(0,ox+dx));
-    var ny=Math.max(0,oy+dy);
-    card.style.left=nx+'px';
-    card.style.top=ny+'px';
-    if(li&&ny+_CARD_H+20>parseInt(li.style.minHeight)||0) li.style.minHeight=(ny+_CARD_H+20)+'px';
-  }
-  function onUp(){
-    document.removeEventListener('mousemove',onMove,true);
-    document.removeEventListener('mouseup',onUp,true);
-    card.style.zIndex=''; card.style.cursor='grab';
-    if(!moved) return;
-    var x=Math.round((parseInt(card.style.left)||0)/_SNAP)*_SNAP;
-    var y=Math.round((parseInt(card.style.top)||0)/_SNAP)*_SNAP;
-    card.style.left=x+'px'; card.style.top=y+'px';
-    var pm=_dbdProjPosGet(); pm[projId]={x:x,y:y}; _dbdProjPosSave(pm);
-    window._dbdProjJustDragged=true;
-    setTimeout(function(){window._dbdProjJustDragged=false;},250);
-  }
-  document.addEventListener('mousemove',onMove,true);
-  document.addEventListener('mouseup',onUp,true);
-};
-
 function _dbdRenderProjects(){
   _dbdProjLoad();
   var list=_dbdProjList();
@@ -57053,23 +57005,14 @@ function _dbdRenderProjects(){
     listEl.innerHTML='<div style="padding:30px 16px;text-align:center;color:var(--txt3);font-size:12px">Aucun projet.<br><span style="font-size:11px;opacity:.7">Cliquez + pour en créer un.</span></div>';
     return;
   }
-  var posMap=_dbdProjPosGet();
   var todos=typeof _dtnTodoList==='function'?_dtnTodoList():[];
-  // Calculer la taille minimale du canvas
-  var maxX=0,maxY=0;
-  sorted.forEach(function(p,i){
-    var pos=posMap[p.id]||_dbdProjDefaultPos(i);
-    maxX=Math.max(maxX,pos.x+_CARD_W+_CARD_GAP);
-    maxY=Math.max(maxY,pos.y+_CARD_H+_CARD_GAP);
-  });
-  var canH=Math.max(maxY+60,400);
-  listEl.style.cssText='position:relative;min-height:'+canH+'px;width:100%;'
-    +'background-image:radial-gradient(circle,rgba(255,255,255,.08) 1px,transparent 1px);'
-    +'background-size:'+_SNAP+'px '+_SNAP+'px;background-position:0 0;';
+  // Grille CSS responsive : chaque carte occupe une largeur égale qui s'adapte
+  // à l'espace disponible (au minimum 150px avant de passer à la ligne) —
+  // par construction, deux cartes ne peuvent jamais se chevaucher.
+  listEl.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-content:start;width:100%';
   if(listEl.parentElement){listEl.parentElement.style.overflowX='hidden';listEl.parentElement.style.overflowY='auto';}
   var html='';
-  sorted.forEach(function(p,i){
-    var pos=posMap[p.id]||_dbdProjDefaultPos(i);
+  sorted.forEach(function(p){
     var tasks=(p.taches||[]).filter(function(t){return t.label||t.todoRef;});
     var effectiveDone=tasks.filter(function(t){
       if(t.todoRef){var td=todos.find(function(x){return x.id===t.todoRef;});return td?td.done:t.done;}
@@ -57093,11 +57036,11 @@ function _dbdRenderProjects(){
       +'</div>';
     }).join('');
     html+='<div class="dbd-proj-card" data-proj-id="'+p.id+'" '
-      +'onmousedown="_dbdProjStartDrag(event,\''+p.id+'\')" '
-      +'style="position:absolute;left:'+pos.x+'px;top:'+pos.y+'px;width:'+_CARD_W+'px;min-height:'+_CARD_H+'px;'
-        +'display:flex;flex-direction:row;overflow:hidden;cursor:grab;user-select:none;padding:0;'+bgStyle+'">'
+      +'onclick="_dbdOpenProjectForm(\''+p.id+'\')" '
+      +'style="min-height:118px;'
+        +'display:flex;flex-direction:row;overflow:hidden;cursor:pointer;padding:0;'+bgStyle+'">'
       +'<div style="width:4px;flex-shrink:0;background:'+barColor+';border-radius:var(--dbd-r) 0 0 var(--dbd-r)"></div>'
-      +'<div onclick="if(window._dbdProjJustDragged)return;_dbdOpenProjectForm(\''+p.id+'\')" style="flex:1;min-width:0;padding:9px 9px 7px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer">'
+      +'<div style="flex:1;min-width:0;padding:9px 9px 7px;display:flex;flex-direction:column;justify-content:space-between">'
         +'<div>'
           +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px;margin-bottom:3px">'
             +(p.domaines&&p.domaines.length?'<div style="font-size:9px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+esc(p.domaines.join(' · '))+'</div>':'<div style="flex:1"></div>')
@@ -58974,16 +58917,7 @@ window._dbdPickProjColor=function(c){
   if(target){target.style.outline='2px solid #fff';target.style.outlineOffset='2px';}
 };
 window._dbdSaveProject=function(){
-  var isNew=!window._dbdCurrentProjId;
   _dbdDoSaveProjData();
-  // Nouveau projet : lui assigner une position libre dans le canvas
-  if(isNew && window._dbdCurrentProjId){
-    var pm=_dbdProjPosGet();
-    if(!pm[window._dbdCurrentProjId]){
-      pm[window._dbdCurrentProjId]=_dbdFindFreePos(pm);
-      _dbdProjPosSave(pm);
-    }
-  }
   var ov=document.getElementById('dbd-proj-ov'); if(ov) ov.remove();
   _dbdRenderProjects();
   if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
@@ -59309,8 +59243,6 @@ window._dbdToggleProjOpen=function(projId){
 window._dbdDeleteProject=function(projId){
   if(!confirm('Supprimer ce projet ?')) return;
   S.dtnProjects=(S.dtnProjects||[]).filter(function(p){return p.id!==projId;});
-  // Nettoyer la position sauvegardée
-  var pm=_dbdProjPosGet(); delete pm[projId]; _dbdProjPosSave(pm);
   _dbdProjSave();
   var ov=document.getElementById('dbd-proj-ov'); if(ov) ov.remove();
   _dbdRenderProjects();
