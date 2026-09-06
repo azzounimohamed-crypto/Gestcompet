@@ -3004,6 +3004,16 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
             <input type="checkbox" id="aide-form-paye" style="width:18px;height:18px;cursor:pointer;accent-color:#10b981">
           </div>
         </div>
+        <!-- Statut du dossier : mis à jour automatiquement à l'envoi de l'email correspondant (bouton 📧 ci-contre), modifiable à tout moment ici -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Situation du dossier</label>
+          <select id="aide-form-statut" style="width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);font-family:inherit;font-size:13px;padding:7px 8px;outline:none">
+            <option value="">En attente</option>
+            <option value="accuse">Accusé de réception envoyé</option>
+            <option value="complements">Compléments demandés</option>
+            <option value="attribution">Attribution envoyée</option>
+          </select>
+        </div>
         <!-- Note -->
         <div>
           <label style="font-size:10px;font-weight:700;color:var(--txt3);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Note / Objet</label>
@@ -21948,6 +21958,7 @@ function renderPartenairesTab(cp) {
             if (p.representant && p.organisme) html += '<div style="font-size:12px;color:var(--txt2);margin-top:1px">'+escH(p.representant)+'</div>';
             if (p.telephone) html += '<div style="font-size:12px;color:var(--txt2);margin-top:2px">📞 '+escH(p.telephone)+'</div>';
             if (p.email)     html += '<div style="font-size:12px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✉ '+escH(p.email)+'</div>';
+            if (p.siteweb)   html += '<div style="font-size:12px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🌐 '+escH(p.siteweb)+'</div>';
             html += '</div>';
             if (isGest) {
               html += '<button data-cpid="'+cpid+'" data-pid="'+pid+'" onclick="event.stopPropagation();deletePartenaire(this.dataset.cpid,this.dataset.pid)" style="width:44px;height:44px;flex-shrink:0;border:none;background:none;color:#ef4444;font-size:20px;font-weight:900;cursor:pointer;font-family:inherit">×</button>';
@@ -22205,6 +22216,7 @@ function openPartenaireEdit(compId, partId) {
   document.getElementById('pe-representant').value = p.representant || '';
   document.getElementById('pe-telephone').value = p.telephone || '';
   document.getElementById('pe-email').value = p.email || '';
+  document.getElementById('pe-siteweb').value = p.siteweb || '';
   document.getElementById('pe-proposition').value = p.proposition || '';
   document.getElementById('pe-fournisseur-repas').checked = !!p.fournisseurRepas;
   document.getElementById('pe-title').textContent = partId ? 'Modifier le partenaire' : 'Ajouter un partenaire';
@@ -22268,6 +22280,7 @@ function savePartenaire() {
   var representant = document.getElementById('pe-representant').value.trim();
   var telephone = document.getElementById('pe-telephone').value.trim();
   var email = document.getElementById('pe-email').value.trim();
+  var siteweb = document.getElementById('pe-siteweb').value.trim();
   var proposition = document.getElementById('pe-proposition').value.trim();
   if (!organisme && !representant) { toast('Veuillez saisir au moins un organisme ou un représentant', 'err'); return; }
 
@@ -22276,14 +22289,14 @@ function savePartenaire() {
     var idx = S.partenaires[compId].findIndex(function(x){ return x.id===partId; });
     if (idx >= 0) {
       var existing = S.partenaires[compId][idx];
-      var upd = {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,
+      var upd = {type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,siteweb:siteweb,proposition:proposition,
                  fournisseurRepas:document.getElementById('pe-fournisseur-repas').checked,
                  fichiers:_peFichiers.slice(),_updatedAt:Date.now()};
       S.partenaires[compId][idx] = Object.assign({}, existing, upd);
     }
   } else {
     savedId = 'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    var newPart = {id:savedId,type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,proposition:proposition,
+    var newPart = {id:savedId,type:type,organisme:organisme,representant:representant,telephone:telephone,email:email,siteweb:siteweb,proposition:proposition,
                    fournisseurRepas:document.getElementById('pe-fournisseur-repas').checked,
                    fichiers:_peFichiers.slice(),_updatedAt:Date.now()};
     S.partenaires[compId].push(newPart);
@@ -22374,8 +22387,8 @@ function deletePartenaire(compId, partId) {
 function exportPartenairesCSV(compId) {
   var cp = (S.comps||[]).find(function(c){ return c.id===compId; })||{};
   var list = ((S.partenaires||{})[compId]||[]);
-  var rows = [['Type','Organisme','Représentant','Téléphone','Email','Proposition/Notes']];
-  list.forEach(function(p){ rows.push([p.type||'',p.organisme||'',p.representant||'',p.telephone||'',p.email||'',p.proposition||'']); });
+  var rows = [['Type','Organisme','Représentant','Téléphone','Email','Site internet','Proposition/Notes']];
+  list.forEach(function(p){ rows.push([p.type||'',p.organisme||'',p.representant||'',p.telephone||'',p.email||'',p.siteweb||'',p.proposition||'']); });
   var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c||'').replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
   var blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -22397,7 +22410,7 @@ function importPartenairesCSV(evt, compId) {
       var c = line.split(';').map(function(x){ return x.replace(/^"|"$/g,'').replace(/""/g,'"').trim(); });
       if (!c[1] && !c[2]) return;
       S.partenaires[compId].push({id:'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-        type:c[0]||'Autre',organisme:c[1]||'',representant:c[2]||'',telephone:c[3]||'',email:c[4]||'',proposition:c[5]||'',
+        type:c[0]||'Autre',organisme:c[1]||'',representant:c[2]||'',telephone:c[3]||'',email:c[4]||'',siteweb:c[5]||'',proposition:c[6]||'',
         fichiers:[],_updatedAt:Date.now()}); added++;
     });
     saveState(); _hdpSaveNow(); renderHomeDetailPanel(null);
@@ -22417,10 +22430,10 @@ function exportPartenairesExcel(compId) {
   var list = ((S.partenaires||{})[compId]||[]);
   if (!list.length) { toast('Aucun partenaire à exporter',''); return; }
   if (typeof XLSX === 'undefined') { toast('Bibliothèque XLSX non chargée','err'); return; }
-  var rows = [['Type','Organisme','Représentant','Téléphone','Email','Proposition/Notes']];
-  list.forEach(function(p){ rows.push([p.type||'',p.organisme||'',p.representant||'',p.telephone||'',p.email||'',p.proposition||'']); });
+  var rows = [['Type','Organisme','Représentant','Téléphone','Email','Site internet','Proposition/Notes']];
+  list.forEach(function(p){ rows.push([p.type||'',p.organisme||'',p.representant||'',p.telephone||'',p.email||'',p.siteweb||'',p.proposition||'']); });
   var ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:16},{wch:28},{wch:22},{wch:16},{wch:28},{wch:36}];
+  ws['!cols'] = [{wch:16},{wch:28},{wch:22},{wch:16},{wch:28},{wch:28},{wch:36}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Partenaires');
   XLSX.writeFile(wb, 'Partenaires_'+(cp.name||compId).replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx');
@@ -22475,6 +22488,7 @@ function importPartenairesAuto(evt, compId) {
           organisme:org, representant:rep,
           telephone:(row['Téléphone']||row['Telephone']||row['tel']||'').toString().trim(),
           email:(row['Email']||row['email']||'').toString().trim(),
+          siteweb:(row['Site internet']||row['Site web']||row['siteweb']||'').toString().trim(),
           proposition:(row['Proposition/Notes']||row['Notes']||row['notes']||'').toString().trim(),
           fichiers:[], _updatedAt:Date.now()
         }); added++;
@@ -22605,7 +22619,7 @@ function _openImportPartenairesPickList(targetCompId, sourceCompId) {
       S.partenaires[targetCompId].push({
         id: 'pt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
         type: src.type||'Autre', organisme: src.organisme||'', representant: src.representant||'',
-        telephone: src.telephone||'', email: src.email||'', proposition: src.proposition||'',
+        telephone: src.telephone||'', email: src.email||'', siteweb: src.siteweb||'', proposition: src.proposition||'',
         fournisseurRepas: !!src.fournisseurRepas, fichiers: [], _updatedAt: Date.now()
       });
       added++;
@@ -28230,9 +28244,16 @@ async function loadFromSupabaseFirst() {
     if (keepLocalEspaces) console.warn('[GestSTOL] ⚠️ GARDE: espaces partagés local ('+localEspaces+') > cloud ('+cloudEspaces+') — local conservé');
     if (Object.keys(_savedEnrollByComp).length) console.warn('[GestSTOL] ⚠️ FUSION compEnroll: équipages locaux conservés et fusionnés avec cloud pour', Object.keys(_savedEnrollByComp).join(', '));
 
-    var savedStaff   = keepLocalStaff   ? S.staff            : null;
-    var savedPart    = keepLocalPart    ? S.partenaires      : null;
-    var savedMat     = keepLocalMat     ? S.materiel         : null;
+    // ✅ Snapshot INCONDITIONNEL (pas seulement quand la garde globale se déclenche) :
+    // staff/partenaires/matériel sont fusionnés par compétition+id après l'écrasement
+    // cloud (voir _mergeObjOfArrays plus bas), pas juste conservés en bloc — la garde
+    // "keepLocalX" ci-dessus compare un TOTAL global (toutes compétitions confondues) :
+    // une compétition peut perdre tout son staff pendant qu'une autre en gagne autant
+    // ailleurs sans que le total bouge, donc cette garde seule ne suffit pas à protéger
+    // une compétition précise. La fusion par id ci-dessous corrige ça pour de vrai.
+    var savedStaff   = S.staff       ? JSON.parse(JSON.stringify(S.staff))       : null;
+    var savedPart    = S.partenaires ? JSON.parse(JSON.stringify(S.partenaires)) : null;
+    var savedMat     = S.materiel    ? JSON.parse(JSON.stringify(S.materiel))    : null;
     var savedBudgets = keepLocalBudgets ? S.budgets          : null;
     var savedEspaces = keepLocalEspaces ? (S.espacesPartages||[]).slice() : null;
     var savedTodos   = S.homeTodosByComp ? JSON.parse(JSON.stringify(S.homeTodosByComp)) : null;
@@ -28315,9 +28336,12 @@ async function loadFromSupabaseFirst() {
       });
       S.ganttTasks = _mergedGT;
     }
-    if (savedStaff)   S.staff           = savedStaff;
-    if (savedPart)    S.partenaires     = savedPart;
-    if (savedMat)     S.materiel        = savedMat;
+    // Fusion par compétition + par id (jamais un remplacement en bloc) : une compétition
+    // ne peut plus perdre ses encadrants/partenaires/matériel parce qu'une autre a été
+    // sauvegardée entre-temps ailleurs dans l'appli.
+    if (savedStaff)   S.staff           = _mergeObjOfArrays(savedStaff, S.staff       || {});
+    if (savedPart)    S.partenaires     = _mergeObjOfArrays(savedPart,  S.partenaires || {});
+    if (savedMat)     S.materiel        = _mergeObjOfArrays(savedMat,   S.materiel    || {});
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedEspaces) S.espacesPartages = savedEspaces;
     if (savedTodos)   S.homeTodosByComp = _mergeObjOfArrays(savedTodos, S.homeTodosByComp || {});
@@ -45611,14 +45635,93 @@ function _aidesToggleActions(btn){
     });
   },0);
 }
+// ─── Situation d'un dossier d'aide (statut unique, modifiable à tout moment) ──
+var _AIDE_STATUTS = {
+  ''            : { label: 'En attente',                pillBg: 'rgba(255,255,255,.06)', color: 'var(--txt3)' },
+  'accuse'      : { label: 'Accusé de réception envoyé', pillBg: 'rgba(59,130,246,.14)',  color: '#93c5fd' },
+  'complements' : { label: 'Compléments demandés',       pillBg: 'rgba(245,158,11,.14)',  color: '#fcd34d' },
+  'attribution' : { label: 'Attribution envoyée',        pillBg: 'rgba(16,185,129,.14)',  color: '#34d399' }
+};
+// Rétro-compatibilité avec d'anciens indicateurs booléens (accuse/complements/attribution)
+function _aideStatutOf(a) {
+  if (a.statut) return a.statut;
+  if (a.attribution) return 'attribution';
+  if (a.complements) return 'complements';
+  if (a.accuse) return 'accuse';
+  return '';
+}
+// Montant déjà "attribué" d'une aide : dossier au stade Attribution envoyée,
+// ou déjà payé (le paiement suppose forcément l'attribution faite en amont).
+function _aideAttribueeMontant(a) {
+  return (_aideStatutOf(a)==='attribution' || a.paye) ? (parseFloat(a.aideOctroye)||0) : 0;
+}
+// Filtres saison + situation actuellement sélectionnés dans la barre d'outils
+// (partagés par l'affichage à l'écran et par l'impression, pour que le PDF
+// reflète toujours exactement ce qui est affiché — ni plus, ni moins).
+function _aideActiveFilters() {
+  var saiEl=document.getElementById('aides-saison-filter');
+  var stEl =document.getElementById('aides-statut-filter');
+  return { saison: saiEl?saiEl.value:'all', statut: stEl?stEl.value:'all' };
+}
+function _aidePiloteKey(a) { return a.piloteId || ('nom:'+(a.piloteNom||'')); }
+function _aideStatutFilterMatch(a, statut) {
+  var st = _aideStatutOf(a);
+  if (statut==='attente')     return st==='' && !a.paye;
+  if (statut==='accuse')      return st==='accuse';
+  if (statut==='complements') return st==='complements';
+  if (statut==='attribution') return st==='attribution';
+  if (statut==='paye')        return !!a.paye;
+  return true;
+}
+// La saison exclut vraiment les aides hors période. La situation, elle, ne doit
+// jamais faire disparaître une aide déjà octroyée/payée d'un demandeur par
+// ailleurs concerné par le filtre : elle sélectionne les DEMANDEURS ayant au
+// moins une aide dans cette situation, puis affiche l'intégralité de leurs
+// demandes de la saison — jamais une partie seulement.
+function _aideApplyFilters(list) {
+  var f = _aideActiveFilters();
+  var enSaison = (list||[]).filter(function(a){ return f.saison==='all' || String(a.annee||'')===String(f.saison); });
+  if (f.statut==='all') return enSaison;
+  var demandeursConcernes = {};
+  enSaison.forEach(function(a){ if (_aideStatutFilterMatch(a, f.statut)) demandeursConcernes[_aidePiloteKey(a)] = true; });
+  return enSaison.filter(function(a){ return demandeursConcernes[_aidePiloteKey(a)]; });
+}
+var _AIDE_STATUT_FILTER_LABELS = { attente:'En attente', accuse:'Accusé envoyé', complements:'Compléments demandés', attribution:'Attribution envoyée', paye:'Payé' };
+function _aideFilterSummaryLabel() {
+  var f = _aideActiveFilters();
+  var bits = [];
+  if (f.saison!=='all') bits.push('Saison '+f.saison);
+  if (f.statut!=='all') bits.push(_AIDE_STATUT_FILTER_LABELS[f.statut]||f.statut);
+  return bits.join(' · ');
+}
+
+// Menu déroulant de situation utilisable directement dans la liste : permet de
+// corriger à tout moment un envoi déjà effectué, sans repasser par la fiche.
+function _aideStatutSelectHtml(a) {
+  var cur = _aideStatutOf(a);
+  var st = _AIDE_STATUTS[cur] || _AIDE_STATUTS[''];
+  var opts = Object.keys(_AIDE_STATUTS).map(function(k){
+    return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+_AIDE_STATUTS[k].label+'</option>';
+  }).join('');
+  return '<select onchange="_aideSetStatut(\''+a.id+'\',this.value)" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--bdr);background:'+st.pillBg+';color:'+st.color+';font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;outline:none">'+opts+'</select>';
+}
+
+// Regroupement par pilote : replié par défaut, mémorisé pour la session en cours.
+var _aideExpandedPilotes = {};
+function _aideToggleGroup(key) {
+  _aideExpandedPilotes[key] = !_aideExpandedPilotes[key];
+  renderAides();
+}
+
 function renderAides(containerEl) {
   var cont = containerEl || document.getElementById('aides-content');
   if (!cont) return;
   if (!S.aides) S.aides = [];
   var fmt = function(v){ return (parseFloat(v)||0).toFixed(2)+' €'; };
-  var thSt  = 'padding:8px 10px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--bdr);text-align:left;background:var(--navy2)';
-  var cellSt= 'padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:var(--txt);vertical-align:middle';
-  var totSt = 'padding:8px 10px;font-size:12px;font-weight:800;border-top:2px solid var(--bdr);background:var(--navy2)';
+  var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
+  var thSt  = 'padding:7px 9px;font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--bdr);text-align:left;background:var(--navy3)';
+  var cellSt= 'padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:var(--txt);vertical-align:middle';
+  var totSt = 'padding:7px 9px;font-size:11px;font-weight:800;border-top:2px solid var(--bdr);background:var(--navy3)';
 
   // ── Toolbar ────────────────────────────────────────────────────────────────
   var html = '<div style="padding:12px 12px 0">';
@@ -45641,33 +45744,31 @@ function renderAides(containerEl) {
   html += '<option value="all"'+((_aideSaisonCur==='all')?' selected':'')+'>Toutes saisons</option>';
   _aideAnnees.forEach(function(y){ html += '<option value="'+y+'"'+(String(_aideSaisonCur)===String(y)?' selected':'')+'>Saison '+y+'</option>'; });
   html += '</select>';
-  html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Ajouter un dispositif</button>';
+  // ── Filtre situation du dossier ──
+  var _aideStatutCur = (function(){ var el=document.getElementById('aides-statut-filter'); return el?el.value:'all'; })();
+  html += '<select id="aides-statut-filter" onchange="renderAides()" title="Filtrer selon la situation du traitement" style="padding:7px 10px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt);font-family:inherit;font-size:12px;cursor:pointer;outline:none">';
+  html += '<option value="all"'+((_aideStatutCur==='all')?' selected':'')+'>Tous statuts</option>';
+  html += '<option value="attente"'+((_aideStatutCur==='attente')?' selected':'')+'>En attente</option>';
+  html += '<option value="accuse"'+((_aideStatutCur==='accuse')?' selected':'')+'>Accusé envoyé</option>';
+  html += '<option value="complements"'+((_aideStatutCur==='complements')?' selected':'')+'>Compléments demandés</option>';
+  html += '<option value="attribution"'+((_aideStatutCur==='attribution')?' selected':'')+'>Attribution envoyée</option>';
+  html += '<option value="paye"'+((_aideStatutCur==='paye')?' selected':'')+'>Payé</option>';
+  html += '</select>';
+  html += '<button onclick="_aideFormOpen(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--stol);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Nouvelle demande</button>';
   html += '</div></div></div>';
 
   if (!S.aides.length) {
-    html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Aucune aide enregistrée.<br><span style="font-size:12px">Cliquez sur <b>+ Ajouter une aide</b> pour commencer.</span></div>';
+    html += '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:48px 32px">Aucune aide enregistrée.<br><span style="font-size:12px">Cliquez sur <b>+ Nouvelle demande</b> pour commencer.</span></div>';
     cont.innerHTML = html; return;
   }
 
-  // ── Filtre saison ──────────────────────────────────────────────────────────
-  var _saiFil = (function(){ var el=document.getElementById('aides-saison-filter'); return el?el.value:'all'; })();
+  // ── Filtre saison + statut (partagé avec l'impression) ────────────────────
+  var sorted = _aideApplyFilters(S.aides);
 
-  // ── Tri principal : Campagne (alpha), puis Année (desc), puis Pilote ──────
-  var sorted = S.aides.filter(function(a){ return _saiFil==='all'||String(a.annee||'')===String(_saiFil); }).slice().sort(function(a,b){
-    var ca=(a.campagne||'').localeCompare(b.campagne||'');
-    if(ca!==0) return ca;
-    var ya=(b.annee||0)-(a.annee||0);
-    if(ya!==0) return ya;
-    return (a.piloteNom||'').localeCompare(b.piloteNom||'');
-  });
-
-  // Grouper par Campagne
-  var byCamp={}, campOrder=[];
-  sorted.forEach(function(a){
-    var k=a.campagne||'(Sans campagne)';
-    if(!byCamp[k]){byCamp[k]=[];campOrder.push(k);}
-    byCamp[k].push(a);
-  });
+  if (!sorted.length) {
+    html += '<div style="padding:40px 32px;text-align:center;color:var(--txt3);font-size:13px">Aucune aide ne correspond à ce filtre.</div>';
+    cont.innerHTML = html; return;
+  }
 
   var grandCout=0,grandDem=0,grandAide=0;
   sorted.forEach(function(a){
@@ -45676,107 +45777,130 @@ function renderAides(containerEl) {
     grandAide+=(parseFloat(a.aideOctroye)||0);
   });
 
-  var fmtDate=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
-  var grpHdSt='padding:8px 10px;background:var(--navy3);font-size:11px;font-weight:800;color:var(--txt);border-top:2px solid var(--bdr)';
-
-  html += '<div style="padding:12px">';
-  html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden"><div style="overflow-x:auto">';
-  html += '<table style="width:100%;border-collapse:collapse;min-width:820px">';
-  html += '<colgroup>'
-    +'<col style="min-width:130px">'
-    +'<col style="width:80px">'
-    +'<col style="width:88px">'
-    +'<col style="width:90px">'
-    +'<col style="min-width:160px">'
-    +'<col style="width:90px">'
-    +'<col style="width:90px">'
-    +'<col style="width:90px">'
-    +'<col style="width:46px">'
-    +'<col style="width:90px">'
-    +'<col style="min-width:100px">'
-    +'<col style="width:64px">'
-    +'</colgroup>';
-  html += '<thead><tr>'
-    +'<th style="'+thSt+'">Pilote</th>'
-    +'<th style="'+thSt+'">N° Licence</th>'
-    +'<th style="'+thSt+'">Date dem.</th>'
-    +'<th style="'+thSt+'">Dispositif</th>'
-    +'<th style="'+thSt+'">Projet</th>'
-    +'<th style="'+thSt+';text-align:right">Coût</th>'
-    +'<th style="'+thSt+';text-align:right">Demandée</th>'
-    +'<th style="'+thSt+';text-align:right">Proposée</th>'
-    +'<th style="'+thSt+';text-align:center">Payé</th>'
-    +'<th style="'+thSt+';text-align:right">Reste</th>'
-    +'<th style="'+thSt+'">Note</th>'
-    +'<th style="'+thSt+'"></th>'
-    +'</tr></thead>';
-  html += '<tbody>';
-
-  campOrder.forEach(function(camp) {
-    var grp=byCamp[camp];
-    var gCout=grp.reduce(function(s,a){return s+(parseFloat(a.cout)||0);},0);
-    var gDem =grp.reduce(function(s,a){return s+(parseFloat(a.aideDemandee)||0);},0);
-    var gAide=grp.reduce(function(s,a){return s+(parseFloat(a.aideOctroye)||0);},0);
-    var gReste=gCout-gAide;
-
-    html += '<tr><td colspan="12" style="'+grpHdSt+'">'
-      +_escHtml(camp)
-      +' <span style="font-size:10px;font-weight:400;color:var(--txt3)">'+grp.length+' aide'+(grp.length>1?'s':'')+'</span>'
-      +' <span style="color:var(--txt3)">·</span> <span style="color:#f59e0b">Demandé : '+fmt(gDem)+'</span>'
-      +' <span style="color:var(--txt3)">·</span> <span style="color:#10b981">Octroyé : '+fmt(gAide)+'</span>'
-      +'</td></tr>';
-
-    grp.forEach(function(a) {
-      var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
-      var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
-      var rc=reste>0?'#f87171':reste<0?'#f59e0b':'var(--txt3)';
-      var _licDisp=(function(){var v=a.licence||'';if(v&&/\d/.test(v))return v;var p=(S.pilots||[]).find(function(x){return x.id===a.piloteId;});var pv=(p&&p.licence)||'';return(pv&&/\d/.test(pv))?pv:'—';})();
-      html += '<tr>'
-        +'<td style="'+cellSt+';font-weight:600">'+_escHtml(a.piloteNom||'—')+'</td>'
-        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3)">'+_escHtml(_licDisp)+'</td>'
-        +'<td style="'+cellSt+';font-size:11px;color:var(--txt3);white-space:nowrap">'+_escHtml(fmtDate(a.dateDemande||''))+'</td>'
-        +'<td style="'+cellSt+'"><span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
-        +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
-        +'<td style="'+cellSt+';text-align:right">'+fmt(a.cout)+'</td>'
-        +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
-        +'<td style="'+cellSt+';text-align:right;color:#10b981;font-weight:700">'+fmt(a.aideOctroye)+'</td>'
-        +'<td style="'+cellSt+';text-align:center"><input type="checkbox"'+(a.paye?' checked':'')+' onchange="_aideTogglePaye(\''+a.id+'\',this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#10b981" title="'+(a.paye?'Payé':'Non payé')+'"></td>'
-        +'<td style="'+cellSt+';text-align:right;color:'+rc+';font-weight:700">'+fmt(reste)+'</td>'
-        +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
-        +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
-          +'<span style="display:inline-flex;gap:6px;align-items:center">'+uiIconBtn('edit', "_aideFormOpen('"+a.id+"')", 'Modifier', 28)+uiIconBtn('delete', "_aideDelete('"+a.id+"')", 'Supprimer', 28)+'</span>'
-        +'</td></tr>';
-    });
-
-    if (grp.length > 1) {
-      html += '<tr>'
-        +'<td colspan="5" style="'+totSt+';color:var(--txt3)">TOTAL</td>'
-        +'<td style="'+totSt+';text-align:right">'+fmt(gCout)+'</td>'
-        +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(gDem)+'</td>'
-        +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(gAide)+'</td>'
-        +'<td style="'+totSt+'"></td>'
-        +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(gReste)+'</td>'
-        +'<td colspan="2" style="'+totSt+'"></td></tr>';
-    }
+  // ── Regroupement par demandeur (pilote) — déplié à la demande ─────────────
+  var byPilote={}, piloteOrder=[];
+  sorted.forEach(function(a){
+    var key = _aidePiloteKey(a);
+    if(!byPilote[key]){ byPilote[key]={ key:key, nom:a.piloteNom||'—', licence:'', items:[] }; piloteOrder.push(key); }
+    byPilote[key].items.push(a);
+  });
+  piloteOrder.sort(function(k1,k2){ return (byPilote[k1].nom||'').localeCompare(byPilote[k2].nom||''); });
+  piloteOrder.forEach(function(k){
+    var g=byPilote[k], first=g.items[0];
+    var lic=first.licence||'';
+    if(!(lic && /\d/.test(lic))){ var p=(S.pilots||[]).find(function(x){return x.id===first.piloteId;}); lic=(p&&p.licence)||''; }
+    g.licence=(lic && /\d/.test(lic))?lic:'';
   });
 
-  html += '</tbody>';
-  html += '<tfoot><tr>'
-    +'<td colspan="5" style="'+totSt+';color:var(--txt3);font-size:11px;letter-spacing:.5px;text-transform:uppercase">Total général</td>'
-    +'<td style="'+totSt+';text-align:right">'+fmt(grandCout)+'</td>'
-    +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(grandDem)+'</td>'
-    +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(grandAide)+'</td>'
-    +'<td style="'+totSt+'"></td>'
-    +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(grandCout-grandAide)+'</td>'
-    +'<td colspan="2" style="'+totSt+'"></td>'
-    +'</tr></tfoot>';
-  html += '</table></div></div>';
+  html += '<div style="padding:12px">';
+  html += '<div style="display:flex;flex-direction:column;gap:8px">';
+
+  piloteOrder.forEach(function(key){
+    var g=byPilote[key];
+    var expanded=!!_aideExpandedPilotes[key];
+    var gCout=0,gDem=0,gAide=0,gAttribuee=0,nAttente=0,nCours=0,nPaye=0;
+    g.items.forEach(function(a){
+      gCout+=(parseFloat(a.cout)||0); gDem+=(parseFloat(a.aideDemandee)||0); gAide+=(parseFloat(a.aideOctroye)||0);
+      gAttribuee+=_aideAttribueeMontant(a);
+      if(a.paye) nPaye++; else if(_aideStatutOf(a)==='') nAttente++; else nCours++;
+    });
+    var gReste=gCout-gAide;
+    var sitBits=[];
+    if(nAttente) sitBits.push('<span style="color:var(--txt3)">'+nAttente+' en attente</span>');
+    if(nCours)   sitBits.push('<span style="color:#93c5fd">'+nCours+' en cours</span>');
+    if(nPaye)    sitBits.push('<span style="color:#34d399">'+nPaye+' payée'+(nPaye>1?'s':'')+'</span>');
+    var keyJs = key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    html += '<div style="border:1px solid var(--bdr);border-radius:10px;overflow:hidden;background:var(--navy2)">';
+    html += '<div onclick="_aideToggleGroup(\''+keyJs+'\')" style="cursor:pointer;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;user-select:none">'
+      +'<span style="font-size:10px;color:var(--txt3);display:inline-block;transition:transform .15s;transform:rotate('+(expanded?90:0)+'deg)">▶</span>'
+      +'<span style="font-weight:700;font-size:13px;color:var(--txt)">'+_escHtml(g.nom)+'</span>'
+      +(g.licence?'<span style="font-size:10px;color:var(--txt3)">Lic. '+_escHtml(g.licence)+'</span>':'')
+      +'<span style="font-size:11px;color:var(--txt3)">'+g.items.length+' demande'+(g.items.length>1?'s':'')+'</span>'
+      +'<span style="font-size:11px;color:#f59e0b">Demandé : '+fmt(gDem)+'</span>'
+      +'<span style="font-size:11px;color:#10b981">Octroyé : '+fmt(gAide)+'</span>'
+      +'<span style="font-size:11px;color:#93c5fd">Déjà attribué : '+fmt(gAttribuee)+'</span>'
+      +(sitBits.length?'<span style="display:flex;gap:6px;font-size:11px;margin-left:auto;white-space:nowrap">'+sitBits.join('<span style="color:var(--txt3)"> · </span>')+'</span>':'')
+      +'</div>';
+
+    if (expanded) {
+      html += '<div style="overflow-x:auto;border-top:1px solid var(--bdr)">';
+      html += '<table style="width:100%;border-collapse:collapse;min-width:1040px">';
+      html += '<colgroup>'
+        +'<col style="width:82px">'
+        +'<col style="min-width:150px">'
+        +'<col style="width:90px">'
+        +'<col style="min-width:150px">'
+        +'<col style="width:84px">'
+        +'<col style="width:84px">'
+        +'<col style="width:84px">'
+        +'<col style="width:190px">'
+        +'<col style="width:52px">'
+        +'<col style="width:84px">'
+        +'<col style="min-width:100px">'
+        +'<col style="width:64px">'
+        +'</colgroup>';
+      html += '<thead><tr>'
+        +'<th style="'+thSt+'">Date dem.</th>'
+        +'<th style="'+thSt+'">Campagne</th>'
+        +'<th style="'+thSt+'">Dispositif</th>'
+        +'<th style="'+thSt+'">Projet</th>'
+        +'<th style="'+thSt+';text-align:right">Coût</th>'
+        +'<th style="'+thSt+';text-align:right">Demandée</th>'
+        +'<th style="'+thSt+';text-align:right">Proposée</th>'
+        +'<th style="'+thSt+'">Situation</th>'
+        +'<th style="'+thSt+';text-align:center">Payé</th>'
+        +'<th style="'+thSt+';text-align:right">Reste</th>'
+        +'<th style="'+thSt+'">Note</th>'
+        +'<th style="'+thSt+'"></th>'
+        +'</tr></thead><tbody>';
+
+      g.items.slice().sort(function(a,b){
+        var ca=(a.campagne||'').localeCompare(b.campagne||''); if(ca!==0) return ca;
+        return (b.annee||0)-(a.annee||0);
+      }).forEach(function(a){
+        var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
+        var reste=(parseFloat(a.cout)||0)-(parseFloat(a.aideOctroye)||0);
+        var rc=reste>0?'#f87171':reste<0?'#f59e0b':'var(--txt3)';
+        html += '<tr>'
+          +'<td style="'+cellSt+';font-size:11px;color:var(--txt3);white-space:nowrap">'+_escHtml(fmtDate(a.dateDemande||''))+'</td>'
+          +'<td style="'+cellSt+';font-size:11px;color:var(--txt2)">'+_escHtml(a.campagne||'—')+'</td>'
+          +'<td style="'+cellSt+'"><span style="padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(0,87,255,.12);color:var(--stol)">'+_escHtml(disp)+'</span></td>'
+          +'<td style="'+cellSt+';font-size:11px;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.projet||'')+'</td>'
+          +'<td style="'+cellSt+';text-align:right">'+fmt(a.cout)+'</td>'
+          +'<td style="'+cellSt+';text-align:right;color:#f59e0b;font-weight:600">'+fmt(a.aideDemandee)+'</td>'
+          +'<td style="'+cellSt+';text-align:right;color:#10b981;font-weight:700">'+fmt(a.aideOctroye)+'</td>'
+          +'<td style="'+cellSt+'">'+_aideStatutSelectHtml(a)+'</td>'
+          +'<td style="'+cellSt+';text-align:center"><input type="checkbox"'+(a.paye?' checked':'')+' onchange="_aideTogglePaye(\''+a.id+'\',this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#10b981" title="'+(a.paye?'Payé':'Non payé')+'"></td>'
+          +'<td style="'+cellSt+';text-align:right;color:'+rc+';font-weight:700">'+fmt(reste)+'</td>'
+          +'<td style="'+cellSt+';color:var(--txt3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_escHtml(a.note||'')+'</td>'
+          +'<td style="'+cellSt+';text-align:center;white-space:nowrap">'
+            +'<span style="display:inline-flex;gap:6px;align-items:center">'+uiIconBtn('edit', "_aideFormOpen('"+a.id+"')", 'Modifier', 26)+uiIconBtn('delete', "_aideDelete('"+a.id+"')", 'Supprimer', 26)+'</span>'
+          +'</td></tr>';
+      });
+
+      if (g.items.length > 1) {
+        html += '<tr>'
+          +'<td colspan="4" style="'+totSt+';color:var(--txt3)">TOTAL</td>'
+          +'<td style="'+totSt+';text-align:right">'+fmt(gCout)+'</td>'
+          +'<td style="'+totSt+';text-align:right;color:#f59e0b">'+fmt(gDem)+'</td>'
+          +'<td style="'+totSt+';text-align:right;color:#10b981">'+fmt(gAide)+'</td>'
+          +'<td colspan="2" style="'+totSt+'"></td>'
+          +'<td style="'+totSt+';text-align:right;color:#f87171">'+fmt(gReste)+'</td>'
+          +'<td colspan="2" style="'+totSt+'"></td></tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
 
   // ── KPIs globaux ────────────────────────────────────────────────────────
   var grandReste=grandCout-grandAide;
   var grandPaye=sorted.reduce(function(s,a){ return s+(a.paye?(parseFloat(a.aideOctroye)||0):0); },0);
   var kSt='flex:1;min-width:130px;background:var(--navy2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px';
-  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">';
   html += '<div style="'+kSt+'"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Coût total</div><div style="font-size:20px;font-weight:900;color:var(--txt)">'+fmt(grandCout)+'</div></div>';
   html += '<div style="'+kSt+';border-color:rgba(245,158,11,.3)"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Aides demandées</div><div style="font-size:20px;font-weight:900;color:#f59e0b">'+fmt(grandDem)+'</div></div>';
   html += '<div style="'+kSt+';border-color:rgba(16,185,129,.3)"><div style="font-size:9px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Aides octroyées</div><div style="font-size:20px;font-weight:900;color:#10b981">'+fmt(grandAide)+'</div></div>';
@@ -45796,59 +45920,85 @@ function printAides() {
   var nomOrg = org.nom || 'Organisation';
   var adresse = [org.adresse, (org.cp||'')+' '+(org.ville||'')].filter(Boolean).join(' — ');
   var dateGen = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var filtreLabel = _aideFilterSummaryLabel();
 
-  // Tri par campagne puis année
-  var sorted = (S.aides||[]).slice().sort(function(a,b){
-    var c=(a.campagne||'').localeCompare(b.campagne||'');
-    if(c!==0) return c;
-    return (b.annee||0)-(a.annee||0);
-  });
-  var byCamp={}, campOrder=[];
+  // Imprime exactement ce qui est actuellement affiché à l'écran : mêmes filtres
+  // saison/situation, et même regroupement par demandeur (pilote) que la liste.
+  var sorted = _aideApplyFilters(S.aides);
+  if (!sorted.length) { toast('Aucune aide ne correspond au filtre actuel', 'warn'); return; }
+
+  var byPilote={}, piloteOrder=[];
   sorted.forEach(function(a){
-    var k=a.campagne||'(Sans campagne)';
-    if(!byCamp[k]){byCamp[k]=[];campOrder.push(k);}
-    byCamp[k].push(a);
+    var key = _aidePiloteKey(a);
+    if(!byPilote[key]){ byPilote[key]={ nom:a.piloteNom||'—', licence:'', items:[] }; piloteOrder.push(key); }
+    byPilote[key].items.push(a);
+  });
+  piloteOrder.sort(function(k1,k2){ return (byPilote[k1].nom||'').localeCompare(byPilote[k2].nom||''); });
+  piloteOrder.forEach(function(k){
+    var g=byPilote[k], first=g.items[0];
+    var lic=first.licence||'';
+    if(!(lic && /\d/.test(lic))){ var p=(S.pilots||[]).find(function(x){return x.id===first.piloteId;}); lic=(p&&p.licence)||''; }
+    g.licence=(lic && /\d/.test(lic))?lic:'';
   });
 
   var fmtDateP=function(d){if(!d)return'';try{var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}};
   var tRows = '';
-  campOrder.forEach(function(camp){
-    var grp = byCamp[camp];
-    var gCout=0,gDem=0,gAide=0;
-    grp.forEach(function(a){ gCout+=(parseFloat(a.cout)||0); gDem+=(parseFloat(a.aideDemandee)||0); gAide+=(parseFloat(a.aideOctroye)||0); });
-    var gReste=gCout-gAide;
+  piloteOrder.forEach(function(key){
+    var g = byPilote[key];
+    var grp = g.items.slice().sort(function(a,b){
+      var c=(a.campagne||'').localeCompare(b.campagne||''); if(c!==0) return c;
+      return (b.annee||0)-(a.annee||0);
+    });
+    var gCout=0,gDem=0,gAide=0,gPaye=0,gAttribuee=0;
+    grp.forEach(function(a){
+      gCout+=(parseFloat(a.cout)||0); gDem+=(parseFloat(a.aideDemandee)||0); gAide+=(parseFloat(a.aideOctroye)||0);
+      if(a.paye) gPaye+=(parseFloat(a.aideOctroye)||0);
+      gAttribuee+=_aideAttribueeMontant(a);
+    });
 
-    tRows += '<tr class="camp-hdr"><td colspan="10">'+_escHtml(camp)+'</td></tr>';
-    var gPaye=0;
+    tRows += '<tr class="camp-hdr"><td colspan="10">'+_escHtml(g.nom)
+      +(g.licence?' <span style="font-weight:400;font-size:8pt">— Lic. '+_escHtml(g.licence)+'</span>':'')
+      +' <span style="font-weight:400;font-size:8pt">· '+grp.length+' demande'+(grp.length>1?'s':'')+'</span>'
+      +' <span style="font-weight:400;font-size:8pt">· Demandé : '+fmt(gDem)+'</span>'
+      +' <span style="font-weight:400;font-size:8pt">· Octroyé : '+fmt(gAide)+'</span>'
+      +' <span style="font-weight:900;font-size:8pt">· Déjà attribué : '+fmt(gAttribuee)+'</span>'
+      +' <span style="font-weight:400;font-size:8pt">· Payé : '+fmt(gPaye)+'</span>'
+      +'</td></tr>';
     grp.forEach(function(a){
       var disp=a.dispositif==='Autre'?(a.autreDispositif||'Autre'):a.dispositif;
-      var lic=a.licence||((S.pilots||[]).find(function(p){return p.id===a.piloteId;})||{}).licence||'—';
-      if(a.paye) gPaye+=(parseFloat(a.aideOctroye)||0);
+      var stLabel=(_AIDE_STATUTS[_aideStatutOf(a)]||_AIDE_STATUTS['']).label;
       tRows += '<tr>'
-        +'<td>'+_escHtml(a.piloteNom||'—')+'</td>'
-        +'<td>'+_escHtml(lic)+'</td>'
         +'<td class="note">'+_escHtml(fmtDateP(a.dateDemande||''))+'</td>'
+        +'<td class="note">'+_escHtml(a.campagne||'—')+'</td>'
         +'<td><span class="badge">'+_escHtml(disp)+'</span></td>'
         +'<td class="note">'+_escHtml(a.projet||'')+'</td>'
         +'<td class="num">'+fmt(a.cout)+'</td>'
         +'<td class="num">'+fmt(a.aideDemandee)+'</td>'
         +'<td class="num">'+fmt(a.aideOctroye)+'</td>'
+        +'<td style="font-size:7.5pt;color:#333">'+_escHtml(stLabel)+'</td>'
         +'<td style="text-align:center;font-size:10pt">'+(a.paye?'<span style="color:#166534;font-weight:900">✓</span>':'')+'</td>'
         +'<td style="font-size:8pt;color:#444;word-break:break-word">'+_escHtml(a.note||'')+'</td>'
         +'</tr>';
     });
-    tRows += '<tr class="subtot">'
-      +'<td colspan="5">Sous-total — '+_escHtml(camp)+'</td>'
-      +'<td class="num">'+fmt(gCout)+'</td>'
-      +'<td class="num">'+fmt(gDem)+'</td>'
-      +'<td class="num">'+fmt(gAide)+'</td>'
-      +'<td class="num" style="color:#166534">'+fmt(gPaye)+'</td>'
-      +'<td></td>'
-      +'</tr>';
+    if (grp.length > 1) {
+      tRows += '<tr class="subtot">'
+        +'<td colspan="4">Sous-total — '+_escHtml(g.nom)+'</td>'
+        +'<td class="num">'+fmt(gCout)+'</td>'
+        +'<td class="num">'+fmt(gDem)+'</td>'
+        +'<td class="num">'+fmt(gAide)+'</td>'
+        +'<td></td>'
+        +'<td class="num" style="color:#166534">'+fmt(gPaye)+'</td>'
+        +'<td></td>'
+        +'</tr>';
+    }
   });
 
-  var grandCout=0,grandDem=0,grandAide=0,grandPayeP=0;
-  sorted.forEach(function(a){ grandCout+=(parseFloat(a.cout)||0); grandDem+=(parseFloat(a.aideDemandee)||0); grandAide+=(parseFloat(a.aideOctroye)||0); if(a.paye) grandPayeP+=(parseFloat(a.aideOctroye)||0); });
+  var grandCout=0,grandDem=0,grandAide=0,grandPayeP=0,grandAttribueeP=0;
+  sorted.forEach(function(a){
+    grandCout+=(parseFloat(a.cout)||0); grandDem+=(parseFloat(a.aideDemandee)||0); grandAide+=(parseFloat(a.aideOctroye)||0);
+    if(a.paye) grandPayeP+=(parseFloat(a.aideOctroye)||0);
+    grandAttribueeP+=_aideAttribueeMontant(a);
+  });
   var grandReste=grandCout-grandAide;
 
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
@@ -45886,24 +46036,26 @@ function printAides() {
     +'<div class="header">'
     +(logoSrc ? '<img class="logo" src="'+logoSrc+'" alt="logo">' : '')
     +'</div>'
-    +'<div style="text-align:center;font-size:15pt;font-weight:900;color:'+accent+';margin:14px 0 12px">Aides fédérales compétitions</div>'
+    +'<div style="text-align:center;font-size:15pt;font-weight:900;color:'+accent+';margin:14px 0 2px">Aides fédérales compétitions</div>'
+    +(filtreLabel ? '<div style="text-align:center;font-size:9pt;font-weight:700;color:#555;margin-bottom:12px">Filtre appliqué : '+_escHtml(filtreLabel)+'</div>' : '<div style="margin-bottom:12px"></div>')
     +'<table><thead><tr>'
-    +'<th>Pilote</th>'
-    +'<th style="width:70px">N° Licence</th>'
     +'<th style="width:62px">Date dem.</th>'
+    +'<th style="min-width:150px">Campagne</th>'
     +'<th style="width:100px">Dispositif</th>'
     +'<th style="min-width:220px">Projet</th>'
     +'<th class="r" style="width:80px">Coût total</th>'
     +'<th class="r" style="width:80px">Demandée</th>'
     +'<th class="r" style="width:80px">Proposée</th>'
+    +'<th style="width:110px">Situation</th>'
     +'<th style="width:36px;text-align:center">Payé</th>'
     +'<th style="min-width:120px">Note</th>'
     +'</tr></thead>'
     +'<tfoot><tr class="grandtot">'
-    +'<td colspan="5">TOTAL GÉNÉRAL</td>'
+    +'<td colspan="4">TOTAL GÉNÉRAL</td>'
     +'<td class="num">'+fmt(grandCout)+'</td>'
     +'<td class="num">'+fmt(grandDem)+'</td>'
     +'<td class="num">'+fmt(grandAide)+'</td>'
+    +'<td></td>'
     +'<td class="num" style="color:#a7f3d0">'+fmt(grandPayeP)+'</td>'
     +'<td></td>'
     +'</tr></tfoot>'
@@ -45912,10 +46064,11 @@ function printAides() {
     +'</tbody></table>'
     +'<div class="kpi-row">'
     +'<div class="kpi"><div class="lbl">Aides octroyées</div><div class="val" style="color:#1a3a8f">'+fmt(grandAide)+'</div></div>'
+    +'<div class="kpi" style="border-color:#93c5fd"><div class="lbl">Aides déjà attribuées</div><div class="val" style="color:#1d4ed8">'+fmt(grandAttribueeP)+'</div></div>'
     +'<div class="kpi" style="border-color:#bbf7d0"><div class="lbl">Aides payées ✓</div><div class="val" style="color:#166534">'+fmt(grandPayeP)+'</div></div>'
     +'<div class="kpi"><div class="lbl">Reste à payer</div><div class="val" style="color:#b91c1c">'+fmt(grandAide-grandPayeP)+'</div></div>'
     +'</div>'
-    +'<div class="footer" style="margin-top:16px;text-align:right;font-size:7.5pt;color:#999">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+campOrder.length+' campagne'+(campOrder.length>1?'s':'')+'</div>'
+    +'<div class="footer" style="margin-top:16px;text-align:right;font-size:7.5pt;color:#999">Document généré le '+dateGen+' · '+sorted.length+' aide'+(sorted.length>1?'s':'')+' · '+piloteOrder.length+' demandeur'+(piloteOrder.length>1?'s':'')+'</div>'
     +'</body></html>';
 
   var w = window.open('','_blank','width=900,height=700');
@@ -46152,6 +46305,7 @@ function _aideFormOpen(id) {
   var demEl=document.getElementById('aide-form-demandee'); if(demEl) demEl.value=aide&&aide.aideDemandee?aide.aideDemandee:'';
   var aidEl=document.getElementById('aide-form-aide'); if(aidEl) aidEl.value=aide&&aide.aideOctroye?aide.aideOctroye:'';
   var pyEl=document.getElementById('aide-form-paye'); if(pyEl) pyEl.checked=!!(aide&&aide.paye);
+  var stEl=document.getElementById('aide-form-statut'); if(stEl) stEl.value=aide?_aideStatutOf(aide):'';
   var nEl=document.getElementById('aide-form-note'); if(nEl) nEl.value=aide?(aide.note||''):'';
   _aideDispChange();
   // Historique pilote : initialiser avec le pilote de la fiche (si modification)
@@ -46305,8 +46459,28 @@ function _aideEmailFooterComps() {
 }
 
 function _aideMailto(email, sujet, corps) {
-  if (!email) { toast('Aucun email trouvé pour ce pilote', 'warn'); return; }
+  if (!email) { toast('Aucun email trouvé pour ce pilote', 'warn'); return false; }
   window.location.href = 'mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(corps);
+  return true;
+}
+
+// Met à jour automatiquement la situation du dossier après l'envoi d'un email
+// (accusé / compléments / attribution). Persiste immédiatement si l'aide est déjà
+// enregistrée, sinon le champ reste positionné dans le formulaire jusqu'à l'enregistrement.
+// L'utilisateur peut à tout moment corriger la situation via le menu déroulant
+// (dans la fiche ou directement dans la liste), y compris pour un envoi déjà effectué.
+function _aideMarkSent(field) {
+  var sel = document.getElementById('aide-form-statut'); if (sel) sel.value = field;
+  var idEl = document.getElementById('aide-form-id');
+  var id = idEl ? idEl.value : '';
+  if (id && S.aides) {
+    var rec = S.aides.find(function(a){ return a.id === id; });
+    if (rec) {
+      rec.statut = field; rec._updatedAt = Date.now();
+      saveState(); if (typeof silentPush === 'function') silentPush();
+      try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
+    }
+  }
 }
 
 function _aideEmailAccuse() {
@@ -46326,7 +46500,7 @@ function _aideEmailAccuse() {
     +'\nNous restons à votre disposition pour tout renseignement complémentaire.\n\n'
     +'Cordialement,\n\n'+'                                                                                                '+d.poleSport
     +_aideEmailFooterComps();
-  _aideMailto(email, sujet, corps);
+  if (_aideMailto(email, sujet, corps)) _aideMarkSent('accuse');
 }
 
 function _aideEmailComplements() {
@@ -46347,7 +46521,7 @@ function _aideEmailComplements() {
     +'\nCes éléments sont à retourner dans les meilleurs délais afin de ne pas retarder le traitement de votre demande.\n\n'
     +'Cordialement,\n\n'+'                                                                                                '+d.poleSport
     +_aideEmailFooterComps();
-  _aideMailto(email, sujet, corps);
+  if (_aideMailto(email, sujet, corps)) _aideMarkSent('complements');
 }
 
 function _aideEmailAttribution() {
@@ -46369,7 +46543,7 @@ function _aideEmailAttribution() {
     +'\nNous vous félicitons pour votre engagement sportif et vous souhaitons plein succès dans votre projet.\n\n'
     +'Cordialement,\n\n'+'                                                                                                '+d.poleSport
     +_aideEmailFooterComps();
-  _aideMailto(email, sujet, corps);
+  if (_aideMailto(email, sujet, corps)) _aideMarkSent('attribution');
 }
 
 var _printHr = '<hr style="border:none;border-top:1.5px solid #003399;margin:0">';
@@ -46525,6 +46699,7 @@ function _aideFormSave() {
     aideDemandee: parseFloat(demEl?demEl.value:0)||0,
     aideOctroye:  parseFloat(aidEl?aidEl.value:0)||0,
     paye:         !!(document.getElementById('aide-form-paye')||{}).checked,
+    statut:       (document.getElementById('aide-form-statut')||{}).value||'',
     note:         nEl?nEl.value.trim():''
   };
   if(id){
@@ -46549,6 +46724,20 @@ function _aideTogglePaye(id, checked) {
   try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
   renderAides();
   toast(checked ? 'Aide marquée payée ✓' : 'Paiement annulé', 'ok');
+}
+
+// Met à jour la situation d'un dossier depuis la liste (menu déroulant par ligne) —
+// permet de corriger à tout moment un envoi déjà effectué, sans repasser par la fiche.
+function _aideSetStatut(id, val) {
+  if (!S.aides) return;
+  var rec = S.aides.find(function(a){ return a.id === id; });
+  if (!rec) return;
+  rec.statut = val;
+  rec._updatedAt = Date.now();
+  saveState(); if (typeof silentPush === 'function') silentPush();
+  try { localStorage.setItem(LS_AIDES, JSON.stringify(S.aides)); } catch(e) {}
+  renderAides();
+  toast('Situation mise à jour : '+(_AIDE_STATUTS[val]||_AIDE_STATUTS['']).label, 'ok');
 }
 
 function _aideDelete(id) {
@@ -67798,6 +67987,10 @@ document.addEventListener('DOMContentLoaded', async function() {
           <label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Email</label>
           <input id="pe-email" type="email" placeholder="contact@exemple.fr" style="width:100%;background:var(--navy3);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box">
         </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Site internet</label>
+        <input id="pe-siteweb" type="url" placeholder="https://www.exemple.fr" style="width:100%;background:var(--navy3);border:1.5px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box">
       </div>
       <div style="margin-bottom:12px">
         <label style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Proposition</label>
