@@ -56992,6 +56992,50 @@ window._dbdImportProjects=function(){
   inp.click();
 };
 
+// ── Ordre manuel des cartes projet (glisser-déposer) ───────────────────────
+// On persiste un ORDRE (liste d'ids), pas des coordonnées en pixels : la
+// grille CSS se charge elle-même de la disposition (colonnes, largeurs), donc
+// elle s'adapte automatiquement à l'ouverture et au redimensionnement de la
+// fenêtre, sans jamais pouvoir superposer deux cartes.
+function _dbdProjOrderGet(){try{return JSON.parse(localStorage.getItem('dtn_proj_order')||'[]');}catch(e){return [];}}
+function _dbdProjOrderSave(ids){try{localStorage.setItem('dtn_proj_order',JSON.stringify(ids));}catch(e){}}
+window._dbdProjDragId=null;
+window._dbdProjDragStart=function(e,id){
+  window._dbdProjDragId=id;
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}catch(err){}
+  var card=e.currentTarget; if(card) setTimeout(function(){card.style.opacity='.4';},0);
+};
+window._dbdProjDragEnd=function(e){
+  var card=e.currentTarget; if(card) card.style.opacity='';
+  window._dbdProjDragId=null;
+};
+window._dbdProjDragOver=function(e){
+  e.preventDefault();
+  if(e.dataTransfer) e.dataTransfer.dropEffect='move';
+};
+// Réordonne : insère la carte glissée juste avant la carte cible (targetId
+// vide = dépose en fin de liste, sur l'espace vide du conteneur).
+window._dbdProjReorder=function(draggedId,targetId){
+  if(!draggedId||draggedId===targetId) return;
+  var currentIds=Array.from(document.querySelectorAll('.dbd-proj-card')).map(function(c){return c.dataset.projId;});
+  var order=_dbdProjOrderGet().filter(function(id){return currentIds.indexOf(id)>=0;});
+  currentIds.forEach(function(id){ if(order.indexOf(id)<0) order.push(id); });
+  var from=order.indexOf(draggedId);
+  if(from<0) return;
+  order.splice(from,1);
+  var to=targetId?order.indexOf(targetId):order.length;
+  if(to<0) to=order.length;
+  order.splice(to,0,draggedId);
+  _dbdProjOrderSave(order);
+  _dbdRenderProjects();
+};
+window._dbdProjDrop=function(e,targetId){
+  e.preventDefault();
+  var draggedId=window._dbdProjDragId||(e.dataTransfer&&e.dataTransfer.getData('text/plain'));
+  window._dbdProjReorder(draggedId,targetId);
+  window._dbdProjDragId=null;
+};
+
 function _dbdRenderProjects(){
   _dbdProjLoad();
   var list=_dbdProjList();
@@ -56999,7 +57043,13 @@ function _dbdRenderProjects(){
   var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
   var listEl=document.getElementById('dbd-proj-list');
   if(!listEl) return;
-  var sorted=list.slice().sort(function(a,b){return (a.dateFrom||'').localeCompare(b.dateFrom||'');});
+  // Ordre manuel (glisser-déposer) en priorité ; tout projet pas encore
+  // positionné manuellement est ajouté à la suite, trié par date.
+  var order=_dbdProjOrderGet();
+  var byDate=list.slice().sort(function(a,b){return (a.dateFrom||'').localeCompare(b.dateFrom||'');});
+  var byId={}; list.forEach(function(p){byId[p.id]=p;});
+  var sorted=order.map(function(id){return byId[id];}).filter(Boolean);
+  byDate.forEach(function(p){ if(order.indexOf(p.id)<0) sorted.push(p); });
   if(!sorted.length){
     listEl.style.cssText='';
     listEl.innerHTML='<div style="padding:30px 16px;text-align:center;color:var(--txt3);font-size:12px">Aucun projet.<br><span style="font-size:11px;opacity:.7">Cliquez + pour en créer un.</span></div>';
@@ -57008,9 +57058,13 @@ function _dbdRenderProjects(){
   var todos=typeof _dtnTodoList==='function'?_dtnTodoList():[];
   // Grille CSS responsive : chaque carte occupe une largeur égale qui s'adapte
   // à l'espace disponible (au minimum 150px avant de passer à la ligne) —
-  // par construction, deux cartes ne peuvent jamais se chevaucher.
+  // par construction, deux cartes ne peuvent jamais se chevaucher. Elle se
+  // réajuste d'elle-même à l'ouverture et à chaque redimensionnement de la
+  // fenêtre (mise en page native du navigateur, pas de calcul JS).
   listEl.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-content:start;width:100%';
   if(listEl.parentElement){listEl.parentElement.style.overflowX='hidden';listEl.parentElement.style.overflowY='auto';}
+  listEl.ondragover=window._dbdProjDragOver;
+  listEl.ondrop=function(e){ if(e.target===listEl) window._dbdProjDrop(e,null); };
   var html='';
   sorted.forEach(function(p){
     var tasks=(p.taches||[]).filter(function(t){return t.label||t.todoRef;});
@@ -57036,9 +57090,11 @@ function _dbdRenderProjects(){
       +'</div>';
     }).join('');
     html+='<div class="dbd-proj-card" data-proj-id="'+p.id+'" '
+      +'draggable="true" ondragstart="_dbdProjDragStart(event,\''+p.id+'\')" ondragend="_dbdProjDragEnd(event)" '
+      +'ondragover="_dbdProjDragOver(event)" ondrop="event.stopPropagation();_dbdProjDrop(event,\''+p.id+'\')" '
       +'onclick="_dbdOpenProjectForm(\''+p.id+'\')" '
       +'style="min-height:118px;'
-        +'display:flex;flex-direction:row;overflow:hidden;cursor:pointer;padding:0;'+bgStyle+'">'
+        +'display:flex;flex-direction:row;overflow:hidden;cursor:grab;padding:0;'+bgStyle+'">'
       +'<div style="width:4px;flex-shrink:0;background:'+barColor+';border-radius:var(--dbd-r) 0 0 var(--dbd-r)"></div>'
       +'<div style="flex:1;min-width:0;padding:9px 9px 7px;display:flex;flex-direction:column;justify-content:space-between">'
         +'<div>'
@@ -59243,6 +59299,9 @@ window._dbdToggleProjOpen=function(projId){
 window._dbdDeleteProject=function(projId){
   if(!confirm('Supprimer ce projet ?')) return;
   S.dtnProjects=(S.dtnProjects||[]).filter(function(p){return p.id!==projId;});
+  var order=_dbdProjOrderGet();
+  var oi=order.indexOf(projId);
+  if(oi>=0){ order.splice(oi,1); _dbdProjOrderSave(order); }
   _dbdProjSave();
   var ov=document.getElementById('dbd-proj-ov'); if(ov) ov.remove();
   _dbdRenderProjects();
