@@ -2757,6 +2757,9 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 <!-- ══ GANTT : overlay plein écran ══ -->
 <div id="gantt-overlay" style="display:none;position:fixed;inset:0;z-index:2600;flex-direction:column;background:var(--navy);overflow:hidden"></div>
 
+<!-- ══ GALAXIE DES PROJETS : overlay plein écran ══ -->
+<div id="galaxie-overlay" style="display:none;position:fixed;inset:0;z-index:2600;flex-direction:column;background:radial-gradient(ellipse at center,#0d1830 0%,#05070f 70%);overflow:hidden"></div>
+
 <!-- ══════════ ESPACES PARTAGÉS ══════════ -->
 <div id="ndf-overlay" style="display:none;position:fixed;top:0;right:0;bottom:0;left:216px;z-index:2600;background:var(--navy);overflow:hidden;flex-direction:column">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--bdr);background:var(--navy2);flex-shrink:0">
@@ -5242,7 +5245,8 @@ function _flushSaveState() {
     accesUsers:S.accesUsers||[],
     factRepasReg:S.factRepasReg||{map:{},seq:{}},
     etapes:S.etapes||{},
-    dtnProjects:S.dtnProjects||[]
+    dtnProjects:S.dtnProjects||[],
+    _deletedProjects:S._deletedProjects||[]
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
   // Priorité absolue : si le quota est dépassé, on libère de la place et on réessaie
@@ -27650,6 +27654,7 @@ async function pushToCloud() {
     _faqSeedImported:     S._faqSeedImported     || {},
     faqRefResumes:        S.faqRefResumes        || {},
     dtnProjects:          S.dtnProjects          || [],
+    _deletedProjects:     S._deletedProjects     || [],
     _pushAt:              Date.now()
   };
   var jsonStr = JSON.stringify(payload);
@@ -28989,6 +28994,18 @@ async function pullFromCloud() {
   });
   S._deletedComps = Object.keys(allDeletedIds).map(function(id){ return {id:id, deletedAt:allDeletedIds[id]}; });
 
+  // ── Tombstones projets DTN ──
+  var remoteDeletedProj = r._deletedProjects || [];
+  var localDeletedProj = S._deletedProjects || [];
+  var allDeletedProjIds = {};
+  localDeletedProj.forEach(function(t){ allDeletedProjIds[t.id] = t.deletedAt; });
+  remoteDeletedProj.forEach(function(t){
+    if (!allDeletedProjIds[t.id] || t.deletedAt > allDeletedProjIds[t.id]) {
+      allDeletedProjIds[t.id] = t.deletedAt;
+    }
+  });
+  S._deletedProjects = Object.keys(allDeletedProjIds).map(function(id){ return {id:id, deletedAt:allDeletedProjIds[id]}; });
+
   // ── Tombstones staff (encadrants supprimés) ──
   var rDS = (r._deletedStaff && typeof r._deletedStaff==='object') ? r._deletedStaff : {};
   var lDS = (S._deletedStaff && typeof S._deletedStaff==='object') ? S._deletedStaff : {};
@@ -29269,13 +29286,17 @@ async function pullFromCloud() {
     try { if (S.officialDocs.footer) localStorage.setItem(LS_OD_FOOTER, S.officialDocs.footer); } catch(e) {}
   }
   S.homeTodosByComp    = _mergeObjOfArrays(S.homeTodosByComp,    r.homeTodosByComp);
-  // Fusionner dtnProjects : local id gagne sur le cloud
+  // Fusionner dtnProjects : local id gagne sur le cloud, puis retirer les tombstones
+  // (sans ce filtre, un projet supprimé localement mais encore présent dans un ancien
+  // instantané cloud réapparaît à chaque synchronisation — cf. bug identique déjà
+  // corrigé pour les compétitions via _deletedComps).
   if (r.dtnProjects && Array.isArray(r.dtnProjects)) {
     var _localProjById = {};
     (S.dtnProjects||[]).forEach(function(p){if(p&&p.id) _localProjById[p.id]=p;});
     r.dtnProjects.forEach(function(p){if(p&&p.id&&!_localProjById[p.id]) _localProjById[p.id]=p;});
     S.dtnProjects = Object.values(_localProjById);
   }
+  S.dtnProjects = (S.dtnProjects||[]).filter(function(p){ return p && p.id && !allDeletedProjIds[p.id]; });
   // enrollMeta : fusion profonde { [compId]: { [pilotId]: { podium, ... } } }
   // Stratégie : local prioritaire sur les champs renseignés, remote comble les trous
   if (r.enrollMeta && typeof r.enrollMeta === 'object') {
@@ -56999,6 +57020,7 @@ function _dtnGoHome() {
       +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Les projets</div>'
       +'<button onclick="_dbdExportProjects()" title="Exporter tous les projets (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dbdImportProjects()" title="Importer des projets (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V7M6 11l4-4 4 4"/><path d="M4 16h12"/></svg></button>'
+      +'<button onclick="_dbdOpenGalaxie()" title="Galaxie des projets" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(120 12 12)"/></svg></button>'
       +'<button onclick="_dbdOpenProjectForm(null)" title="Nouveau projet" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div class="dbd-sc" style="padding:6px 4px;flex:1;min-height:0;overflow-y:auto"><div id="dbd-proj-list"></div></div>'
       +'</div>'
@@ -57098,6 +57120,13 @@ function _dbdProjLoad(){
     }
   }catch(e){}
   if(!Array.isArray(S.dtnProjects)) S.dtnProjects=[];
+  // Filet anti-résurrection : un projet supprimé (tombstone) ne doit jamais revenir,
+  // même si S.dtnProjects a été réinitialisé par un ancien instantané entre-temps.
+  if (S._deletedProjects && S._deletedProjects.length) {
+    var _delProjIds = {};
+    S._deletedProjects.forEach(function(t){ if (t && t.id) _delProjIds[t.id] = true; });
+    S.dtnProjects = S.dtnProjects.filter(function(p){ return !(p && p.id && _delProjIds[p.id]); });
+  }
 }
 function _dbdProjList(){
   _dbdProjLoad();
@@ -57110,6 +57139,181 @@ function _dbdProjSave(){
   // (sinon _dbdProjLoad re-merge depuis localStorage et annule les suppressions)
   try{ localStorage.setItem('dtn_projects', JSON.stringify(S.dtnProjects||[])); }catch(e){}
   if(typeof saveState==='function') saveState();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── GALAXIE DES PROJETS : vue radiale (centre = objectifs stratégiques,
+//    4 anneaux = niveau de criticité). Réutilise S.dtnProjects tel quel et
+//    ajoute 5 champs facultatifs par projet : tier, budget, partenaires,
+//    indicateurs, documents (préservés par le merge dans _dbdDoSaveProjData).
+// ══════════════════════════════════════════════════════════════════════════
+var _GAL_TIERS = [
+  {key:'critique',      label:'Projets critiques',         radius:18, color:'#ef4444'},
+  {key:'structurant',   label:'Projets structurants',       radius:36, color:'#f59e0b'},
+  {key:'developpement', label:'Projets de développement',   radius:54, color:'#2563eb'},
+  {key:'veille',        label:'Veille et innovations',      radius:72, color:'#8b5cf6'}
+];
+function _galEsc(s){ return typeof escH==='function' ? escH(s) : (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function _galTierOf(p){
+  return (p && p.tier && _GAL_TIERS.some(function(t){ return t.key===p.tier; })) ? p.tier : 'developpement';
+}
+function _galTierMeta(key){
+  return _GAL_TIERS.find(function(t){ return t.key===key; }) || _GAL_TIERS[2];
+}
+function _galProjStats(p){
+  var today = new Date().toISOString().slice(0,10);
+  var todos = typeof _dtnTodoList==='function' ? _dtnTodoList() : [];
+  var tasks = (p.taches||[]).filter(function(t){ return t.label||t.todoRef; });
+  var effectiveDone = tasks.filter(function(t){
+    if (t.todoRef){ var td=todos.find(function(x){ return x.id===t.todoRef; }); return td?td.done:t.done; }
+    return t.done;
+  }).length;
+  var pct = tasks.length ? Math.round(effectiveDone/tasks.length*100) : 0;
+  var overdue = tasks.filter(function(t){ return !t.done && t.status!=='done' && t.dateTo && t.dateTo<today; }).length;
+  return {pct:pct, effectiveDone:effectiveDone, total:tasks.length, overdue:overdue};
+}
+window._galOpenId = null;
+var _GAL_OVERLAY_BG = 'background:var(--bg)';
+function _dbdOpenGalaxie(){
+  var ov = document.getElementById('galaxie-overlay');
+  if (!ov) return;
+  ov.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2700;flex-direction:column;'+_GAL_OVERLAY_BG+';overflow:hidden';
+  window._galOpenId = null;
+  _galRender();
+}
+function _dbdCloseGalaxie(){
+  var ov = document.getElementById('galaxie-overlay');
+  if (ov) {
+    ov.style.cssText = 'display:none;position:fixed;inset:0;z-index:2700;flex-direction:column;'+_GAL_OVERLAY_BG+';overflow:hidden';
+    ov.innerHTML = '';
+  }
+  window._galOpenId = null;
+}
+function _galRender(){
+  var ov = document.getElementById('galaxie-overlay');
+  if (!ov) return;
+  var projects = _dbdProjList();
+  var groups = {};
+  _GAL_TIERS.forEach(function(t){ groups[t.key]=[]; });
+  projects.forEach(function(p){ groups[_galTierOf(p)].push(p); });
+
+  var html = '';
+  html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--navy2);border-bottom:1px solid var(--bdr);flex-shrink:0">';
+  html += '<div style="font-size:15px;font-weight:800;color:var(--txt);flex:1">🌌 Galaxie des projets</div>';
+  html += '<div style="font-size:11px;color:var(--txt3)">'+projects.length+' projet(s) · cliquez une planète pour le détail</div>';
+  html += '<button onclick="_dbdCloseGalaxie()" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:16px;cursor:pointer;font-family:inherit">✕</button>';
+  html += '</div>';
+
+  html += '<div style="flex:1;position:relative;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px">';
+  if (!projects.length) {
+    html += '<div style="text-align:center;color:var(--txt3)"><div style="font-size:40px;margin-bottom:10px">🌌</div><div style="font-size:13px">Aucun projet — créez-en un depuis le tableau de bord.</div></div>';
+  } else {
+    html += '<div id="gal-stage" style="position:relative;width:min(80vw,80vh);height:min(80vw,80vh);flex-shrink:0">';
+    html += '<svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">';
+    _GAL_TIERS.forEach(function(t){
+      html += '<circle cx="50" cy="50" r="'+t.radius+'" fill="none" stroke="'+t.color+'" stroke-opacity=".4" stroke-width="0.3" stroke-dasharray="1.4 1.4"/>';
+    });
+    html += '</svg>';
+
+    html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:17%;aspect-ratio:1/1;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#c7d2fe 40%,#4f46e5 100%);box-shadow:0 0 40px rgba(99,102,241,.5);display:flex;align-items:center;justify-content:center;text-align:center;padding:6%;box-sizing:border-box">';
+    html += '<div style="font-size:clamp(8px,1vw,12px);font-weight:800;color:#1e1b4b;line-height:1.25">Objectifs stratégiques<br>2026–2028</div>';
+    html += '</div>';
+
+    _GAL_TIERS.forEach(function(t){
+      var y = 50 - t.radius;
+      html += '<div style="position:absolute;left:50%;top:'+y+'%;transform:translate(-50%,-100%);font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+t.color+';white-space:nowrap;padding-bottom:5px;text-shadow:0 0 5px var(--bg),0 0 9px var(--bg),0 0 9px var(--bg)">'+t.label+' ('+groups[t.key].length+')</div>';
+    });
+
+    _GAL_TIERS.forEach(function(t){
+      var items = groups[t.key];
+      var n = items.length;
+      items.forEach(function(p, i){
+        var angle = (n<=1) ? -90 : (-90 + (360*i/n));
+        var rad = angle*Math.PI/180;
+        var x = 50 + t.radius*Math.cos(rad);
+        var y = 50 + t.radius*Math.sin(rad);
+        var st = _galProjStats(p);
+        var color = p.couleur || t.color;
+        var idEsc = p.id.replace(/'/g,"\\'");
+        html += '<div class="gal-node" onclick="_galOpenDetail(\''+idEsc+'\')" title="'+_galEsc(p.titre||'Sans titre')+'" style="position:absolute;left:'+x+'%;top:'+y+'%;transform:translate(-50%,-50%);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;width:10%;max-width:72px;min-width:38px">';
+        html += '<div style="width:100%;aspect-ratio:1/1;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.9),'+color+' 60%);box-shadow:0 0 14px '+color+'99;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)">'+st.pct+'%</div>';
+        html += '<div style="font-size:9px;font-weight:600;color:var(--txt);text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 0 4px var(--bg),0 0 7px var(--bg)">'+_galEsc(p.titre||'Sans titre')+'</div>';
+        html += '</div>';
+      });
+    });
+
+    html += '</div>'; // /gal-stage
+  }
+  html += '</div>'; // corps
+
+  html += '<div id="gal-detail" style="display:none;position:absolute;top:0;right:0;bottom:0;width:380px;max-width:92vw;background:var(--navy2);border-left:1px solid var(--bdr);box-shadow:-8px 0 32px rgba(0,0,0,.35);overflow-y:auto;z-index:5"></div>';
+
+  ov.innerHTML = html;
+  if (window._galOpenId) _galRenderDetail();
+}
+function _galOpenDetail(id){
+  window._galOpenId = id;
+  _galRenderDetail();
+}
+function _galCloseDetail(){
+  window._galOpenId = null;
+  var d = document.getElementById('gal-detail');
+  if (d) { d.style.display='none'; d.innerHTML=''; }
+}
+function _galSaveField(id, field, value){
+  var p = _dbdProjList().find(function(x){ return x.id===id; });
+  if (!p) return;
+  p[field] = value;
+  _dbdProjSave();
+  _galRender();
+}
+function _galRenderDetail(){
+  var d = document.getElementById('gal-detail');
+  if (!d) return;
+  var id = window._galOpenId;
+  var p = _dbdProjList().find(function(x){ return x.id===id; });
+  if (!p) { d.style.display='none'; d.innerHTML=''; return; }
+  var st = _galProjStats(p);
+  var tierMeta = _galTierMeta(_galTierOf(p));
+  var d1 = p.dateFrom ? p.dateFrom.split('-').reverse().join('/') : '—';
+  var d2 = p.dateTo ? p.dateTo.split('-').reverse().join('/') : '—';
+  var idEsc = id.replace(/'/g,"\\'");
+  var inpStyle = 'width:100%;box-sizing:border-box;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-family:inherit;font-size:12px;padding:7px 9px;outline:none';
+  var sec = function(icon, label, inner) {
+    return '<div style="padding:14px 16px;border-bottom:1px solid var(--bdr)">'
+      + '<div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--txt3);margin-bottom:8px">'+icon+' '+label+'</div>'
+      + inner + '</div>';
+  };
+  var html = '';
+  html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:16px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--navy2);z-index:1">';
+  html += '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:var(--txt);line-height:1.3">'+_galEsc(p.titre||'Sans titre')+'</div>';
+  html += (p.domaines&&p.domaines.length ? '<div style="font-size:11px;color:var(--txt3);margin-top:3px">'+_galEsc(p.domaines.join(' · '))+'</div>' : '');
+  html += '</div>';
+  html += '<button onclick="_galCloseDetail()" style="flex-shrink:0;width:26px;height:26px;border-radius:7px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:14px;cursor:pointer;font-family:inherit">✕</button>';
+  html += '</div>';
+
+  html += sec('🪐','Niveau', '<select onchange="_galSaveField(\''+idEsc+'\',\'tier\',this.value)" style="'+inpStyle+';cursor:pointer">'
+    + _GAL_TIERS.map(function(t){ return '<option value="'+t.key+'"'+(t.key===tierMeta.key?' selected':'')+'>'+t.label+'</option>'; }).join('')
+    + '</select>');
+
+  html += sec('📈','État d\'avancement',
+    '<div style="height:8px;border-radius:4px;background:var(--navy3);overflow:hidden;margin-bottom:6px"><div style="height:100%;width:'+st.pct+'%;background:'+tierMeta.color+'"></div></div>'
+    + '<div style="font-size:12px;color:var(--txt2)">'+st.effectiveDone+' / '+st.total+' tâche(s) · '+st.pct+'%'+(st.overdue?' · <span style="color:#ef4444;font-weight:700">'+st.overdue+' en retard</span>':'')+'</div>');
+
+  html += sec('📅','Échéances', '<div style="font-size:12px;color:var(--txt2)">Du '+d1+' au '+d2+'</div>');
+
+  html += sec('💶','Budget', '<input type="text" value="'+_galEsc(p.budget||'')+'" placeholder="Ex. 12 000 €" onchange="_galSaveField(\''+idEsc+'\',\'budget\',this.value)" style="'+inpStyle+'">');
+
+  html += sec('🤝','Partenaires', '<textarea rows="2" placeholder="Ex. FFA, Région Occitanie…" onchange="_galSaveField(\''+idEsc+'\',\'partenaires\',this.value)" style="'+inpStyle+';resize:vertical;font-family:inherit">'+_galEsc(p.partenaires||'')+'</textarea>');
+
+  html += sec('🎯','Indicateurs', '<textarea rows="3" placeholder="Ex. Taux de réalisation, nb bénéficiaires…" onchange="_galSaveField(\''+idEsc+'\',\'indicateurs\',this.value)" style="'+inpStyle+';resize:vertical;font-family:inherit">'+_galEsc(p.indicateurs||'')+'</textarea>');
+
+  html += sec('📎','Documents associés', '<textarea rows="3" placeholder="Un lien ou nom de document par ligne" onchange="_galSaveField(\''+idEsc+'\',\'documents\',this.value)" style="'+inpStyle+';resize:vertical;font-family:inherit">'+_galEsc(p.documents||'')+'</textarea>');
+
+  html += '<div style="padding:14px 16px"><button onclick="_dbdCloseGalaxie();_dbdOpenProjectForm(\''+idEsc+'\')" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Ouvrir la fiche complète (Kanban, équipe…) →</button></div>';
+
+  d.innerHTML = html;
+  d.style.display = 'block';
 }
 
 window._dbdExportProjects=function(){
@@ -59124,9 +59328,11 @@ function _dbdDoSaveProjData(){
     window._dbdProjCRs=_crs;
   }
   var couleur=(document.getElementById('dbdp-couleur')||{}).value||'';
-  var record={id:id,titre:titre,dateFrom:dateFrom,dateTo:dateTo,domaines:domaines,couleur:couleur,taches:window._dbdProjTasks,objectifs:objectifs,piloteProjet:piloteProjet,groupePilotage:window._dbdProjGP||[],experts:window._dbdProjExp||[],compteRendus:window._dbdProjCRs||[]};
   var list=_dbdProjList();
   var idx=list.findIndex(function(p){return p.id===id;});
+  // Fusionner sur l'objet existant (au lieu de l'écraser) pour préserver les champs
+  // gérés ailleurs (ex. tier/budget/partenaires/indicateurs/documents de la Galaxie des projets)
+  var record=Object.assign({}, idx>=0?list[idx]:{}, {id:id,titre:titre,dateFrom:dateFrom,dateTo:dateTo,domaines:domaines,couleur:couleur,taches:window._dbdProjTasks,objectifs:objectifs,piloteProjet:piloteProjet,groupePilotage:window._dbdProjGP||[],experts:window._dbdProjExp||[],compteRendus:window._dbdProjCRs||[]});
   if(idx>=0){ list[idx]=record; } else { list.push(record); }
   _dbdProjSave();
   if(typeof _dbdRenderSidebarCRs==='function') _dbdRenderSidebarCRs();
@@ -59476,6 +59682,9 @@ window._dbdToggleProjOpen=function(projId){
 window._dbdDeleteProject=function(projId){
   if(!confirm('Supprimer ce projet ?')) return;
   S.dtnProjects=(S.dtnProjects||[]).filter(function(p){return p.id!==projId;});
+  // Tombstone : empêche le projet de réapparaître via un ancien instantané cloud
+  if (!S._deletedProjects) S._deletedProjects = [];
+  S._deletedProjects.push({ id: projId, deletedAt: Date.now() });
   var order=_dbdProjOrderGet();
   var oi=order.indexOf(projId);
   if(oi>=0){ order.splice(oi,1); _dbdProjOrderSave(order); }
