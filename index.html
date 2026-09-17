@@ -10483,19 +10483,20 @@ function _agendaBuildTimeLayout(colCount) {
       _agendaNewItemMenu(getDate(), t.str, null);
     });
   })(evArea, _winSt, _span, function(){ return _agendaDayDate; });
-  // ── Dépôt d'une tâche "Mes tâches" → crée un événement agenda pré-rempli ──
-  // (heure déduite de la position du dépôt dans la grille, ou "tout le jour"
-  // si déposé sur le bandeau du haut) ; l'horaire/couleur se règlent ensuite
-  // dans la boîte de dialogue qui s'ouvre automatiquement.
+  // ── Dépôt d'une tâche "Mes tâches" (ou d'une tâche/sous-tâche de projet) →
+  // crée un événement agenda pré-rempli (heure déduite de la position du dépôt
+  // dans la grille, ou "tout le jour" si déposé sur le bandeau du haut) ;
+  // l'horaire/couleur se règlent ensuite dans la boîte de dialogue qui s'ouvre.
   (function(){
-    function _hasTodoPayload(e){
+    function _hasDropPayload(e){
       var types = e.dataTransfer && e.dataTransfer.types;
       if (!types) return false;
-      return Array.prototype.indexOf.call(types, 'application/x-dtn-todo') !== -1;
+      return Array.prototype.indexOf.call(types, 'application/x-dtn-todo') !== -1
+          || Array.prototype.indexOf.call(types, 'application/x-dtn-projtask') !== -1;
     }
     function _armDropZone(area, isAllDay){
       area.addEventListener('dragover', function(e){
-        if (!_hasTodoPayload(e)) return;
+        if (!_hasDropPayload(e)) return;
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
         area.style.outline = '2px dashed #10b981';
@@ -10503,15 +10504,35 @@ function _agendaBuildTimeLayout(colCount) {
       });
       area.addEventListener('dragleave', function(){ area.style.outline = ''; });
       area.addEventListener('drop', function(e){
-        if (!_hasTodoPayload(e)) return;
+        if (!_hasDropPayload(e)) return;
         e.preventDefault();
         area.style.outline = '';
+        var presetTitle = null, presetTodoId = null;
         var todoId = e.dataTransfer.getData('application/x-dtn-todo');
-        var todo = (typeof _dtnTodoList === 'function') ? _dtnTodoList().find(function(t){ return t.id === todoId; }) : null;
-        if (!todo) return;
-        var presetTitle = todo.thematique || todo.action || 'Tâche';
+        if (todoId) {
+          var todo = (typeof _dtnTodoList === 'function') ? _dtnTodoList().find(function(t){ return t.id === todoId; }) : null;
+          if (!todo) return;
+          presetTitle = todo.thematique || todo.action || 'Tâche';
+          presetTodoId = todoId;
+        } else {
+          var raw = e.dataTransfer.getData('application/x-dtn-projtask');
+          if (!raw) return;
+          var pt; try { pt = JSON.parse(raw); } catch(ex){ return; }
+          var proj = (typeof _dbdProjList === 'function') ? _dbdProjList().find(function(p){ return p.id === pt.projId; }) : null;
+          var task = proj && (proj.taches||[]).find(function(t){ return t.id === pt.taskId; });
+          if (!task) return;
+          var taskLbl;
+          if (pt.stId) {
+            var st = (task.sousTaches||[]).find(function(s){ return s.id === pt.stId; });
+            taskLbl = (st && st.titre) || task.label || 'Tâche';
+          } else {
+            taskLbl = task.label || 'Tâche';
+          }
+          // Préfixer par le titre du projet pour identifier la tâche une fois posée sur le calendrier
+          presetTitle = proj && proj.titre ? (proj.titre + ' — ' + taskLbl) : taskLbl;
+        }
         if (isAllDay) {
-          _agendaOpenEventForm(_agendaDayDate, null, '', '', presetTitle, todoId);
+          _agendaOpenEventForm(_agendaDayDate, null, '', '', presetTitle, presetTodoId);
         } else {
           var rect = evArea.getBoundingClientRect();
           var frac = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
@@ -10523,7 +10544,7 @@ function _agendaBuildTimeLayout(colCount) {
           var endMin = h*60+m+60; // +1h par défaut, ajustable ensuite dans la boîte de dialogue
           var eh = Math.min(23, Math.floor(endMin/60)), em = endMin%60;
           var endStr = (eh<10?'0':'')+eh+':'+(em<10?'0':'')+em;
-          _agendaOpenEventForm(_agendaDayDate, null, startStr, endStr, presetTitle, todoId);
+          _agendaOpenEventForm(_agendaDayDate, null, startStr, endStr, presetTitle, presetTodoId);
         }
       });
     }
@@ -11730,6 +11751,7 @@ function _agendaSaveEvent(dateStr, evId, btn) {
   document.getElementById('ag-event-form').remove();
   _agendaRender();
   if (typeof _dbdRenderDayCal === 'function' && document.getElementById('dbd-ag-dayview')) _dbdRenderDayCal();
+  if (typeof _crpRenderAgendaDayView === 'function' && document.getElementById('crp-ag-dayview')) _crpRenderAgendaDayView();
   toast('Événement enregistré ✓','ok');
 }
 
@@ -11859,6 +11881,12 @@ function _agendaDeleteEvent(evId) {
   saveState();
   document.getElementById('ag-event-form').remove();
   _agendaRender();
+  // _agendaRender() ne cible que #ag-main (page Agenda complète) ; les mini-calendriers
+  // du tableau de bord et du volet compétition utilisent un échange d'id temporaire
+  // (_dbdRenderDayCal / _crpRenderAgendaDayView) et doivent être resynchronisés à part,
+  // sinon l'événement supprimé y reste affiché jusqu'à réouverture manuelle.
+  if (typeof _dbdRenderDayCal === 'function' && document.getElementById('dbd-ag-dayview')) _dbdRenderDayCal();
+  if (typeof _crpRenderAgendaDayView === 'function' && document.getElementById('crp-ag-dayview')) _crpRenderAgendaDayView();
   toast('Événement supprimé','ok');
 }
 
@@ -57028,14 +57056,14 @@ function _dtnGoHome() {
       +'<div id="dbd-r-wrap" style="overflow:hidden;display:flex;flex-direction:row">'
       +'<div class="dbd-col dbd-col-r" id="dbd-tasks-col" style="flex:1;min-width:0">'
       +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div class="dbd-slbl" style="flex:1;min-width:0;margin:0">Mes tâches</div>'
-      +'<button id="dbd-cal-btn" onclick="_dbdToggleCal()" title="Afficher/Masquer l\'agenda du jour" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>'
+      +'<button id="dbd-cal-btn" onclick="_dbdToggleCal()" title="Afficher/Masquer l\'agenda du jour" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>'
       +'<button onclick="_dtnTodoExport()" title="Exporter mes tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dtnTodoImport()" title="Importer des tâches (JSON)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V7M6 11l4-4 4 4"/><path d="M4 16h12"/></svg></button>'
       +'<button onclick="_dtnTodoOpenForm()" title="Nouvelle tâche" style="width:26px;height:26px;border-radius:50%;border:none;background:#2563eb;color:#fff;font-size:18px;font-weight:300;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;flex-shrink:0">+</button></div>'
       +'<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column"><div id="dtn-todo-zone" style="flex:1;min-height:0;overflow-y:auto;padding:0"></div></div>'
       +'</div>'
-      /* Panneau calendrier du jour (masqué par défaut) */
-      +'<div id="dbd-cal-col" style="display:none;flex:1;min-width:0;flex-direction:column;overflow:hidden;border-left:1px solid var(--bdr)">'
+      /* Panneau calendrier du jour (figé/affiché dès l'ouverture du tableau de bord) */
+      +'<div id="dbd-cal-col" style="display:flex;flex:1;min-width:0;flex-direction:column;overflow:hidden;border-left:1px solid var(--bdr)">'
       +'<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--bdr);flex-shrink:0">'
       +'<button onclick="_dbdCalNavDay(-1)" title="Jour précédent" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit">‹</button>'
       +'<button onclick="_dbdCalGoToday()" title="Aujourd\'hui" style="padding:3px 10px;border-radius:6px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Aujourd\'hui</button>'
@@ -57049,10 +57077,15 @@ function _dtnGoHome() {
   }
   _dtnSetActiveNav('home');
   _dtnHomeBoot();
+  window._dbdProjSelectedId = null;
+  window._dbdProjEditMode = false;
   if (typeof _dtnRenderTodo === 'function') _dtnRenderTodo();
   _dbdRenderProjects();
   _dtnPresenceInit();
   _dtnRenderPresence();
+  // Calendrier du jour figé/affiché dès l'ouverture (repointé sur aujourd'hui)
+  _agendaDayDate = new Date().toISOString().slice(0,10);
+  if (typeof _dbdRenderDayCal === 'function') _dbdRenderDayCal();
 }
 
 // ── Calendrier jour intégré au tableau de bord ──────────────────────────
@@ -57473,7 +57506,7 @@ function _dbdRenderProjects(){
     html+='<div class="dbd-proj-card" data-proj-id="'+p.id+'" '
       +'draggable="true" ondragstart="_dbdProjDragStart(event,\''+p.id+'\')" ondragend="_dbdProjDragEnd(event)" '
       +'ondragover="_dbdProjDragOver(event)" ondrop="event.stopPropagation();_dbdProjDrop(event,\''+p.id+'\')" '
-      +'onclick="_dbdOpenProjectForm(\''+p.id+'\')" '
+      +'onclick="_dbdShowProjInTasksCol(\''+p.id+'\')" ondblclick="_dbdOpenProjectForm(\''+p.id+'\')" '
       +'style="min-height:118px;'
         +'display:flex;flex-direction:row;overflow:hidden;cursor:grab;padding:0;'+bgStyle+'">'
       +'<div style="width:4px;flex-shrink:0;background:'+barColor+';border-radius:var(--dbd-r) 0 0 var(--dbd-r)"></div>'
@@ -57495,6 +57528,289 @@ function _dbdRenderProjects(){
   });
   listEl.innerHTML=html;
 }
+// ── Aperçu projet dans la colonne "Mes tâches" (clic simple sur une carte) ──
+// Double-clic = fiche complète (_dbdOpenProjectForm). Simple clic = aperçu ici.
+window._dbdProjSelectedId = null;
+window._dbdProjEditMode = false;
+window._dbdShowProjInTasksCol = function(id){
+  window._dbdProjSelectedId = id;
+  window._dbdProjEditMode = false;
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+window._dbdShowProjEditInTasksCol = function(id){
+  window._dbdProjSelectedId = id;
+  window._dbdProjEditMode = true;
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+window._dbdShowMyTasks = function(){
+  window._dbdProjSelectedId = null;
+  window._dbdProjEditMode = false;
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+// Enregistre les modifications saisies dans le panneau d'édition rapide (colonne "Mes tâches")
+// puis revient à l'aperçu en lecture du projet.
+window._dbdSaveProjFromTasksCol = function(id){
+  _dbdDoSaveProjData();
+  window._dbdProjEditMode = false;
+  window._dbdProjSelectedId = id;
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+  if(typeof _dbdRenderProjects==='function') _dbdRenderProjects();
+};
+function _dbdRenderProjDetailPanel(el, p){
+  var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
+  var d1=p.dateFrom?p.dateFrom.split('-').reverse().join('/'):'—';
+  var d2=p.dateTo?p.dateTo.split('-').reverse().join('/'):'—';
+  var color=p.couleur||'var(--bdr)';
+  var lab='font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);margin-bottom:3px';
+  var val='font-size:12px;color:var(--txt);line-height:1.5';
+  function personName(pp){ return ((pp.prenom||'')+' '+(pp.nom||'')).trim(); }
+  var piloteName = p.piloteProjet ? personName(p.piloteProjet) : '';
+  var gp = (p.groupePilotage||[]).map(personName).filter(Boolean);
+  var exp = (p.experts||[]).map(personName).filter(Boolean);
+  // Tâches du Gantt/Kanban non terminées (À faire / À valider / En cours), regroupées et
+  // colorées comme dans "Mes tâches" : En retard / En cours / À venir / Non programmées.
+  var today=new Date().toISOString().slice(0,10);
+  var todos=typeof _dtnTodoList==='function'?_dtnTodoList():[];
+  var ganttTasks=(p.taches||[]).filter(function(t){
+    var st=t.status||(t.done?'done':'inprogress');
+    return st!=='done'&&(t.label||t.todoRef);
+  });
+  var gR=[],gC=[],gA=[],gN=[];
+  ganttTasks.forEach(function(t){
+    var dt=t.dateTo||null;
+    if(!dt){ gN.push(t); return; }
+    if(dt<today){ gR.push(t); return; }
+    if(dt>today){ gA.push(t); return; }
+    gC.push(t);
+  });
+  function _taskRow(t){
+    var td=t.todoRef?todos.find(function(x){return x.id===t.todoRef;}):null;
+    var lbl=t.label||(td?(td.action||td.thematique||''):'')||'—';
+    var dTo=t.dateTo?t.dateTo.split('-').reverse().join('/'):'';
+    var overdue=t.dateTo&&t.dateTo<today;
+    var barColor=overdue?'#ef4444':(t.dateTo===today?'#f59e0b':(t.dateTo?'#22c55e':'#94a3b8'));
+    var subs=t.sousTaches||[];
+    var hasSubs=subs.length>0;
+    var nStDone=hasSubs?subs.filter(function(s){return s.done;}).length:0;
+    var isOpen=hasSubs&&!!(window._dbdProjTaskSubOpen&&window._dbdProjTaskSubOpen[t.id]);
+    var triangle=hasSubs
+      ?'<button type="button" onclick="event.stopPropagation();window._dbdProjTaskSubOpen=window._dbdProjTaskSubOpen||{};window._dbdProjTaskSubOpen[\''+t.id+'\']=!window._dbdProjTaskSubOpen[\''+t.id+'\'];_dtnRenderTodo()" title="Afficher/masquer les sous-tâches" style="width:18px;height:18px;border:none;background:transparent;color:var(--txt3);cursor:pointer;padding:0;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(isOpen?'▾':'▸')+'</button>'
+      :'';
+    var subsHtml=(hasSubs&&isOpen)
+      ?'<div onclick="event.stopPropagation()" style="margin:2px 0 6px 27px;display:flex;flex-direction:column;gap:2px">'
+        +subs.map(function(s){
+          return '<div draggable="true" ondragstart="_dbdProjTaskDragStart(event,\''+p.id+'\',\''+t.id+'\',\''+s.id+'\')" title="Glisser vers le calendrier pour planifier" style="display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:5px;cursor:grab" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\'\'">'
+            +'<input type="checkbox"'+(s.done?' checked':'')+' onclick="event.stopPropagation();_dbdToggleProjSousTache(\''+p.id+'\',\''+t.id+'\',\''+s.id+'\')" style="width:13px;height:13px;accent-color:#10b981;cursor:pointer;flex-shrink:0">'
+            +'<span style="font-size:12px;color:var(--txt2);'+(s.done?'text-decoration:line-through;opacity:.55;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.titre||'')+'</span>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+      :'';
+    return '<div draggable="true" ondragstart="_dbdProjTaskDragStart(event,\''+p.id+'\',\''+t.id+'\')" onclick="_dbdOpenProjTaskDialog(\''+p.id+'\',\''+t.id+'\')" title="Cliquer pour modifier — glisser vers le calendrier pour planifier" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" style="display:flex;background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:'+(isOpen?'2px':'6px')+';overflow:hidden;cursor:pointer;transition:border-color .15s">'
+      +'<div style="width:4px;align-self:stretch;background:'+barColor+';flex-shrink:0"></div>'
+      +'<div style="padding:8px 10px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'
+        +'<input type="checkbox" onclick="event.stopPropagation();_dbdToggleProjTask(\''+p.id+'\',\''+t.id+'\')" style="width:15px;height:15px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:2px">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(lbl)+'</div>'
+          +(dTo?'<div style="font-size:11px;font-weight:'+(overdue?'700':'400')+';color:'+(overdue?'#ef4444':'var(--txt3)')+';margin-top:2px">'+dTo+'</div>':'')
+          +(hasSubs?'<div style="font-size:9px;color:var(--txt3);margin-top:1px">'+nStDone+'/'+subs.length+' sous-tâches</div>':'')
+        +'</div>'
+        +triangle
+      +'</div>'
+    +'</div>'
+    +subsHtml;
+  }
+  function _taskSection(secLabel,secColor,tasks){
+    if(!tasks.length) return '';
+    return '<div style="margin-bottom:4px">'
+      +'<div style="display:flex;align-items:center;gap:6px;padding:4px 2px">'
+        +'<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:'+secColor+'">'+secLabel+'</span>'
+        +'<span style="font-size:10px;color:var(--txt3);background:var(--navy3);border-radius:10px;padding:1px 6px">'+tasks.length+'</span>'
+      +'</div>'
+      +tasks.map(_taskRow).join('')
+    +'</div>';
+  }
+  var taskRowsHtml=ganttTasks.length
+    ?_taskSection('En retard','#ef4444',gR)+_taskSection('En cours','#f59e0b',gC)+_taskSection('À venir','#22c55e',gA)+_taskSection('Non programmées','#94a3b8',gN)
+    :'<div style="font-size:11px;color:var(--txt3)">Aucune tâche en cours.</div>';
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+      +'<button onclick="_dbdShowMyTasks()" title="Retour à mes tâches" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4l-6 6 6 6"/></svg></button>'
+      +'<span style="width:12px;height:12px;border-radius:50%;background:'+color+';flex-shrink:0;border:1px solid var(--bdr)"></span>'
+      +'<div style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.titre||'Sans titre')+'</div>'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:12px">'
+      +'<div><div style="'+lab+'">Dates</div><div style="'+val+'">'+d1+' → '+d2+'</div></div>'
+      +(p.domaines&&p.domaines.length?'<div><div style="'+lab+'">Domaines</div><div style="'+val+'">'+esc(p.domaines.join(', '))+'</div></div>':'')
+      +'<div><div style="'+lab+'">Objectifs</div><div style="'+val+';white-space:pre-wrap">'+(p.objectifs?esc(p.objectifs):'<span style="color:var(--txt3)">Non renseignés</span>')+'</div></div>'
+      +'<div><div style="'+lab+'">Équipe projet</div>'
+        +(piloteName?'<div style="'+val+'">'+esc(piloteName)+' <span style="color:var(--txt3);font-size:10px">— Pilote</span></div>':'')
+        +(gp.length?'<div style="'+val+'">'+esc(gp.join(', '))+' <span style="color:var(--txt3);font-size:10px">— Groupe de pilotage</span></div>':'')
+        +(exp.length?'<div style="'+val+'">'+esc(exp.join(', '))+' <span style="color:var(--txt3);font-size:10px">— Experts/Support</span></div>':'')
+        +(!piloteName&&!gp.length&&!exp.length?'<div style="'+val+';color:var(--txt3)">Non renseignée</div>':'')
+      +'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;padding-top:14px;margin-bottom:16px">'
+      +'<button onclick="_dbdShowProjEditInTasksCol(\''+p.id+'\')" title="Modifier titre, couleur, dates, domaines, objectifs, équipe…" style="padding:9px 12px;border-radius:9px;border:none;background:#2563eb;color:#fff;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 3.3a1 1 0 011.4 0l.6.6a1 1 0 010 1.4L6.4 15.6l-2.8.7.7-2.8L14.7 3.3z"/></svg>Modifier</button>'
+      +'<button onclick="_dbdOpenProjectForm(\''+p.id+'\')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bdr);background:var(--navy3);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Ouvrir la fiche complète (Gantt, équipe…) →</button>'
+    +'</div>'
+    +'<div style="'+lab+'">Tâches ('+ganttTasks.length+')</div>'
+    +taskRowsHtml;
+}
+// ── Boîte de dialogue d'édition d'une tâche de projet (+ sous-tâches) ──────
+// Ouverte en cliquant sur une des tâches listées dans l'aperçu projet (colonne "Mes tâches").
+window._dbdTaskDlgProjId=null;
+window._dbdTaskDlgTaskId=null;
+window._dbdTaskDlgTmp=null;
+window._dbdOpenProjTaskDialog=function(projId,taskId){
+  var p=_dbdProjList().find(function(pp){return pp.id===projId;});
+  var t=p&&(p.taches||[]).find(function(tt){return tt.id===taskId;});
+  if(!t) return;
+  window._dbdTaskDlgProjId=projId;
+  window._dbdTaskDlgTaskId=taskId;
+  window._dbdTaskDlgTmp=Object.assign({},t,{sousTaches:(t.sousTaches||[]).map(function(s){return Object.assign({},s);})});
+  var old=document.getElementById('dbd-tdlg-ov'); if(old) old.remove();
+  var ov=document.createElement('div');
+  ov.id='dbd-tdlg-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center';
+  ov.onclick=function(e){if(e.target===ov)_dbdCloseProjTaskDialog();};
+  document.body.appendChild(ov);
+  _dbdRenderProjTaskDialog();
+};
+window._dbdCloseProjTaskDialog=function(){
+  var ov=document.getElementById('dbd-tdlg-ov'); if(ov) ov.remove();
+  window._dbdTaskDlgProjId=null; window._dbdTaskDlgTaskId=null; window._dbdTaskDlgTmp=null;
+};
+function _dbdRenderProjTaskDialog(){
+  var ov=document.getElementById('dbd-tdlg-ov'); if(!ov) return;
+  var t=window._dbdTaskDlgTmp; if(!t) return;
+  var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
+  var escV=function(s){return (s||'').replace(/"/g,'&quot;');};
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box';
+  var lab='font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);display:block;margin-bottom:4px';
+  var statusOpts=[['todo','À faire'],['validate','À valider'],['inprogress','En cours'],['done','Terminé']];
+  var st=t.status||(t.done?'done':'inprogress');
+  var stSel='<select id="tdlg-status" style="'+inp+'">'+statusOpts.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===st?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
+  var stHtml=(t.sousTaches||[]).length?(t.sousTaches||[]).map(function(s,i){
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
+      +'<input type="checkbox"'+(s.done?' checked':'')+' onclick="_dbdTaskDlgToggleSousTache('+i+')" style="width:14px;height:14px;accent-color:#2563eb;cursor:pointer;flex-shrink:0">'
+      +'<span style="flex:1;min-width:0;font-size:12px;color:var(--txt);'+(s.done?'opacity:.5;text-decoration:line-through;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.titre||'—')+'</span>'
+      +'<button onclick="_dbdTaskDlgRemoveSousTache('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Retirer">×</button>'
+    +'</div>';
+  }).join(''):'<div style="font-size:11px;color:var(--txt3);padding:4px 0">Aucune sous-tâche.</div>';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:12px;padding:18px;width:380px;max-width:92vw;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+      +'<div style="flex:1;font-size:13px;font-weight:700;color:var(--txt)">Modifier la tâche</div>'
+      +'<button onclick="_dbdCloseProjTaskDialog()" style="width:26px;height:26px;border-radius:50%;border:none;background:var(--navy3);color:var(--txt3);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lab+'">Libellé</label><input id="tdlg-label" type="text" value="'+escV(t.label||'')+'" placeholder="Libellé de la tâche…" style="'+inp+'"></div>'
+    +'<div style="margin-bottom:10px"><label style="'+lab+'">Statut</label>'+stSel+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      +'<div><label style="'+lab+'">Du</label><input id="tdlg-from" type="date" value="'+escV(t.dateFrom||'')+'" style="'+inp+'"></div>'
+      +'<div><label style="'+lab+'">Au</label><input id="tdlg-to" type="date" value="'+escV(t.dateTo||'')+'" style="'+inp+'"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lab+'">Responsable</label><input id="tdlg-resp" type="text" value="'+escV(t.responsable?((t.responsable.prenom||'')+' '+(t.responsable.nom||'')).trim():'')+'" placeholder="Prénom NOM…" style="'+inp+'"></div>'
+    +'<div style="margin-bottom:14px"><label style="'+lab+'">Commentaire</label><textarea id="tdlg-comm" rows="3" style="'+inp+';resize:vertical;min-height:60px">'+esc(t.commentaire||'')+'</textarea></div>'
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6366f1;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:8px">Sous-tâches</div>'
+    +'<div id="tdlg-st-list" style="margin-bottom:8px">'+stHtml+'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:16px">'
+      +'<input id="tdlg-st-inp" type="text" placeholder="Nouvelle sous-tâche… + Entrée" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_dbdTaskDlgAddSousTache();}" style="'+inp+';font-size:12px">'
+      +'<button onclick="_dbdTaskDlgAddSousTache()" style="padding:0 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:16px;font-weight:400;cursor:pointer;flex-shrink:0">+</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+      +'<button onclick="_dbdTaskDlgSave()" style="flex:1;padding:9px;border-radius:9px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">Enregistrer</button>'
+      +'<button onclick="_dbdTaskDlgDelete()" style="padding:9px 14px;border-radius:9px;border:1px solid rgba(239,68,68,.35);background:transparent;color:#ef4444;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Supprimer</button>'
+    +'</div>'
+  +'</div>';
+}
+window._dbdTaskDlgAddSousTache=function(){
+  var inp=document.getElementById('tdlg-st-inp'); if(!inp) return;
+  var val=(inp.value||'').trim(); if(!val) return;
+  if(!window._dbdTaskDlgTmp.sousTaches) window._dbdTaskDlgTmp.sousTaches=[];
+  window._dbdTaskDlgTmp.sousTaches.push({id:'st_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),titre:val,done:false});
+  _dbdRenderProjTaskDialog();
+  var f=document.getElementById('tdlg-st-inp'); if(f) f.focus();
+};
+window._dbdTaskDlgToggleSousTache=function(i){
+  var s=window._dbdTaskDlgTmp.sousTaches[i]; if(!s) return;
+  s.done=!s.done;
+  _dbdRenderProjTaskDialog();
+};
+window._dbdTaskDlgRemoveSousTache=function(i){
+  window._dbdTaskDlgTmp.sousTaches.splice(i,1);
+  _dbdRenderProjTaskDialog();
+};
+window._dbdTaskDlgSave=function(){
+  var tmp=window._dbdTaskDlgTmp; if(!tmp) return;
+  tmp.label=(document.getElementById('tdlg-label')||{}).value||'';
+  tmp.status=(document.getElementById('tdlg-status')||{}).value||'todo';
+  tmp.done=(tmp.status==='done');
+  tmp.dateFrom=(document.getElementById('tdlg-from')||{}).value||'';
+  tmp.dateTo=(document.getElementById('tdlg-to')||{}).value||'';
+  tmp.commentaire=(document.getElementById('tdlg-comm')||{}).value||'';
+  var respVal=((document.getElementById('tdlg-resp')||{}).value||'').trim();
+  if(respVal){
+    var parts=typeof _dbdParseProjName==='function'?_dbdParseProjName(respVal):{prenom:respVal,nom:''};
+    tmp.responsable={nom:parts.nom,prenom:parts.prenom};
+  } else { tmp.responsable=null; }
+  var p=_dbdProjList().find(function(pp){return pp.id===window._dbdTaskDlgProjId;});
+  if(!p) return;
+  var idx=(p.taches||[]).findIndex(function(tt){return tt.id===window._dbdTaskDlgTaskId;});
+  if(idx<0) return;
+  p.taches[idx]=Object.assign({},p.taches[idx],tmp);
+  _dbdProjSave();
+  // Si la fiche complète (Gantt/Kanban) de ce projet est ouverte, la resynchroniser aussi
+  if(document.getElementById('dbd-proj-ov')&&window._dbdCurrentProjId===p.id&&Array.isArray(window._dbdProjTasks)){
+    var kIdx=window._dbdProjTasks.findIndex(function(tt){return tt.id===window._dbdTaskDlgTaskId;});
+    if(kIdx>=0){ window._dbdProjTasks[kIdx]=Object.assign({},window._dbdProjTasks[kIdx],tmp); }
+    if(typeof _dbdRenderKanban==='function') _dbdRenderKanban();
+    if(typeof _dbdRenderGantt==='function') _dbdRenderGantt();
+  }
+  _dbdCloseProjTaskDialog();
+  if(typeof _dbdRenderProjects==='function') _dbdRenderProjects();
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+window._dbdTaskDlgDelete=function(){
+  if(!confirm('Supprimer cette tâche ?')) return;
+  var p=_dbdProjList().find(function(pp){return pp.id===window._dbdTaskDlgProjId;});
+  if(!p) return;
+  p.taches=(p.taches||[]).filter(function(tt){return tt.id!==window._dbdTaskDlgTaskId;});
+  _dbdProjSave();
+  if(document.getElementById('dbd-proj-ov')&&window._dbdCurrentProjId===p.id&&Array.isArray(window._dbdProjTasks)){
+    window._dbdProjTasks=window._dbdProjTasks.filter(function(tt){return tt.id!==window._dbdTaskDlgTaskId;});
+    if(typeof _dbdRenderKanban==='function') _dbdRenderKanban();
+    if(typeof _dbdRenderGantt==='function') _dbdRenderGantt();
+  }
+  _dbdCloseProjTaskDialog();
+  if(typeof _dbdRenderProjects==='function') _dbdRenderProjects();
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+// Panneau d'édition rapide des rubriques projet, affiché dans la colonne "Mes tâches"
+// (bouton "Modifier" ci-dessus). Réutilise les mêmes champs/ids et la même sauvegarde
+// (_dbdProjFormFieldsHtml / _dbdDoSaveProjData) que la fiche complète.
+function _dbdRenderProjEditPanel(el, p){
+  window._dbdCurrentProjId = p.id;
+  var tasks=(p.taches||[]).map(function(t){ if(!t.status) t.status=t.done?'done':'inprogress'; return t; });
+  window._dbdProjTasks = JSON.parse(JSON.stringify(tasks));
+  window._dbdProjGP = JSON.parse(JSON.stringify(p.groupePilotage||[]));
+  window._dbdProjExp = JSON.parse(JSON.stringify(p.experts||[]));
+  window._dbdProjCRs = JSON.parse(JSON.stringify(p.compteRendus||[]));
+  window._dbdProjCRIdx = null;
+  _dbdBuildPeopleAll();
+  var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+      +'<button onclick="_dbdShowProjInTasksCol(\''+p.id+'\')" title="Annuler" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);background:transparent;color:var(--txt2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4l-6 6 6 6"/></svg></button>'
+      +'<div style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Modifier — '+esc(p.titre||'Sans titre')+'</div>'
+    +'</div>'
+    +_dbdProjFormFieldsHtml(p)
+    +'<div style="display:flex;gap:8px;padding-top:8px">'
+      +'<button onclick="_dbdSaveProjFromTasksCol(\''+p.id+'\')" style="flex:1;padding:9px;border-radius:9px;border:none;background:#2563eb;color:#fff;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit">Enregistrer</button>'
+      +'<button onclick="_dbdShowProjInTasksCol(\''+p.id+'\')" style="padding:9px 14px;border-radius:9px;border:1px solid var(--bdr);background:transparent;color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Annuler</button>'
+    +'</div>';
+  _dbdRenderGP();
+  _dbdRenderExp();
+}
 window._dbdToggleProjLeft = function(){
   var left = document.getElementById('dbdp-proj-left');
   if (!left) return;
@@ -57508,8 +57824,80 @@ window._dbdToggleProjLeft = function(){
     btn.style.color = hidden ? '#fff' : '#888';
   }
 };
+// People list for autocomplete (pilots + collectif + staff + partenaires, deduped) — partagé entre la fiche complète et l'édition rapide dans "Mes tâches"
+function _dbdBuildPeopleAll(){
+  var _peopleAll=[];
+  var _padd=function(nm,pr,extra){nm=(nm||'').trim();pr=(pr||'').trim();if(!nm&&!pr)return;var ex=_peopleAll.find(function(x){return x.nom.toUpperCase()===nm.toUpperCase()&&x.prenom.toUpperCase()===pr.toUpperCase();});if(!ex)_peopleAll.push(Object.assign({nom:nm,prenom:pr,tel:'',email:''},extra||{}));};
+  (S.pilots||[]).forEach(function(p){_padd(p.nom,p.prenom,{id:p.id,tel:p.tel||'',email:p.email||''});});
+  (S.collectif||[]).forEach(function(m){_padd(m.nom,m.prenom,{id:m.id||('c-'+(m.nom||'')),tel:m.tel||'',email:m.email||''});});
+  if(S.staff){var _sa=Array.isArray(S.staff)?S.staff:[].concat.apply([],Object.values(S.staff).filter(Array.isArray));_sa.forEach(function(m){_padd(m.nom,m.prenom,{tel:m.tel||'',email:m.email||''});});}
+  if(S.partenaires){Object.values(S.partenaires).forEach(function(arr){(arr||[]).forEach(function(p){var parts=(p.representant||'').trim().split(/\s+/);var pr=parts[0]||'';var nm=parts.slice(1).join(' ')||'';_padd(nm,pr,{tel:p.telephone||'',email:p.email||''});});});}
+  _peopleAll.sort(function(a,b){return((a.nom+a.prenom)<(b.nom+b.prenom)?-1:1);});
+  window._dbdPeopleAll=_peopleAll;
+  return _peopleAll;
+}
+// Rubriques "projet" (titre, couleur, dates, domaines, objectifs, équipe projet) — partagées
+// entre la fiche complète (#dbd-proj-ov) et l'édition rapide dans la colonne "Mes tâches".
+// Les ids générés (dbdp-titre, dbdp-from…) doivent rester uniques dans le DOM : les deux
+// vues ne sont jamais affichées en même temps (voir _dbdOpenProjectForm et _dbdShowProjEditInTasksCol).
+function _dbdProjFormFieldsHtml(proj){
+  var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
+  var escV=function(s){return (s||'').replace(/"/g,'&quot;');};
+  var inp='width:100%;background:var(--navy3);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;color:var(--txt);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box';
+  var lab='font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);display:block;margin-bottom:4px';
+  var dom=(proj&&proj.domaines||[]).join(', ');
+  var objectifs=proj?(proj.objectifs||''):'';
+  var piloteProj=proj?(proj.piloteProjet||null):null;
+  return ''
+    // ── Section Projet ──
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">📁 Projet</div>'
+    +'<div style="margin-bottom:10px"><label style="'+lab+'">Titre</label><input id="dbdp-titre" type="text" value="'+escV(proj?proj.titre:'')+'" placeholder="Nom du projet…" style="'+inp+'"></div>'
+    +'<div style="margin-bottom:12px"><label style="'+lab+'">Couleur</label>'
+      +'<div id="dbdp-couleur-wrap" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+        +(['#6366f1','#2563eb','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#f97316','#64748b'].map(function(c){
+          var sel=(proj&&proj.couleur===c)?'outline:2px solid #fff;outline-offset:2px;':'';
+          return '<span data-c="'+c+'" onclick="_dbdPickProjColor(\''+c+'\')" title="'+c+'" style="display:inline-block;width:20px;height:20px;border-radius:50%;background:'+c+';cursor:pointer;flex-shrink:0;'+sel+'"></span>';
+        }).join(''))
+        +'<span data-c="" onclick="_dbdPickProjColor(\'\')" title="Aucune couleur" style="display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--navy3);border:1px solid var(--bdr);cursor:pointer;flex-shrink:0;'+((!proj||!proj.couleur)?'outline:2px solid #fff;outline-offset:2px;':'')+'"></span>'
+      +'</div>'
+      +'<input type="hidden" id="dbdp-couleur" value="'+escV(proj?proj.couleur||'':'')+'">'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      +'<div><label style="'+lab+'">Du</label><input id="dbdp-from" type="date" value="'+escV(proj?proj.dateFrom:'')+'" style="'+inp+'"></div>'
+      +'<div><label style="'+lab+'">Au</label><input id="dbdp-to" type="date" value="'+escV(proj?proj.dateTo:'')+'" style="'+inp+'"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:14px"><label style="'+lab+'">Domaines <span style="font-weight:400;text-transform:none;font-size:10px">(séparés par virgule)</span></label><input id="dbdp-dom" type="text" value="'+escV(dom)+'" placeholder="Formation, Sécurité…" style="'+inp+'"></div>'
+    // ── Section Objectifs ──
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">🎯 Objectifs</div>'
+    +'<div style="margin-bottom:14px"><textarea id="dbdp-objectifs" rows="4" placeholder="Décrire les objectifs du projet…" style="'+inp+';resize:vertical;min-height:80px">'+esc(objectifs)+'</textarea></div>'
+    // ── Section Équipe ──
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6366f1;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">👥 Équipe projet</div>'
+    +'<div style="margin-bottom:12px">'
+      +'<label style="'+lab+'">Pilote du projet</label>'
+      +'<input id="dbdp-pilote" autocomplete="nope" value="'+escV(piloteProj?((piloteProj.prenom||'')+' '+(piloteProj.nom||'')).trim():'')+'" placeholder="Prénom NOM…" oninput="_dbdAC(this,\'dbdp-pilote-ac\');if(typeof _dbdRenderSidebarAvatars===\'function\')_dbdRenderSidebarAvatars();" onblur="_dbdACHide(\'dbdp-pilote-ac\',300)" style="'+inp+'">'
+      +'<div id="dbdp-pilote-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:12px">'
+      +'<label style="'+lab+'">Groupe de pilotage</label>'
+      +'<div id="dbdp-gp-list"></div>'
+      +'<input id="dbdp-gp-inp" autocomplete="nope" placeholder="Prénom NOM… + Entrée" oninput="_dbdAC(this,\'dbdp-gp-ac\',\'_dbdProjAddGP\')" onblur="_dbdACHide(\'dbdp-gp-ac\',300)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_dbdProjAddGP();}" style="'+inp+';font-size:11px;margin-top:5px">'
+      +'<div id="dbdp-gp-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
+    +'</div>'
+    +'<div>'
+      +'<label style="'+lab+'">Experts / Support</label>'
+      +'<div id="dbdp-exp-list"></div>'
+      +'<input id="dbdp-exp-inp" autocomplete="nope" placeholder="Prénom NOM… + Entrée" oninput="_dbdAC(this,\'dbdp-exp-ac\',\'_dbdProjAddExp\')" onblur="_dbdACHide(\'dbdp-exp-ac\',300)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_dbdProjAddExp();}" style="'+inp+';font-size:11px;margin-top:5px">'
+      +'<div id="dbdp-exp-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
+    +'</div>';
+}
 function _dbdOpenProjectForm(editId){
   var existing=document.getElementById('dbd-proj-ov'); if(existing) existing.remove();
+  // Sécurité anti-collision d'ids : l'édition rapide dans "Mes tâches" utilise les
+  // mêmes ids (dbdp-titre, dbdp-from…) que cette fiche complète — jamais les deux à la fois.
+  if(window._dbdProjSelectedId||window._dbdProjEditMode){
+    window._dbdProjSelectedId=null; window._dbdProjEditMode=false;
+    if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+  }
   var list=_dbdProjList();
   var proj=editId?list.find(function(p){return p.id===editId;}):null;
   var esc=typeof escH==='function'?escH:function(s){return (s||'').replace(/</g,'&lt;');};
@@ -57529,15 +57917,7 @@ function _dbdOpenProjectForm(editId){
     return t;
   });
   var dom=(proj&&proj.domaines||[]).join(', ');
-  // People list for autocomplete (pilots + collectif, deduped)
-  var _peopleAll=[];
-  var _padd=function(nm,pr,extra){nm=(nm||'').trim();pr=(pr||'').trim();if(!nm&&!pr)return;var ex=_peopleAll.find(function(x){return x.nom.toUpperCase()===nm.toUpperCase()&&x.prenom.toUpperCase()===pr.toUpperCase();});if(!ex)_peopleAll.push(Object.assign({nom:nm,prenom:pr,tel:'',email:''},extra||{}));};
-  (S.pilots||[]).forEach(function(p){_padd(p.nom,p.prenom,{id:p.id,tel:p.tel||'',email:p.email||''});});
-  (S.collectif||[]).forEach(function(m){_padd(m.nom,m.prenom,{id:m.id||('c-'+(m.nom||'')),tel:m.tel||'',email:m.email||''});});
-  if(S.staff){var _sa=Array.isArray(S.staff)?S.staff:[].concat.apply([],Object.values(S.staff).filter(Array.isArray));_sa.forEach(function(m){_padd(m.nom,m.prenom,{tel:m.tel||'',email:m.email||''});});}
-  if(S.partenaires){Object.values(S.partenaires).forEach(function(arr){(arr||[]).forEach(function(p){var parts=(p.representant||'').trim().split(/\s+/);var pr=parts[0]||'';var nm=parts.slice(1).join(' ')||'';_padd(nm,pr,{tel:p.telephone||'',email:p.email||''});});});}
-  _peopleAll.sort(function(a,b){return((a.nom+a.prenom)<(b.nom+b.prenom)?-1:1);});
-  window._dbdPeopleAll=_peopleAll;
+  var _peopleAll=_dbdBuildPeopleAll();
   var dlOpts=_peopleAll.map(function(p){return '<option value="'+escV((p.prenom+' '+p.nom).trim())+'">';}).join('');
   // Project team fields
   var objectifs=proj?(proj.objectifs||''):'';
@@ -57592,46 +57972,7 @@ function _dbdOpenProjectForm(editId){
     +'</div>'
     +'<div id="dbdp-proj-grid" style="display:flex;flex-direction:row;overflow:hidden;flex:1;min-height:0">'
       +'<div id="dbdp-proj-left" style="width:320px;flex-shrink:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:0;border-right:1px solid var(--bdr)">'
-        // ── Section Projet ──
-        +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">📁 Projet</div>'
-        +'<div style="margin-bottom:10px"><label style="'+lab+'">Titre</label><input id="dbdp-titre" type="text" value="'+escV(proj?proj.titre:'')+'" placeholder="Nom du projet…" style="'+inp+'"></div>'
-        +'<div style="margin-bottom:12px"><label style="'+lab+'">Couleur</label>'
-          +'<div id="dbdp-couleur-wrap" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
-            +(['#6366f1','#2563eb','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#f97316','#64748b'].map(function(c){
-              var sel=(proj&&proj.couleur===c)?'outline:2px solid #fff;outline-offset:2px;':'';
-              return '<span data-c="'+c+'" onclick="_dbdPickProjColor(\''+c+'\')" title="'+c+'" style="display:inline-block;width:20px;height:20px;border-radius:50%;background:'+c+';cursor:pointer;flex-shrink:0;'+sel+'"></span>';
-            }).join(''))
-            +'<span data-c="" onclick="_dbdPickProjColor(\'\')" title="Aucune couleur" style="display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--navy3);border:1px solid var(--bdr);cursor:pointer;flex-shrink:0;'+((!proj||!proj.couleur)?'outline:2px solid #fff;outline-offset:2px;':'')+'"></span>'
-          +'</div>'
-          +'<input type="hidden" id="dbdp-couleur" value="'+escV(proj?proj.couleur||'':'')+'">'
-        +'</div>'
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
-          +'<div><label style="'+lab+'">Du</label><input id="dbdp-from" type="date" value="'+escV(proj?proj.dateFrom:'')+'" style="'+inp+'"></div>'
-          +'<div><label style="'+lab+'">Au</label><input id="dbdp-to" type="date" value="'+escV(proj?proj.dateTo:'')+'" style="'+inp+'"></div>'
-        +'</div>'
-        +'<div style="margin-bottom:14px"><label style="'+lab+'">Domaines <span style="font-weight:400;text-transform:none;font-size:10px">(séparés par virgule)</span></label><input id="dbdp-dom" type="text" value="'+escV(dom)+'" placeholder="Formation, Sécurité…" style="'+inp+'"></div>'
-        // ── Section Objectifs ──
-        +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--txt3);border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">🎯 Objectifs</div>'
-        +'<div style="margin-bottom:14px"><textarea id="dbdp-objectifs" rows="4" placeholder="Décrire les objectifs du projet…" style="'+inp+';resize:vertical;min-height:80px">'+esc(objectifs)+'</textarea></div>'
-        // ── Section Équipe ──
-        +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6366f1;border-bottom:1px solid var(--bdr);padding-bottom:5px;margin-bottom:10px">👥 Équipe projet</div>'
-        +'<div style="margin-bottom:12px">'
-          +'<label style="'+lab+'">Pilote du projet</label>'
-          +'<input id="dbdp-pilote" autocomplete="nope" value="'+escV(piloteProj?((piloteProj.prenom||'')+' '+(piloteProj.nom||'')).trim():'')+'" placeholder="Prénom NOM…" oninput="_dbdAC(this,\'dbdp-pilote-ac\');if(typeof _dbdRenderSidebarAvatars===\'function\')_dbdRenderSidebarAvatars();" onblur="_dbdACHide(\'dbdp-pilote-ac\',300)" style="'+inp+'">'
-          +'<div id="dbdp-pilote-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
-        +'</div>'
-        +'<div style="margin-bottom:12px">'
-          +'<label style="'+lab+'">Groupe de pilotage</label>'
-          +'<div id="dbdp-gp-list"></div>'
-          +'<input id="dbdp-gp-inp" autocomplete="nope" placeholder="Prénom NOM… + Entrée" oninput="_dbdAC(this,\'dbdp-gp-ac\',\'_dbdProjAddGP\')" onblur="_dbdACHide(\'dbdp-gp-ac\',300)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_dbdProjAddGP();}" style="'+inp+';font-size:11px;margin-top:5px">'
-          +'<div id="dbdp-gp-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
-        +'</div>'
-        +'<div>'
-          +'<label style="'+lab+'">Experts / Support</label>'
-          +'<div id="dbdp-exp-list"></div>'
-          +'<input id="dbdp-exp-inp" autocomplete="nope" placeholder="Prénom NOM… + Entrée" oninput="_dbdAC(this,\'dbdp-exp-ac\',\'_dbdProjAddExp\')" onblur="_dbdACHide(\'dbdp-exp-ac\',300)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_dbdProjAddExp();}" style="'+inp+';font-size:11px;margin-top:5px">'
-          +'<div id="dbdp-exp-ac" style="display:none;position:fixed;z-index:10001;background:var(--navy2);border:1px solid var(--bdr);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);max-height:180px;overflow-y:auto;min-width:220px"></div>'
-        +'</div>'
+        +_dbdProjFormFieldsHtml(proj)
       +'</div>'
       +'<div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden">'
         // ── Vue combinée : Planning (haut) + Tableau de tâches (bas) ──
@@ -57645,12 +57986,12 @@ function _dbdOpenProjectForm(editId){
               +'<div id="dbdp-col-todo" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'todo\')"></div>'
             +'</div>'
             +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
-              +colHdr('En cours','#f59e0b','inprogress')
-              +'<div id="dbdp-col-inprogress" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'inprogress\')"></div>'
-            +'</div>'
-            +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
               +colHdr('À valider','#8b5cf6','validate')
               +'<div id="dbdp-col-validate" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'validate\')"></div>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">'
+              +colHdr('En cours','#f59e0b','inprogress')
+              +'<div id="dbdp-col-inprogress" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_dbdKanbanColOver(event)" ondrop="_dbdKanbanDrop(event,\'inprogress\')"></div>'
             +'</div>'
             +'<div style="display:flex;flex-direction:column;overflow:hidden">'
               +colHdr('Terminé','#10b981','done')
@@ -59715,6 +60056,24 @@ window._dbdDeleteProjTask=function(projId,taskId){
   _dbdRenderProjects();
   if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
 };
+// Coche/décoche une sous-tâche depuis l'aperçu "Mes tâches" (sans ouvrir la boîte de dialogue)
+window._dbdToggleProjSousTache=function(projId,taskId,stId){
+  var proj=_dbdProjList().find(function(p){return p.id===projId;}); if(!proj) return;
+  var task=(proj.taches||[]).find(function(t){return t.id===taskId;}); if(!task) return;
+  var st=(task.sousTaches||[]).find(function(s){return s.id===stId;}); if(!st) return;
+  st.done=!st.done;
+  _dbdProjSave();
+  if(typeof _dtnRenderTodo==='function') _dtnRenderTodo();
+};
+// Glisser une tâche (ou une sous-tâche, si stId est fourni) de projet vers le calendrier du jour
+// pour créer un événement agenda pré-rempli — voir le drop-zone dédié dans _agendaRenderDay.
+window._dbdProjTaskDragStart=function(ev,projId,taskId,stId){
+  if(!ev.dataTransfer) return;
+  ev.dataTransfer.effectAllowed='copy';
+  var payload=JSON.stringify({projId:projId,taskId:taskId,stId:stId||null});
+  try{ ev.dataTransfer.setData('application/x-dtn-projtask',payload); }catch(e){}
+  try{ ev.dataTransfer.setData('text/plain',payload); }catch(e){}
+};
 
 // ══ To-do liste personnelle du tableau de bord DTN ═════════════════════════
 // Attachée au titulaire du compte : stockée dans la table Supabase dtn_todos,
@@ -59892,6 +60251,15 @@ async function _dtnTodoMoveToDate(draggedId, targetId){
 }
 function _dtnRenderTodo(){
   var el = document.getElementById('dtn-todo-zone'); if(!el) return;
+  if(window._dbdProjSelectedId){
+    var _selProj=(typeof _dbdProjList==='function'?_dbdProjList():[]).find(function(pp){return pp.id===window._dbdProjSelectedId;});
+    if(_selProj){
+      if(window._dbdProjEditMode) _dbdRenderProjEditPanel(el,_selProj);
+      else _dbdRenderProjDetailPanel(el,_selProj);
+      return;
+    }
+    window._dbdProjSelectedId=null; window._dbdProjEditMode=false;
+  }
   if(!_dtnTodoIsGuest() && !window._dtnTodoRemote[_dtnTodoUserKey()]){
     el.innerHTML = '<div style="font-size:12px;color:var(--txt3);padding:4px 0">Chargement de votre to-do liste…</div>';
     _dtnTodoRemoteFetch().then(function(){ _dtnRenderTodo(); });
@@ -59940,7 +60308,7 @@ function _dtnRenderTodoNow(el){
     var opP = isDone ? 'opacity:.45;' : '';
     var stColP = {todo:'#ef4444',inprogress:'#f59e0b',done:'#10b981'};
     var barColorP = stColP[t.status||(isDone?'done':(overdue?'todo':'inprogress'))]||'#f59e0b';
-    return '<div onclick="event.stopPropagation()" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;transition:border-color .15s;flex-shrink:0;'+opP+'cursor:default">'
+    return '<div draggable="true" ondragstart="_dbdProjTaskDragStart(event,\''+p.id+'\',\''+t.id+'\')" onclick="event.stopPropagation()" title="Glisser vers le calendrier pour planifier" onmouseover="this.style.borderColor=\'var(--bdr2,#384060)\'" onmouseout="this.style.borderColor=\'var(--bdr)\'" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:9px;margin-bottom:6px;display:flex;overflow:hidden;transition:border-color .15s;flex-shrink:0;'+opP+'cursor:grab">'
       +'<div style="width:4px;background:'+barColorP+';flex-shrink:0;align-self:stretch"></div>'
       +'<div style="padding:9px 11px;display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">'
         +'<input type="checkbox"'+(isDone?' checked':'')+' onclick="event.stopPropagation();_dbdToggleProjTask(\''+p.id+'\',\''+t.id+'\')" style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;margin-top:2px">'
