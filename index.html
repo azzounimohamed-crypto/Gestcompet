@@ -5092,7 +5092,7 @@ function clearLocalStorageQuota() {
                'geststol_agenda_colors', 'geststol_agenda_window', 'geststol_media_v', 'geststol_stolresults_backup',
                'geststol_vibration', 'geststol_notif_sound', LS_AGENDA_EVS, LS_NDF, LS_SECURITE_EVS, LS_AIDES, LS_GANTT, LS_COLLECTIF, LS_SIG, LS_STAMP,
                LS_ETAPES, 'dtn_projects', 'dtn_proj_order', 'dtn_proj_pos', '_cr_anthropic_key', '_cr_known_people', '_gantt_zoom', '_dbdGanttScale',
-               'gestdtn_dtntodos'];
+               'gestdtn_dtntodos', 'gestappli_repasSortMode'];
   _COL_KEYS.forEach(function(k){ _KEEP.push(k); });
   try {
     // Étape 1 : supprimer toutes les clés inconnues
@@ -5261,7 +5261,8 @@ function _flushSaveState() {
     factRepasReg:S.factRepasReg||{map:{},seq:{}},
     etapes:S.etapes||{},
     dtnProjects:S.dtnProjects||[],
-    _deletedProjects:S._deletedProjects||[]
+    _deletedProjects:S._deletedProjects||[],
+    repas:S.repas||{}, repasTarifs:S.repasTarifs||{}, hebergementModes:S.hebergementModes||{}
   });
   // ── Clé dédiée étapes (filet anti-perte — jamais strippée) ──
   // Priorité absolue : si le quota est dépassé, on libère de la place et on réessaie
@@ -5294,7 +5295,8 @@ function _flushSaveState() {
         _enrollResetAt:S._enrollResetAt||{}, enrollMeta:S.enrollMeta||{},
         runs:S.runs, staff:S.staff, settings:S.settings||{},
         homeTodosByComp:S.homeTodosByComp,
-        _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{}
+        _deletedComps:S._deletedComps||[], _deletedStaff:S._deletedStaff||{},
+        repas:S.repas||{}, repasTarifs:S.repasTarifs||{}, hebergementModes:S.hebergementModes||{}
       })));
       console.log('[Storage] Sauvegarde allégée (quota) — IndexedDB = source principale');
     } catch(e2) {
@@ -28690,6 +28692,12 @@ async function loadFromSupabaseFirst() {
     var savedStaff   = S.staff       ? JSON.parse(JSON.stringify(S.staff))       : null;
     var savedPart    = S.partenaires ? JSON.parse(JSON.stringify(S.partenaires)) : null;
     var savedMat     = S.materiel    ? JSON.parse(JSON.stringify(S.materiel))    : null;
+    // Repas/Hébergement : même filet que staff/partenaires/matériel ci-dessus — une compétition
+    // ne doit jamais perdre ses cases repas cochées ou sa config hébergement parce qu'un
+    // instantané cloud plus ancien (push manqué) a été appliqué entre-temps.
+    var savedRepas       = S.repas            ? JSON.parse(JSON.stringify(S.repas))            : null;
+    var savedRepasTarifs = S.repasTarifs      ? JSON.parse(JSON.stringify(S.repasTarifs))      : null;
+    var savedHebModes    = S.hebergementModes ? JSON.parse(JSON.stringify(S.hebergementModes)) : null;
     var savedBudgets = keepLocalBudgets ? S.budgets          : null;
     var savedEspaces = keepLocalEspaces ? (S.espacesPartages||[]).slice() : null;
     var savedTodos   = S.homeTodosByComp ? JSON.parse(JSON.stringify(S.homeTodosByComp)) : null;
@@ -28743,6 +28751,13 @@ async function loadFromSupabaseFirst() {
       if(_dpRaw){ var _dpArr=JSON.parse(_dpRaw); if(Array.isArray(_dpArr)&&_dpArr.length) savedDtnProjects=_dpArr; }
     }catch(e){}
     if(!savedDtnProjects && S.dtnProjects && S.dtnProjects.length) savedDtnProjects=JSON.parse(JSON.stringify(S.dtnProjects));
+    // ✅ GARDE TOMBSTONES PROJETS : même bug que _deletedComps corrigé précédemment (voir
+    // savedDeletedComps ci-dessous) — sans ce filet, un projet supprimé localement mais
+    // encore présent dans un ancien instantané cloud revenait à chaque démarrage, même
+    // après le filtre anti-résurrection de _dbdProjLoad() (celui-ci s'applique trop tard :
+    // S._deletedProjects lui-même vient d'être écrasé par Object.assign(S, cloudData)
+    // ci-dessous et peut ne plus contenir la tombstone si le cloud est en retard).
+    var savedDeletedProjects = S._deletedProjects ? S._deletedProjects.slice() : null;
 
     Object.keys(S).forEach(function(k) { delete S[k]; });
     Object.assign(S, cloudData);
@@ -28778,6 +28793,9 @@ async function loadFromSupabaseFirst() {
     if (savedStaff)   S.staff           = _mergeObjOfArrays(savedStaff, S.staff       || {});
     if (savedPart)    S.partenaires     = _mergeObjOfArrays(savedPart,  S.partenaires || {});
     if (savedMat)     S.materiel        = _mergeObjOfArrays(savedMat,   S.materiel    || {});
+    if (savedRepas)       S.repas            = _mergeObjOfArrays(savedRepas,       S.repas            || {});
+    if (savedRepasTarifs) S.repasTarifs      = _mergeObjOfArrays(savedRepasTarifs, S.repasTarifs      || {});
+    if (savedHebModes)    S.hebergementModes = _mergeObjOfArrays(savedHebModes,    S.hebergementModes || {});
     if (savedBudgets) S.budgets         = savedBudgets;
     if (savedEspaces) S.espacesPartages = savedEspaces;
     if (savedTodos)   S.homeTodosByComp = _mergeObjOfArrays(savedTodos, S.homeTodosByComp || {});
@@ -28786,6 +28804,18 @@ async function loadFromSupabaseFirst() {
       var projById = {}; cloudProj.forEach(function(p){if(p&&p.id) projById[p.id]=p;});
       savedDtnProjects.forEach(function(p){if(p&&p.id) projById[p.id]=p;});
       S.dtnProjects = Object.values(projById);
+    }
+    if (savedDeletedProjects) {
+      if (!S._deletedProjects) S._deletedProjects = [];
+      savedDeletedProjects.forEach(function(t){
+        var pid = (t && typeof t === 'object') ? t.id : t;
+        if (!pid) return;
+        if (!S._deletedProjects.some(function(x){ return ((x && x.id) || x) === pid; })) S._deletedProjects.push(t);
+      });
+      // Retirer tout projet revenu via le cloud alors qu'il est tombstoné localement
+      var _delProjIds2 = {};
+      S._deletedProjects.forEach(function(t){ var pid=(t&&typeof t==='object')?t.id:t; if(pid) _delProjIds2[pid]=true; });
+      if (S.dtnProjects) S.dtnProjects = S.dtnProjects.filter(function(p){ return !(p && p.id && _delProjIds2[p.id]); });
     }
     if (savedPilots)  S.pilots = savedPilots;
     // ✅ GARANTIE DES SAISIES : une valeur CLOUD VIDE ne doit JAMAIS écraser une saisie
@@ -29525,16 +29555,11 @@ async function pullFromCloud() {
       S.repas[cid] = Object.assign({}, winner, { checks: mergedChecks });
     });
   }
-  // repasTarifs : simple objet plat — remote wins si présent
-  if (r.repasTarifs && typeof r.repasTarifs === 'object') {
-    if (!S.repasTarifs) S.repasTarifs = {};
-    Object.assign(S.repasTarifs, r.repasTarifs);
-  }
-  // hebergementModes : même mécanisme (objet plat par compId, remote wins si présent)
-  if (r.hebergementModes && typeof r.hebergementModes === 'object') {
-    if (!S.hebergementModes) S.hebergementModes = {};
-    Object.assign(S.hebergementModes, r.hebergementModes);
-  }
+  // repasTarifs / hebergementModes : objets indexés par compId — fusion par compId
+  // via _mergeObjOfArrays (même mécanisme que staff/materiel ci-dessus), pour ne jamais
+  // écraser en bloc une édition locale récente par un instantané cloud plus ancien.
+  S.repasTarifs      = _mergeObjOfArrays(S.repasTarifs      || {}, r.repasTarifs      || {});
+  S.hebergementModes = _mergeObjOfArrays(S.hebergementModes || {}, r.hebergementModes || {});
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
   // ✅ Site & Étapes : cette clé n'était fusionnée qu'au démarrage (_applyCloudData),
   // jamais pendant la synchro périodique (3 min) d'un onglet resté ouvert. Un onglet
@@ -35038,6 +35063,21 @@ function silentPush(fast) {
     }); // fin _autoOffloadBlobs().then
   }, _pushDelay); // debounce : 10s normal, 2,5s en mode saisie live STOL
 }
+// Si un push silencieux est encore en attente (debounce 10s) quand l'utilisateur ferme
+// l'onglet ou le met en arrière-plan, le lancer immédiatement plutôt que d'attendre le
+// délai complet — sans ça, une saisie faite dans les 10 dernières secondes n'atteint
+// jamais le cloud. Best-effort : rien ne garantit qu'il termine avant la fermeture réelle
+// (la sauvegarde locale — localStorage/IndexedDB, voir _flushSaveState — reste la
+// protection fiable contre la perte de données, celle-ci ne fait qu'accélérer le cloud).
+function _flushSilentPush() {
+  if (!_silentPushTimer) return;
+  clearTimeout(_silentPushTimer);
+  _silentPushTimer = null;
+  if (!getSB() || !navigator.onLine) return;
+  Promise.resolve(_autoOffloadBlobs()).catch(function(){}).then(function(){ pushToCloud().catch(function(){}); });
+}
+window.addEventListener('beforeunload', _flushSilentPush);
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') _flushSilentPush(); });
 
 var _syncFailSince   = 0;
 var _syncAlerteShown = false;
