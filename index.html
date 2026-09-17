@@ -632,7 +632,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
   body.dtn-sb-hidden #header-spacer{display:block!important;flex:1!important}
 
   /* ── Zone contenu ── */
-  #main{grid-column:1;grid-row:2;overflow:visible;height:calc(100vh - 60px);padding-bottom:0}
+  #main{grid-column:1;grid-row:2;overflow:visible;min-width:0;height:calc(100vh - 60px);padding-bottom:0}
 
   /* ── Toast ── */
   #toast{bottom:24px}
@@ -3415,6 +3415,10 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
               <input class="cf-input" type="date" id="comp-date-to">
             </div>
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);margin-top:4px">Report éventuel</div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+              <input type="checkbox" id="comp-reporte-chk" onchange="_compReporteToggle(this)" style="width:15px;height:15px;cursor:pointer;accent-color:#f59e0b;flex-shrink:0">
+              <span style="font-size:12px;color:var(--txt2);font-weight:600">Reporté</span>
+            </label>
             <div class="cf-row" style="opacity:.55">
               <label class="cf-label">Reportée du</label>
               <input class="cf-input" type="date" id="comp-date-report-from" onchange="(function(){var t=document.getElementById('comp-date-report-to');if(t&&!t.value)t.value=this.value;}).call(this)">
@@ -3504,10 +3508,20 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
 
         </div>
 
-        <div class="cf-divider"><span>Objectifs</span></div>
-        <textarea class="cf-textarea" id="comp-objectifs"
-          placeholder="Décrivez les objectifs sportifs, les enjeux et les résultats attendus de cet événement…"
-          style="min-height:70px;resize:vertical;line-height:1.6"></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+            <div class="cf-divider"><span>Objectifs</span></div>
+            <textarea class="cf-textarea" id="comp-objectifs"
+              placeholder="Décrivez les objectifs sportifs, les enjeux et les résultats attendus de cet événement…"
+              style="min-height:70px;resize:vertical;line-height:1.6"></textarea>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+            <div class="cf-divider"><span>Infos / Commentaires</span></div>
+            <textarea class="cf-textarea" id="comp-infos"
+              placeholder="Informations complémentaires, remarques, points de vigilance…"
+              style="min-height:70px;resize:vertical;line-height:1.6"></textarea>
+          </div>
+        </div>
       </div>
 
       <!-- ③ Organisation -->
@@ -3594,7 +3608,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-repas" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
-            <span style="font-size:13px;font-weight:600;color:var(--txt)">🍽 Repas</span>
+            <span style="font-size:13px;font-weight:600;color:var(--txt)">🍽 Repas/Hébergement</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy3);border-radius:10px;cursor:pointer;border:1px solid var(--bdr);transition:border-color .15s" onmouseover="this.style.borderColor='var(--stol)'" onmouseout="this.style.borderColor='var(--bdr)'">
             <input type="checkbox" id="volet-chk-partenaires" checked style="width:15px;height:15px;accent-color:var(--stol);cursor:pointer;flex-shrink:0">
@@ -3631,7 +3645,7 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
       <div class="cf-panel cf-panel-active" id="cfp-planning" style="padding:0;gap:0;height:100%">
         <div style="padding:24px 32px 10px;flex-shrink:0">
           <div class="cf-panel-title">Planning</div>
-          <div class="cf-panel-sub">Gantt et suivi des tâches de la compétition — À faire, En cours, À valider, Terminé</div>
+          <div class="cf-panel-sub">Gantt et suivi des tâches de la compétition — À faire, À valider, En cours, Terminé</div>
         </div>
         <div id="cfp-planning-empty" style="display:none;padding:0 32px 32px;color:var(--txt3);font-size:12px">
           Enregistrez d'abord cette compétition (bouton « Enregistrer ») pour accéder au planning.
@@ -3647,18 +3661,18 @@ body.theme-light #overlay-comp-mobile [style*="background:var(--navy3)"]{backgro
               <div id="cfp-col-todo" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_cfpKanbanColOver(event)" ondrop="_cfpKanbanDrop(event,'todo')"></div>
             </div>
             <div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">
-              <div style="background:#a855f7;padding:11px 14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
-                <div style="display:flex;align-items:center;gap:7px;color:#fff"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span style="font-size:12px;font-weight:700;letter-spacing:.3px;color:#fff">En cours</span></div>
-                <div style="width:22px;height:22px"></div>
-              </div>
-              <div id="cfp-col-inprogress" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_cfpKanbanColOver(event)" ondrop="_cfpKanbanDrop(event,'inprogress')"></div>
-            </div>
-            <div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">
               <div style="background:#06b6d4;padding:11px 14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
                 <div style="display:flex;align-items:center;gap:7px;color:#fff"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><span style="font-size:12px;font-weight:700;letter-spacing:.3px;color:#fff">À valider</span></div>
                 <div style="width:22px;height:22px"></div>
               </div>
               <div id="cfp-col-validate" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_cfpKanbanColOver(event)" ondrop="_cfpKanbanDrop(event,'validate')"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr)">
+              <div style="background:#a855f7;padding:11px 14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:7px;color:#fff"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span style="font-size:12px;font-weight:700;letter-spacing:.3px;color:#fff">En cours</span></div>
+                <div style="width:22px;height:22px"></div>
+              </div>
+              <div id="cfp-col-inprogress" style="flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:4px" ondragover="_cfpKanbanColOver(event)" ondrop="_cfpKanbanDrop(event,'inprogress')"></div>
             </div>
             <div style="display:flex;flex-direction:column;overflow:hidden">
               <div style="background:#22c55e;padding:11px 14px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
@@ -4498,6 +4512,7 @@ var S = {
   repas: {},
   deroulement: {},
   repasTarifs: {},
+  hebergementModes: {},
   nationalRanking: {},
   messages: [],
   collectif: [],
@@ -5801,10 +5816,14 @@ function openAddComp() {
   document.getElementById('comp-region').value = '';
   document.getElementById('comp-desc').value = '';
   document.getElementById('comp-objectifs').value = '';
+  var _infosN = document.getElementById('comp-infos');
+  if (_infosN) _infosN.value = '';
   document.getElementById('comp-affiche-url').value = '';
   resetAfficheForm();
   var _afChkN = document.getElementById('comp-agenda-fed-chk');
   if (_afChkN) _afChkN.checked = false;
+  var _repChkN = document.getElementById('comp-reporte-chk');
+  if (_repChkN) _repChkN.checked = false;
   var delBtn = document.getElementById('comp-delete-btn');
   if (delBtn) delBtn.style.display = 'none';
   _compTypeChanged();
@@ -6231,6 +6250,14 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Cocher "Reporté" active automatiquement "Masquer de l'agenda fédéral" (par défaut logique
+// pour un événement reporté), mais cette dernière case reste modifiable indépendamment ensuite.
+function _compReporteToggle(chk) {
+  if (chk && chk.checked) {
+    var afChk = document.getElementById('comp-agenda-fed-chk');
+    if (afChk) afChk.checked = true;
+  }
+}
 function saveComp() {
   var id = document.getElementById('comp-edit-id').value;
   var comp = {
@@ -6255,6 +6282,7 @@ function saveComp() {
     discipline: document.getElementById('comp-discipline').value,
     desc: document.getElementById('comp-desc').value.trim(),
     objectifs: document.getElementById('comp-objectifs').value.trim(),
+    infos: (document.getElementById('comp-infos')||{}).value ? document.getElementById('comp-infos').value.trim() : '',
     affiche: (function(){
       var inp = document.getElementById('comp-affiche-inp');
       if (inp && inp._data) return inp._data;
@@ -6267,6 +6295,7 @@ function saveComp() {
       return undefined;
     })(),
     hiddenFromAgenda: !!(document.getElementById('comp-agenda-fed-chk')||{}).checked,
+    reporte: !!(document.getElementById('comp-reporte-chk')||{}).checked,
     saison: (document.getElementById('comp-date-from').value || '').substring(0,4) || '2026',
     voletsConfig: (function(){
       var vc = {};
@@ -6931,7 +6960,7 @@ var _MOBILE_COMP_SECTIONS = [
   {id:'infos',       lbl:'Infos & Stats', ico:'📊', tab:'Accueil',     col:'#2563eb'},
   {id:'staff',       lbl:'Staff',         ico:'👥', tab:'Staff',       col:'#0369a1'},
   {id:'gestion',     lbl:'Equipage',      ico:'✈️', tab:'Equipage',    col:'#7c3aed'},
-  {id:'repas',       lbl:'🍽 Repas',       ico:'🍽', tab:'Repas',       col:'#d97706'},
+  {id:'repas',       lbl:'🍽 Repas/Hébergement', ico:'🍽', tab:'Repas/Hébergement', col:'#d97706'},
   {id:'partenaires', lbl:'Partenaires',   ico:'🤝', tab:'Partenaires', col:'#059669'},
   {id:'deroulement', lbl:'Déroulement',   ico:'📅', tab:'Déroulement', col:'#0891b2'},
   {id:'resultats',   lbl:'Résultats',     ico:'🏅', tab:'Résultats',   col:'#b45309'},
@@ -8833,8 +8862,12 @@ function editComp(id) {
   document.getElementById('comp-discipline').value = cp.discipline || 'stol';
   document.getElementById('comp-desc').value = cp.desc || '';
   document.getElementById('comp-objectifs').value = cp.objectifs || '';
+  var _infos = document.getElementById('comp-infos');
+  if (_infos) _infos.value = cp.infos || '';
   var _afChk = document.getElementById('comp-agenda-fed-chk');
   if (_afChk) _afChk.checked = !!cp.hiddenFromAgenda;
+  var _repChk = document.getElementById('comp-reporte-chk');
+  if (_repChk) _repChk.checked = !!cp.reporte;
   resetAfficheForm();
   var afficheVal = cp.affiche || '';
   var urlField = document.getElementById('comp-affiche-url');
@@ -16037,6 +16070,13 @@ async function hdgRemoveStaff(compId, idx) {
   toast('Encadrant retiré','');
   if (document.getElementById('staff-list')) renderStaffList();
 }
+// Réglage rapide Repas / Hébergement d'un encadrant depuis la ligne du tableau (sans re-render complet)
+function _stfSetRepas(compId, idx, field, value) {
+  if (!S.staff || !S.staff[compId] || !S.staff[compId][idx]) return;
+  S.staff[compId][idx][field] = value;
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+}
 
 // ── Ordre de Mission PDF ──────────────────────────────────────────────────
 function renderReglagesOdmSection() {
@@ -17178,7 +17218,7 @@ function renderHomeDetailPanel(cp, _overrideContainer) {
     var _stfN = (staffList&&staffList.length)?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:rgba(255,255,255,.22);font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">'+staffList.length+'</span>':'';
     var _eqpN = (enrolled&&enrolled.length)?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:8px;background:rgba(255,255,255,.22);font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle">'+enrolled.length+'</span>':'';
     var _vc = cp.voletsConfig || {};
-    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'+_stfN},{id:'gestion',lbl:'Equipage'+_eqpN},{id:'repas',lbl:'🍽 Repas'},{id:'partenaires',lbl:'Partenaires'},{id:'deroulement',lbl:'Déroulement'},{id:'resultats',lbl:'Résultats'}];
+    var tabs = [{id:'infos',lbl:'Info & Stats'},{id:'staff',lbl:'Encadrants'+_stfN},{id:'gestion',lbl:'Equipage'+_eqpN},{id:'repas',lbl:'🍽 Repas/Hébergement'},{id:'partenaires',lbl:'Partenaires'},{id:'deroulement',lbl:'Déroulement'},{id:'resultats',lbl:'Résultats'}];
     tabs.push({id:'etapes',lbl:'🗺 Site & Étapes'},{id:'materiel',lbl:'Matériel'},{id:'evenements',lbl:'Événements'},{id:'budget',lbl:'Budget'});
     // Onglet "Installation" masqué : ses infos (OACI/lieu/dates + fiche BasULM) sont reprises dans "Site & Étapes".
     tabs = tabs.filter(function(t){ return _vc[t.id] !== false; });
@@ -18108,9 +18148,9 @@ function _staffToggleSort(col) {
 // ── Redimensionnement colonnes Encadrants ──────────────────────────────────
 var _STF_LS_KEY     = 'gestappli_staffColWidths';
 var _staffColWidths = (function(){
-  try { var s=localStorage.getItem(_STF_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===7) return a; } } catch(e){}
-  return [40, 170, 130, 68, 92, 150, 130];
-})(); // avatar|nom|fonction|licence|tel|email|odm-ndf
+  try { var s=localStorage.getItem(_STF_LS_KEY); if(s){ var a=JSON.parse(s); if(Array.isArray(a)&&a.length===8) return a; } } catch(e){}
+  return [40, 170, 130, 68, 92, 150, 150, 130];
+})(); // avatar|nom|fonction|licence|tel|email|repas|odm-ndf
 _staffColWidths[0] = 68; // colonne avatar élargie : case à cocher + avatar
 var _staffResizing  = null;
 function _staffGetTpl() { return _staffColWidths.map(function(w){ return w+'px'; }).join(' '); }
@@ -20053,6 +20093,9 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         + '<div onmousedown="_staffResizeStart(event,'+(i+3)+')" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
         + '</div>';
     });
+    html3 += '<div style="'+_hStS+';text-align:center;position:relative">Repas'
+      + '<div onmousedown="_staffResizeStart(event,6)" style="'+_rh+'"><div style="'+_rl+'"></div></div>'
+      + '</div>';
     html3 += '<div style="'+_hStS+';text-align:center">ODM / NDF</div>';
     html3 += '</div>';
     }
@@ -20069,6 +20112,7 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
       html3 += '<div><input id="hdg-s-lic"   placeholder="—" style="'+_iStS+'" readonly></div>';
       html3 += '<div><input id="hdg-s-tel"   placeholder="Téléphone…" style="'+_iStS+'"></div>';
       html3 += '<div><input id="hdg-s-email" placeholder="Email…" style="'+_iStS+'"></div>';
+      html3 += '<div></div>'; // repas/hébergement placeholder — réglable après création de la ligne
       html3 += '<div style="display:flex;align-items:center;justify-content:center"><button onclick="hdgAddStaff(\''+cidS+'\')" style="'+_addBS+'" title="Ajouter">+</button></div>';
       html3 += '</div>';
     }
@@ -20139,6 +20183,27 @@ function renderHDPTabContent(cp, tab, runs, enrolled, staffList) {
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(lic2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(tel2||'—')+'</div>';
         html3 += '<div style="'+_dStS+';color:var(--txt2)">'+(email2||'—')+'</div>';
+        // Repas / Hébergement — deux menus déroulants, réglables directement dans la ligne
+        (function(){
+          var _repasV = s.repasType || '';
+          var _hebV   = s.hebergementType || '';
+          var _selBaseSt = 'background:var(--navy2);border:1px solid var(--bdr);border-radius:5px;font-family:inherit;font-size:10px;padding:2px 3px;outline:none;box-sizing:border-box;width:100%;cursor:pointer';
+          // Titre en gris (var(--txt3)) tant que rien n'est choisi, couleur normale dès qu'une valeur est activée.
+          var _selColor = function(v){ return v ? 'var(--txt)' : 'var(--txt3)'; };
+          // Repas : simple oui/non ("Repas" ou rien) — plus de détail par type de repas.
+          var _mealOpts = ['Repas'];
+          // Hébergement : uniquement les modes activés (case cochée) dans le volet Repas/Hébergement
+          var _hebCfg = (S.hebergementModes && S.hebergementModes[cidS]) || {};
+          var _hebOpts = (typeof _HEBERGEMENT_MODES !== 'undefined' ? _HEBERGEMENT_MODES : []).filter(function(m){ return _hebCfg[m] && _hebCfg[m].actif; });
+          html3 += '<div style="display:flex;flex-direction:column;gap:2px;min-width:0" onclick="event.stopPropagation()">';
+          html3 += '<select onchange="_stfSetRepas(\''+cidS+'\','+si+',\'repasType\',this.value);this.style.color=this.value?\'var(--txt)\':\'var(--txt3)\'" style="'+_selBaseSt+';color:'+_selColor(_repasV)+'"><option value="">— Repas —</option>'
+            + _mealOpts.map(function(o){ return '<option value="'+o+'"'+(_repasV===o?' selected':'')+'>'+o+'</option>'; }).join('')
+            + '</select>';
+          html3 += '<select onchange="_stfSetRepas(\''+cidS+'\','+si+',\'hebergementType\',this.value);this.style.color=this.value?\'var(--txt)\':\'var(--txt3)\'" style="'+_selBaseSt+';color:'+_selColor(_hebV)+'"><option value="">— Hébergement —</option>'
+            + _hebOpts.map(function(o){ return '<option value="'+o+'"'+(_hebV===o?' selected':'')+'>'+o+'</option>'; }).join('')
+            + '</select>';
+          html3 += '</div>';
+        })();
         /* Statut OM de cet encadrant pour cette compétition */
         var _omList = (S.ordresMission||[]).filter(function(o){ return o.compId===cidS && (o.pilotId===(s.pilotId||s.id)); });
         var _omLast = _omList.length ? _omList[_omList.length-1] : null;
@@ -21002,9 +21067,16 @@ function renderRepasTab(cp) {
   var h = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">';
   // ── Barre haute ──
   h += '<div style="padding:12px 16px;background:var(--navy2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap">';
-  h += '<div style="font-weight:800;font-size:14px;flex:1">🍽️ Repas</div>';
+  h += '<div style="font-weight:800;font-size:14px;flex:1">🍽️ Repas/Hébergement</div>';
   if (isGest) {
     h += '<label style="'+btnSt+';background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.3);cursor:pointer">'+(data&&data.rows&&data.rows.length?'🔄 Remplacer':'⬆️ Importer Excel')+'<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importRepasExcel(this,\''+escH(compId)+'\',\'replace\')"></label>';
+    h += '<div id="repas-print-wrap" style="position:relative">';
+    h += '<button onclick="_repasPrintMenu()" style="'+btnSt+';background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.3)">🖨️ Listes ▾</button>';
+    h += '<div id="repas-print-menu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:190px;background:#1f2937;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:500;overflow:hidden">';
+    [['hebergement','🛏 Liste hébergement'],['repas','🍽 Liste repas'],['complete','📋 Liste complète']].forEach(function(o){
+      h += '<button onclick="_repasPrintMenuClose();_repasPrintNewGrid(\''+escH(compId)+'\',\''+o[0]+'\')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:none;color:#e2e8f0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" onmouseover="this.style.background=\'rgba(255,255,255,.08)\'" onmouseout="this.style.background=\'none\'">'+o[1]+'</button>';
+    });
+    h += '</div></div>';
     if (data && data.rows && data.rows.length) {
       h += '<label style="'+btnSt+';background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.3);cursor:pointer">➕ Ajouter un fichier<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importRepasExcel(this,\''+escH(compId)+'\',\'add\')"></label>';
     }
@@ -21033,11 +21105,29 @@ function renderRepasTab(cp) {
     h += '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:'+t.col+';font-weight:600">';
     h += escH(t.lbl)+' :';
     h += '<input type="number" id="repas-tarif-'+t.key+'" value="'+(_tarifs[t.key]||0)+'" min="0" step="0.01"';
-    h += ' style="width:64px;padding:3px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:var(--navy);color:var(--txt1);font-size:11px;font-family:inherit"';
+    h += ' style="width:92px;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:var(--navy);color:var(--txt1);font-size:12px;font-family:inherit"';
     h += ' onchange="saveRepasTarifs(\''+escH(compId)+'\')">';
     h += '<span style="color:var(--txt3)">€</span></label>';
   });
   h += '<button onclick="saveRepasTarifs(\''+escH(compId)+'\')" style="height:28px;padding:0 10px;border-radius:6px;background:rgba(99,102,241,.15);color:#a78bfa;border:1px solid rgba(99,102,241,.3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ Enregistrer</button>';
+  h += '</div>';
+  // ── Barre modes d'hébergement (case à cocher "actif" + tarif par mode) ──
+  var _hebModesCfg = (S.hebergementModes && S.hebergementModes[compId]) || {};
+  var _hebSlug = function(m){ return m.replace(/[^a-zA-Z0-9]/g,''); };
+  h += '<div id="heb-mode-bar" style="padding:8px 16px;background:var(--navy3);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:14px;flex-shrink:0;flex-wrap:wrap">';
+  h += '<span style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px">Hébergement :</span>';
+  _HEBERGEMENT_MODES.forEach(function(mode){
+    var mid = _hebSlug(mode);
+    var cfgM = _hebModesCfg[mode] || {};
+    h += '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt2);font-weight:600">';
+    h += '<input type="checkbox" id="heb-actif-'+mid+'" '+(cfgM.actif?'checked':'')+' onchange="saveHebergementModes(\''+escH(compId)+'\')" style="width:14px;height:14px;cursor:pointer;accent-color:#8b5cf6;flex-shrink:0">';
+    h += escH(mode)+' :';
+    h += '<input type="number" id="heb-tarif-'+mid+'" value="'+(cfgM.tarif||0)+'" min="0" step="0.01"';
+    h += ' style="width:92px;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:var(--navy);color:var(--txt1);font-size:12px;font-family:inherit"';
+    h += ' onchange="saveHebergementModes(\''+escH(compId)+'\')">';
+    h += '<span style="color:var(--txt3)">€</span></label>';
+  });
+  h += '<button onclick="saveHebergementModes(\''+escH(compId)+'\')" style="height:28px;padding:0 10px;border-radius:6px;background:rgba(139,92,246,.15);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ Enregistrer</button>';
   h += '</div>';
   h += _buildRepasGrid(compId);
   h += '</div>';
@@ -21410,27 +21500,49 @@ function _buildRepasTable(compId) {
 var _REPAS_MEALS = [
   { type:'Petit déjeuner', short:'Petit déj', tk:'pDej', col:'#f59e0b' },
   { type:'Déjeuner',       short:'Déjeuner',  tk:'dej',  col:'#10b981' },
-  { type:'Dîner',          short:'Dîner',     tk:'din',  col:'#6366f1' }
+  { type:'Dîner',          short:'Dîner',     tk:'din',  col:'#6366f1' },
+  { type:'Hébergement',    short:'Héberg.',   tk:'heb',  col:'#8b5cf6' }
 ];
+// Modes d'hébergement configurables par compétition (case à cocher "actif" + tarif chacun) —
+// voir la barre "Hébergement :" du volet Repas/Hébergement (renderRepasTab) et le menu déroulant
+// Hébergement de l'onglet Encadrants, qui ne propose que les modes activés ici.
+var _HEBERGEMENT_MODES = ['Camping / place', 'Camping / bungalow', 'Hôtel', 'Location', 'Autre'];
+// Tri de la colonne Nom : "alpha" (ordre alphabétique global) ou "group" (Encadrement
+// d'abord, puis Équipage, chaque groupe trié alphabétiquement) — bouton dans l'en-tête.
+var _REPAS_SORT_LS_KEY = 'gestappli_repasSortMode';
+var _repasSortMode = (function(){
+  try { var v = localStorage.getItem(_REPAS_SORT_LS_KEY); if (v==='group'||v==='alpha') return v; } catch(e){}
+  return 'alpha';
+})();
+function _repasToggleSort() {
+  _repasSortMode = _repasSortMode === 'alpha' ? 'group' : 'alpha';
+  try { localStorage.setItem(_REPAS_SORT_LS_KEY, _repasSortMode); } catch(e){}
+  switchHomeDetailTab('repas');
+}
 // Participants = encadrants (staff, hors NDF) + équipages (pilotes enrôlés), dédoublonnés et triés.
 function _repasParticipants(compId) {
   var parts = [], seen = {};
-  function add(nom, prenom, role, id) {
+  function add(nom, prenom, role, id, grp) {
     nom = (nom||'').toString().trim(); prenom = (prenom||'').toString().trim();
     if (!nom && !prenom) return;
     var key = nom.toUpperCase() + '\x01' + prenom.toUpperCase();
     if (seen[key]) return; seen[key] = true;
-    parts.push({ nom:nom, prenom:prenom, role:role||'', key:key, id:id||'' });
+    parts.push({ nom:nom, prenom:prenom, role:role||'', grp:grp, key:key, id:id||'' });
   }
   (Array.isArray((S.staff||{})[compId]) ? S.staff[compId] : []).forEach(function(s){
     if (!s || (s.role||'').toUpperCase() === 'NDF') return;
-    add(s.nom, s.prenom, s.role || 'Encadrant');
+    add(s.nom, s.prenom, s.role || 'Encadrant', null, 'encadrement');
   });
   (((S.compEnroll||{})[compId]) || []).forEach(function(pid){
     var p = (S.pilots||[]).find(function(x){ return x.id === pid; });
-    if (p) add(p.nom, p.prenom, 'Équipage', p.id);
+    if (p) add(p.nom, p.prenom, 'Équipage', p.id, 'equipage');
   });
-  parts.sort(function(a,b){ var n=(a.nom||'').localeCompare(b.nom||'','fr'); return n!==0?n:(a.prenom||'').localeCompare(b.prenom||'','fr'); });
+  var alphaCmp = function(a,b){ var n=(a.nom||'').localeCompare(b.nom||'','fr'); return n!==0?n:(a.prenom||'').localeCompare(b.prenom||'','fr'); };
+  if (_repasSortMode === 'group') {
+    parts.sort(function(a,b){ return a.grp!==b.grp ? (a.grp==='encadrement'?-1:1) : alphaCmp(a,b); });
+  } else {
+    parts.sort(alphaCmp);
+  }
   return parts;
 }
 // Jours de l'événement (une entrée par journée entre dateFrom et dateTo), clé = "JJ/MM/AAAA".
@@ -21461,7 +21573,7 @@ function _repasPruneChecks(compId) {
   if (!parts.length || !days.length) return;
   var okPk = {}; parts.forEach(function(p){ okPk[p.key] = 1; });
   var okDay = {}; days.forEach(function(d){ okDay[d.key] = 1; });
-  var okType = { 'Petit déjeuner':1, 'Déjeuner':1, 'Dîner':1 };
+  var okType = { 'Petit déjeuner':1, 'Déjeuner':1, 'Dîner':1, 'Hébergement':1 };
   var removed = 0;
   Object.keys(data.checks).forEach(function(k){
     var sep = k.indexOf('|'); if (sep < 0) { delete data.checks[k]; removed++; return; }
@@ -21477,7 +21589,7 @@ function _buildRepasGrid(compId) {
   var data = S.repas[compId] || (S.repas[compId] = {});
   if (!data.checks) data.checks = {};
   var _t = (S.repasTarifs && S.repasTarifs[compId]) || {};
-  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0 };
+  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0, 'Hébergement': +_t.heb||0 };
   var parts = _repasParticipants(compId), days = _repasDays(compId);
 
   // Élagage auto-correctif : purge les cases héritées (participant absent / date hors plage).
@@ -21496,12 +21608,16 @@ function _buildRepasGrid(compId) {
   var tdSt = 'padding:4px 6px;font-size:11px;text-align:center;border:1px solid rgba(255,255,255,.07)';
   var totBg = 'var(--navy3)';
 
-  var h = '<div style="flex:1;overflow:auto;padding:14px">';
-  h += '<table style="border-collapse:collapse;font-family:inherit;min-width:max-content">';
+  var h = '<div style="flex:1;overflow:auto;padding:14px;overscroll-behavior:contain;scroll-behavior:auto">';
+  h += '<table style="border-collapse:separate;border-spacing:0;font-family:inherit;min-width:max-content">';
   h += '<thead><tr>';
-  h += '<th rowspan="2" style="'+thSt+';text-align:left;position:sticky;left:0;top:0;z-index:6;min-width:180px;background:var(--navy3);color:var(--txt);border-right:2px solid var(--bdr)">Nom</th>';
+  h += '<th rowspan="2" style="'+thSt+';text-align:left;position:sticky;left:0;top:0;z-index:6;min-width:180px;background:var(--navy3);color:var(--txt);border-right:2px solid var(--bdr)">'
+    + '<span style="display:flex;align-items:center;gap:6px">Nom'
+    + '<button onclick="_repasToggleSort()" title="'+(_repasSortMode==='group'?'Trier par ordre alphabétique':'Trier : Encadrement puis Équipage')+'" style="background:var(--navy2);border:1px solid var(--bdr);border-radius:5px;color:var(--txt2);font-size:9px;font-weight:700;padding:2px 6px;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0;white-space:nowrap">'
+    + (_repasSortMode==='group' ? '👥 Groupé' : 'A→Z')
+    + '</button></span></th>';
   days.forEach(function(dy){
-    h += '<th colspan="3" style="'+thSt+';position:sticky;top:0;z-index:4;background:var(--navy3);color:var(--txt);font-size:12px;font-weight:800;border-bottom:2px solid var(--bdr)">'+dy.label
+    h += '<th colspan="'+_REPAS_MEALS.length+'" style="'+thSt+';position:sticky;top:0;z-index:4;background:var(--navy3);color:var(--txt);font-size:12px;font-weight:800;border-bottom:2px solid var(--bdr)">'+dy.label
       + ' <button onclick="_sendRepasEmail(\''+escH(compId)+'\',\''+dy.key+'\')" title="Envoyer la commande de ce jour au fournisseur repas" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px;vertical-align:middle;opacity:.85">✉️</button></th>';
   });
   h += '<th rowspan="2" style="'+thSt+';position:sticky;top:0;right:0;z-index:6;background:var(--navy3);color:var(--stol);border-left:2px solid var(--bdr);min-width:100px">Total €</th>';
@@ -21547,7 +21663,7 @@ function _repasTog(el, compId, pkE, dkE, tyE) {
 function _repasRefreshTotals(compId) {
   var data = (S.repas||{})[compId] || {}, checks = data.checks || {};
   var _t = (S.repasTarifs && S.repasTarifs[compId]) || {};
-  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0 };
+  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0, 'Hébergement': +_t.heb||0 };
   var parts = _repasParticipants(compId), days = _repasDays(compId), grand = 0;
   parts.forEach(function(p,i){
     var t=0; days.forEach(function(dy){ _REPAS_MEALS.forEach(function(m){ if(checks[p.key+'|'+dy.key+'\x02'+m.type]) t+=TARIF[m.type]; }); });
@@ -21575,6 +21691,23 @@ function saveRepasTarifs(compId) {
   saveState();
   if (typeof silentPush === 'function') silentPush();
   toast('Tarifs enregistrés ✓', 'ok');
+  switchHomeDetailTab('repas');
+}
+// Modes d'hébergement (case "actif" + tarif) pour cette compétition — le menu Hébergement
+// de l'onglet Encadrants ne propose ensuite que les modes marqués actifs ici.
+function saveHebergementModes(compId) {
+  if (!S.hebergementModes) S.hebergementModes = {};
+  var out = {};
+  _HEBERGEMENT_MODES.forEach(function(mode){
+    var mid = mode.replace(/[^a-zA-Z0-9]/g,'');
+    var actifEl = document.getElementById('heb-actif-'+mid);
+    var tarifEl = document.getElementById('heb-tarif-'+mid);
+    out[mode] = { actif: !!(actifEl && actifEl.checked), tarif: parseFloat((tarifEl && tarifEl.value)||0)||0 };
+  });
+  S.hebergementModes[compId] = out;
+  saveState();
+  if (typeof silentPush === 'function') silentPush();
+  toast('Modes d\'hébergement enregistrés ✓', 'ok');
   switchHomeDetailTab('repas');
 }
 
@@ -21807,7 +21940,7 @@ function printRepas(compId, filterJours) {
   var dateStr = data.importedAt ? new Date(data.importedAt).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
   var fnames = (data.fileNames&&data.fileNames.length) ? data.fileNames.join(', ') : (data.fileName||'');
   H += '<div class="hd">';
-  H += '<h1>🍽 Repas — '+escStr(cp.name||compId)+'</h1>';
+  H += '<h1>🍽 Repas/Hébergement — '+escStr(cp.name||compId)+'</h1>';
   H += '<p>Imprimé le '+new Date().toLocaleDateString('fr-FR')+' · '+personOrder.length+' participants · '+rows.length+' repas';
   if (fnames) H += ' · Source : '+escStr(fnames);
   H += '</p></div>';
@@ -21884,6 +22017,116 @@ function printRepas(compId, filterJours) {
   }
 
   var w = window.open('','_blank','width=900,height=700');
+  if (!w) { toast('Popup bloquée — autorisez les popups pour imprimer','err'); return; }
+  w.document.open();
+  w.document.write(H);
+  w.document.close();
+}
+
+// ── Menu "🖨️ Listes" (nouvelle grille Repas/Hébergement) : Liste hébergement / repas / complète ──
+function _repasPrintMenu()      { _makeActMenu('repas-print-menu','repas-print-wrap'); }
+function _repasPrintMenuClose() { var m=document.getElementById('repas-print-menu'); if(m) m.style.display='none'; }
+// Impression au format paysage de la grille repas/hébergement (participants × jours), avec les
+// tarifs de référence en légende et les totaux — mode : 'hebergement' | 'repas' | 'complete'.
+function _repasPrintNewGrid(compId, mode) {
+  var cp = (S.comps||[]).find(function(c){ return c.id===compId; }) || {};
+  var data = (S.repas||{})[compId] || {};
+  var checks = data.checks || {};
+  var parts = _repasParticipants(compId);
+  var days = _repasDays(compId);
+  if (!parts.length) { toast('Aucun participant (encadrants/équipages)', 'err'); return; }
+  if (!days.length)  { toast('Dates de la compétition manquantes', 'err'); return; }
+
+  var meals = mode === 'repas' ? _REPAS_MEALS.filter(function(m){ return m.type!=='Hébergement'; })
+            : mode === 'hebergement' ? _REPAS_MEALS.filter(function(m){ return m.type==='Hébergement'; })
+            : _REPAS_MEALS;
+
+  var _t = (S.repasTarifs && S.repasTarifs[compId]) || {};
+  var TARIF = { 'Petit déjeuner': +_t.pDej||0, 'Déjeuner': +_t.dej||0, 'Dîner': +_t.din||0, 'Hébergement': +_t.heb||0 };
+  var _hebCfg = (S.hebergementModes && S.hebergementModes[compId]) || {};
+
+  function isC(pk,dk,ty){ return !!checks[pk+'|'+dk+'\x02'+ty]; }
+  function pTot(pk){ var t=0; days.forEach(function(dy){ meals.forEach(function(m){ if(isC(pk,dy.key,m.type)) t+=TARIF[m.type]; }); }); return t; }
+
+  function escStr(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  var titleMap = { repas:'Liste Repas', hebergement:'Liste Hébergement', complete:'Liste complète — Repas / Hébergement' };
+  var title = titleMap[mode] || 'Repas/Hébergement';
+
+  var H = '';
+  H += '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">';
+  H += '<title>'+escStr(title)+' — '+escStr(cp.name||compId)+'</title>';
+  H += '<style>';
+  H += '*{box-sizing:border-box;margin:0;padding:0}';
+  H += 'body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;background:#fff;padding:10mm}';
+  H += '.hd{margin-bottom:10px}';
+  H += '.hd h1{font-size:16px;font-weight:900;color:#1e3a5f}';
+  H += '.hd p{font-size:10px;color:#555;margin-top:2px}';
+  H += '.tarifs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}';
+  H += '.tarifs .chip{padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;font-size:10px;font-weight:600}';
+  H += '.tarifs .chip.off{opacity:.45;text-decoration:line-through;font-weight:400}';
+  H += 'table{border-collapse:collapse;width:100%;font-size:10px}';
+  H += 'th,td{border:1px solid #ccc;padding:4px 6px;text-align:center;white-space:nowrap}';
+  H += 'th{background:#1e3a5f;color:#fff;font-weight:700}';
+  H += 'th.left,td.left{text-align:left}';
+  H += 'td.left{font-weight:700;background:#f0f4fa}';
+  H += 'tr.total td{background:#dbe8ff;font-weight:900;font-size:11px;color:#1e3a5f}';
+  H += 'tr.total td.left{background:#c3d5f7}';
+  H += 'tr:nth-child(even) td.left{background:#e8eef8}';
+  H += 'tr:nth-child(odd)  td.left{background:#f0f4fa}';
+  H += '@media print{ @page{size:A4 landscape;margin:10mm} body{padding:0} button{display:none!important} }';
+  H += '</style></head><body>';
+
+  H += '<div class="hd"><h1>'+escStr(title)+'</h1>';
+  H += '<p>'+escStr(cp.name||'')+' · Imprimé le '+new Date().toLocaleDateString('fr-FR')+' · '+parts.length+' participant'+(parts.length>1?'s':'')+'</p></div>';
+
+  // Tarifs de référence
+  H += '<div class="tarifs">';
+  if (mode !== 'hebergement') {
+    [['pDej','Petit déjeuner'],['dej','Déjeuner'],['din','Dîner']].forEach(function(t){
+      H += '<span class="chip">'+escStr(t[1])+' : '+(TARIF[t[1]]||0).toFixed(2)+' €</span>';
+    });
+  }
+  if (mode !== 'repas') {
+    _HEBERGEMENT_MODES.forEach(function(mo){
+      var cfg = _hebCfg[mo] || {};
+      H += '<span class="chip'+(cfg.actif?'':' off')+'">'+escStr(mo)+' : '+(cfg.tarif||0).toFixed(2)+' €</span>';
+    });
+  }
+  H += '</div>';
+
+  // Tableau principal
+  H += '<table><thead><tr>';
+  H += '<th rowspan="2" class="left" style="min-width:150px">Nom</th>';
+  days.forEach(function(dy){ H += '<th colspan="'+meals.length+'">'+escStr(dy.label)+'</th>'; });
+  H += '<th rowspan="2" style="color:#f59e0b">Total €</th>';
+  H += '</tr><tr>';
+  days.forEach(function(){ meals.forEach(function(m){ H += '<th style="font-size:9px">'+escStr(m.short)+'</th>'; }); });
+  H += '</tr></thead><tbody>';
+
+  parts.forEach(function(p){
+    H += '<tr><td class="left">'+escStr((p.nom||'').toUpperCase())+' <span style="font-weight:400;color:#555">'+escStr(p.prenom||'')+'</span>'+(p.role?' <span style="font-size:9px;font-weight:400;color:#777">· '+escStr(p.role)+'</span>':'')+'</td>';
+    days.forEach(function(dy){ meals.forEach(function(m){
+      H += '<td>'+(isC(p.key,dy.key,m.type)?'✓':'—')+'</td>';
+    }); });
+    H += '<td style="font-weight:700;color:#1e3a5f">'+pTot(p.key).toFixed(2)+' €</td></tr>';
+  });
+
+  // Ligne TOTAL
+  var grand = 0;
+  H += '<tr class="total"><td class="left">TOTAL</td>';
+  days.forEach(function(dy){ meals.forEach(function(m){
+    var cnt=0; parts.forEach(function(p){ if(isC(p.key,dy.key,m.type)) cnt++; });
+    H += '<td>'+(cnt||'')+'</td>';
+  }); });
+  parts.forEach(function(p){ grand += pTot(p.key); });
+  H += '<td>'+grand.toFixed(2)+' €</td></tr>';
+  H += '</tbody></table>';
+
+  H += '<script>window.onload=function(){window.print();};<\/script>';
+  H += '</body></html>';
+
+  var w = window.open('','_blank','width=1000,height=700');
   if (!w) { toast('Popup bloquée — autorisez les popups pour imprimer','err'); return; }
   w.document.open();
   w.document.write(H);
@@ -27654,6 +27897,7 @@ async function pushToCloud() {
     ganttTasks:           S.ganttTasks           || {},
     repas:                S.repas                || {},
     repasTarifs:          S.repasTarifs          || {},
+    hebergementModes:     S.hebergementModes     || {},
     enrollMeta:           S.enrollMeta           || {},
     espacesPartages:      S.espacesPartages      || [],
     stolResults:          S.stolResults          || {},
@@ -29195,6 +29439,11 @@ async function pullFromCloud() {
   if (r.repasTarifs && typeof r.repasTarifs === 'object') {
     if (!S.repasTarifs) S.repasTarifs = {};
     Object.assign(S.repasTarifs, r.repasTarifs);
+  }
+  // hebergementModes : même mécanisme (objet plat par compId, remote wins si présent)
+  if (r.hebergementModes && typeof r.hebergementModes === 'object') {
+    if (!S.hebergementModes) S.hebergementModes = {};
+    Object.assign(S.hebergementModes, r.hebergementModes);
   }
   S.evenements         = _mergeObjOfArrays(S.evenements,         r.evenements);
   // ✅ Site & Étapes : cette clé n'était fusionnée qu'au démarrage (_applyCloudData),
