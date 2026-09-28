@@ -63018,34 +63018,8 @@ function _renderSecuriteStats() {
     html+=_card('Par année',s);
   })();
 
-  // ── Card 2 : Par mois (uniquement pertinent quand une saison précise est sélectionnée) ──
-  if (filterYear) (function(){
-    var MN=['J','F','M','A','M','J','J','A','S','O','N','D'];
-    var byM={}; for(var i=1;i<=12;i++) byM[i]={c:0,m:0};
-    evs.forEach(function(e){var m=parseInt((e.date||'').slice(5,7));if(!m||m<1||m>12)return;if(_isMort(e))byM[m].m++;else if(_isCorp(e))byM[m].c++;});
-    var W=260,H=155,pL=20,pR=4,pT=6,pB=22;
-    var cW=W-pL-pR,cH=H-pT-pB;
-    var maxV=0; for(var mi=1;mi<=12;mi++) maxV=Math.max(maxV,byM[mi].c+byM[mi].m); maxV=Math.ceil(maxV/5)*5||5;
-    var bW=Math.floor(cW/12)-2,gap=(cW-bW*12)/13;
-    var yStep=maxV<=5?1:maxV<=10?2:5;
-    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">';
-    for(var yv=0;yv<=maxV;yv+=yStep){var cy=pT+cH-(yv/maxV)*cH;
-      s+='<line x1="'+pL+'" y1="'+cy+'" x2="'+(W-pR)+'" y2="'+cy+'" stroke="rgba(255,255,255,.06)" stroke-width="1"/>';
-      if(yv>0) s+='<text x="'+(pL-2)+'" y="'+(cy+3)+'" text-anchor="end" font-family="inherit" font-size="8" fill="#64748b">'+yv+'</text>';}
-    s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
-    for(var mi2=1;mi2<=12;mi2++){var xM=pL+gap+(mi2-1)*(bW+gap),yBM=pT+cH;
-      var hC=byM[mi2].c>0?(byM[mi2].c/maxV)*cH:0,hM2=byM[mi2].m>0?(byM[mi2].m/maxV)*cH:0;
-      if(hC>0){s+='<rect x="'+xM+'" y="'+(yBM-hC)+'" width="'+bW+'" height="'+hC+'" fill="#f59e0b" rx="1"/>';
-        if(hC>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC/2+2.5)+'" text-anchor="middle" font-family="inherit" font-size="6" font-weight="700" fill="#1f2937">'+byM[mi2].c+'</text>';}
-      if(hM2>0){s+='<rect x="'+xM+'" y="'+(yBM-hC-hM2)+'" width="'+bW+'" height="'+hM2+'" fill="#ef4444" rx="1"/>';
-        if(hM2>=6)s+='<text x="'+(xM+bW/2)+'" y="'+(yBM-hC-hM2/2+2.5)+'" text-anchor="middle" font-family="inherit" font-size="6" font-weight="700" fill="#fff">'+byM[mi2].m+'</text>';}
-      s+='<text x="'+(xM+bW/2)+'" y="'+(yBM+13)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+MN[mi2-1]+'</text>';}
-    s+='</svg>';
-    html+=_card('Par mois',s);
-  })();
-
-  // ── Card 2bis : Âge moyen des DC par saison (uniquement quand "Toutes saisons" est sélectionné) ──
-  if (!filterYear) (function(){
+  // ── Card 2 : Âge moyen des DCD par saison (toujours affiché, indépendamment du filtre) ──
+  (function(){
     var byYDC={};
     _allEvs.forEach(function(e){
       if(!_isMort(e)) return;
@@ -63055,7 +63029,7 @@ function _renderSecuriteStats() {
       byYDC[y].sum+=a; byYDC[y].n++;
     });
     var yrsDC=Object.keys(byYDC).sort();
-    if(!yrsDC.length){html+=_card('Âge moyen des DC par saison','<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucun âge renseigné<br>sur les accidents mortels.</div>');return;}
+    if(!yrsDC.length){html+=_card('Âge moyen des DCD par saison','<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucun âge renseigné<br>sur les accidents mortels.</div>');return;}
     var W=260,H=155,pL=22,pR=6,pT=6,pB=24;
     var cW=W-pL-pR,cH=H-pT-pB;
     var maxV=0; yrsDC.forEach(function(y){maxV=Math.max(maxV,Math.round(byYDC[y].sum/byYDC[y].n));}); maxV=Math.ceil(maxV/10)*10||10;
@@ -63075,7 +63049,7 @@ function _renderSecuriteStats() {
       s+='<text x="'+(x+bW/2)+'" y="'+(yB+14)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+yr.slice(2)+'</text>';
     });
     s+='</svg>';
-    html+=_card('Âge moyen des DC par saison',s);
+    html+=_card('Âge moyen des DCD par saison',s);
   })();
 
   // ── Card 3 : Corporel / Mortel (donut — mortels + corporels uniquement) ──
