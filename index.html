@@ -62909,17 +62909,24 @@ function _renderSecuriteStats() {
   var nYears=Object.keys(allYrs).length;
 
   // ── Statistiques d'âge ──
-  var ages = evs.map(function(e){
+  var _ageOf = function(e){
     var a = parseInt(e.agePilote)||null;
     if (!a) {
       var m = (e.pilote||'').match(/[Ââ]ge\s*:\s*(\d+)/);
       if (m) a = parseInt(m[1])||null;
     }
     return (a && a > 10 && a < 120) ? a : null;
-  }).filter(function(a){ return a !== null; });
+  };
+  var ages = evs.map(_ageOf).filter(function(a){ return a !== null; });
   var ageMoy = ages.length ? Math.round(ages.reduce(function(s,a){return s+a;},0)/ages.length) : null;
   var ageMax = ages.length ? Math.max.apply(null,ages) : null;
   var ageMin = ages.length ? Math.min.apply(null,ages) : null;
+
+  // ── Âge moyen des décédés (accidents mortels) ──
+  var agesDC = evs.filter(_isMort).map(_ageOf).filter(function(a){ return a !== null; });
+  var ageMoyDC = agesDC.length ? Math.round(agesDC.reduce(function(s,a){return s+a;},0)/agesDC.length) : null;
+  var ageMaxDC = agesDC.length ? Math.max.apply(null,agesDC) : null;
+  var ageMinDC = agesDC.length ? Math.min.apply(null,agesDC) : null;
 
   // ── Période couverte ──
   var yrsArr = Object.keys(allYrs).sort();
@@ -62959,6 +62966,9 @@ function _renderSecuriteStats() {
   ];
   if (ageMoy !== null) {
     kpis.push({val:ageMoy+' ans', lbl:'Âge moyen', col:'#8b5cf6', sub:'min '+ageMin+' · max '+ageMax});
+  }
+  if (ageMoyDC !== null) {
+    kpis.push({val:ageMoyDC+' ans', lbl:'Âge moyen des DC', col:'#ef4444', sub:'min '+ageMinDC+' · max '+ageMaxDC});
   }
   kpis.push({val:nInstr, lbl:'Instructeur à bord', col:'#6366f1', sub:'👨‍🏫 vol en instruction'});
   kpis.push({val:nPara,  lbl:'Parachute déclenché', col:'#10b981', sub:'🪂 secours activé'});
@@ -63199,6 +63209,9 @@ function _sevPrintStats() {
   var ages=evs.map(function(e){var a=parseInt(e.agePilote)||null;return(a&&a>10&&a<120)?a:null;}).filter(Boolean);
   var ageMoy=ages.length?Math.round(ages.reduce(function(s,a){return s+a;},0)/ages.length):null;
   var ageMin=ages.length?Math.min.apply(null,ages):null, ageMax=ages.length?Math.max.apply(null,ages):null;
+  var agesDC=evs.filter(_isMort).map(function(e){var a=parseInt(e.agePilote)||null;return(a&&a>10&&a<120)?a:null;}).filter(Boolean);
+  var ageMoyDC=agesDC.length?Math.round(agesDC.reduce(function(s,a){return s+a;},0)/agesDC.length):null;
+  var ageMinDC=agesDC.length?Math.min.apply(null,agesDC):null, ageMaxDC=agesDC.length?Math.max.apply(null,agesDC):null;
   var yrsArr=Object.keys(allYrs).sort();
   var minYear=yrsArr[0]||'', maxYear=yrsArr[yrsArr.length-1]||'';
   var periodeStr=minYear&&maxYear?(minYear===maxYear?minYear:minYear+' – '+maxYear):'';
@@ -63570,6 +63583,7 @@ function _sevPrintStats() {
     {val:nMat,lbl:'Matériels',col:'#64748b',sub:'sans victime'},
   ];
   if(ageMoy!==null) kpis2.push({val:ageMoy+' ans',lbl:'Âge moyen',col:'#7c3aed',sub:'min '+ageMin+' / max '+ageMax});
+  if(ageMoyDC!==null) kpis2.push({val:ageMoyDC+' ans',lbl:'Âge moyen des DC',col:C.mort,sub:'min '+ageMinDC+' / max '+ageMaxDC});
 
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat('+kpis2.length+',1fr);gap:8px;margin-bottom:8px">';
   kpis2.forEach(function(k){
