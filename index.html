@@ -63047,6 +63047,40 @@ function _renderSecuriteStats() {
     html+=_card('Par mois',s);
   })();
 
+  // ── Card 2bis : Âge moyen des DC par saison (uniquement quand "Toutes saisons" est sélectionné) ──
+  if (!filterYear) (function(){
+    var byYDC={};
+    _allEvs.forEach(function(e){
+      if(!_isMort(e)) return;
+      var y=(e.date||'').slice(0,4); if(y.length!==4) return;
+      var a=_ageOf(e); if(a===null) return;
+      if(!byYDC[y]) byYDC[y]={sum:0,n:0};
+      byYDC[y].sum+=a; byYDC[y].n++;
+    });
+    var yrsDC=Object.keys(byYDC).sort();
+    if(!yrsDC.length){html+=_card('Âge moyen des DC par saison','<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:11px;text-align:center">Aucun âge renseigné<br>sur les accidents mortels.</div>');return;}
+    var W=260,H=155,pL=22,pR=6,pT=6,pB=24;
+    var cW=W-pL-pR,cH=H-pT-pB;
+    var maxV=0; yrsDC.forEach(function(y){maxV=Math.max(maxV,Math.round(byYDC[y].sum/byYDC[y].n));}); maxV=Math.ceil(maxV/10)*10||10;
+    var bW=Math.min(28,Math.floor(cW/yrsDC.length)-3), gap=(cW-bW*yrsDC.length)/(yrsDC.length+1);
+    var yStep=maxV<=20?5:maxV<=50?10:20;
+    var s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">';
+    for(var yv=0;yv<=maxV;yv+=yStep){var cy=pT+cH-(yv/maxV)*cH;
+      s+='<line x1="'+pL+'" y1="'+cy+'" x2="'+(W-pR)+'" y2="'+cy+'" stroke="rgba(255,255,255,.06)" stroke-width="1"/>';
+      s+='<text x="'+(pL-2)+'" y="'+(cy+3)+'" text-anchor="end" font-family="inherit" font-size="8" fill="#64748b">'+yv+'</text>';}
+    s+='<line x1="'+pL+'" y1="'+(pT+cH)+'" x2="'+(W-pR)+'" y2="'+(pT+cH)+'" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
+    yrsDC.forEach(function(yr,i){
+      var avg=Math.round(byYDC[yr].sum/byYDC[yr].n);
+      var x=pL+gap+i*(bW+gap),yB=pT+cH;
+      var h=(avg/maxV)*cH;
+      s+='<rect x="'+x+'" y="'+(yB-h)+'" width="'+bW+'" height="'+h+'" fill="#ef4444" rx="2"/>';
+      s+='<text x="'+(x+bW/2)+'" y="'+(yB-h-2)+'" text-anchor="middle" font-family="inherit" font-size="8" font-weight="700" fill="#e2e8f0">'+avg+'</text>';
+      s+='<text x="'+(x+bW/2)+'" y="'+(yB+14)+'" text-anchor="middle" font-family="inherit" font-size="8" fill="#94a3b8">'+yr.slice(2)+'</text>';
+    });
+    s+='</svg>';
+    html+=_card('Âge moyen des DC par saison',s);
+  })();
+
   // ── Card 3 : Corporel / Mortel (donut — mortels + corporels uniquement) ──
   (function(){
     var cols3=['#ef4444','#f59e0b'];
