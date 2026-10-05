@@ -30,8 +30,8 @@ input[type=date]{color:#000}input[type=date].vide{color:#999}
 .calc{background:#E6F0E6;padding:2px 4px}
 .measure .np{display:none}
 @media print{.sigtools,.bar,.np{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff}
-#pw{width:1077px;height:745px;overflow:hidden;break-after:page}
-#p1{width:1100px;max-width:none;margin:0;overflow:visible;transform:scale(var(--s,.75));transform-origin:0 0}
+#pw{width:1077px;height:calc(var(--h,740)*1px);overflow:hidden;break-after:page}
+#p1{width:1100px;max-width:none;margin:0;overflow:visible;transform:scale(var(--s,.68));transform-origin:0 0}
 .page{margin:0;max-width:none;overflow:visible}.rules{zoom:.9}}
 </style></head><body>
 <div class="bar"><div class="nav"><button type="button" id="prev" title="NDF précédente" hidden>‹ Précédente</button><b id="nlab" hidden></b><button type="button" id="next" title="NDF suivante" hidden>Suivante ›</button><button type="button" id="nouv" hidden>+ Nouvelle NDF</button></div><button onclick="fitPrint();window.print()">Imprimer / Enregistrer en PDF</button></div>
@@ -231,9 +231,10 @@ function fitPrint(){const p=$('#p1'),rows=[...document.querySelectorAll('tbody t
  let last=-1;rows.forEach((r,i)=>{if(!r.classList.contains('vide'))last=i});const N=Math.max(6,last+1);
  rows.forEach((r,i)=>r.classList.toggle('np',i>=N));
  p.style.width='1100px';p.style.maxWidth='none';p.style.margin='0';
- document.body.classList.add('measure');const h=p.offsetHeight;document.body.classList.remove('measure');$('#pw').style.setProperty('--s',Math.min(1077/1100,745/h).toFixed(4));
+ document.body.classList.add('measure');const h=p.offsetHeight;document.body.classList.remove('measure');const k=Math.min(1077/1100,700/h);$('#pw').style.setProperty('--s',k.toFixed(4));$('#pw').style.setProperty('--h',Math.min(745,Math.ceil(h*k*1.04+8)));
  p.style.width=p.style.maxWidth=p.style.margin=''}
 function unfitPrint(){document.querySelectorAll('tbody tr.np').forEach(r=>r.classList.remove('np'))}
+try{matchMedia('print').addEventListener('change',e=>e.matches?fitPrint():unfitPrint())}catch(e){}
 addEventListener('beforeprint',fitPrint);addEventListener('afterprint',unfitPrint);
 function sigChanged(){curSg=sig.data();calc()}
 $('#prev').onclick=()=>go(S.c-1);$('#next').onclick=()=>go(S.c+1);$('#nouv').onclick=nouvelle;
