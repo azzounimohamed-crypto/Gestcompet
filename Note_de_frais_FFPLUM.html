@@ -21,7 +21,7 @@ td{padding:0;height:18px}tbody tr.vide td{border-color:#c4c4c4}#p1 tbody tr:not(
 .sigs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
 .sigs>div{border:1px solid #1F3E7A;border-radius:10px;overflow:hidden;height:100px;position:relative}.sigs p{margin:0;background:#E8EDF5;color:#1F3E7A;font-weight:bold;font-size:11px;text-align:center;padding:3px;height:30px}
 .small{font-size:10px;margin-top:6px}
-.comp :is(col,th,td):nth-child(7),.comp :is(col,th,td):nth-child(11){display:none}
+.comp :is(col,th):nth-child(7),.comp :is(col,th):nth-child(11),.comp tbody td:nth-child(7),.comp tbody td:nth-child(11),.comp #ttaxi,.comp #thotel{display:none}.comp col:nth-child(7),.comp col:nth-child(11){width:0!important;visibility:collapse}
 .sigbox{display:block;width:100%;height:calc(100% - 30px);touch-action:none;cursor:crosshair;background:#fff}
 .sigtools{position:absolute;right:2px;bottom:2px;display:flex;gap:3px}.sigtools button{padding:3px 6px;line-height:0}
 .sigdrop{outline:2px dashed #1F3E7A;outline-offset:-3px}
@@ -192,7 +192,7 @@ input[type=date]{color:#000}input[type=date].vide{color:#999}
 <td><input class="n repas" inputmode="decimal"></td><td><input class="n inv" inputmode="numeric"></td><td><input class="n hotel" inputmode="decimal"></td>
 <td><input class="n divers" inputmode="decimal"></td><td class="r tot"></td><td><input></td></tr>
 </tbody>
-<tfoot><tr><td colspan="5"></td><td class="r" id="kmeur"></td><td class="r" id="ttaxi"></td><td class="r" id="tsncf"></td><td colspan="2"></td><td></td><td></td><td></td><td></td></tr></tfoot></table>
+<tfoot><tr><td colspan="5"></td><td class="r" id="kmeur"></td><td class="r" id="ttaxi"></td><td class="r" id="tsncf"></td><td colspan="2"></td><td id="thotel"></td><td></td><td></td><td></td></tr></tfoot></table>
 <div class="tot2"><div style="grid-column:span 3"><b>Commentaires ou précisions :</b><textarea id="comm2" rows="4" style="border:1px solid #1F3E7A;resize:none"></textarea></div>
 <div class="sub"><b class="big" style="grid-column:1/3">TOTAL À PAYER =</b><span class="big" id="tpay"></span><div class="kmt"><b>Km total :</b> <span class="calc" id="kmtot"></span></div><b>Transport</b><span id="sT"></span><b style="grid-column:2">Hôtel</b><span id="sH"></span><b style="grid-column:2">Repas</b><span id="sR"></span><b style="grid-column:2">Divers</b><span id="sD"></span></div></div>
 <div class="sigs"><div id="sigdem"><p>SIGNATURE DU DEMANDEUR<br><i style="font-weight:normal">(certifiée sincère et véritable)</i></p><canvas class="sigbox" id="sigcv" title="Signez ici ou déposez une image"></canvas><div class="sigtools"><button type="button" id="sigimg" title="Importer une image de signature" aria-label="Importer une image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button><button type="button" id="sigclr" title="Effacer la signature" aria-label="Effacer la signature"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></div></div><div><p>SIGNATURE DU RESPONSABLE DU PÔLE</p></div><div><p>SIGNATURE DU TRÉSORIER</p></div><div><p>SIGNATURE DE LA PRÉSIDENTE</p></div></div>
@@ -250,7 +250,7 @@ function nouvelle(){const cur=snap();S.l[S.c]=cur;
  S.l.push({v:fields().map((e,i)=>e.closest('.info')?cur.v[i]:''),sg:''});go(S.l.length-1)}
 function widths(){const cg=[...document.querySelectorAll('colgroup col')],w=cg.map(c=>parseFloat(c.dataset.w||(c.dataset.w=c.style.width)));
  const hid=comp()?[6,10]:[],tot=w.reduce((a,v,i)=>hid.includes(i)?a:a+v,0);
- cg.forEach((c,i)=>c.style.width=(w[i]*100/tot).toFixed(2)+'%');}
+ cg.forEach((c,i)=>c.style.width=hid.includes(i)?'0':(w[i]*100/tot).toFixed(2)+'%');}
 (function(){const cv=$('#sigcv'),ctx=cv.getContext('2d');
  const fit=()=>{const r=cv.getBoundingClientRect();cv.width=Math.max(300,r.width*2);cv.height=Math.max(100,r.height*2);ctx.lineWidth=3;ctx.lineCap='round';ctx.strokeStyle='#000'};fit();
  let d=false;const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
