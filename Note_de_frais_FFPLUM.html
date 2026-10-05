@@ -9,9 +9,10 @@ h1{text-align:center;color:#fff;background:#1F3E7A;padding:2px 0;margin:0 0 8px;
 .info{flex:1;display:grid;grid-template-columns:auto 1fr auto 1fr;gap:3px 6px;align-items:center}
 .info b{white-space:nowrap}
 input,select,textarea{font:inherit;border:0;border-bottom:1px solid #1F3E7A;background:#fff;width:100%;padding:2px;min-width:0}
-table{border-collapse:collapse;width:100%;margin-top:8px;min-width:900px;table-layout:fixed}
-th{background:#E8EDF5;color:#1F3E7A;border:1px solid #1F3E7A;font-size:11px;padding:3px}
-td{border:1px solid #1F3E7A;padding:0;height:18px}td input{border:0;height:100%}
+table{border-collapse:separate;border-spacing:0;width:100%;margin-top:8px;min-width:900px;table-layout:fixed}
+th,td{border:0 solid #1F3E7A;border-width:0 1px 1px 0}th:first-child,td:first-child{border-left-width:1px}
+th{background:#E8EDF5;color:#1F3E7A;border-top-width:1px;font-size:11px;padding:3px}
+td{padding:0;height:18px}tbody tr.vide td{border-color:#c4c4c4}tbody tr:not(.vide) td{box-shadow:0 -1px 0 #1F3E7A}td input{border:0;height:100%}
 .c{text-align:center}.r{text-align:right;padding:0 4px;background:#E6F0E6}.no{background:#E6F0E6}
 .n{text-align:right}
 .tot2{display:flex;justify-content:space-between;margin-top:6px;gap:14px}
@@ -27,8 +28,7 @@ td{border:1px solid #1F3E7A;padding:0;height:18px}td input{border:0;height:100%}
 .sigdrop{outline:2px dashed #1F3E7A;outline-offset:-3px}
 input[type=date]{color:#000}input[type=date].vide{color:#999}
 .calc{background:#E6F0E6;padding:2px 4px}
-@media print{.sigtools{display:none}#p1{zoom:.72}.rules{zoom:.9}body{background:#fff}.bar{display:none}.page{margin:0;padding:0;max-width:none;overflow:visible}
-input,select,textarea{background:none!important}.rules{page-break-before:always}select{appearance:none;border:0;border-bottom:1px solid #1F3E7A}}
+@media print{.sigtools,.bar{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff}.page{margin:0 auto}#p1{zoom:.75}.rules{zoom:.9;page-break-before:always}}
 </style></head><body>
 <div class="bar"><div class="nav"><button type="button" id="prev" title="NDF précédente" hidden>‹ Précédente</button><b id="nlab" hidden></b><button type="button" id="next" title="NDF suivante" hidden>Suivante ›</button><button type="button" id="nouv" hidden>+ Nouvelle NDF</button></div><button onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
 <div class="page" id="p1"><h1>NOTE DE FRAIS</h1>
@@ -185,6 +185,7 @@ function calc(){
  const st=$('#statut').value,bar=st==='Compétiteurs'?0.2:st?0.408:0;$('#bareme').textContent=bar?eur(bar,3)+' €/km':'';
  let n=0,km=0,tx=0,sn=0,hh=0,rp=0,dv=0,tot=0;
  document.querySelectorAll('tbody tr').forEach(r=>{
+  r.classList.toggle('vide',![...r.querySelectorAll('input')].some(i=>i.value!==''));
   const has=r.querySelector('.dt').value!=='';if(has)n++;r.querySelector('.no').textContent=has?n:'';
   const t=col(r,'taxi')+col(r,'sncf')+col(r,'repas')+col(r,'hotel')+col(r,'divers');
   r.querySelector('.tot').textContent=t>0?eur(t):'';
