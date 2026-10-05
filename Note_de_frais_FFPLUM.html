@@ -18,12 +18,15 @@ td{border:1px solid #1F3E7A;padding:0;height:18px}td input{border:0;height:100%}
 .sub{display:grid;grid-template-columns:auto 90px;gap:2px 6px;align-content:start;text-align:right}.sub span{background:#E6F0E6;padding:2px 4px;min-width:90px}
 .big{font-size:16px;font-weight:bold;color:#1F3E7A}
 .sigs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
-.sigs div{border:1px solid #1F3E7A;height:90px}.sigs p{margin:0;background:#E8EDF5;color:#1F3E7A;font-weight:bold;font-size:11px;text-align:center;padding:3px;height:30px}
+.sigs>div{border:1px solid #1F3E7A;height:100px;position:relative}.sigs p{margin:0;background:#E8EDF5;color:#1F3E7A;font-weight:bold;font-size:11px;text-align:center;padding:3px;height:30px}
 .small{font-size:10px;margin-top:6px}
 .rules{max-width:1100px}.rules h2{color:#1F3E7A}.rules p{margin:5px 0}
 .comp :is(col,th,td):nth-child(7),.comp :is(col,th,td):nth-child(11){display:none}
+.sigbox{display:block;width:100%;height:calc(100% - 30px);touch-action:none;cursor:crosshair;background:#fff}
+.sigtools{position:absolute;right:2px;bottom:2px;display:flex;gap:3px}.sigtools button{font:10px Arial;padding:2px 6px;background:#1F3E7A}
+.sigdrop{outline:2px dashed #1F3E7A;outline-offset:-3px}
 .calc{background:#E6F0E6;padding:2px 4px}
-@media print{#p1{zoom:.72}.rules{zoom:.9}body{background:#fff}.bar{display:none}.page{margin:0;padding:0;max-width:none;overflow:visible}
+@media print{.sigtools{display:none}#p1{zoom:.72}.rules{zoom:.9}body{background:#fff}.bar{display:none}.page{margin:0;padding:0;max-width:none;overflow:visible}
 input,select,textarea{background:none!important}.rules{page-break-before:always}select{appearance:none;border:0;border-bottom:1px solid #1F3E7A}}
 </style></head><body>
 <div class="bar"><button onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
@@ -154,7 +157,7 @@ input,select,textarea{background:none!important}.rules{page-break-before:always}
 <div class="tot2"><div style="flex:1"><b>Date :</b> <input id="datesig" type="date" style="width:150px"><br><b>Commentaires ou précisions :</b><textarea id="comm2" rows="4" style="border:1px solid #1F3E7A"></textarea>
 <div class="small"><b>Km total :</b> <span class="calc" id="kmtot"></span></div></div>
 <div class="sub"><b class="big">TOTAL À PAYER =</b><span class="big" id="tpay"></span><b>Transport</b><span id="sT"></span><b>Hôtel</b><span id="sH"></span><b>Repas</b><span id="sR"></span><b>Divers</b><span id="sD"></span></div></div>
-<div class="sigs"><div><p>SIGNATURE DU DEMANDEUR<br><i style="font-weight:normal">(certifiée sincère et véritable)</i></p></div><div><p>SIGNATURE DU RESPONSABLE DU PÔLE</p></div><div><p>SIGNATURE DU TRÉSORIER</p></div><div><p>SIGNATURE DU PRÉSIDENT</p></div></div>
+<div class="sigs"><div id="sigdem"><p>SIGNATURE DU DEMANDEUR<br><i style="font-weight:normal">(certifiée sincère et véritable)</i></p><canvas class="sigbox" id="sigcv" title="Signez ici ou déposez une image"></canvas><div class="sigtools"><button type="button" id="sigimg">Image…</button><button type="button" id="sigclr">Effacer</button></div></div><div><p>SIGNATURE DU RESPONSABLE DU PÔLE</p></div><div><p>SIGNATURE DU TRÉSORIER</p></div><div><p>SIGNATURE DU PRÉSIDENT</p></div></div>
 <div class="small">Les conditions sont précisées dans le volet « À lire » (page 2). NDF V2025.1</div></div>
 <div class="page rules"><h2>Règles d'usages des notes de frais - NDF</h2>
 <p>Pour être remboursés par la Fédération, les frais que vous avancez personnellement doivent systématiquement respecter les 3 règles suivantes : être engagés dans l'intérêt de la Fédération et pour les besoins stricts de l'action que vous menez, être proportionnés ou « raisonnables », et dûment justifiés.</p>
@@ -177,7 +180,7 @@ const eur=(v,d=2)=>v.toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFrac
 const comp=()=>$('#statut').value==='Compétiteurs';
 const col=(r,c)=>comp()&&(c==='taxi'||c==='hotel')?0:num(r.querySelector('.'+c).value);
 function calc(){
- document.querySelector('table').classList.toggle('comp',comp());
+ document.querySelector('table').classList.toggle('comp',comp());widths();
  const bar=$('#statut').value==='Compétiteurs'?0.2:0.408;$('#bareme').textContent=eur(bar,3)+' €/km';
  let n=0,km=0,tx=0,sn=0,hh=0,rp=0,dv=0,tot=0;
  document.querySelectorAll('tbody tr').forEach(r=>{
@@ -191,5 +194,21 @@ function calc(){
  try{const d={};document.querySelectorAll('input,select,textarea').forEach((e,i)=>d[i]=e.type==='checkbox'?e.checked:e.value);localStorage.setItem('ndf2',JSON.stringify(d))}catch(e){}
 }
 try{const d=JSON.parse(localStorage.getItem('ndf2')||'null');if(d)document.querySelectorAll('input,select,textarea').forEach((e,i)=>{if(i in d){e.type==='checkbox'?e.checked=d[i]:e.value=d[i]}})}catch(e){}
+function widths(){const cg=[...document.querySelectorAll('colgroup col')],w=cg.map(c=>parseFloat(c.dataset.w||(c.dataset.w=c.style.width)));
+ const hid=comp()?[6,10]:[],tot=w.reduce((a,v,i)=>hid.includes(i)?a:a+v,0);
+ cg.forEach((c,i)=>c.style.width=(w[i]*100/tot).toFixed(2)+'%');}
+(function(){const cv=$('#sigcv'),ctx=cv.getContext('2d');
+ const fit=()=>{const r=cv.getBoundingClientRect();cv.width=Math.max(300,r.width*2);cv.height=Math.max(100,r.height*2);ctx.lineWidth=3;ctx.lineCap='round';ctx.strokeStyle='#000'};fit();
+ let d=false;const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+ cv.addEventListener('pointerdown',e=>{d=true;cv.setPointerCapture(e.pointerId);const[x,y]=pt(e);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+.1,y);ctx.stroke()});
+ cv.addEventListener('pointermove',e=>{if(!d)return;const[x,y]=pt(e);ctx.lineTo(x,y);ctx.stroke()});
+ ['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>d=false));
+ const load=f=>{if(!f||!f.type.startsWith('image/'))return;const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{ctx.clearRect(0,0,cv.width,cv.height);const k=Math.min(cv.width/im.width,cv.height/im.height);ctx.drawImage(im,(cv.width-im.width*k)/2,(cv.height-im.height*k)/2,im.width*k,im.height*k);URL.revokeObjectURL(u)};im.src=u};
+ $('#sigclr').onclick=()=>ctx.clearRect(0,0,cv.width,cv.height);
+ $('#sigimg').onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>load(i.files[0]);i.click()};
+ const box=$('#sigdem');['dragenter','dragover'].forEach(t=>box.addEventListener(t,e=>{e.preventDefault();box.classList.add('sigdrop')}));
+ ['dragleave','drop'].forEach(t=>box.addEventListener(t,e=>{e.preventDefault();box.classList.remove('sigdrop')}));
+ box.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+ addEventListener('resize',()=>{});})();
 document.addEventListener('input',calc);document.addEventListener('change',calc);calc();
 </script></body></html>
